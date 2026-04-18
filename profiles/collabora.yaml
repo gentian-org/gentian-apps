@@ -43,17 +43,50 @@ spec:
   # No valueMapping — no kernel-provided credentials to inject.
 
   appSecrets:
-    # Admin panel password — used only for internal admin API calls, not end-user login.
     - name: admin_password
       valuePath: "collabora.password"
 
-  # Disable the chart's default HPA — single-tenant dev clusters don't need
-  # autoscaling, and the default memory target (50%) causes runaway scaling
-  # because Collabora idles above that threshold.
+  # Default values aligned with opendesk/helmfile/apps/collabora/values.yaml.gotmpl.
+  # Environment-specific overrides (domain, image registry, replicas) are injected
+  # by the orchestrator's Tofu module at deploy time.
   extraValues:
+    fullnameOverride: "collabora"
+
     replicaCount: 1
     autoscaling:
       enabled: false
 
-  # Pattern B — collabora-online chart injects the admin password as a direct Helm value.
+    collabora:
+      username: "collabora-internal-admin"
+      extra_params: >
+        --o:ssl.enable=false
+        --o:ssl.termination=true
+        --o:fetch_update_check=0
+        --o:num_prespawn_children=1
+        --o:security.enable_macros_execution=false
+        --o:security.macro_security_level=1
+        --o:logging.anonymize.anonymize_user_data=true
+
+    ingress:
+      enabled: false  # Managed by the orchestrator's Ingress reconciler (Inc 10)
+
+    podSecurityContext:
+      fsGroup: 1001
+
+    securityContext:
+      allowPrivilegeEscalation: true
+      privileged: false
+      readOnlyRootFilesystem: false
+      runAsNonRoot: true
+      runAsUser: 1001
+      runAsGroup: 1001
+      seccompProfile:
+        type: "RuntimeDefault"
+      capabilities:
+        drop: ["ALL"]
+        add: ["CHOWN", "FOWNER", "SYS_CHROOT"]
+
+    serviceAccount:
+      create: true
+
   deploymentMethod: tofu-controller
