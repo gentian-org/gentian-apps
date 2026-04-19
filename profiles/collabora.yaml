@@ -73,6 +73,7 @@ spec:
         --o:security.macro_security_level=1
         --o:logging.disable_server_audit=true
         --o:logging.anonymize.anonymize_user_data=true
+        --o:mount_jail_tree=false
 
     # Chart-level ingress disabled — the operator's ensureIngress (spec.ingress)
     # creates the Kubernetes Ingress resource with the tenant domain.
@@ -93,7 +94,7 @@ spec:
         type: "RuntimeDefault"
       capabilities:
         drop: ["ALL"]
-        add: ["CHOWN", "FOWNER", "SYS_CHROOT"]
+        add: ["CHOWN", "FOWNER", "MKNOD", "SYS_ADMIN", "SYS_CHROOT"]
 
     serviceAccount:
       create: true
@@ -111,6 +112,7 @@ spec:
       nginx.ingress.kubernetes.io/proxy-body-size: "100M"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
       nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+      nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
       nginx.ingress.kubernetes.io/server-snippet: |
         location /cool/getMetrics { deny all; return 403; }
         location /cool/adminws/ { deny all; return 403; }
