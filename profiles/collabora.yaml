@@ -67,8 +67,10 @@ spec:
         --o:security.macro_security_level=1
         --o:logging.anonymize.anonymize_user_data=true
 
+    # Chart-level ingress disabled — the operator's ensureIngress (spec.ingress)
+    # creates the Kubernetes Ingress resource with the tenant domain.
     ingress:
-      enabled: false  # Managed by the orchestrator's Ingress reconciler (Inc 10)
+      enabled: false
 
     podSecurityContext:
       fsGroup: 1001
@@ -90,3 +92,19 @@ spec:
       create: true
 
   deploymentMethod: tofu-controller
+
+  # Ingress managed by the operator's ensureIngress reconciler.
+  # Creates Ingress "office.<tenant-domain>" → Service collabora:9980.
+  ingress:
+    subDomain: "office"
+    serviceName: "collabora"
+    servicePort: 9980
+    annotations:
+      nginx.ingress.kubernetes.io/upstream-hash-by: "$arg_WOPISrc"
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+      nginx.ingress.kubernetes.io/server-snippet: |
+        location /cool/getMetrics { deny all; return 403; }
+        location /cool/adminws/ { deny all; return 403; }
+        location /browser/dist/admin/admin.html { deny all; return 403; }
