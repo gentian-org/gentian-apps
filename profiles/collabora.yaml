@@ -96,6 +96,14 @@ spec:
         drop: ["ALL"]
         add: ["CHOWN", "FOWNER", "MKNOD", "SYS_ADMIN", "SYS_CHROOT"]
 
+    resources:
+      limits:
+        cpu: "4"
+        memory: "4Gi"
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+
     serviceAccount:
       create: true
 
