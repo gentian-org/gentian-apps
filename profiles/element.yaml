@@ -1,0 +1,197 @@
+# AppProfile — Element (Matrix / Synapse)
+#
+# Source chart: oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-element
+#   opendesk-element v6.1.9  (frontend)
+#   opendesk-synapse v6.1.9  (Matrix homeserver — same OCI repo, deployed alongside)
+#   opendesk-well-known v6.1.9
+# Value paths verified against:
+#   opendesk/helmfile/apps/element/values-element.yaml.gotmpl
+#   opendesk/helmfile/apps/element/values-synapse.yaml.gotmpl
+# Chart versions from: opendesk/helmfile/environments/default/charts.yaml.gotmpl
+#
+# Secret inventory:
+#   Kernel-provided (3):
+#     oidc_client_secret  → configuration.homeserver.oidc.clientSecret
+#     synapse_db_password → configuration.database.password.value
+#     smtp_password       → configuration.homeserver.smtp.password
+#   App-internal (3) → appSecrets:
+#     registration_shared_secret → configuration.homeserver.registrationSharedSecret
+#     intercom_as_token          → configuration.homeserver.appServiceConfigs[0].as_token
+#     ox_appsuite_as_token       → configuration.homeserver.appServiceConfigs[1].as_token
+#
+# Design notes:
+#   The TURN shared secret (configuration.homeserver.turn.sharedSecret / .Values.turn.credentials)
+#   is a cluster-level infrastructure credential shared between Element and Jitsi. It is
+#   provisioned at the kernel infrastructure level (not per-tenant), so it is NOT listed
+#   as an appSecret here. The orchestrator resolves it from the kernel OpenBao path
+#   gentianos/kernel/turn/credentials at deploy time.
+#
+#   The appServiceConfig tokens connect Synapse to the Intercom service (kernel) and to
+#   OX App Suite (when installed in the same tenant). These must be generated per-tenant
+#   and per-app, hence appSecrets. The orchestrator wires the bridge by writing the
+#   matching as_token / hs_token into Synapse's configuration when both Element and the
+#   provider (intercom-service kernel, ox-appsuite app) are present in the tenant.
+#
+#   The chart uses direct Helm value injection (.Values.secrets.*) → Pattern B.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: element
+spec:
+  displayName: "Element (Matrix)"
+  description: "Federated team chat and collaboration based on the Matrix protocol, with Synapse homeserver."
+
+  kernelRequirements:
+    identity:
+      oidc: true
+    database:
+      engine: postgresql
+      databasePerTenant: true
+    mail:
+      smtp:
+        auth: plain
+        port: 587
+
+  provides:
+    - name: chat
+      protocol: matrix
+
+  optionalIntegrations:
+    - contract: central-navigation
+      provider: nubus
+      capabilities:
+        - navigation:register
+    - contract: file-store
+      provider: nextcloud
+      capabilities:
+        - webdav:read
+        - webdav:write
+
+  chart:
+    repository: "oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-element"
+    name: opendesk-element
+    version: "6.1.9"
+
+  valueMapping:
+    oidc:
+      clientSecretKey: "configuration.homeserver.oidc.clientSecret"
+    database:
+      passwordKey: "configuration.database.password.value"
+    smtp:
+      passwordKey: "configuration.homeserver.smtp.password"
+
+  appSecrets:
+    # Synapse registration shared secret — controls who can register accounts.
+    - name: registration_shared_secret
+      valuePath: "configuration.homeserver.registrationSharedSecret"
+    # Application service token for the Intercom kernel notification gateway.
+    - name: intercom_as_token
+      valuePath: "configuration.homeserver.appServiceConfigs[0].as_token"
+    # Application service token for OX App Suite OIDC actor in Matrix.
+    - name: ox_appsuite_as_token
+      valuePath: "configuration.homeserver.appServiceConfigs[1].as_token"
+
+  # Default values aligned with opendesk/helmfile/apps/element/values-element.yaml.gotmpl
+  # (frontend) and values-synapse.yaml.gotmpl (homeserver). Environment-specific
+  # overrides (domain, image registry, replicas) are injected by the orchestrator's
+  # Tofu module at deploy time. ${TENANT_DOMAIN} is substituted by the operator with
+  # the tenant's domain.
+  extraValues:
+    fullnameOverride: "element"
+
+    replicaCount: 1
+
+    configuration:
+      endToEndEncryption: true
+      # Matrix homeserver federation, OIDC issuer, SMTP host and TURN servers are
+      # injected by the orchestrator's Tofu module — they require live values from
+      # the tenant's Keycloak realm and the kernel mail / TURN infrastructure.
+      homeserver:
+        defaultRoomVersion: 12
+        presence:
+          enabled: true
+        profile:
+          allowUsersToUpdateDisplayname: true
+        # smtp.host / smtp.username are injected by the operator from kernel mail
+        # config; smtp.password is injected via Pattern B from the per-tenant
+        # ExternalSecret materialised in OpenBao.
+        smtp:
+          port: 25
+          tls: false
+          starttls: false
+        oidc:
+          clientId: "opendesk-matrix"
+          matrixIdLocalpart: "opendesk_username"
+          scopes:
+            - "openid"
+            - "opendesk-matrix-scope"
+      # Tighter rate limits for non-chat Matrix apps and widgets (NeoBoard etc).
+      additionalConfiguration:
+        rc_login:
+          account:
+            per_second: 2
+            burst_count: 8
+          address:
+            per_second: 2
+            burst_count: 12
+        rc_message:
+          per_second: 5
+          burst_count: 25
+        rc_media_create:
+          per_second: 20
+          burst_count: 100
+        room_prejoin_state:
+          additional_event_types:
+            - "m.space.parent"
+            - "net.nordeck.meetings.metadata"
+            - "m.room.power_levels"
+        user_directory:
+          enabled: true
+          search_all_users: true
+
+    # Chart-level ingress disabled — the operator's ensureIngress (spec.ingress)
+    # creates the Kubernetes Ingress resource with the tenant domain.
+    ingress:
+      enabled: false
+
+    podSecurityContext:
+      enabled: true
+      fsGroup: 101
+
+    containerSecurityContext:
+      enabled: true
+      allowPrivilegeEscalation: false
+      privileged: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 101
+      runAsGroup: 101
+      seccompProfile:
+        type: "RuntimeDefault"
+      capabilities:
+        drop: ["ALL"]
+
+    resources:
+      limits:
+        cpu: "1"
+        memory: "256Mi"
+      requests:
+        cpu: "100m"
+        memory: "32Mi"
+
+    serviceAccount:
+      create: true
+
+  # Pattern B — opendesk-element/synapse chart injects secrets as direct Helm values.
+  deploymentMethod: tofu-controller
+
+  # Ingress managed by the operator's ensureIngress reconciler.
+  # Creates Ingress "chat.<tenant-domain>" → Service element:80 (frontend).
+  ingress:
+    subDomain: "chat"
+    serviceName: "element"
+    servicePort: 80
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "100M"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
