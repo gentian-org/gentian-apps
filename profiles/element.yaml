@@ -157,6 +157,18 @@ spec:
     podSecurityContext:
       enabled: true
       fsGroup: 101
+      # nginx in the upstream docker.io/vectorim/element-web image listens on
+      # port 80 and runs as uid 101 (non-root). Binding to a privileged port
+      # (<1024) as a non-root user normally requires CAP_NET_BIND_SERVICE, but
+      # Kubernetes places container capabilities in the bounding/permitted set
+      # only — non-root processes don't inherit them via ambient. The portable
+      # fix is to lower the unprivileged-port threshold for this pod's net ns
+      # (a "safe" sysctl unconditionally allowed by kubelet).
+      # Opendesk's custom opendesk-element-web image rebinds nginx to a high
+      # port and so does not need this.
+      sysctls:
+        - name: net.ipv4.ip_unprivileged_port_start
+          value: "80"
 
     containerSecurityContext:
       enabled: true
@@ -170,12 +182,6 @@ spec:
         type: "RuntimeDefault"
       capabilities:
         drop: ["ALL"]
-        # nginx in the upstream docker.io/vectorim/element-web image listens on
-        # port 80 and runs as uid 101 (non-root). Binding to a privileged port
-        # (<1024) as a non-root user requires CAP_NET_BIND_SERVICE. Opendesk's
-        # custom opendesk-element-web image rebinds to a high port and so does
-        # not need this capability.
-        add: ["NET_BIND_SERVICE"]
 
     # nginx (the element-web frontend's webserver) writes to /var/cache/nginx and
     # /var/run at startup. With readOnlyRootFilesystem: true these paths must be
