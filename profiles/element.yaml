@@ -171,6 +171,24 @@ spec:
       capabilities:
         drop: ["ALL"]
 
+    # nginx (the element-web frontend's webserver) writes to /var/cache/nginx and
+    # /var/run at startup. With readOnlyRootFilesystem: true these paths must be
+    # backed by writable emptyDir volumes, otherwise the container crashloops with
+    # 'mkdir() "/var/cache/nginx/client_temp" failed (Read-only file system)'.
+    # Opendesk's bmi/.../opendesk-element-web image bakes its own writable layout;
+    # this profile uses the upstream docker.io/vectorim/element-web image so it
+    # needs the standard nginx-on-readonly emptyDir pattern.
+    extraVolumes:
+      - name: nginx-cache
+        emptyDir: {}
+      - name: nginx-run
+        emptyDir: {}
+    extraVolumeMounts:
+      - name: nginx-cache
+        mountPath: /var/cache/nginx
+      - name: nginx-run
+        mountPath: /var/run
+
     resources:
       limits:
         cpu: "1"
