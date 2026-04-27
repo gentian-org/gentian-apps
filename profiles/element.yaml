@@ -154,21 +154,24 @@ spec:
     ingress:
       enabled: false
 
+    # Use opendesk's purpose-built element-web image. It is hardened for the
+    # security context defined below (uid 101, readOnlyRootFilesystem,
+    # capabilities drop ALL) and listens on port 8080 — matching the chart's
+    # default service / probe configuration. The upstream
+    # docker.io/vectorim/element-web image is NOT compatible with these
+    # defaults (nginx wants /var/cache/nginx writable and binds to port 80).
+    image:
+      registry: "registry.opencode.de"
+      repository: "bmi/opendesk/components/supplier/element/images/opendesk-element-web"
+      tag: "v1.12.6@sha256:ab2c5b5bc359d2b2e73a33fd3f3efdc3439d4a761bdf9624419b8ef53df7ae14"
+
+    # Pull the opendesk image from registry.opencode.de.
+    imagePullSecrets:
+      - name: registry-credentials
+
     podSecurityContext:
       enabled: true
       fsGroup: 101
-      # nginx in the upstream docker.io/vectorim/element-web image listens on
-      # port 80 and runs as uid 101 (non-root). Binding to a privileged port
-      # (<1024) as a non-root user normally requires CAP_NET_BIND_SERVICE, but
-      # Kubernetes places container capabilities in the bounding/permitted set
-      # only — non-root processes don't inherit them via ambient. The portable
-      # fix is to lower the unprivileged-port threshold for this pod's net ns
-      # (a "safe" sysctl unconditionally allowed by kubelet).
-      # Opendesk's custom opendesk-element-web image rebinds nginx to a high
-      # port and so does not need this.
-      sysctls:
-        - name: net.ipv4.ip_unprivileged_port_start
-          value: "80"
 
     containerSecurityContext:
       enabled: true
@@ -182,34 +185,6 @@ spec:
         type: "RuntimeDefault"
       capabilities:
         drop: ["ALL"]
-
-    # nginx (the element-web frontend's webserver) writes to /var/cache/nginx and
-    # /var/run at startup. With readOnlyRootFilesystem: true these paths must be
-    # backed by writable emptyDir volumes, otherwise the container crashloops with
-    # 'mkdir() "/var/cache/nginx/client_temp" failed (Read-only file system)'.
-    # Opendesk's bmi/.../opendesk-element-web image bakes its own writable layout;
-    # this profile uses the upstream docker.io/vectorim/element-web image so it
-    # needs the standard nginx-on-readonly emptyDir pattern.
-    extraVolumes:
-      - name: nginx-cache
-        emptyDir: {}
-      - name: nginx-run
-        emptyDir: {}
-    extraVolumeMounts:
-      - name: nginx-cache
-        mountPath: /var/cache/nginx
-      - name: nginx-run
-        mountPath: /var/run
-
-    # The opendesk-element chart's default service / probe port is 8080,
-    # matching opendesk's custom opendesk-element-web image. The upstream
-    # docker.io/vectorim/element-web image listens on 80, so we override.
-    service:
-      ports:
-        element:
-          containerPort: 80
-          port: 80
-          protocol: TCP
 
     resources:
       limits:
@@ -226,11 +201,12 @@ spec:
   deploymentMethod: tofu-controller
 
   # Ingress managed by the operator's ensureIngress reconciler.
-  # Creates Ingress "chat.<tenant-domain>" → Service element:80 (frontend).
+  # Creates Ingress "chat.<tenant-domain>" → Service element:8080 (frontend).
+  # Port 8080 matches the chart default and the opendesk-element-web image.
   ingress:
     subDomain: "chat"
     serviceName: "element"
-    servicePort: 80
+    servicePort: 8080
     annotations:
       nginx.ingress.kubernetes.io/proxy-body-size: "100M"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
