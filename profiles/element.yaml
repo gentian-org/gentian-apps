@@ -201,6 +201,16 @@ spec:
       - name: nginx-run
         mountPath: /var/run
 
+    # The opendesk-element chart's default service / probe port is 8080,
+    # matching opendesk's custom opendesk-element-web image. The upstream
+    # docker.io/vectorim/element-web image listens on 80, so we override.
+    service:
+      ports:
+        element:
+          containerPort: 80
+          port: 80
+          protocol: TCP
+
     resources:
       limits:
         cpu: "1"
