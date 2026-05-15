@@ -57,6 +57,8 @@ apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
   name: ox-appsuite
+  labels:
+    gentianos.io/profile-name: ox-appsuite
 spec:
   displayName: "OX App Suite"
   description: "Groupware suite with email, contacts, calendar and tasks via Open-Xchange."

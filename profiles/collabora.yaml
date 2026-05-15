@@ -24,6 +24,8 @@ apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
   name: collabora
+  labels:
+    gentianos.io/profile-name: collabora
 spec:
   displayName: "Collabora Online"
   description: "WOPI-compatible browser-based office suite for collaborative document editing."

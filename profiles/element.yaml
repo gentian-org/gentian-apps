@@ -37,6 +37,8 @@ apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
   name: element
+  labels:
+    gentianos.io/profile-name: element
 spec:
   displayName: "Element (Matrix)"
   description: "Federated team chat and collaboration based on the Matrix protocol, with Synapse homeserver."
