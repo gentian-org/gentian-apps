@@ -1,0 +1,244 @@
+# AppProfile — Jitsi Meet (video conferencing)
+#
+# Source chart: oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-jitsi
+#   opendesk-jitsi v3.5.1
+# Value paths verified against:
+#   opendesk/helmfile/apps/jitsi/values-jitsi.yaml.gotmpl
+# Chart version from: opendesk/helmfile/environments/default/charts.yaml.gotmpl
+#
+# Secret inventory:
+#   Kernel-provided:
+#     oidc_client_secret  — Keycloak client secret for the "opendesk-jitsi" realm client
+#                           (used by the Keycloak adapter init job)
+#     turn_credentials    — TURN shared secret; provisioned at kernel level, shared
+#                           between Jitsi and Element (Matrix TURN). Resolved from
+#                           gentianos/kernel/turn/credentials — NOT listed as an appSecret.
+#   App-internal (4) → appSecrets:
+#     jwt_app_secret          → jitsi.prosody.extraEnvs[JWT_APP_SECRET]
+#                               + settings.jwtAppSecret.value (Keycloak adapter)
+#     jicofo_auth_password    → jitsi.jicofo.xmpp.password
+#     jicofo_component_secret → jitsi.jicofo.xmpp.componentSecret
+#     jvb_auth_password       → jitsi.jvb.xmpp.password
+#
+# Design notes:
+#   Authentication uses the hybrid-matrix-token scheme (AUTH_TYPE=hybrid_matrix_token).
+#   Prosody validates JWT tokens signed with jwt_app_secret; the Keycloak adapter
+#   performs the OAuth2 exchange. The TURN credentials are cluster-wide infrastructure
+#   shared with Element — the orchestrator injects them from the kernel OpenBao path
+#   at deploy time, NOT as a per-tenant appSecret.
+#
+#   Jitsi does NOT require a database or SMTP kernel service. The only kernel
+#   requirement is OIDC (for the Keycloak adapter that issues JWT tokens).
+#
+#   JVB (video bridge) uses a NodePort / hostPort for UDP media traffic. On the
+#   single-node dev cluster this works via the node IP directly. The patchJVB
+#   init job discovers the node's public IP and patches the JVB deployment — no
+#   extra manual config needed.
+#
+#   Ingress is at meet.<tenant_domain> (e.g. meet.desk.gentian.org). The chart's
+#   built-in ingress (jitsi.web.ingress.enabled: true) is used, with the operator
+#   injecting the hostname from the tenant domain at deploy time.
+#
+#   Element integration: when both Jitsi and Element are installed in the same
+#   tenant, the orchestrator's IntegrationBinding wires the Jitsi public URL into
+#   Synapse's configuration for Jitsi widget support in Matrix rooms. No extra
+#   AppProfile setting is needed — the binding is emitted automatically by the
+#   app-element Composition when it detects a jitsi AppProfile in the tenant.
+#
+#   Deployment uses Pattern B (tofu-controller): the Terraform module
+#   kernel/tofu/tenant/app-workspace provisions an ExternalSecret in OpenBao that
+#   collects all four appSecrets, then renders the Helm Release.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: jitsi
+  labels:
+    gentianos.io/profile-name: jitsi
+spec:
+  displayName: "Jitsi Meet"
+  description: "Open-source video conferencing with end-to-end encryption, JWT authentication, and Element (Matrix) integration."
+
+  kernelRequirements:
+    identity:
+      oidc: true
+
+  provides:
+    - name: videoconference
+      protocol: webrtc
+
+  optionalIntegrations:
+    - contract: central-navigation
+      provider: nubus
+      capabilities:
+        - navigation:register
+    - contract: video-conferencing
+      provider: element
+      capabilities:
+        - jitsi:widget
+
+  chart:
+    repository: "oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-jitsi"
+    name: opendesk-jitsi
+    version: "3.5.1"
+
+  deploymentMethod: tofu-controller
+
+  valueMapping:
+    oidc:
+      clientSecretKey: "settings.oidcClientSecret"
+
+  appSecrets:
+    # JWT token signing secret — shared between Prosody XMPP and the Keycloak adapter.
+    - name: jwt_app_secret
+      valuePath: "jitsi.prosody.extraEnvs[JWT_APP_SECRET]"
+    # Jicofo XMPP authentication password.
+    - name: jicofo_auth_password
+      valuePath: "jitsi.jicofo.xmpp.password"
+    # Jicofo external component secret.
+    - name: jicofo_component_secret
+      valuePath: "jitsi.jicofo.xmpp.componentSecret"
+    # JVB (video bridge) XMPP authentication password.
+    - name: jvb_auth_password
+      valuePath: "jitsi.jvb.xmpp.password"
+
+  ingress:
+    subdomain: meet
+
+  # Default values aligned with opendesk/helmfile/apps/jitsi/values-jitsi.yaml.gotmpl.
+  # Environment-specific overrides (domain, public IP, image registry) are injected
+  # by the orchestrator's Tofu module at deploy time.
+  extraValues:
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      enabled: true
+      readOnlyRootFilesystem: true
+      privileged: false
+      capabilities:
+        drop:
+          - "ALL"
+      seccompProfile:
+        type: "RuntimeDefault"
+      runAsUser: 1993
+      runAsGroup: 1993
+      runAsNonRoot: true
+
+    settings:
+      keycloakClientId: "opendesk-jitsi"
+
+    jitsi:
+      web:
+        replicaCount: 1
+        ingress:
+          enabled: true
+          ingressClassName: "nginx"
+        extraConfig:
+          doNotStoreRoom: true
+          disableThirdPartyRequests: true
+        extraEnvs:
+          TURN_ENABLE: "1"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "1"
+            memory: "256Mi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {}
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 0
+          runAsNonRoot: false
+          runAsUser: 0
+          seccompProfile:
+            type: "RuntimeDefault"
+
+      prosody:
+        extraEnvs:
+          - name: "AUTH_TYPE"
+            value: "hybrid_matrix_token"
+          - name: "JWT_APP_ID"
+            # Substituted by the operator with <meet>.<tenant_domain>.
+            value: ""
+          - name: "MATRIX_UVS_SYNC_POWER_LEVELS"
+            value: "true"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "1"
+            memory: "512Mi"
+        persistence:
+          size: "1Gi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {}
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 0
+          runAsNonRoot: false
+          runAsUser: 0
+          seccompProfile:
+            type: "RuntimeDefault"
+
+      jicofo:
+        replicaCount: 1
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "1"
+            memory: "512Mi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {}
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 0
+          runAsNonRoot: false
+          runAsUser: 0
+          seccompProfile:
+            type: "RuntimeDefault"
+
+      jigasi:
+        replicaCount: 0
+        enabled: false
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {}
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 0
+          runAsNonRoot: false
+          runAsUser: 0
+          seccompProfile:
+            type: "RuntimeDefault"
+
+      jvb:
+        replicaCount: 1
+        # publicIPs is patched at deploy time by the patchJVB init job.
+        publicIPs:
+          - 0.0.0.0
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "2"
+            memory: "1Gi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {}
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 0
+          runAsNonRoot: false
+          runAsUser: 0
+          seccompProfile:
+            type: "RuntimeDefault"
+
+    imagePullSecrets:
+      - name: registry-credentials
