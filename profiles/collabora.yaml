@@ -109,7 +109,7 @@ spec:
     serviceAccount:
       create: true
 
-  deploymentMethod: tofu-controller
+  deploymentMethod: crossplane
 
   # Ingress managed by the operator's ensureIngress reconciler.
   # Creates Ingress "office.<tenant-domain>" → Service collabora:9980.

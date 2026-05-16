@@ -45,9 +45,8 @@
 #   AppProfile setting is needed — the binding is emitted automatically by the
 #   app-element Composition when it detects a jitsi AppProfile in the tenant.
 #
-#   Deployment uses Pattern B (tofu-controller): the Terraform module
-#   kernel/tofu/tenant/app-workspace provisions an ExternalSecret in OpenBao that
-#   collects all four appSecrets, then renders the Helm Release.
+#   Deployment uses Pattern B (crossplane): an App claim drives the Composition
+#   which collects all four appSecrets via ExternalSecret and renders the Helm Release.
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
@@ -81,7 +80,7 @@ spec:
     name: opendesk-jitsi
     version: "3.5.1"
 
-  deploymentMethod: tofu-controller
+  deploymentMethod: crossplane
 
   valueMapping:
     oidc:

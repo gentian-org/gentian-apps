@@ -200,7 +200,7 @@ spec:
       create: true
 
   # Pattern B — opendesk-element/synapse chart injects secrets as direct Helm values.
-  deploymentMethod: tofu-controller
+  deploymentMethod: crossplane
 
   # Ingress managed by the operator's ensureIngress reconciler.
   # Creates Ingress "chat.<tenant-domain>" → Service element:8080 (frontend).
