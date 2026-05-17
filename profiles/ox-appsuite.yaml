@@ -120,20 +120,20 @@ spec:
     - name: admin_password
       valuePath: "global.appsuite.adminPassword"
 
-  # Non-secret defaults. ${TENANT_DOMAIN} and ${TENANT_NAMESPACE} are
-  # substituted at render time by the app-ox Composition.
-  # LDAP host/port are cluster-internal and hardcoded to the dev environment.
-  # TODO: make LDAP host env-agnostic via a cluster-scoped ConfigMap lookup.
+  # Non-secret defaults. ${TENANT_DOMAIN}, ${TENANT_NAMESPACE}, ${LDAP_HOST},
+  # ${LDAP_BASE_DN}, and ${LDAP_BIND_DN} are substituted at render time by the
+  # app-ox Composition. LDAP values come from the gentian-cluster-config
+  # ConfigMap created by install.sh, making this profile env-agnostic.
   extraValues:
     raw: |
       {
         "global": {
           "hostname": "ox.${TENANT_DOMAIN}",
           "ldap": {
-            "host": "nubus-dev-ldap-server.gentian-dev.svc.cluster.local",
+            "host": "${LDAP_HOST}",
             "port": 389,
-            "baseDn": "dc=swp-ldap,dc=internal",
-            "bindDn": "uid=ldapsearch_ox,cn=users,dc=swp-ldap,dc=internal"
+            "baseDn": "${LDAP_BASE_DN}",
+            "bindDn": "${LDAP_BIND_DN}"
           }
         },
         "openXchange": {
