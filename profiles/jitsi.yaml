@@ -101,7 +101,7 @@ spec:
       valuePath: "jitsi.jvb.xmpp.password"
 
   ingress:
-    subdomain: meet
+    subDomain: meet
 
   # Default values aligned with opendesk/helmfile/apps/jitsi/values-jitsi.yaml.gotmpl.
   # Environment-specific overrides (domain, public IP, image registry) are injected
