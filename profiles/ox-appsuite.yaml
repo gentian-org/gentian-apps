@@ -77,6 +77,12 @@ spec:
         auth: plain
         port: 587
 
+  # OX App Suite exposes a full groupware interface. Other apps (e.g. element)
+  # can integrate with it as a mail/calendar provider via the 'groupware' contract.
+  provides:
+    - name: groupware
+      protocol: imap
+
   chart:
     repository: "oci://registry.opencode.de/bmi/opendesk/components/supplier/open-xchange/charts-mirror"
     name: "appsuite-public-sector"
