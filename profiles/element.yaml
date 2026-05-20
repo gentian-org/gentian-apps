@@ -99,6 +99,19 @@ spec:
   # Tofu module at deploy time. ${TENANT_DOMAIN} is substituted by the operator with
   # the tenant's domain.
   extraValues:
+    global:
+      domain: "${TENANT_DOMAIN}"
+      hosts:
+        element: "chat"
+        synapse: "matrix"
+        jitsi: "meet"
+        keycloak: "id"
+        nubus: "portal"
+        intercomService: "ics"
+        matrixNeoBoardWidget: "matrix-neoboard-widget"
+        matrixNeoChoiceWidget: "matrix-neochoice-widget"
+        matrixNeoDateFixWidget: "matrix-neodatefix-widget"
+
     fullnameOverride: "element"
 
     replicaCount: 1
@@ -109,6 +122,7 @@ spec:
       # injected by the orchestrator's Tofu module — they require live values from
       # the tenant's Keycloak realm and the kernel mail / TURN infrastructure.
       homeserver:
+        serverName: "${TENANT_DOMAIN}"
         defaultRoomVersion: 12
         presence:
           enabled: true
