@@ -128,15 +128,20 @@ spec:
           enabled: true
         profile:
           allowUsersToUpdateDisplayname: true
-        # smtp.host / smtp.username are injected by the operator from kernel mail
-        # config; smtp.password is injected via Pattern B from the per-tenant
-        # ExternalSecret materialised in OpenBao.
+        # smtp.host: postfix is a kernel service accessible cluster-wide at
+        # postfix-dev.gentian-dev.svc.cluster.local on port 25.
+        # smtp.username and smtp.password are injected by the operator / ExternalSecret.
         smtp:
+          host: "postfix-dev.gentian-dev.svc.cluster.local"
           port: 25
           tls: false
           starttls: false
         oidc:
           clientId: "opendesk-matrix"
+          # issuer must be set; Synapse's homeserver.yaml template renders it
+          # verbatim into the oidc_providers block. Keycloak opendesk realm URL
+          # is derived from global.hosts.keycloak + domain.
+          issuer: "https://id.${TENANT_DOMAIN}/realms/opendesk"
           matrixIdLocalpart: "opendesk_username"
           scopes:
             - "openid"
