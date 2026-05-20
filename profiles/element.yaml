@@ -138,6 +138,7 @@ spec:
           port: 25
           tls: false
           starttls: false
+          senderAddress: "matrix@${TENANT_DOMAIN}"
         oidc:
           clientId: "opendesk-matrix"
           # issuer must be set; Synapse's homeserver.yaml template renders it
