@@ -123,7 +123,9 @@ spec:
       # the tenant's Keycloak realm and the kernel mail / TURN infrastructure.
       homeserver:
         serverName: "${TENANT_DOMAIN}"
-        defaultRoomVersion: 12
+        # opendesk-synapse v6.1.9 bundles Synapse 1.116.0, which only supports room
+        # versions up to 11. Room version 12 was introduced in Synapse 1.127+.
+        defaultRoomVersion: 11
         presence:
           enabled: true
         profile:
