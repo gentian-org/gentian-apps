@@ -7,7 +7,9 @@ the cluster by ArgoCD.
 
 ```
 profiles/
-  collabora.yaml       # Collabora Online (WOPI document editor)
+  element.yaml         # Element (Matrix chat)
+  openproject.yaml     # OpenProject (project management)
+  ...
 ```
 
 ## Adding an app
