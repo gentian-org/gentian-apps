@@ -137,6 +137,12 @@ spec:
           enabled: true
         profile:
           allowUsersToUpdateDisplayname: true
+        # App service bridges (Intercom, OX App Suite) require a full app service
+        # config (id, hs_token, url, namespaces) beyond the as_token injected by
+        # appSecrets. Set to empty list until the bridge orchestration is
+        # implemented end-to-end. The as_token appSecrets continue to be seeded in
+        # OpenBao for future use.
+        appServiceConfigs: []
         # smtp.host: postfix is a kernel service accessible cluster-wide at
         # postfix-dev.gentian-dev.svc.cluster.local on port 25.
         # smtp.username and smtp.password are injected by the operator / ExternalSecret.
