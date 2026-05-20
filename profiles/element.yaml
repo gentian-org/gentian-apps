@@ -78,6 +78,13 @@ spec:
     oidc:
       clientSecretKey: "configuration.homeserver.oidc.clientSecret"
     database:
+      # All four non-password fields are seeded into OpenBao by the database
+      # reconciler alongside the password; fetch them all so the Synapse chart
+      # gets a fully-resolved database config without hardcoded hostnames.
+      hostKey: "configuration.database.host"
+      portKey: "configuration.database.port"
+      nameKey: "configuration.database.name"
+      userKey: "configuration.database.user"
       passwordKey: "configuration.database.password.value"
     smtp:
       passwordKey: "configuration.homeserver.smtp.password"
