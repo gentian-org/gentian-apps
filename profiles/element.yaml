@@ -259,3 +259,13 @@ spec:
       nginx.ingress.kubernetes.io/proxy-body-size: "100M"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
       nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+
+  # Element/Synapse can be deployed as a shared platform service with per-tenant
+  # IAM brokering via the shared-apps Keycloak realm. In shared mode a single
+  # Synapse instance serves all tenants; users authenticate through the
+  # shared-apps → tenant-realm → kernel broker chain (transparent SSO).
+  isolation:
+    modes:
+      - dedicated
+      - shared
+    default: dedicated
