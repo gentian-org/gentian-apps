@@ -76,6 +76,8 @@ spec:
 
   valueMapping:
     oidc:
+      issuerKey: "configuration.homeserver.oidc.issuer"
+      clientIdKey: "configuration.homeserver.oidc.clientId"
       clientSecretKey: "configuration.homeserver.oidc.clientSecret"
     database:
       # All four non-password fields are seeded into OpenBao by the database
@@ -153,11 +155,8 @@ spec:
           starttls: false
           senderAddress: "matrix@${TENANT_DOMAIN}"
         oidc:
-          clientId: "${TENANT_NAME}-element"
-          # issuer points at the per-tenant Keycloak realm which is named after
-          # the tenant (e.g. gtn-demo). The client is created by the
-          # identity-reconciler with clientId = <tenantName>-element.
-          issuer: "https://id.${TENANT_DOMAIN}/realms/${TENANT_NAME}"
+          # issuer and clientId are injected by ExternalSecret from OpenBao
+          # (seeded by the identity-reconciler). Only the static claims remain here.
           matrixIdLocalpart: "preferred_username"
           scopes:
             - "openid"
