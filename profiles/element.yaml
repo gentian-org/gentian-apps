@@ -242,6 +242,12 @@ spec:
   # Pattern B — opendesk-element/synapse chart injects secrets as direct Helm values.
   deploymentMethod: crossplane
 
+  # Use the dedicated app-element Composition which deploys three Helm Releases:
+  # opendesk-element (frontend), opendesk-synapse (homeserver), opendesk-synapse-web
+  # (nginx proxy + matrix.<domain> ingress). The XRD default (app-default) only
+  # deploys a single Release and would leave Synapse undeployed.
+  compositionRef: app-element
+
   # Ingress managed by the operator's ensureIngress reconciler.
   # Creates Ingress "chat.<tenant-domain>" → Service element:8080 (frontend).
   # Port 8080 matches the chart default and the opendesk-element-web image.
