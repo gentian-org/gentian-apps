@@ -161,12 +161,14 @@ spec:
           scopes:
             - "openid"
             - "profile"
-        # Disable local password authentication so Element redirects straight
-        # to the OIDC provider instead of showing the username/password form.
-        passwordConfig:
-          enabled: false
       # Tighter rate limits for non-chat Matrix apps and widgets (NeoBoard etc).
       additionalConfiguration:
+        # Disable local password authentication so Element redirects straight
+        # to the OIDC provider instead of showing the username/password form.
+        # The chart hardcodes password_config.enabled: true, so we override it here.
+        password_config:
+          enabled: false
+          localdb_enabled: false
         rc_login:
           account:
             per_second: 2
