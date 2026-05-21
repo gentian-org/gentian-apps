@@ -161,6 +161,10 @@ spec:
           scopes:
             - "openid"
             - "profile"
+        # Disable local password authentication so Element redirects straight
+        # to the OIDC provider instead of showing the username/password form.
+        passwordConfig:
+          enabled: false
       # Tighter rate limits for non-chat Matrix apps and widgets (NeoBoard etc).
       additionalConfiguration:
         rc_login:
