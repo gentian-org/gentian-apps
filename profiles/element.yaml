@@ -153,15 +153,15 @@ spec:
           starttls: false
           senderAddress: "matrix@${TENANT_DOMAIN}"
         oidc:
-          clientId: "opendesk-matrix"
-          # issuer must be set; Synapse's homeserver.yaml template renders it
-          # verbatim into the oidc_providers block. Keycloak opendesk realm URL
-          # is derived from global.hosts.keycloak + domain.
-          issuer: "https://id.${TENANT_DOMAIN}/realms/opendesk"
-          matrixIdLocalpart: "opendesk_username"
+          clientId: "${TENANT_NAME}-element"
+          # issuer points at the per-tenant Keycloak realm which is named after
+          # the tenant (e.g. gtn-demo). The client is created by the
+          # identity-reconciler with clientId = <tenantName>-element.
+          issuer: "https://id.${TENANT_DOMAIN}/realms/${TENANT_NAME}"
+          matrixIdLocalpart: "preferred_username"
           scopes:
             - "openid"
-            - "opendesk-matrix-scope"
+            - "profile"
       # Tighter rate limits for non-chat Matrix apps and widgets (NeoBoard etc).
       additionalConfiguration:
         rc_login:
