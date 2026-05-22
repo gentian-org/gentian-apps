@@ -267,5 +267,6 @@ spec:
   isolation:
     modes:
       - dedicated
+      - primary
       - shared
     default: dedicated
