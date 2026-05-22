@@ -189,7 +189,7 @@ spec:
             - "m.room.power_levels"
         user_directory:
           enabled: true
-          search_all_users: true
+          search_all_users: false
 
     # Chart-level ingress disabled — the operator's ensureIngress (spec.ingress)
     # creates the Kubernetes Ingress resource with the tenant domain.
