@@ -262,11 +262,10 @@ spec:
 
   # Element/Synapse can be deployed as a shared platform service with per-tenant
   # IAM brokering via the shared-apps Keycloak realm. In shared mode a single
-  # Synapse instance serves all tenants; users authenticate through the
-  # shared-apps → tenant-realm → kernel broker chain (transparent SSO).
+  # Synapse instance in the platform-kernel namespace serves all tenants; users
+  # authenticate through the shared-apps → tenant-realm → kernel broker chain.
   isolation:
     modes:
       - dedicated
-      - primary
       - shared
     default: dedicated
