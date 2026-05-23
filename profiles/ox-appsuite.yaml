@@ -64,7 +64,7 @@ spec:
         sync: true
         interval: "1h"
     database:
-      engine: mysql
+      engine: mariadb
       databasePerTenant: true
     storage:
       s3:
