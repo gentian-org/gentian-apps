@@ -29,10 +29,11 @@
 #   Jitsi does NOT require a database or SMTP kernel service. The only kernel
 #   requirement is OIDC (for the Keycloak adapter that issues JWT tokens).
 #
-#   JVB (video bridge) uses a NodePort / hostPort for UDP media traffic. On the
-#   single-node dev cluster this works via the node IP directly. The patchJVB
-#   init job discovers the node's public IP and patches the JVB deployment — no
-#   extra manual config needed.
+#   JVB (video bridge) uses NodePort for UDP media traffic. The service type is
+#   set to NodePort and patchJVB is disabled (the chart's post-install job hardcodes
+#   service name "jitsi-jvb" which only works when the Helm release is named "jitsi";
+#   our operator uses a generated release name). The node IP is set directly in
+#   jvb.publicIPs; for other environments override via App.spec.config.extraValues.
 #
 #   Ingress is at meet.<tenant_domain> (e.g. meet.desk.gentian.org). The chart's
 #   built-in ingress (jitsi.web.ingress.enabled: true) is used, with the operator
@@ -235,9 +236,13 @@ spec:
 
       jvb:
         replicaCount: 1
-        # publicIPs is patched at deploy time by the patchJVB init job.
+        # Default placeholder IP. Override per-cluster via App.spec.config.extraValues
+        # (e.g. jitsi.jvb.publicIPs: ["<node-ip>"]).
+        # For the single-node dev cluster this is set to the static node IP:
         publicIPs:
-          - 0.0.0.0
+          - "192.168.0.100"
+        service:
+          type: "NodePort"
         resources:
           requests:
             cpu: "100m"
@@ -258,3 +263,11 @@ spec:
 
     imagePullSecrets:
       - name: registry-credentials
+
+    # Disable the patchJVB post-install job. It hardcodes the service name as "jitsi-jvb"
+    # which only works when the Helm release is named exactly "jitsi". Our operator uses
+    # a generated release name (e.g. "jitsi-w8zjl-release"), so the job always fails.
+    # Instead, we set jvb.publicIPs directly from NODE_IP injected by the operator and
+    # use NodePort so no cloud LoadBalancer is required.
+    patchJVB:
+      enabled: false
