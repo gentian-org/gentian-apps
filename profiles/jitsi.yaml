@@ -14,8 +14,7 @@
 #                           between Jitsi and Element (Matrix TURN). Resolved from
 #                           gentianos/kernel/turn/credentials — NOT listed as an appSecret.
 #   App-internal (4) → appSecrets:
-#     jwt_app_secret          → jitsi.prosody.extraEnvs[JWT_APP_SECRET]
-#                               + settings.jwtAppSecret.value (Keycloak adapter)
+#     jwt_app_secret          → settings.jwtAppSecret.value
 #     jicofo_auth_password    → jitsi.jicofo.xmpp.password
 #     jicofo_component_secret → jitsi.jicofo.xmpp.componentSecret
 #     jvb_auth_password       → jitsi.jvb.xmpp.password
@@ -89,7 +88,7 @@ spec:
   appSecrets:
     # JWT token signing secret — shared between Prosody XMPP and the Keycloak adapter.
     - name: jwt_app_secret
-      valuePath: "jitsi.prosody.extraEnvs[JWT_APP_SECRET]"
+      valuePath: "settings.jwtAppSecret.value"
     # Jicofo XMPP authentication password.
     - name: jicofo_auth_password
       valuePath: "jitsi.jicofo.xmpp.password"
