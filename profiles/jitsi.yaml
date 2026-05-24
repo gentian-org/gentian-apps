@@ -102,7 +102,7 @@ spec:
 
   ingress:
     subDomain: meet
-
+    serviceName: jitsi-web
   # Default values aligned with opendesk/helmfile/apps/jitsi/values-jitsi.yaml.gotmpl.
   # Environment-specific overrides (domain, public IP, image registry) are injected
   # by the orchestrator's Tofu module at deploy time.
