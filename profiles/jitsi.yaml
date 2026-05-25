@@ -35,9 +35,10 @@
 #   our operator uses a generated release name). The node IP is set directly in
 #   jvb.publicIPs; for other environments override via App.spec.config.extraValues.
 #
-#   Ingress is at meet.<tenant_domain> (e.g. meet.desk.gentian.org). The chart's
-#   built-in ingress (jitsi.web.ingress.enabled: true) is used, with the operator
-#   injecting the hostname from the tenant domain at deploy time.
+#   Ingress is at meet.<tenant_domain> (e.g. meet.desk.gentian.org). The operator
+#   creates the ingress (spec.ingress.serviceName: jitsi-web) backed by the stable
+#   service alias emitted by the composition. The chart's built-in ingress is
+#   disabled (jitsi.web.ingress.enabled: false) to avoid conflicting resources.
 #
 #   Element integration: when both Jitsi and Element are installed in the same
 #   tenant, the orchestrator's IntegrationBinding wires the Jitsi public URL into
@@ -142,12 +143,7 @@ spec:
       web:
         replicaCount: 1
         ingress:
-          enabled: true
-          ingressClassName: "nginx"
-          hosts:
-            - host: "meet.${TENANT_DOMAIN}"
-              paths:
-                - "/"
+          enabled: false
         extraConfig:
           doNotStoreRoom: true
           disableThirdPartyRequests: true
