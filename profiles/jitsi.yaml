@@ -141,6 +141,7 @@ spec:
 
     settings:
       keycloakClientId: "opendesk-jitsi"
+      keycloakRealm: "${TENANT_ID}"
 
     jitsi:
       publicURL: "https://meet.${TENANT_DOMAIN}"
