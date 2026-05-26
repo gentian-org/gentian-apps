@@ -146,6 +146,8 @@ spec:
       publicURL: "https://meet.${TENANT_DOMAIN}"
       web:
         replicaCount: 1
+        podAnnotations:
+          reloader.stakater.com/auto: "true"
         ingress:
           enabled: false
         extraConfig:
