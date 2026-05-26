@@ -270,6 +270,10 @@ spec:
       nginx.ingress.kubernetes.io/proxy-body-size: "100M"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
       nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+      nginx.ingress.kubernetes.io/configuration-snippet: |
+        more_clear_headers "X-Frame-Options";
+        more_clear_headers "Content-Security-Policy";
+        more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.desk.gentian.org";
 
   # Element/Synapse can be deployed as a shared platform service with per-tenant
   # IAM brokering via the shared-apps Keycloak realm. In shared mode a single
