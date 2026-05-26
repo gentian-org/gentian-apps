@@ -102,6 +102,11 @@ spec:
   valueMapping:
     oidc:
       clientSecretKey: "appsuite.core-mw.properties.com\\.openexchange\\.oidc\\.clientSecret"
+      # OX App Suite uses the shared kernel-realm OIDC client (opendesk-oxappsuite),
+      # not a per-tenant client. The client secret lives at the kernel path,
+      # not the default per-tenant path (gentian-os/tenants/{tenant}/apps/…/oidc).
+      clientSecretOpenbaoPath: "gentian-os/kernel/apps/ox"
+      clientSecretOpenbaoProperty: "oidc_client_secret"
     database:
       passwordKey: "global.mysql.auth.password"
     s3:
