@@ -60,7 +60,14 @@ spec:
 
   kernelRequirements:
     identity:
-      oidc: true
+      oidc:
+        # Jitsi's keycloak-adapter uses the authorization code + PKCE flow
+        # (no client secret needed in the adapter pod).
+        clientId: "opendesk-jitsi"
+        name: "Jitsi Meet"
+        accessType: PUBLIC
+        redirectUris:
+          - "https://meet.${TENANT_DOMAIN}/*"
 
   provides:
     - name: videoconference

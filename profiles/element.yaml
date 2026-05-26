@@ -45,7 +45,15 @@ spec:
 
   kernelRequirements:
     identity:
-      oidc: true
+      oidc:
+        # Synapse (Matrix homeserver) uses a CONFIDENTIAL client for OIDC.
+        # The composition creates this client in the tenant's realm and writes
+        # the generated secret to crossplane-system for external consumption.
+        clientId: "opendesk-synapse"
+        name: "Element (Synapse)"
+        accessType: CONFIDENTIAL
+        redirectUris:
+          - "https://chat.${TENANT_DOMAIN}/_synapse/client/oidc/callback"
     database:
       engine: postgresql
       databasePerTenant: true

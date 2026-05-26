@@ -59,7 +59,11 @@ spec:
 
   kernelRequirements:
     identity:
-      oidc: true
+      # OX App Suite uses the shared kernel Keycloak realm (not the tenant's own
+      # realm). The client 'opendesk-oxappsuite' is managed in
+      # gentian-os/kernel/services/keycloak-config/manifests/dev/clients.yaml.
+      # Do NOT set kernelRequirements.identity.oidc here — that field is only for
+      # apps that need a per-tenant Keycloak client in the tenant's isolated realm.
       ldap:
         sync: true
         interval: "1h"
