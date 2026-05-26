@@ -255,6 +255,9 @@ spec:
     subDomain: "chat"
     serviceName: "element"
     servicePort: 8080
+    ingressClassName: "nginx"
+    tlsEnabled: true
+    clusterIssuer: "letsencrypt-http01"
     annotations:
       nginx.ingress.kubernetes.io/proxy-body-size: "100M"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "60"

@@ -121,6 +121,9 @@ spec:
 
   ingress:
     subDomain: webmail
+    ingressClassName: "nginx"
+    tlsEnabled: true
+    clusterIssuer: "letsencrypt-http01"
 
   extraValues:
     global:

@@ -104,6 +104,10 @@ spec:
   ingress:
     subDomain: meet
     serviceName: jitsi-web
+    servicePort: 80
+    ingressClassName: "nginx"
+    tlsEnabled: true
+    clusterIssuer: "letsencrypt-http01"
   # Default values aligned with opendesk/helmfile/apps/jitsi/values-jitsi.yaml.gotmpl.
   # Environment-specific overrides (domain, public IP, image registry) are injected
   # by the orchestrator's Tofu module at deploy time.
