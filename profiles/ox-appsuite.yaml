@@ -37,10 +37,8 @@
 #   stack-data-ums seeds the groupware portal tiles (swp.groupware_mail,
 #   swp.groupware_calendar, swp.groupware_contacts, swp.groupware_tasks) with
 #   activated: false when apps.oxAppSuite.enabled: false (the base default).
-#   TODO (orchestrator): when this AppProfile is deployed to a tenant, the
-#   orchestrator must flip those four portal entries to activated: true via
-#   the UDM REST API. No portalTiles field exists in the AppProfile CRD yet —
-#   this needs to be added alongside the Composition.
+#   The orchestrator creates per-tenant tiles via spec.portalTiles (below)
+#   linked to the tenant ingress URL and the managed-by-attribute-Groupware group.
 #
 # Upstream bug note:
 #   32-ox-connector-opendesk_on.yaml sends globaladdressbookdisabled: True
@@ -93,6 +91,39 @@ spec:
       provider: nubus
       capabilities:
         - navigation:register
+
+  # One portal tile per OX sub-app.  The orchestrator creates a UDM portal
+  # entry (swp.{name}_{tenant}) for each tile and links it into the
+  # od.applications category so users see deep-linked launchers in gentian-ui.
+  portalTiles:
+    - name: ox-mail
+      displayName:
+        de_DE: "E-Mail"
+        en_US: "Mail"
+      linkSuffix: "#app=io.ox/mail"
+      linkTarget: newwindow
+      allowedGroup: "managed-by-attribute-Groupware"
+    - name: ox-calendar
+      displayName:
+        de_DE: "Kalender"
+        en_US: "Calendar"
+      linkSuffix: "#app=io.ox/calendar"
+      linkTarget: newwindow
+      allowedGroup: "managed-by-attribute-Groupware"
+    - name: ox-contacts
+      displayName:
+        de_DE: "Adressbuch"
+        en_US: "Contacts"
+      linkSuffix: "#app=io.ox/contacts"
+      linkTarget: newwindow
+      allowedGroup: "managed-by-attribute-Groupware"
+    - name: ox-tasks
+      displayName:
+        de_DE: "Aufgaben"
+        en_US: "Tasks"
+      linkSuffix: "#app=io.ox/tasks"
+      linkTarget: newwindow
+      allowedGroup: "managed-by-attribute-Groupware"
 
   chart:
     repository: "oci://registry.opencode.de/bmi/opendesk/components/supplier/open-xchange/charts-mirror"

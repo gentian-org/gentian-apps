@@ -84,6 +84,15 @@ spec:
       capabilities:
         - jitsi:widget
 
+  # One portal tile pointing to the tenant Jitsi instance root URL.
+  portalTiles:
+    - name: jitsi
+      displayName:
+        de_DE: "Videokonferenz"
+        en_US: "Video Conference"
+      linkTarget: newwindow
+      allowedGroup: "Domain Users"
+
   chart:
     repository: "oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-jitsi"
     name: opendesk-jitsi
