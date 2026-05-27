@@ -141,6 +141,10 @@ spec:
       clientSecretOpenbaoPath: "gentian-os/kernel/apps/ox"
       clientSecretOpenbaoProperty: "oidc_client_secret"
     database:
+      nameKey: "global.mysql.database"
+      readNameKey: "global.mysql.readDatabase"
+      userKey: "global.mysql.auth.user"
+      readUserKey: "global.mysql.auth.readUser"
       passwordKey: "global.mysql.auth.password"
     s3:
       secretKeyKey: "appsuite.core-mw.propertiesFiles[/opt/open-xchange/etc/filestore-s3\\.properties].com\\.openexchange\\.filestore\\.s3\\.ox-filestore-s3\\.secretKey"
@@ -174,11 +178,6 @@ spec:
       mysql:
         host: "${MYSQL_HOST}"
         readHost: "${MYSQL_HOST}"
-        database: "openxchange_${TENANT_ID}"
-        readDatabase: "openxchange_${TENANT_ID}"
-        auth:
-          user: "openxchange_${TENANT_ID}"
-          readUser: "openxchange_${TENANT_ID}"
       appsuite:
         cookieHashSalt: "${cookie_hash_salt}"
         shareCryptKey: "${share_crypt_key}"
