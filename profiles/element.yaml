@@ -284,8 +284,3 @@ spec:
         more_clear_headers "Content-Security-Policy";
         more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.desk.gentian.org";
 
-  # Element/Synapse can be deployed as a shared platform service with per-tenant
-  # IAM brokering via the shared-apps Keycloak realm. In shared mode a single
-  # Synapse instance in the platform-kernel namespace serves all tenants; users
-  # authenticate through the shared-apps → tenant-realm → kernel broker chain.
-  # NOTE: isolation is a Tenant-level concept, not an AppProfile field. Removed.
