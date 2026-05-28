@@ -288,8 +288,4 @@ spec:
   # IAM brokering via the shared-apps Keycloak realm. In shared mode a single
   # Synapse instance in the platform-kernel namespace serves all tenants; users
   # authenticate through the shared-apps → tenant-realm → kernel broker chain.
-  isolation:
-    modes:
-      - dedicated
-      - shared
-    default: dedicated
+  # NOTE: isolation is a Tenant-level concept, not an AppProfile field. Removed.
