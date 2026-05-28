@@ -283,7 +283,7 @@ spec:
             com.openexchange.filestore.s3.ox-filestore-s3.accessKey: "openxchange_${TENANT_ID}"
             com.openexchange.filestore.s3.ox-filestore-s3.pathStyleAccess: "true"
           /opt/open-xchange/etc/ldapauth.properties:
-            java.naming.provider.url: "ldap://${LDAP_HOST}/${LDAP_BASE_DN}"
+            java.naming.provider.url: "ldap://${LDAP_HOST}/ou=users,${LDAP_BASE_DN}"
             bindDN: "${LDAP_BIND_DN}"
       ingress:
         enabled: true
