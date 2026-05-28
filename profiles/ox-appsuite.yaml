@@ -189,12 +189,6 @@ spec:
         sessiondEncryptionKey: "${sessiond_encryption_key}"
 
     appsuite:
-      ingress:
-        annotations:
-          nginx.ingress.kubernetes.io/configuration-snippet: |
-            more_clear_headers "X-Frame-Options";
-            more_clear_headers "Content-Security-Policy";
-            more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.desk.gentian.org";
       appsuite-toolkit:
         enabled: false
       switchboard:
@@ -294,6 +288,11 @@ spec:
       ingress:
         enabled: true
         ingressClassName: "nginx"
+        annotations:
+          nginx.ingress.kubernetes.io/configuration-snippet: |
+            more_clear_headers "X-Frame-Options";
+            more_clear_headers "Content-Security-Policy";
+            more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.desk.gentian.org";
         tls:
           enabled: true
           existingSecret: "wildcard-tls"
