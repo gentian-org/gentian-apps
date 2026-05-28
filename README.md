@@ -8,7 +8,10 @@ the cluster by ArgoCD.
 ```
 profiles/
   element.yaml         # Element (Matrix chat)
+  jitsi.yaml           # Jitsi (video conferencing)
   openproject.yaml     # OpenProject (project management)
+  ox-appsuite.yaml     # OX App Suite (groupware)
+  xwiki.yaml           # XWiki (wiki and knowledge management)
   ...
 ```
 
