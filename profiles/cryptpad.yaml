@@ -1,0 +1,160 @@
+# AppProfile — CryptPad (end-to-end encrypted collaborative editing)
+#
+# Source chart: oci://registry.opencode.de/bmi/opendesk/components/supplier/xwiki/charts-mirror
+#   cryptpad v0.0.21  (same supplier mirror channel as xwiki)
+# Value paths verified against:
+#   opendesk/helmfile/apps/cryptpad/values.yaml.gotmpl
+# Chart version from: opendesk/helmfile/environments/default/charts.yaml.gotmpl
+# Image from:         opendesk/helmfile/environments/default/images.yaml.gotmpl
+#
+# Secret inventory:
+#   None — CryptPad does not integrate with Keycloak (OIDC), LDAP, PostgreSQL,
+#   MariaDB, or SMTP. All document content is encrypted client-side with keys
+#   the server never sees. No secrets are provisioned from OpenBao.
+#
+# Design notes:
+#   CryptPad differs fundamentally from the other opendesk apps:
+#
+#   No SSO/OIDC:
+#     CryptPad manages its own user accounts. There is no Keycloak integration.
+#     Users register directly on the CryptPad instance. Registration is closed
+#     (restrictRegistration: true) to prevent public sign-up, but authentication
+#     is internal to CryptPad — not federated via Keycloak.
+#
+#   No database:
+#     CryptPad uses a flat key-value file store. All document content is
+#     encrypted with keys known only to the client — the server stores opaque
+#     blobs and cannot read document content.
+#
+#   No LDAP, no SMTP:
+#     Group sync and email notification features are not used in this deployment.
+#
+#   No persistent volume (aligned with opendesk default):
+#     persistence.enabled: false. If persistent storage is required, attach a PVC
+#     by overriding persistence.enabled and persistence.size via App extraValues.
+#
+#   WebSocket (mandatory):
+#     CryptPad uses persistent WebSocket connections for real-time multi-user
+#     collaboration. The NGINX Ingress must carry the
+#     `nginx.org/websocket-services: "cryptpad"` annotation; without it, live
+#     editing will fail with connection-dropped errors.
+#
+#   Embedding:
+#     enableEmbedding: true allows CryptPad to be opened inside an iframe in
+#     the portal. The Ingress CSP annotation restricts frame-ancestors to the
+#     same origin and the tenant portal.
+#
+#   Chart-managed ingress disabled:
+#     ingress.enabled: false — the operator creates the Ingress CR (spec.ingress).
+#     Leaving the chart ingress enabled causes duplicate resources and sync errors.
+#
+#   fullnameOverride: "cryptpad":
+#     Ensures the chart Service is always named "cryptpad", matching the
+#     `nginx.org/websocket-services` annotation and the operator's serviceName.
+#
+#   Deployment uses Pattern B (crossplane): an App claim drives the Composition
+#   which renders the Helm Release. No ExternalSecret is needed (no secrets).
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: cryptpad
+  labels:
+    gentianos.io/profile-name: cryptpad
+spec:
+  displayName: "CryptPad"
+  description: >-
+    End-to-end encrypted real-time collaborative document editor.
+    No SSO — users register directly on the instance.
+    The server cannot read document content (client-side encryption).
+  logo: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSIjMUVBRkM4Ij48cmVjdCB4PSIyMCIgeT0iNDUiIHdpZHRoPSI2MCIgaGVpZ2h0PSI0NSIgcng9IjYiIHJ5PSI2Ii8+PHBhdGggZD0iTTMyIDQ1VjMyYTE4IDE4IDAgMCAxIDM2IDB2MTMiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzFFQUZDOCIgc3Ryb2tlLXdpZHRoPSI4IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjY1IiByPSI3IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iNDYiIHk9IjY1IiB3aWR0aD0iOCIgaGVpZ2h0PSIxMiIgcng9IjIiIGZpbGw9IiNmZmYiLz48L3N2Zz4="
+
+  # CryptPad requires no kernel services — no OIDC client, no database,
+  # no LDAP bind account, and no SMTP relay are needed.
+  kernelRequirements: {}
+
+  provides:
+    - name: collaborative-editing
+      protocol: https
+
+  optionalIntegrations:
+    # Register a tile in the Univention Portal (nubus) for this tenant.
+    - contract: central-navigation
+      provider: nubus
+      capabilities:
+        - navigation:register
+
+  portalTiles:
+    - name: cryptpad
+      displayName:
+        de_DE: "CryptPad"
+        en_US: "CryptPad"
+      linkTarget: newwindow
+      allowedGroup: "Domain Users"
+
+  chart:
+    # Published via the opendesk XWiki supplier mirror (same channel as xwiki v1.4.4).
+    repository: "oci://registry.opencode.de/bmi/opendesk/components/supplier/xwiki/charts-mirror"
+    name: cryptpad
+    version: "0.0.21"
+
+  deploymentMethod: crossplane
+
+  # No valueMapping block — no kernel-provisioned secrets to inject.
+
+  ingress:
+    # Subdomain from opendesk global.yaml.gotmpl: hosts.cryptpad = "pad"
+    subDomain: "pad"
+    # Service name matches fullnameOverride below.
+    serviceName: "cryptpad"
+    # CryptPad Helm chart default service port.
+    servicePort: 3000
+    ingressClassName: "nginx"
+    tlsEnabled: true
+    clusterIssuer: "letsencrypt-http01"
+    annotations:
+      # WebSocket upgrade passthrough — required for real-time collaboration.
+      nginx.org/websocket-services: "cryptpad"
+      # Allow the portal to embed CryptPad in an iframe; block all other origins.
+      nginx.ingress.kubernetes.io/content-security-policy: >-
+        frame-ancestors 'self' https://portal.${TENANT_DOMAIN}
+
+  extraValues:
+    image:
+      repository: "registry.opencode.de/bmi/opendesk/components/supplier/xwiki/images-mirror/cryptpad"
+      tag: "version-2025.9.0@sha256:484492964391231863b21e8735e5b168230dcc6906b58f320526a46c78dfa53b"
+
+    # Predictable Service name — must match ingress.serviceName and the
+    # nginx.org/websocket-services annotation above.
+    fullnameOverride: "cryptpad"
+
+    # Closed registration: users cannot self-register.
+    # Access is controlled at the network / portal level.
+    restrictRegistration: true
+
+    # Allow the tenant portal to embed CryptPad in an iframe.
+    enableEmbedding: true
+
+    # Chart-managed ingress is disabled; the operator creates the Ingress CR.
+    ingress:
+      enabled: false
+
+    # No persistent volume (opendesk default). Override in App extraValues if
+    # persistent attachment storage is needed:
+    #   persistence:
+    #     enabled: true
+    #     size: "10Gi"
+    persistence:
+      enabled: false
+
+    # Required by the chart (fsGroup must match runAsGroup 4001).
+    podSecurityContext:
+      fsGroup: 4001
+
+    podAnnotations:
+      # Trigger a rolling restart when any referenced ConfigMap or Secret changes.
+      reloader.stakater.com/auto: "true"
+
+    global:
+      domain: "${TENANT_DOMAIN}"
+      hosts:
+        cryptpad: "pad"
