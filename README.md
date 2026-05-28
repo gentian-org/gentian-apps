@@ -14,6 +14,10 @@ profiles/
 
 ## Adding an app
 
+See [app-profile-guide.md](app-profile-guide.md) for authoring guidelines,
+best practices, and a pre-PR checklist. It documents every class of bug
+that has appeared in the git history of this repo.
+
 Create a new `AppProfile` YAML in `profiles/`. ArgoCD syncs it automatically
 via Source 3 in `gentian-deployments/dev/app-of-apps.yaml`. The Gentian OS
 `AppStoreReconciler` picks it up and adds it to the `AppCatalogue`.
