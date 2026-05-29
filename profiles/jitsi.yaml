@@ -135,17 +135,22 @@ spec:
   # by the orchestrator's Tofu module at deploy time.
   extraValues:
     global:
-      domain: "${TENANT_DOMAIN}"
+      # Use the kernel/platform domain so that global.hosts.keycloak resolves
+      # correctly to id.<kernel_domain> (e.g. id.desk.gentian.org) instead of
+      # id.<tenant_domain> (e.g. id.gtn-demo-2.desk.gentian.org which returns 404).
+      # global.hosts.jitsi is prefixed with the tenant ID to keep the Jitsi-specific
+      # URLs at meet.<tenant_id>.<kernel_domain>.
+      domain: "${KERNEL_DOMAIN}"
       hosts:
-        element: "chat"
-        synapse: "matrix"
-        jitsi: "meet"
+        element: "chat.${TENANT_ID}"
+        synapse: "matrix.${TENANT_ID}"
+        jitsi: "meet.${TENANT_ID}"
         keycloak: "id"
         nubus: "portal"
         intercomService: "ics"
-        matrixNeoBoardWidget: "matrix-neoboard-widget"
-        matrixNeoChoiceWidget: "matrix-neochoice-widget"
-        matrixNeoDateFixWidget: "matrix-neodatefix-widget"
+        matrixNeoBoardWidget: "matrix-neoboard-widget.${TENANT_ID}"
+        matrixNeoChoiceWidget: "matrix-neochoice-widget.${TENANT_ID}"
+        matrixNeoDateFixWidget: "matrix-neodatefix-widget.${TENANT_ID}"
 
     containerSecurityContext:
       allowPrivilegeEscalation: false
