@@ -106,8 +106,8 @@ spec:
     subDomain: "pad"
     # Service name matches fullnameOverride below.
     serviceName: "cryptpad"
-    # CryptPad Helm chart default service port.
-    servicePort: 3000
+    # The chart's Service exposes container port 3000 as Service port 80.
+    servicePort: 80
     ingressClassName: "nginx"
     tlsEnabled: true
     clusterIssuer: "letsencrypt-http01"
