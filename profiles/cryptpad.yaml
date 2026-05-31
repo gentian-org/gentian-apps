@@ -146,6 +146,16 @@ spec:
     persistence:
       enabled: false
 
+    # CryptPad requires more memory than the chart default (512Mi OOMKills on startup).
+    # opendesk production sets 2Gi; 1.5Gi is sufficient for a tenant instance.
+    resources:
+      limits:
+        cpu: "1"
+        memory: "1536Mi"
+      requests:
+        cpu: "100m"
+        memory: "512Mi"
+
     # Required by the chart (fsGroup must match runAsGroup 4001).
     podSecurityContext:
       fsGroup: 4001
