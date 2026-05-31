@@ -114,16 +114,16 @@ spec:
     annotations:
       # WebSocket upgrade passthrough — required for real-time collaboration.
       nginx.org/websocket-services: "cryptpad"
-      # Allow the portal to embed CryptPad in an iframe; block all other origins.
-      nginx.ingress.kubernetes.io/content-security-policy: >-
-        frame-ancestors 'self' https://portal.${TENANT_DOMAIN}
 
   # CryptPad requires httpSafeOrigin to be a DIFFERENT subdomain from httpUnsafeOrigin.
   # The safe origin hosts sandboxed iframes for client-side encryption isolation.
   # Without this second ingress the browser loads the main page but immediately
   # fails to reach the sandbox subdomain (connection refused / white screen).
+  # pad-sandbox is a flat subdomain (one level under effectiveDomain) so it is
+  # covered by the wildcard cert *.<effectiveDomain>. A two-level subdomain like
+  # sandbox.pad would not be covered by that wildcard.
   additionalIngresses:
-    - subDomain: "sandbox.pad"
+    - subDomain: "pad-sandbox"
       serviceName: "cryptpad"
       servicePort: 80
       ingressClassName: "nginx"
@@ -187,4 +187,4 @@ spec:
     # uses it for sandboxed iframes that provide client-side encryption isolation.
     config:
       httpUnsafeOrigin: "https://pad.${TENANT_DOMAIN}"
-      httpSafeOrigin: "https://sandbox.pad.${TENANT_DOMAIN}"
+      httpSafeOrigin: "https://pad-sandbox.${TENANT_DOMAIN}"
