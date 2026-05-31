@@ -118,6 +118,18 @@ spec:
       nginx.ingress.kubernetes.io/content-security-policy: >-
         frame-ancestors 'self' https://portal.${TENANT_DOMAIN}
 
+  # CryptPad requires httpSafeOrigin to be a DIFFERENT subdomain from httpUnsafeOrigin.
+  # The safe origin hosts sandboxed iframes for client-side encryption isolation.
+  # Without this second ingress the browser loads the main page but immediately
+  # fails to reach the sandbox subdomain (connection refused / white screen).
+  additionalIngresses:
+    - subDomain: "sandbox.pad"
+      serviceName: "cryptpad"
+      servicePort: 80
+      ingressClassName: "nginx"
+      tlsEnabled: true
+      clusterIssuer: "letsencrypt-http01"
+
   extraValues:
     image:
       repository: "registry.opencode.de/bmi/opendesk/components/supplier/xwiki/images-mirror/cryptpad"
@@ -171,7 +183,8 @@ spec:
 
     # When ingress.enabled=false the chart defaults httpUnsafeOrigin/httpSafeOrigin
     # to "http://localhost:3000", which causes the browser to be redirected there.
-    # Override them explicitly with the actual external URL.
+    # httpSafeOrigin MUST be a different subdomain from httpUnsafeOrigin — CryptPad
+    # uses it for sandboxed iframes that provide client-side encryption isolation.
     config:
       httpUnsafeOrigin: "https://pad.${TENANT_DOMAIN}"
-      httpSafeOrigin: "https://pad.${TENANT_DOMAIN}"
+      httpSafeOrigin: "https://sandbox.pad.${TENANT_DOMAIN}"
