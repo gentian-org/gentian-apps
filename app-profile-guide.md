@@ -46,7 +46,7 @@ That value only works in one cluster and breaks on every other environment.
 ## 3. Secrets and valueMapping
 
 Secrets are **never** placed in `extraValues`. They travel from OpenBao →
-Terraform (`set_sensitive`) → Helm values.
+Crossplane `ExternalSecret` → flat Kubernetes `Secret` → Helm `set[]` values.
 
 `valueMapping` maps each secret category to the Helm value path the chart expects:
 
@@ -87,8 +87,8 @@ appSecrets:
 ```
 
 The orchestrator seeds these into OpenBao under
-`gentian-os/tenants/{tenant}/apps/{app}/appSecrets/{name}` and injects them via
-`set_sensitive` at deploy time.
+`gentian-os/tenants/{tenant}/apps/{app}/internal/{name}` and injects them via
+the Crossplane `ExternalSecret` → Helm `set[]` pipeline at deploy time.
 
 ---
 
