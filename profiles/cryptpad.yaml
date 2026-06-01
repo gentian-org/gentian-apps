@@ -40,9 +40,11 @@
 #     editing will fail with connection-dropped errors.
 #
 #   Embedding:
-#     enableEmbedding: true allows CryptPad to be opened inside an iframe in
-#     the portal. The Ingress CSP annotation restricts frame-ancestors to the
-#     same origin and the tenant portal.
+#     config.enableEmbedding: true (under extraValues.config) renders into config.js
+#     and makes CryptPad set frame-ancestors to 'self' https: vector: — allowing any
+#     HTTPS origin (including the tenant portal) to embed it in an iframe.
+#     IMPORTANT: enableEmbedding at the root extraValues level is a no-op because
+#     the chart's configmap template only iterates .Values.config keys, not root keys.
 #
 #   Chart-managed ingress disabled:
 #     ingress.enabled: false — the operator creates the Ingress CR (spec.ingress).
@@ -144,6 +146,9 @@ spec:
     restrictRegistration: true
 
     # Allow the tenant portal to embed CryptPad in an iframe.
+    # NOTE: this root-level key is declared in the chart's values.yaml but is never
+    # rendered into config.js by the chart's configmap template. It has no effect here.
+    # The effective setting is config.enableEmbedding below.
     enableEmbedding: true
 
     # Chart-managed ingress is disabled; the operator creates the Ingress CR.
@@ -188,3 +193,9 @@ spec:
     config:
       httpUnsafeOrigin: "https://pad.${TENANT_DOMAIN}"
       httpSafeOrigin: "https://pad-sandbox.${TENANT_DOMAIN}"
+      # enableEmbedding must be under config: so the chart's configmap template
+      # renders it into config.js. When true, CryptPad sets:
+      #   frame-ancestors 'self' https: vector:  (allows any HTTPS origin)
+      #   Access-Control-Allow-Origin: *
+      # This allows portal.TENANT_DOMAIN to embed CryptPad in an iframe.
+      enableEmbedding: true
