@@ -132,7 +132,7 @@ spec:
       # proxy_set_header disables gzip so nginx receives plaintext to filter.
       nginx.ingress.kubernetes.io/configuration-snippet: |
         proxy_set_header Accept-Encoding "";
-        sub_filter_types application/javascript;
+        sub_filter_types application/javascript text/javascript;
         sub_filter "'integration'" "'integration','drive'";
         sub_filter_once on;
 
