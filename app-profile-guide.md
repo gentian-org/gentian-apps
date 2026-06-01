@@ -190,7 +190,7 @@ ingress:
     nginx.ingress.kubernetes.io/configuration-snippet: |
       more_clear_headers "X-Frame-Options";
       more_clear_headers "Content-Security-Policy";
-      more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.desk.gentian.org";
+      more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.${TENANT_DOMAIN}";
 ```
 
 **This is the only app-level CORS/security requirement.** Everything else
