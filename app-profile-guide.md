@@ -92,27 +92,38 @@ The orchestrator seeds these into OpenBao under
 
 ---
 
-## 5. Ingress
+## 5. Ingress, TLS and CORS
 
-### 5a. Operator ingress spec
+### 5a. How TLS is provisioned
+
+Setting `spec.ingress` (with `tlsEnabled: true`, the default) tells the
+gentian-os controller to create two resources per tenant deployment:
+
+1. A Kubernetes `Ingress` at `{subDomain}.{tenantDomain}` → `Service:{servicePort}`.
+2. A cert-manager `Certificate` CR targeting the `clusterIssuer` you specify.
+
+cert-manager's **HTTP-01 solver** satisfies the ACME challenge through NGINX
+and stores the issued cert in the tenant namespace. No manual certificate work
+is needed. The default issuer `letsencrypt-http01` is correct for all
+per-tenant vanity-domain apps.
 
 ```yaml
 ingress:
-  subDomain: "projects"        # camelCase — NOT "subdomain" (lowercase is wrong)
-  serviceName: "openproject"   # Kubernetes Service name — see fullnameOverride note
+  subDomain: "projects"        # → projects.{tenantDomain}
+  serviceName: "openproject"   # must match the Kubernetes Service name
   servicePort: 8080
   ingressClassName: "nginx"
-  tlsEnabled: true
-  clusterIssuer: "letsencrypt-http01"
+  tlsEnabled: true             # default — omit to accept the default
+  clusterIssuer: "letsencrypt-http01"   # default — omit to accept the default
 ```
 
-**`subDomain` capitalization matters.** The field is validated; `subdomain` is
-silently ignored, leaving the app with no ingress.
+**`subDomain` capitalization matters.** The field is validated; `subdomain`
+(lowercase) is silently ignored, leaving the app with no ingress.
 
 ### 5b. Always disable chart-managed ingress
 
-Every chart that ships its own `Ingress` resource must have it disabled, otherwise
-two `Ingress` objects collide on the same host:
+Every chart that ships its own `Ingress` resource must have it disabled,
+otherwise two `Ingress` objects collide on the same host:
 
 ```yaml
 extraValues:
@@ -123,20 +134,55 @@ extraValues:
 ### 5c. Predictable Service name
 
 The Crossplane composition generates a random Helm release name. If the chart
-uses the release name in its Service name, the operator cannot predict it.
+derives its Service name from the release name, the operator cannot predict it.
 Set `fullnameOverride` to lock the Service name:
 
 ```yaml
 extraValues:
-  fullnameOverride: "openproject"   # matches spec.ingress.serviceName above
+  fullnameOverride: "openproject"   # must match spec.ingress.serviceName
 ```
+
+### 5d. CORS — why most apps need nothing extra
+
+Gentian OS avoids browser CORS issues by architecture:
+
+- Apps are loaded in **iframes**, all under `*.{tenantDomain}`. Iframes do not
+  trigger CORS preflight requests.
+- **OIDC** token exchange is server-side — no `fetch()` to a foreign origin.
+- When the shell itself needs to call an app's API, declare a
+  `spec.browserProxy` route (see §5e). The shell server proxies the call
+  server-side; the browser sees a same-origin request.
+
+If your app's own UI calls back to its own backend (normal REST/XHR to the same
+host), no CORS configuration is needed.
+
+### 5e. Shell proxy for app APIs (`spec.browserProxy`)
+
+Declare a `browserProxy` route when the gentian shell (not the app's own UI)
+needs to call the app's API from the browser. The shell exposes
+`/api/apps/{appName}/{path}` and forwards requests to the cluster-internal
+service, injecting the user's bearer token.
+
+```yaml
+browserProxy:
+  - path: api
+    target: "http://openproject.{namespace}.svc/api/v3/"
+    authMode: forward-bearer   # default — forwards the user's Bearer token
+    stripPrefix: true          # default — strips /api/apps/{name}/api before forwarding
+```
+
+**When you need it:** the shell calls the app's REST API to show a widget,
+badge count, or AI context. **When you don't:** the app's own UI calls its own
+backend (same host, no CORS).
 
 ---
 
 ## 6. Portal iframe embedding (CSP header)
 
-Apps that should be embeddable inside the gentian portal tile need the
-`frame-ancestors` Content Security Policy header. Add it as an ingress annotation:
+Without a `frame-ancestors` header the browser **refuses to render the app
+inside the portal iframe** and falls back to opening it in a new tab.
+
+Add the following ingress annotation to allow portal embedding:
 
 ```yaml
 ingress:
@@ -147,7 +193,9 @@ ingress:
       more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.desk.gentian.org";
 ```
 
-Without this the browser refuses to render the app inside the portal iframe.
+**This is the only app-level CORS/security requirement.** Everything else
+(TLS, bearer-token forwarding, same-origin iframe loading) is handled by the
+platform automatically.
 
 ---
 
@@ -253,6 +301,7 @@ Before opening a PR, verify:
 - [ ] OIDC uses full `OIDCClientSpec`, realm is `${TENANT_ID}`
 - [ ] Secrets only in `valueMapping` / `appSecrets`, never in `extraValues`
 - [ ] `reloader.stakater.com/auto: "true"` in `podAnnotations`
-- [ ] CSP `frame-ancestors` annotation if portal embedding is required
+- [ ] CSP `frame-ancestors` annotation present (required for portal iframe embedding)
+- [ ] `spec.browserProxy` declared if the shell calls this app's REST API
 - [ ] `compositionRef` omitted unless using a non-default composition
 - [ ] YAML passes `python3 -c "import yaml; yaml.safe_load(open('<file>'))"` locally

@@ -284,3 +284,12 @@ spec:
         more_clear_headers "Content-Security-Policy";
         more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.desk.gentian.org";
 
+  # BrowserProxy routes expose the Matrix Client-Server API to the shell via a CORS-safe
+  # server-side proxy. The shell forwards the user's bearer token to Synapse.
+  browserProxy:
+    - path: matrix
+      # Forwards /api/apps/element/matrix/** → http://synapse.{namespace}.svc/_matrix/
+      target: "http://synapse.{namespace}.svc/_matrix/"
+      authMode: forward-bearer
+      stripPrefix: true
+

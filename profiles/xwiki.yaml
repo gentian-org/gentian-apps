@@ -160,6 +160,16 @@ spec:
         more_clear_headers "Content-Security-Policy";
         more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.desk.gentian.org";
 
+  # BrowserProxy routes expose the XWiki REST API to the shell via a CORS-safe
+  # server-side proxy. The shell forwards the user's bearer token to XWiki,
+  # which validates it via the OIDC authenticator extension.
+  browserProxy:
+    - path: api
+      # Forwards /api/apps/xwiki/api/** → http://xwiki.{namespace}.svc/rest/
+      target: "http://xwiki.{namespace}.svc/rest/"
+      authMode: forward-bearer
+      stripPrefix: true
+
   # Default values aligned with opendesk/helmfile/apps/xwiki/values.yaml.gotmpl.
   # ${TENANT_DOMAIN}, ${TENANT_ID} substituted by the operator at deploy time.
   # ${LDAP_HOST}, ${LDAP_BASE_DN} substituted from kernel LDAP metadata.

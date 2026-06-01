@@ -127,6 +127,11 @@ spec:
       # WebSocket upgrade passthrough — required for real-time collaboration.
       nginx.org/websocket-services: "cryptpad"
 
+  # BrowserProxy: CryptPad uses client-side encryption — all document content is
+  # encrypted in the browser before leaving the client. The shell has no need to
+  # proxy CryptPad API calls; the browser communicates directly with the CryptPad
+  # instance via the operator-managed ingress.
+
   # CryptPad requires httpSafeOrigin to be a DIFFERENT subdomain from httpUnsafeOrigin.
   # The safe origin hosts sandboxed iframes for client-side encryption isolation.
   # Without this second ingress the browser loads the main page but immediately

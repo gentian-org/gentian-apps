@@ -130,6 +130,9 @@ spec:
         more_clear_headers "X-Frame-Options";
         more_clear_headers "Content-Security-Policy";
         more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.desk.gentian.org";
+  # BrowserProxy: Jitsi does not expose a REST API consumed by the shell.
+  # Real-time signalling uses WebRTC/WebSocket directly from the browser
+  # to the XMPP/Prosody service on the same tenant domain — no proxy needed.
   # Default values aligned with opendesk/helmfile/apps/jitsi/values-jitsi.yaml.gotmpl.
   # Environment-specific overrides (domain, public IP, image registry) are injected
   # by the orchestrator's Tofu module at deploy time.

@@ -182,6 +182,16 @@ spec:
         more_clear_headers "Content-Security-Policy";
         more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.desk.gentian.org";
 
+  # BrowserProxy routes expose OpenProject's REST API to the shell via a CORS-safe
+  # server-side proxy. The shell forwards the user's bearer token to the upstream,
+  # so no separate API credentials are needed in the browser.
+  browserProxy:
+    - path: api
+      # Forwards /api/apps/openproject/api/** → http://openproject.{namespace}.svc/api/v3/
+      target: "http://openproject.{namespace}.svc/api/v3/"
+      authMode: forward-bearer
+      stripPrefix: true
+
   # Default values aligned with opendesk/helmfile/apps/openproject/values.yaml.gotmpl.
   # ${TENANT_DOMAIN}, ${TENANT_ID} are substituted by the operator at deploy time.
   # ${LDAP_HOST}, ${LDAP_BASE_DN}, ${LDAP_BIND_DN} are substituted from kernel metadata.
