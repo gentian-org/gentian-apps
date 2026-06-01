@@ -126,6 +126,15 @@ spec:
     annotations:
       # WebSocket upgrade passthrough — required for real-time collaboration.
       nginx.org/websocket-services: "cryptpad"
+      # Patch CryptPad's embeddableApps list at the HTTP layer to include /drive/.
+      # sframe-common-outer.js hard-codes which paths can be embedded in iframes.
+      # sub_filter_once replaces only the first occurrence (line 22 of the file).
+      # proxy_set_header disables gzip so nginx receives plaintext to filter.
+      nginx.ingress.kubernetes.io/configuration-snippet: |
+        proxy_set_header Accept-Encoding "";
+        sub_filter_types application/javascript;
+        sub_filter "'integration'" "'integration','drive'";
+        sub_filter_once on;
 
   # BrowserProxy: CryptPad uses client-side encryption — all document content is
   # encrypted in the browser before leaving the client. The shell has no need to
