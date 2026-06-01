@@ -63,6 +63,11 @@ spec:
         accessType: CONFIDENTIAL
         redirectUris:
           - "https://chat.${TENANT_DOMAIN}/_synapse/client/oidc/callback"
+      ldap:
+        # Per-tenant LDAP search account provisioned by the LDAP init Job on
+        # first app install. Credentials are written to OpenBao by the init Job
+        # and injected via valueMapping.ldap.
+        search: true
     database:
       engine: postgresql
       databasePerTenant: true

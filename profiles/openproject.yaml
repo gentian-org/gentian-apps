@@ -80,8 +80,10 @@ spec:
           - "https://projects.${TENANT_DOMAIN}/"
         backchannelLogoutUrl: "https://projects.${TENANT_DOMAIN}/auth/keycloak/backchannel-logout"
       ldap:
-        # Per-tenant LDAP bind account provisioned by the LDAP reconciler (Inc 4).
+        # Per-tenant LDAP search account provisioned by the LDAP init Job on
+        # first app install; sync account provisioned by the LDAP reconciler.
         # Credentials are seeded into OpenBao and injected via valueMapping.ldap.
+        search: true
         sync: true
         interval: "1h"
     database:
