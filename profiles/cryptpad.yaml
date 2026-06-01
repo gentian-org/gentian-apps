@@ -146,10 +146,16 @@ spec:
     restrictRegistration: true
 
     # Allow the tenant portal to embed CryptPad in an iframe.
-    # NOTE: this root-level key is declared in the chart's values.yaml but is never
-    # rendered into config.js by the chart's configmap template. It has no effect here.
-    # The effective setting is config.enableEmbedding below.
+    # The init container writes an ENABLE_EMBEDDING admin decree to the data volume,
+    # which CryptPad reads on startup to set frame-ancestors to 'self' https:.
     enableEmbedding: true
+
+    # Use a Deployment (not StatefulSet) so the chart mounts the emptyDir data
+    # volumes in the main container. With workloadStateful: true (the chart default)
+    # and persistence.enabled: false, the chart's volumeMounts template skips the
+    # data volumes for the main container entirely — meaning the init container's
+    # decree file is written to an emptyDir the main container never sees.
+    workloadStateful: false
 
     # Chart-managed ingress is disabled; the operator creates the Ingress CR.
     ingress:
@@ -193,9 +199,3 @@ spec:
     config:
       httpUnsafeOrigin: "https://pad.${TENANT_DOMAIN}"
       httpSafeOrigin: "https://pad-sandbox.${TENANT_DOMAIN}"
-      # enableEmbedding must be under config: so the chart's configmap template
-      # renders it into config.js. When true, CryptPad sets:
-      #   frame-ancestors 'self' https: vector:  (allows any HTTPS origin)
-      #   Access-Control-Allow-Origin: *
-      # This allows portal.TENANT_DOMAIN to embed CryptPad in an iframe.
-      enableEmbedding: true
