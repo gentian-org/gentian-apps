@@ -59,20 +59,21 @@ spec:
 
   kernelRequirements:
     identity:
-      # OX App Suite uses the shared kernel Keycloak realm (not the tenant's own
-      # realm). The client 'opendesk-oxappsuite' is managed in
-      # gentian-os/kernel/services/keycloak-config/manifests/dev/clients.yaml.
-      # Do NOT set kernelRequirements.identity.oidc here — that field is only for
-      # apps that need a per-tenant Keycloak client in the tenant's isolated realm.
+      oidc:
+        clientId: "opendesk-oxappsuite"
+        name: "OX App Suite"
+        accessType: PUBLIC
+        redirectUris:
+          - "https://webmail.${TENANT_DOMAIN}/appsuite/api/oidc/auth"
+          - "https://webmail.${TENANT_DOMAIN}/appsuite/api/oidc/logout"
       ldap:
-        # Per-tenant LDAP search account provisioned by the LDAP init Job on
-        # first app install; sync account provisioned by the LDAP reconciler.
         search: true
         sync: true
         interval: "1h"
     database:
       engine: mariadb
       databasePerTenant: true
+      allowDynamicDatabaseCreation: true
     storage:
       s3:
         bucketPerTenant: true
@@ -138,11 +139,6 @@ spec:
   valueMapping:
     oidc:
       clientSecretKey: "appsuite.core-mw.properties.com\\.openexchange\\.oidc\\.clientSecret"
-      # OX App Suite uses the shared kernel-realm OIDC client (opendesk-oxappsuite),
-      # not a per-tenant client. The client secret lives at the kernel path,
-      # not the default per-tenant path (gentian-os/tenants/{tenant}/apps/…/oidc).
-      clientSecretOpenbaoPath: "gentian-os/kernel/apps/ox"
-      clientSecretOpenbaoProperty: "oidc_client_secret"
     database:
       nameKey: "global.mysql.database"
       readNameKey: "global.mysql.readDatabase"
@@ -244,22 +240,22 @@ spec:
           com.openexchange.oidc.userLookupNamePart: "full"
           com.openexchange.oidc.enablePasswordGrant: "true"
           com.openexchange.oidc.passwordGrantUserNamePart: "local-part"
-          com.openexchange.oidc.opAuthorizationEndpoint: "https://id.${TENANT_DOMAIN}/realms/kernel/protocol/openid-connect/auth"
-          com.openexchange.oidc.opIssuer: "https://id.${TENANT_DOMAIN}/realms/kernel"
-          com.openexchange.oidc.opJwkSetEndpoint: "https://id.${TENANT_DOMAIN}/realms/kernel/protocol/openid-connect/certs"
-          com.openexchange.oidc.opLogoutEndpoint: "https://id.${TENANT_DOMAIN}/realms/kernel/protocol/openid-connect/logout"
-          com.openexchange.oidc.opTokenEndpoint: "https://id.${TENANT_DOMAIN}/realms/kernel/protocol/openid-connect/token"
+          com.openexchange.oidc.opAuthorizationEndpoint: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/auth"
+          com.openexchange.oidc.opIssuer: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}"
+          com.openexchange.oidc.opJwkSetEndpoint: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/certs"
+          com.openexchange.oidc.opLogoutEndpoint: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/logout"
+          com.openexchange.oidc.opTokenEndpoint: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/token"
           com.openexchange.oidc.rpRedirectURIAuth: "https://webmail.${TENANT_DOMAIN}/appsuite/api/oidc/auth"
           com.openexchange.oidc.rpRedirectURILogout: "https://portal.${TENANT_DOMAIN}"
           com.openexchange.oidc.rpRedirectURIPostSSOLogout: "https://webmail.${TENANT_DOMAIN}/appsuite/api/oidc/logout"
           com.openexchange.oauth.provider.enabled: "true"
           com.openexchange.oauth.provider.mode: "expect_jwt"
-          com.openexchange.oauth.provider.allowedIssuer: "https://id.${TENANT_DOMAIN}/realms/kernel"
+          com.openexchange.oauth.provider.allowedIssuer: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}"
           com.openexchange.oauth.provider.contextLookupClaim: "context"
           com.openexchange.oauth.provider.contextLookupNamePart: "full"
           com.openexchange.oauth.provider.userLookupClaim: "opendesk_username"
           com.openexchange.oauth.provider.userLookupNamePart: "full"
-          com.openexchange.oauth.provider.jwt.jwksUri: "https://id.${TENANT_DOMAIN}/realms/kernel/protocol/openid-connect/certs"
+          com.openexchange.oauth.provider.jwt.jwksUri: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/certs"
           com.openexchange.mail.authType: "xoauth2"
           com.openexchange.mail.loginSource: "name"
           com.openexchange.mail.mailServer: "mail.${TENANT_DOMAIN}"
