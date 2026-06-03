@@ -101,7 +101,7 @@ spec:
       # to load info pages in an iframe"). Point to /drive/ instead, which uses the full
       # application framework and loads correctly in an iframe.
       linkSuffix: "/drive/"
-      allowedGroup: "Domain Users"
+      allowedGroup: "App Users"
 
   chart:
     # Published via the opendesk XWiki supplier mirror (same channel as xwiki v1.4.4).

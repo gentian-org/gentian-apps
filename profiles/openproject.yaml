@@ -119,7 +119,7 @@ spec:
         de_DE: "Projekte"
         en_US: "Projects"
       linkTarget: newwindow
-      allowedGroup: "Domain Users"
+      allowedGroup: "App Users"
 
   chart:
     repository: "oci://registry.opencode.de/bmi/opendesk/components/supplier/openproject/charts-mirror"

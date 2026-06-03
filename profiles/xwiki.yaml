@@ -115,7 +115,7 @@ spec:
         de_DE: "Wissen"
         en_US: "Wiki"
       linkTarget: newwindow
-      allowedGroup: "Domain Users"
+      allowedGroup: "App Users"
 
   chart:
     repository: "oci://registry.opencode.de/bmi/opendesk/components/supplier/xwiki/charts-mirror"

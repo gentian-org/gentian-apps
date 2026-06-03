@@ -91,7 +91,7 @@ spec:
         de_DE: "Videokonferenz"
         en_US: "Video Conference"
       linkTarget: newwindow
-      allowedGroup: "Domain Users"
+      allowedGroup: "App Users"
 
   chart:
     repository: "oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-jitsi"
