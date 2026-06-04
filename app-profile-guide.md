@@ -191,10 +191,48 @@ Tenants sign in at the kernel portal, not `portal.<tenant-domain>`.
 If your chart needs extra NGINX snippet lines (e.g. CryptPad `sub_filter`), put
 only those under `ingress.annotations`; the operator prepends the
 frame-ancestors block and strips any legacy per-profile CSP you may have copied
-from older examples.
+from older examples. The operator **appends** a second `Content-Security-Policy`
+header (it does not replace the app's CSP). CryptPad's sandbox relies on the
+upstream `script-src` without `'unsafe-eval'`; clearing the whole header causes
+"eval should not be permitted" at load time.
 
 **No other app-level CORS setup is required.** TLS, bearer-token forwarding,
 and same-origin iframe loading are handled by the platform.
+
+### 6b. Nested iframes and `additionalIngresses` (CryptPad)
+
+Some apps load **another origin inside themselves** after the portal opens them.
+CryptPad is the reference case:
+
+```text
+portal.<kernel-domain>  →  pad.<tenant-domain>/drive/  →  pad-sandbox.<tenant-domain>
+```
+
+CSP `frame-ancestors` checks the **full ancestor chain**, not just the immediate
+parent. A single “allow the portal” rule on every hostname is therefore not
+enough: the sandbox host must also allow `https://pad.${TENANT_DOMAIN}`, and
+when the portal embeds CryptPad in an iframe window it must allow
+`https://portal.${KERNEL_DOMAIN}` as well.
+
+The operator handles this automatically for `spec.additionalIngresses` entries
+whose `subDomain` is `pad-sandbox` (see `profiles/cryptpad.yaml`). **Do not**
+copy `frame-ancestors` or `X-Frame-Options` lines into those annotations — the
+operator injects the correct per-host `frame-ancestors` policy alongside the
+app's own CSP headers.
+
+CryptPad-specific profile requirements beyond normal ingress:
+
+| Field | Why |
+|---|---|
+| `additionalIngresses` with `subDomain: pad-sandbox` | `httpSafeOrigin` must be a **different** host from `httpUnsafeOrigin` (crypto sandbox). Use a **flat** subdomain (`pad-sandbox`, not `sandbox.pad`) so the tenant wildcard cert covers it. |
+| `config.httpUnsafeOrigin` / `config.httpSafeOrigin` | Must match the operator-created ingress hostnames (`pad.*`, `pad-sandbox.*`). |
+| `enableEmbedding: true` + `workloadStateful: false` | Chart init container writes an ENABLE_EMBEDDING decree; with ephemeral storage the main container must mount the same emptyDir or the decree is lost. |
+| `portalTiles[].linkSuffix: "/drive/"` | CryptPad’s `/` info page blocks iframe embedding in JS; `/drive/` uses the app shell. |
+| `ingress.annotations` `sub_filter` | Patches CryptPad’s hard-coded embeddable-app list so `/drive/` can load in iframes. |
+
+CryptPad has **no OIDC pack** — it uses internal accounts (`kernelRequirements: {}`).
+See `profiles/cryptpad.yaml` and gentian-os `docs/architecture.md` §6 for the
+platform-side CSP rules.
 
 ---
 
@@ -301,6 +339,7 @@ Before opening a PR, verify:
 - [ ] Secrets only in `valueMapping` / `appSecrets`, never in `extraValues`
 - [ ] `reloader.stakater.com/auto: "true"` in `podAnnotations`
 - [ ] (automatic) Operator injects portal `frame-ancestors` on app Ingress — no profile annotation needed
+- [ ] (CryptPad / multi-host) `additionalIngresses` use flat subdomains; no per-host CSP in annotations — operator sets `pad-sandbox` policy
 - [ ] `spec.browserProxy` declared if the shell calls this app's REST API
 - [ ] `compositionRef` omitted unless using a non-default composition
 - [ ] YAML passes `python3 -c "import yaml; yaml.safe_load(open('<file>'))"` locally
