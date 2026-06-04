@@ -125,11 +125,8 @@ spec:
     ingressClassName: "nginx"
     tlsEnabled: true
     clusterIssuer: "letsencrypt-http01"
-    annotations:
-      nginx.ingress.kubernetes.io/configuration-snippet: |
-        more_clear_headers "X-Frame-Options";
-        more_clear_headers "Content-Security-Policy";
-        more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.${TENANT_DOMAIN}";
+    # Portal iframe CSP (frame-ancestors) is injected by the gentian-os operator on
+    # every app Ingress — see internal/controller/ingress_helpers.go.
   # BrowserProxy: Jitsi does not expose a REST API consumed by the shell.
   # Real-time signalling uses WebRTC/WebSocket directly from the browser
   # to the XMPP/Prosody service on the same tenant domain — no proxy needed.

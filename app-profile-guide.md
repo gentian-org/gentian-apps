@@ -180,22 +180,21 @@ backend (same host, no CORS).
 ## 6. Portal iframe embedding (CSP header)
 
 Without a `frame-ancestors` header the browser **refuses to render the app
-inside the portal iframe** and falls back to opening it in a new tab.
+inside the portal iframe** (Firefox shows “will not allow … if another site has
+embedded it”).
 
-Add the following ingress annotation to allow portal embedding:
+**You do not add this in AppProfiles.** The gentian-os operator injects NGINX
+`configuration-snippet` directives on every app `Ingress` it creates, allowing
+embedding from the shared kernel portal (`https://portal.${KERNEL_DOMAIN}`).
+Tenants sign in at the kernel portal, not `portal.<tenant-domain>`.
 
-```yaml
-ingress:
-  annotations:
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      more_clear_headers "X-Frame-Options";
-      more_clear_headers "Content-Security-Policy";
-      more_set_headers "Content-Security-Policy: frame-ancestors 'self' https://portal.${TENANT_DOMAIN}";
-```
+If your chart needs extra NGINX snippet lines (e.g. CryptPad `sub_filter`), put
+only those under `ingress.annotations`; the operator prepends the
+frame-ancestors block and strips any legacy per-profile CSP you may have copied
+from older examples.
 
-**This is the only app-level CORS/security requirement.** Everything else
-(TLS, bearer-token forwarding, same-origin iframe loading) is handled by the
-platform automatically.
+**No other app-level CORS setup is required.** TLS, bearer-token forwarding,
+and same-origin iframe loading are handled by the platform.
 
 ---
 
@@ -301,7 +300,7 @@ Before opening a PR, verify:
 - [ ] OIDC uses full `OIDCClientSpec`, realm is `${TENANT_ID}`
 - [ ] Secrets only in `valueMapping` / `appSecrets`, never in `extraValues`
 - [ ] `reloader.stakater.com/auto: "true"` in `podAnnotations`
-- [ ] CSP `frame-ancestors` annotation present (required for portal iframe embedding)
+- [ ] (automatic) Operator injects portal `frame-ancestors` on app Ingress — no profile annotation needed
 - [ ] `spec.browserProxy` declared if the shell calls this app's REST API
 - [ ] `compositionRef` omitted unless using a non-default composition
 - [ ] YAML passes `python3 -c "import yaml; yaml.safe_load(open('<file>'))"` locally
