@@ -21,25 +21,45 @@ spec:
 
 ---
 
-## 2. Placeholders (operator-substituted at deploy time)
+## 2. Placeholders (substituted at deploy time)
 
-The operator substitutes these tokens before rendering the Helm release. Use them
-everywhere — never hardcode cluster-specific addresses.
+The **gentian-os operator** sets `App.spec.domain` from the tenant's
+effective domain. **Crossplane app Compositions** replace placeholders in
+`extraValues` and OIDC redirect URIs when rendering helm values and
+`provider-keycloak` Client MRs. Use placeholders everywhere — never
+hardcode cluster-specific addresses.
 
 | Placeholder | Resolves to |
 |---|---|
-| `${TENANT_DOMAIN}` | The tenant's root domain (e.g. `desk.example.com`) |
-| `${TENANT_ID}` | The tenant identifier / Keycloak realm name (e.g. `gtn-demo`) |
-| `${TENANT_NAMESPACE}` | The Kubernetes namespace for the tenant |
+| `${TENANT_DOMAIN}` | Tenant effective domain (e.g. `demo.desk.gentian.org`) |
+| `${TENANT_ID}` | Tenant name / Keycloak realm (e.g. `demo`) |
+| `${TENANT_NAMESPACE}` | Kubernetes namespace (`tenant-{id}`) |
+| `${KERNEL_DOMAIN}` | Cluster kernel DNS suffix (e.g. `desk.gentian.org`) |
 | `${LDAP_HOST}` | UCS LDAP service hostname |
-| `${LDAP_BASE_DN}` | LDAP base DN (e.g. `dc=example,dc=com`) |
+| `${LDAP_BASE_DN}` | LDAP base DN (e.g. `dc=swp-ldap,dc=internal`) |
 | `${LDAP_BIND_DN}` | App-specific LDAP bind DN |
-| `${SMTP_HOST}` | Postfix service address |
+| `${SMTP_HOST}` | Postfix service address (injected by operator) |
 | `${S3_ENDPOINT}` | MinIO API endpoint URL |
+| `${MYSQL_HOST}` | MariaDB service (OX App Suite) |
+| `${REDIS_HOST}` | Redis service (OX App Suite) |
+| `${IMAP_HOST}` | Dovecot/IMAP service |
+| `${NODE_IP}` | Node external IP (Jitsi TURN) |
+| `${TURN_*}` | TURN credentials (Element/Jitsi, from kernel path) |
 
 **Common mistake:** Using a hardcoded cluster-internal address like
 `nubus-dev-ldap-server.gentian-dev.svc.cluster.local` instead of `${LDAP_HOST}`.
 That value only works in one cluster and breaks on every other environment.
+
+### `${TENANT_DOMAIN}` vs `${KERNEL_DOMAIN}` — where and why
+
+| Placeholder | Use for | Why it matters |
+|---|---|---|
+| **`${TENANT_DOMAIN}`** | App-facing URLs on the tenant zone: `chat.${TENANT_DOMAIN}`, `meet.${TENANT_DOMAIN}`, OIDC `redirectUris`, Matrix `serverName`, public Jitsi URL, `mail.${TENANT_DOMAIN}` in OX | Browsers, Keycloak, and ingress must agree on the **same hostname** the user sees. A typo or hardcoded domain causes `redirect_uri` mismatch, broken cookies, or TLS on the wrong cert (`*.<effectiveDomain>`). |
+| **`${KERNEL_DOMAIN}`** | Shared platform hosts: `portal.${KERNEL_DOMAIN}`, `id.${KERNEL_DOMAIN}`, post-logout redirect to portal | Kernel UIs and the Gentian Portal live on the **cluster** wildcard, not the per-tenant app wildcard. Mixing these (e.g. OIDC issuer on tenant domain when the app expects `id.<kernel>`) breaks SSO and iframe embedding from the portal. |
+
+**Rule of thumb:** anything the tenant's users type in the address bar for an
+**installed app** → `${TENANT_DOMAIN}` (plus `subDomain` in `AppProfile.spec.ingress`).
+Anything on the **platform shell or IdP** → `${KERNEL_DOMAIN}`.
 
 ---
 
@@ -97,24 +117,24 @@ the Crossplane `ExternalSecret` → Helm `set[]` pipeline at deploy time.
 ### 5a. How TLS is provisioned
 
 Setting `spec.ingress` (with `tlsEnabled: true`, the default) tells the
-gentian-os controller to create two resources per tenant deployment:
+gentian-os controller to create:
 
-1. A Kubernetes `Ingress` at `{subDomain}.{tenantDomain}` → `Service:{servicePort}`.
-2. A cert-manager `Certificate` CR targeting the `clusterIssuer` you specify.
+1. A Kubernetes `Ingress` at `{subDomain}.{effectiveDomain}` → `Service:{servicePort}`.
+2. One **DNS-01 wildcard** cert-manager `Certificate` per tenant
+   (`tenant-{tenant}-wildcard-tls`) covering `*.{effectiveDomain}`.
 
-cert-manager's **HTTP-01 solver** satisfies the ACME challenge through NGINX
-and stores the issued cert in the tenant namespace. No manual certificate work
-is needed. The default issuer `letsencrypt-http01` is correct for all
-per-tenant vanity-domain apps.
+All app ingresses for that tenant reference the same TLS secret.
+**Do not** set per-app HTTP-01 issuers in profiles — `spec.ingress.clusterIssuer`
+is reserved for a possible future mode and is **ignored** by the operator today.
+See [gentian-os/docs/architecture.md](../gentian-os/docs/architecture.md) §6.1.
 
 ```yaml
 ingress:
-  subDomain: "projects"        # → projects.{tenantDomain}
+  subDomain: "projects"        # → projects.demo.desk.gentian.org
   serviceName: "openproject"   # must match the Kubernetes Service name
   servicePort: 8080
   ingressClassName: "nginx"
-  tlsEnabled: true             # default — omit to accept the default
-  clusterIssuer: "letsencrypt-http01"   # default — omit to accept the default
+  tlsEnabled: true             # default
 ```
 
 **`subDomain` capitalization matters.** The field is validated; `subdomain`
@@ -146,8 +166,9 @@ extraValues:
 
 Gentian OS avoids browser CORS issues by architecture:
 
-- Apps are loaded in **iframes**, all under `*.{tenantDomain}`. Iframes do not
-  trigger CORS preflight requests.
+- Apps load in **iframes** from the Gentian Portal on `portal.{kernelDomain}`;
+  app UIs are on `{sub}.{tenantDomain}` (cross-origin). The operator injects
+  `frame-ancestors` for the kernel portal origin.
 - **OIDC** token exchange is server-side — no `fetch()` to a foreign origin.
 - When the shell itself needs to call an app's API, declare a
   `spec.browserProxy` route (see §5e). The shell server proxies the call

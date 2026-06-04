@@ -92,7 +92,7 @@ spec:
 
   optionalIntegrations:
     - contract: central-navigation
-      provider: nubus
+      provider: portal
       capabilities:
         - navigation:register
 
@@ -166,11 +166,14 @@ spec:
 
   ingress:
     subDomain: webmail
+    serviceName: appsuite
+    servicePort: 80
     ingressClassName: "nginx"
     tlsEnabled: true
-    clusterIssuer: "letsencrypt-http01"
+    # TLS: operator uses per-tenant DNS-01 wildcard (clusterIssuer field unused)
 
   extraValues:
+    fullnameOverride: "appsuite"
     global:
       domain: "${TENANT_DOMAIN}"
       hostname: "webmail.${TENANT_DOMAIN}"
@@ -241,7 +244,7 @@ spec:
           com.openexchange.oidc.opLogoutEndpoint: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/logout"
           com.openexchange.oidc.opTokenEndpoint: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/token"
           com.openexchange.oidc.rpRedirectURIAuth: "https://webmail.${TENANT_DOMAIN}/appsuite/api/oidc/auth"
-          com.openexchange.oidc.rpRedirectURILogout: "https://portal.${TENANT_DOMAIN}"
+          com.openexchange.oidc.rpRedirectURILogout: "https://portal.${KERNEL_DOMAIN}"
           com.openexchange.oidc.rpRedirectURIPostSSOLogout: "https://webmail.${TENANT_DOMAIN}/appsuite/api/oidc/logout"
           com.openexchange.oauth.provider.enabled: "true"
           com.openexchange.oauth.provider.mode: "expect_jwt"
@@ -280,13 +283,6 @@ spec:
             java.naming.provider.url: "ldap://${LDAP_HOST}/ou=users,${LDAP_BASE_DN}"
             bindDN: "${LDAP_BIND_DN}"
       ingress:
-        enabled: true
-        ingressClassName: "nginx"
-        tls:
-          enabled: true
-          existingSecret: "wildcard-tls"
-        appsuite:
-          hosts:
-            - "webmail.${TENANT_DOMAIN}"
+        enabled: false
         dav:
           enabled: false

@@ -92,6 +92,8 @@ spec:
     storage:
       s3:
         bucketPerTenant: true
+    cache:
+      engine: memcached
     mail:
       smtp:
         # OpenProject requires CRAM-MD5 SMTP authentication (postfix kernel service).
@@ -104,7 +106,7 @@ spec:
 
   optionalIntegrations:
     - contract: central-navigation
-      provider: nubus
+      provider: portal
       capabilities:
         - navigation:register
     - contract: file-store
@@ -174,7 +176,7 @@ spec:
     servicePort: 8080
     ingressClassName: "nginx"
     tlsEnabled: true
-    clusterIssuer: "letsencrypt-http01"
+    # TLS: operator uses per-tenant DNS-01 wildcard (clusterIssuer field unused)
     annotations:
       nginx.ingress.kubernetes.io/proxy-body-size: "512M"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
@@ -376,8 +378,8 @@ spec:
       OPENPROJECT_MAIL__FROM: "noreply@${TENANT_DOMAIN}"
 
       # ── Portal navigation ─────────────────────────────────────────────────
-      OPENPROJECT_HOME__URL: "https://portal.${TENANT_DOMAIN}/"
-      OPENPROJECT_SOUVAP__NAVIGATION__URL: "https://portal.${TENANT_DOMAIN}/univention/portal/navigation.json?base=https%3A//portal.${TENANT_DOMAIN}"
+      OPENPROJECT_HOME__URL: "https://portal.${KERNEL_DOMAIN}/"
+      OPENPROJECT_SOUVAP__NAVIGATION__URL: "https://portal.${KERNEL_DOMAIN}/univention/portal/navigation.json?base=https%3A//portal.${KERNEL_DOMAIN}"
       # OPENPROJECT_SOUVAP__NAVIGATION__SECRET: wired by central-navigation IntegrationBinding.
 
       # ── LDAP seeder (static fields — per-cluster params via placeholders) ──

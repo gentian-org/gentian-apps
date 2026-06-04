@@ -101,7 +101,7 @@ spec:
 
   optionalIntegrations:
     - contract: central-navigation
-      provider: nubus
+      provider: portal
       capabilities:
         - navigation:register
     - contract: office-editor
@@ -152,7 +152,7 @@ spec:
     servicePort: 80
     ingressClassName: "nginx"
     tlsEnabled: true
-    clusterIssuer: "letsencrypt-http01"
+    # TLS: operator uses per-tenant DNS-01 wildcard (clusterIssuer field unused)
     annotations:
       nginx.ingress.kubernetes.io/proxy-body-size: "100M"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
@@ -271,8 +271,8 @@ spec:
         "url.trustedDomains": "id.${TENANT_DOMAIN}"
 
         # Central navigation — portalSecret wired by central-navigation IntegrationBinding.
-        "workplaceServices.navigationEndpoint": "https://portal.${TENANT_DOMAIN}/univention/portal/navigation.json"
-        "workplaceServices.base": "https://portal.${TENANT_DOMAIN}"
+        "workplaceServices.navigationEndpoint": "https://portal.${KERNEL_DOMAIN}/univention/portal/navigation.json"
+        "workplaceServices.base": "https://portal.${KERNEL_DOMAIN}"
         # workplaceServices.portalSecret: injected by central-navigation IntegrationBinding.
 
         "openoffice.serverType": "0"

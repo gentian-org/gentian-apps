@@ -21,9 +21,10 @@ See [app-profile-guide.md](app-profile-guide.md) for authoring guidelines,
 best practices, and a pre-PR checklist. It documents every class of bug
 that has appeared in the git history of this repo.
 
-Create a new `AppProfile` YAML in `profiles/`. ArgoCD syncs it automatically
-via Source 3 in `gentian-deployments/dev/app-of-apps.yaml`. The Gentian OS
-`AppStoreReconciler` picks it up and adds it to the `AppCatalogue`.
+Create a new `AppProfile` YAML in `profiles/`. After cluster bootstrap,
+ArgoCD syncs profiles via the **`gentian-appprofiles`** Application
+(created by `gentian-os/install.sh` step 15c), not via `gentian-deployments`.
+The Gentian OS `AppStoreReconciler` builds the `AppCatalogue` CR from them.
 
 ```bash
 # Verify the catalogue after sync:

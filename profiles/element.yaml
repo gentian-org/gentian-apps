@@ -26,11 +26,9 @@
 #   as an appSecret here. The orchestrator resolves it from the kernel OpenBao path
 #   gentianos/kernel/turn/credentials at deploy time.
 #
-#   The appServiceConfig tokens connect Synapse to the Intercom service (kernel) and to
-#   OX App Suite (when installed in the same tenant). These must be generated per-tenant
-#   and per-app, hence appSecrets. The orchestrator wires the bridge by writing the
-#   matching as_token / hs_token into Synapse's configuration when both Element and the
-#   provider (intercom-service kernel, ox-appsuite app) are present in the tenant.
+#   App-service bridge tokens (Intercom, OX) are seeded via appSecrets below.
+#   Full Synapse appServiceConfigs wiring is planned — until then the chart may
+#   run with appServiceConfigs: [] and bridges are not end-to-end active.
 #
 #   The chart uses direct Helm value injection (.Values.secrets.*) → Pattern B.
 apiVersion: gentianos.io/v1alpha1
@@ -82,7 +80,7 @@ spec:
 
   optionalIntegrations:
     - contract: central-navigation
-      provider: nubus
+      provider: portal
       capabilities:
         - navigation:register
     - contract: file-store
@@ -179,7 +177,7 @@ spec:
         # postfix-dev.gentian-dev.svc.cluster.local on port 25.
         # smtp.username and smtp.password are injected by the operator / ExternalSecret.
         smtp:
-          host: "postfix-dev.gentian-dev.svc.cluster.local"
+          host: "${SMTP_HOST}"
           port: 25
           tls: false
           starttls: false
@@ -300,7 +298,7 @@ spec:
     servicePort: 8080
     ingressClassName: "nginx"
     tlsEnabled: true
-    clusterIssuer: "letsencrypt-http01"
+    # TLS: operator uses per-tenant DNS-01 wildcard (clusterIssuer field unused)
     annotations:
       nginx.ingress.kubernetes.io/proxy-body-size: "100M"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "60"

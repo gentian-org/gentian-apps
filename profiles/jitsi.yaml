@@ -76,7 +76,7 @@ spec:
 
   optionalIntegrations:
     - contract: central-navigation
-      provider: nubus
+      provider: portal
       capabilities:
         - navigation:register
 
@@ -97,9 +97,8 @@ spec:
 
   deploymentMethod: crossplane
 
-  valueMapping:
-    oidc:
-      clientSecretKey: "settings.oidcClientSecret"
+  # PUBLIC OIDC client — no client secret in valueMapping (aligned with opendesk).
+  valueMapping: {}
 
   appSecrets:
     # JWT token signing secret — shared between Prosody XMPP and the Keycloak adapter.
@@ -121,7 +120,7 @@ spec:
     servicePort: 80
     ingressClassName: "nginx"
     tlsEnabled: true
-    clusterIssuer: "letsencrypt-http01"
+    # TLS: operator uses per-tenant DNS-01 wildcard (clusterIssuer field unused)
     # Portal iframe CSP (frame-ancestors) is injected by the gentian-os operator on
     # every app Ingress — see internal/controller/ingress_helpers.go.
   # BrowserProxy: Jitsi does not expose a REST API consumed by the shell.
