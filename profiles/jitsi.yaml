@@ -266,11 +266,10 @@ spec:
 
       jvb:
         replicaCount: 1
-        # Default placeholder IP. Override per-cluster via App.spec.config.extraValues
-        # (e.g. jitsi.jvb.publicIPs: ["<node-ip>"]).
-        # For the single-node dev cluster this is set to the static node IP:
+        # Advertised media IP for WebRTC (UDP). Substituted from gentian-cluster-config
+        # node.ip at deploy time (${NODE_IP}); override per-cluster via extraValues.
         publicIPs:
-          - "192.168.0.100"
+          - "${NODE_IP}"
         service:
           type: "NodePort"
         resources:
