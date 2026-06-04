@@ -199,40 +199,18 @@ upstream `script-src` without `'unsafe-eval'`; clearing the whole header causes
 **No other app-level CORS setup is required.** TLS, bearer-token forwarding,
 and same-origin iframe loading are handled by the platform.
 
-### 6b. Nested iframes and `additionalIngresses` (CryptPad)
+### 6b. Kernel diagram service (CryptPad)
 
-Some apps load **another origin inside themselves** after the portal opens them.
-CryptPad is the reference case:
+Diagram editing from Nextcloud Files uses a **shared CryptPad kernel service**
+(like Collabora in §9b of `gentian-os/docs/architecture.md`), not a per-tenant
+AppProfile. One instance at `pad.<kernel_domain>` plus
+`pad-sandbox.<kernel_domain>` for the crypto sandbox origin serves all tenants;
+Nextcloud embeds it from `files.<kernel_domain>`.
 
-```text
-portal.<kernel-domain>  →  pad.<tenant-domain>/drive/  →  pad-sandbox.<tenant-domain>
-```
-
-CSP `frame-ancestors` checks the **full ancestor chain**, not just the immediate
-parent. A single “allow the portal” rule on every hostname is therefore not
-enough: the sandbox host must also allow `https://pad.${TENANT_DOMAIN}`, and
-when the portal embeds CryptPad in an iframe window it must allow
-`https://portal.${KERNEL_DOMAIN}` as well.
-
-The operator handles this automatically for `spec.additionalIngresses` entries
-whose `subDomain` is `pad-sandbox` (see `profiles/cryptpad.yaml`). **Do not**
-copy `frame-ancestors` or `X-Frame-Options` lines into those annotations — the
-operator injects the correct per-host `frame-ancestors` policy alongside the
-app's own CSP headers.
-
-CryptPad-specific profile requirements beyond normal ingress:
-
-| Field | Why |
-|---|---|
-| `additionalIngresses` with `subDomain: pad-sandbox` | `httpSafeOrigin` must be a **different** host from `httpUnsafeOrigin` (crypto sandbox). Use a **flat** subdomain (`pad-sandbox`, not `sandbox.pad`) so the tenant wildcard cert covers it. |
-| `config.httpUnsafeOrigin` / `config.httpSafeOrigin` | Must match the operator-created ingress hostnames (`pad.*`, `pad-sandbox.*`). |
-| `enableEmbedding: true` + `workloadStateful: false` | Chart init container writes an ENABLE_EMBEDDING decree; with ephemeral storage the main container must mount the same emptyDir or the decree is lost. |
-| `portalTiles[].linkSuffix: "/drive/"` | CryptPad’s `/` info page blocks iframe embedding in JS; `/drive/` uses the app shell. |
-| `ingress.annotations` `sub_filter` | Patches CryptPad’s hard-coded embeddable-app list so `/drive/` can load in iframes. |
-
-CryptPad has **no OIDC pack** — it uses internal accounts (`kernelRequirements: {}`).
-See `profiles/cryptpad.yaml` and gentian-os `docs/architecture.md` §6 for the
-platform-side CSP rules.
+There is **no portal tile** and **no tenant ingress** — manifests live under
+`gentian-os/kernel/services/cryptpad/`. CSP `frame-ancestors` on the kernel
+ingresses must allow Nextcloud and the portal; do not use `more_clear_headers`
+(microk8s ingress-nginx lacks it) — append with `add_header … always` only.
 
 ---
 
@@ -251,6 +229,23 @@ extraValues:
       keycloak: "id"
       nubus: "portal"
 ```
+
+### 7b. Jitsi + Element (video in Matrix rooms)
+
+OpenDesk keeps Jitsi and Element as **separate AppProfiles** in the same tenant.
+To enable conference widgets:
+
+1. Install both `element` and `jitsi` on the tenant (`spec.apps`).
+2. Element's `optionalIntegrations` declares `videoconference` from provider `jitsi`
+   (creates an `IntegrationBinding`; no extra Helm wiring in the binding itself).
+3. The `app-element` composition deploys **Matrix User Verification Service**
+   (UVS bootstrap Job + service). Jitsi Prosody must use `AUTH_TYPE=hybrid_matrix_token`
+   and `MATRIX_UVS_URL=http://opendesk-matrix-user-verification-service.${TENANT_NAMESPACE}.svc.cluster.local`.
+4. Set `global.hosts.jitsi: meet` in **both** profiles so Element's bundled
+   `jitsi.html` widget targets `https://meet.${TENANT_DOMAIN}`.
+5. Configure shared TURN in `gentian-deployments` → `kernelServices.turn*` on the
+   gentian-os Helm chart; compositions substitute `${TURN_*}` into Element Synapse
+   and Jitsi Prosody env vars.
 
 ---
 

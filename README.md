@@ -7,8 +7,7 @@ the cluster by ArgoCD.
 
 ```
 profiles/
-  cryptpad.yaml        # CryptPad (end-to-end encrypted collaborative editing)
-  element.yaml         # Element (Matrix chat)
+  element.yaml         # Element (Matrix chat) — deploy with jitsi for room widgets
   jitsi.yaml           # Jitsi (video conferencing)
   openproject.yaml     # OpenProject (project management)
   ox-appsuite.yaml     # OX App Suite (groupware)

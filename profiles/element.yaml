@@ -90,6 +90,10 @@ spec:
       capabilities:
         - webdav:read
         - webdav:write
+    - contract: videoconference
+      provider: jitsi
+      capabilities:
+        - jitsi:widget
 
   chart:
     repository: "oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-element"
@@ -123,6 +127,10 @@ spec:
     # Application service token for OX App Suite OIDC actor in Matrix.
     - name: ox_appsuite_as_token
       valuePath: "configuration.homeserver.appServiceConfigs[1].as_token"
+    # Matrix User Verification Service password — seeded for the UVS bootstrap Job
+    # (app-element composition); not injected into element/synapse Helm values.
+    - name: matrix_uvs_password
+      valuePath: "bootstrap.configuration.password"
 
   # Default values aligned with opendesk/helmfile/apps/element/values-element.yaml.gotmpl
   # (frontend) and values-synapse.yaml.gotmpl (homeserver). Environment-specific
@@ -176,6 +184,15 @@ spec:
           tls: false
           starttls: false
           senderAddress: "matrix@${TENANT_DOMAIN}"
+        turn:
+          sharedSecret: "${TURN_CREDENTIALS}"
+          servers:
+            - server: "${TURN_TLS_HOST}"
+              port: 5349
+              transport: "${TURN_TRANSPORT}"
+            - server: "${TURN_HOST}"
+              port: 3478
+              transport: "${TURN_TRANSPORT}"
         oidc:
           # issuer and clientId are injected by ExternalSecret from OpenBao
           # (seeded by the identity-reconciler). Only the static claims remain here.
@@ -191,6 +208,10 @@ spec:
         password_config:
           enabled: false
           localdb_enabled: false
+        "net.nordeck.element_web.module.widget_lifecycle":
+          widget_permissions:
+            "https://chat.${TENANT_DOMAIN}/jitsi.html":
+              identity_approved: true
         rc_login:
           account:
             per_second: 2
@@ -264,10 +285,10 @@ spec:
   # Pattern B — opendesk-element/synapse chart injects secrets as direct Helm values.
   deploymentMethod: crossplane
 
-  # Use the dedicated app-element Composition which deploys three Helm Releases:
-  # opendesk-element (frontend), opendesk-synapse (homeserver), opendesk-synapse-web
-  # (nginx proxy + matrix.<domain> ingress). The XRD default (app-default) only
-  # deploys a single Release and would leave Synapse undeployed.
+  # Use the dedicated app-element Composition which deploys five Helm Releases:
+  # opendesk-element (frontend), opendesk-synapse (homeserver),
+  # opendesk-synapse-create-account + opendesk-matrix-user-verification-service
+  # (Jitsi hybrid_matrix_token auth), and opendesk-synapse-web (matrix ingress).
   compositionRef: app-element
 
   # Ingress managed by the operator's ensureIngress reconciler.

@@ -40,11 +40,11 @@
 #   service alias emitted by the composition. The chart's built-in ingress is
 #   disabled (jitsi.web.ingress.enabled: false) to avoid conflicting resources.
 #
-#   Element integration: when both Jitsi and Element are installed in the same
-#   tenant, the orchestrator's IntegrationBinding wires the Jitsi public URL into
-#   Synapse's configuration for Jitsi widget support in Matrix rooms. No extra
-#   AppProfile setting is needed — the binding is emitted automatically by the
-#   app-element Composition when it detects a jitsi AppProfile in the tenant.
+#   Element integration: install Element in the same tenant. The app-element
+#   composition deploys Matrix User Verification Service (UVS); Prosody uses
+#   hybrid_matrix_token auth and MATRIX_UVS_URL pointing at that service.
+#   Element's jitsi.html widget and Synapse TURN config use ${TURN_*} from the
+#   gentian-kernel-services ConfigMap (shared with this profile).
 #
 #   Deployment uses Pattern B (crossplane): an App claim drives the Composition
 #   which collects all four appSecrets via ExternalSecret and renders the Helm Release.
@@ -79,12 +79,9 @@ spec:
       provider: nubus
       capabilities:
         - navigation:register
-    - contract: video-conferencing
-      provider: element
-      capabilities:
-        - jitsi:widget
 
-  # One portal tile pointing to the tenant Jitsi instance root URL.
+  # Portal tile for standalone meetings (OpenDesk parity). Element room widgets
+  # use the same meet.<tenant> URL via global.hosts.jitsi in the Element profile.
   portalTiles:
     - name: jitsi
       displayName:
@@ -135,22 +132,14 @@ spec:
   # by the orchestrator's Tofu module at deploy time.
   extraValues:
     global:
-      # Use the kernel/platform domain so that global.hosts.keycloak resolves
-      # correctly to id.<kernel_domain> (e.g. id.desk.gentian.org) instead of
-      # id.<tenant_domain> (e.g. id.gtn-demo-2.desk.gentian.org which returns 404).
-      # global.hosts.jitsi is prefixed with the tenant ID to keep the Jitsi-specific
-      # URLs at meet.<tenant_id>.<kernel_domain>.
-      domain: "${KERNEL_DOMAIN}"
+      domain: "${TENANT_DOMAIN}"
       hosts:
-        element: "chat.${TENANT_ID}"
-        synapse: "matrix.${TENANT_ID}"
-        jitsi: "meet.${TENANT_ID}"
+        element: "chat"
+        synapse: "matrix"
+        jitsi: "meet"
         keycloak: "id"
         nubus: "portal"
         intercomService: "ics"
-        matrixNeoBoardWidget: "matrix-neoboard-widget.${TENANT_ID}"
-        matrixNeoChoiceWidget: "matrix-neochoice-widget.${TENANT_ID}"
-        matrixNeoDateFixWidget: "matrix-neodatefix-widget.${TENANT_ID}"
 
     containerSecurityContext:
       allowPrivilegeEscalation: false
@@ -206,10 +195,23 @@ spec:
           - name: "AUTH_TYPE"
             value: "hybrid_matrix_token"
           - name: "JWT_APP_ID"
-            # Substituted with meet.<tenant_domain> via ${TENANT_DOMAIN}.
             value: "meet.${TENANT_DOMAIN}"
           - name: "MATRIX_UVS_SYNC_POWER_LEVELS"
             value: "true"
+          - name: "MATRIX_UVS_URL"
+            value: "http://opendesk-matrix-user-verification-service.${TENANT_NAMESPACE}.svc.cluster.local"
+          - name: "TURN_HOST"
+            value: "${TURN_HOST}"
+          - name: "TURN_PORT"
+            value: "${TURN_PORT}"
+          - name: "TURNS_HOST"
+            value: "${TURN_TLS_HOST}"
+          - name: "TURNS_PORT"
+            value: "${TURN_TLS_PORT}"
+          - name: "TURN_TRANSPORT"
+            value: "${TURN_TRANSPORT}"
+          - name: "TURN_CREDENTIALS"
+            value: "${TURN_CREDENTIALS}"
         resources:
           requests:
             cpu: "100m"
