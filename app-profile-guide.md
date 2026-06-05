@@ -363,6 +363,19 @@ There is **no portal tile** and **no tenant ingress** — manifests live under
 ingresses must allow Nextcloud and the portal; do not use `more_clear_headers`
 (microk8s ingress-nginx lacks it) — append with `add_header … always` only.
 
+### 6c. Kernel file share (Nextcloud Files)
+
+Nextcloud Files is a **shared kernel service** at `files.<kernel_domain>` (not an
+AppProfile). The gentian-os operator does **not** manage its Ingress — CSP lives in
+`gentian-os/kernel/services/nextcloud/manifests/<env>/configmap.yaml` and is
+re-applied by `./update.sh --nextcloud-office`.
+
+Use the same **replace** pattern as Element (§6b): `proxy_hide_header` for upstream
+`X-Frame-Options` and `Content-Security-Policy`, then a single
+`add_header Content-Security-Policy "frame-ancestors 'self' https://portal.<kernel-domain>" always`.
+Do **not** use `more_clear_headers` or `more_set_headers` — they are ignored on
+microk8s and leave `X-Frame-Options: SAMEORIGIN`, which blocks the portal iframe.
+
 ---
 
 ## 7. Global domain and hosts
