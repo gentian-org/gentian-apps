@@ -259,7 +259,7 @@ spec:
         "oidc.logoutMechanism": "rpInitiated"
         # oidc.provider uses the per-tenant realm (${TENANT_ID}) — NOT a hardcoded
         # realm name like "opendesk". This is the key per-tenant fix vs opendesk.
-        "oidc.provider": "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}"
+        "oidc.provider": "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
         "oidc.scope": "openid,opendesk-xwiki-scope"
         "oidc.skipped": false
         # These ${oidc.user.*} expressions are XWiki's own internal template
@@ -268,7 +268,7 @@ spec:
         "oidc.user.subjectFormater": "${oidc.user.opendesk_username._lowerCase}"
         "oidc.userinfoclaims": "xwiki_user_accessibility,xwiki_user_company,xwiki_user_displayHiddenDocuments,xwiki_user_editor,xwiki_user_usertype"
 
-        "url.trustedDomains": "id.${TENANT_DOMAIN}"
+        "url.trustedDomains": "id.${KERNEL_DOMAIN}"
 
         # Central navigation — portalSecret wired by central-navigation IntegrationBinding.
         "workplaceServices.navigationEndpoint": "https://portal.${KERNEL_DOMAIN}/univention/portal/navigation.json"
@@ -328,7 +328,7 @@ spec:
       # Link LDAP users with OIDC-authenticated sessions (required for LDAP+OIDC).
       "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.addOIDCObject": 1
       # OIDCIssuer uses per-tenant realm (${TENANT_ID}) — NOT hardcoded "opendesk".
-      "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.OIDCIssuer": "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}"
+      "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.OIDCIssuer": "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
 
       # Auth service — delegates password auth to the OIDC bridge.
       "property:xwiki:XWiki.AuthService.Configuration^XWiki.AuthService.ConfigurationClass.authService": "keycloak-bridge-auth"

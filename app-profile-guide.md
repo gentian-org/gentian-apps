@@ -61,6 +61,16 @@ That value only works in one cluster and breaks on every other environment.
 **installed app** → `${TENANT_DOMAIN}` (plus `subDomain` in `AppProfile.spec.ingress`).
 Anything on the **platform shell or IdP** → `${KERNEL_DOMAIN}`.
 
+**Keycloak / `global.domain`:** charts build `https://{hosts.keycloak}.{global.domain}`
+for OIDC. Set `global.domain: "${KERNEL_DOMAIN}"` and prefix tenant app host
+labels with `${TENANT_ID}` (e.g. `jitsi: "meet.${TENANT_ID}"` →
+`meet.demo.desk.gentian.org`). See `gentian-apps` commit `b1203d0`.
+
+**ACME staging (dev):** when `tenantDNS01ClusterIssuer` contains `staging`,
+compositions mount `gentian-staging-ca-tls` so Synapse/Jitsi trust
+`id.${KERNEL_DOMAIN}` (LE staging intermediate). Run
+`./update.sh --acme-issuers` to refresh the bundle.
+
 ---
 
 ## 3. Secrets and valueMapping

@@ -137,17 +137,20 @@ spec:
   # the tenant's domain.
   extraValues:
     global:
-      domain: "${TENANT_DOMAIN}"
+      # Kernel/platform domain so global.hosts.keycloak resolves to id.<kernel>
+      # (e.g. id.desk.gentian.org), not id.<tenant> (404). Tenant-scoped app
+      # hostnames use ${TENANT_ID} prefix — see commit b1203d0 / app-profile-guide.
+      domain: "${KERNEL_DOMAIN}"
       hosts:
-        element: "chat"
-        synapse: "matrix"
-        jitsi: "meet"
+        element: "chat.${TENANT_ID}"
+        synapse: "matrix.${TENANT_ID}"
+        jitsi: "meet.${TENANT_ID}"
         keycloak: "id"
         nubus: "portal"
         intercomService: "ics"
-        matrixNeoBoardWidget: "matrix-neoboard-widget"
-        matrixNeoChoiceWidget: "matrix-neochoice-widget"
-        matrixNeoDateFixWidget: "matrix-neodatefix-widget"
+        matrixNeoBoardWidget: "matrix-neoboard-widget.${TENANT_ID}"
+        matrixNeoChoiceWidget: "matrix-neochoice-widget.${TENANT_ID}"
+        matrixNeoDateFixWidget: "matrix-neodatefix-widget.${TENANT_ID}"
 
     fullnameOverride: "element"
 

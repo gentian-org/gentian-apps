@@ -128,14 +128,19 @@ spec:
   # to the XMPP/Prosody service on the same tenant domain — no proxy needed.
   # Default values aligned with opendesk/helmfile/apps/jitsi/values-jitsi.yaml.gotmpl.
   # Environment-specific overrides (domain, public IP, image registry) are injected
-  # by the orchestrator's Tofu module at deploy time.
+  # by the orchestrator's Tofu module at deploy time. ${TENANT_DOMAIN} is substituted
+  # by the operator with the tenant effective domain; ${KERNEL_DOMAIN} with the
+  # cluster kernel domain (central IdP at id.${KERNEL_DOMAIN}).
   extraValues:
     global:
-      domain: "${TENANT_DOMAIN}"
+      # Kernel/platform domain so global.hosts.keycloak resolves to id.<kernel>
+      # (e.g. id.desk.gentian.org), not id.<tenant> (404). Tenant app URLs stay
+      # at meet.<tenant_id>.<kernel> via ${TENANT_ID}-prefixed host labels.
+      domain: "${KERNEL_DOMAIN}"
       hosts:
-        element: "chat"
-        synapse: "matrix"
-        jitsi: "meet"
+        element: "chat.${TENANT_ID}"
+        synapse: "matrix.${TENANT_ID}"
+        jitsi: "meet.${TENANT_ID}"
         keycloak: "id"
         nubus: "portal"
         intercomService: "ics"

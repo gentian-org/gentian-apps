@@ -330,16 +330,16 @@ spec:
         # by OpenProject's OmniAuth Keycloak strategy.
         authorizationEndpoint: "/realms/${TENANT_ID}/protocol/openid-connect/auth"
         # endSessionEndpoint is browser-facing: requires the full external URL.
-        endSessionEndpoint: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/logout"
-        host: "id.${TENANT_DOMAIN}"
+        endSessionEndpoint: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/logout"
+        host: "id.${KERNEL_DOMAIN}"
         identifier: "opendesk-openproject"
         provider: "keycloak"
         scope: "[openid,opendesk-openproject-scope]"
         # Backend endpoints: OpenProject fetches these server-side (token exchange
         # and user info). External URLs work on clusters without hairpin NAT issues.
         # Override via App.spec.config.extraValues if internal routing is required.
-        tokenEndpoint: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/token"
-        userinfoEndpoint: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/userinfo"
+        tokenEndpoint: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/token"
+        userinfoEndpoint: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/userinfo"
         attribute_map:
           login: "opendesk_username"
           admin: "openproject_admin"
@@ -361,9 +361,9 @@ spec:
       # ── OIDC env overrides ────────────────────────────────────────────────
       # OpenProject reads these in addition to the structured openproject.oidc.*
       # block above. The issuer env var sets the OmniAuth provider config.
-      OPENPROJECT_OPENID__CONNECT_KEYCLOAK_ISSUER: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}"
+      OPENPROJECT_OPENID__CONNECT_KEYCLOAK_ISSUER: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
       OPENPROJECT_OPENID__CONNECT_KEYCLOAK_POST__LOGOUT__REDIRECT__URI: "https://projects.${TENANT_DOMAIN}/"
-      OPENPROJECT_OPENID__CONNECT_KEYCLOAK_JWKS__URI: "https://id.${TENANT_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/certs"
+      OPENPROJECT_OPENID__CONNECT_KEYCLOAK_JWKS__URI: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/certs"
 
       # ── SMTP (password injected via valueMapping.smtp.passwordKey) ────────
       # ${SMTP_HOST} is substituted from the kernel Postfix service address.
