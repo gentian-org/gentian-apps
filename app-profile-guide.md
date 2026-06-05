@@ -423,6 +423,14 @@ To enable conference widgets:
    (`Password login has been disabled`) and leaves the Element XApp Not Ready.
    Human users still use OIDC: `app-element` sets `sso_redirect_options.immediate`
    on the Element web `config.json` only.
+7. **Retry after a bootstrap failure:** the chart hook runs at post-install only.
+   After Synapse password auth is restored, delete the failed Job and let Crossplane
+   retry the bootstrap `Release` (or delete `opendesk-matrix-user-verification-service-bootstrap`
+   and re-sync the Element `App` claim):
+
+   ```bash
+   kubectl delete job -n tenant-demo opendesk-matrix-user-verification-service-bootstrap --ignore-not-found
+   ```
 
 ---
 
