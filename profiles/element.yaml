@@ -48,7 +48,10 @@ spec:
         de_DE: "Chat"
         en_US: "Chat"
       linkTarget: newwindow
-      allowedGroup: "managed-by-attribute-Livecollaboration"
+      # Match Jitsi: portal tile visible to all App Users. Synapse OIDC still
+      # requires managed-by-attribute-Livecollaboration (via opendeskLivecollaborationEnabled
+      # on the App User template and the ldap-app-user-capabilities backfill job).
+      allowedGroup: "App Users"
 
   kernelRequirements:
     identity:
