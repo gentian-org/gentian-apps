@@ -106,8 +106,10 @@ The operator seeds OIDC issuer/client credentials in OpenBao as
 - Redirect URIs on `${KERNEL_DOMAIN}` or portal host instead of `${TENANT_DOMAIN}`.
 
 **ACME staging (dev):** when `tenantDNS01ClusterIssuer` contains `staging`,
-compositions mount `gentian-staging-ca-tls` so Synapse/Jitsi trust
-`id.${KERNEL_DOMAIN}` (LE staging intermediate). `install.sh` and the
+compositions mount `gentian-staging-ca-tls` and (for Synapse) set
+`use_insecure_ssl_client_just_for_testing_do_not_use` so in-cluster OIDC
+discovery can reach `id.${KERNEL_DOMAIN}` — see
+`gentian-os/docs/design/security.md` §9. `install.sh` and the
 gentian-os operator bootstrap this secret in `gentian-dev` and replicate it
 into each `tenant-*` namespace; run `./update.sh --acme-issuers` to refresh
 the bundle after issuer or kernel cert changes.
