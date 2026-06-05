@@ -47,6 +47,8 @@ spec:
       displayName:
         de_DE: "Chat"
         en_US: "Chat"
+      # embedded opens inside gentian-ui; newwindow still uses the portal shell.
+      # Either way the operator must allow frame-ancestors from portal.<kernel>.
       linkTarget: newwindow
       # Match Jitsi: portal tile visible to all App Users. Synapse OIDC still
       # requires managed-by-attribute-Livecollaboration (via opendeskLivecollaborationEnabled
@@ -305,6 +307,8 @@ spec:
     ingressClassName: "nginx"
     tlsEnabled: true
     # TLS: operator uses per-tenant DNS-01 wildcard (clusterIssuer field unused)
+    # Portal iframe CSP (frame-ancestors) is injected by the gentian-os operator —
+    # do not add X-Frame-Options or Content-Security-Policy here (see app-profile-guide §6).
     annotations:
       nginx.ingress.kubernetes.io/proxy-body-size: "100M"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "60"

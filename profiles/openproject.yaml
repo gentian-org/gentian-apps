@@ -177,6 +177,8 @@ spec:
     ingressClassName: "nginx"
     tlsEnabled: true
     # TLS: operator uses per-tenant DNS-01 wildcard (clusterIssuer field unused)
+    # Portal iframe CSP (frame-ancestors) is injected by the gentian-os operator —
+    # do not add X-Frame-Options or Content-Security-Policy here (see app-profile-guide §6).
     annotations:
       nginx.ingress.kubernetes.io/proxy-body-size: "512M"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "120"

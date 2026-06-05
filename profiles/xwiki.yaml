@@ -146,6 +146,7 @@ spec:
   # No appSecrets — all credentials are kernel-provisioned (oidc, db, smtp, ldap).
 
   # Operator ingress — chart-managed ingress disabled below (ingress.enabled: false).
+  # Portal iframe CSP (frame-ancestors) is injected by the operator (app-profile-guide §6).
   ingress:
     subDomain: "wiki"
     serviceName: "xwiki"

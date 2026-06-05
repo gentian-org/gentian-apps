@@ -251,27 +251,74 @@ backend (same host, no CORS).
 
 ---
 
-## 6. Portal iframe embedding (CSP header)
+## 6. Portal iframe embedding (CSP / `frame-ancestors`)
 
-Without a `frame-ancestors` header the browser **refuses to render the app
-inside the portal iframe** (Firefox shows “will not allow … if another site has
-embedded it”).
+Gentian apps open inside the **kernel portal** (`https://portal.${KERNEL_DOMAIN}`)
+in an iframe (gentian-ui window manager). The app UI is cross-origin
+(`https://chat.${TENANT_DOMAIN}`, etc.). Browsers block embedding unless the app
+response explicitly allows the portal origin in **`Content-Security-Policy:
+frame-ancestors`**.
 
-**You do not add this in AppProfiles.** The gentian-os operator injects NGINX
-`configuration-snippet` directives on every app `Ingress` it creates, allowing
-embedding from the shared kernel portal (`https://portal.${KERNEL_DOMAIN}`).
-Tenants sign in at the kernel portal, not `portal.<tenant-domain>`.
+### 6a. Firefox “will not allow … if another site has embedded it”
 
-If your chart needs extra NGINX snippet lines (e.g. CryptPad `sub_filter`), put
-only those under `ingress.annotations`; the operator prepends the
-frame-ancestors block and strips any legacy per-profile CSP you may have copied
-from older examples. The operator **appends** a second `Content-Security-Policy`
-header (it does not replace the app's CSP). CryptPad's sandbox relies on the
-upstream `script-src` without `'unsafe-eval'`; clearing the whole header causes
-"eval should not be permitted" at load time.
+That message means the app's CSP (or `X-Frame-Options`) does **not** include
+`https://portal.${KERNEL_DOMAIN}` in `frame-ancestors`.
 
-**No other app-level CORS setup is required.** TLS, bearer-token forwarding,
-and same-origin iframe loading are handled by the platform.
+**Do not fix this in AppProfiles.** The gentian-os operator injects NGINX
+`configuration-snippet` directives on every app `Ingress` it manages.
+
+| Check | Action |
+|---|---|
+| Portal URL | Users must use `portal.${KERNEL_DOMAIN}` — **not** `portal.${TENANT_DOMAIN}` (404 on multi-tenant). |
+| Profile `ingress.annotations` | **Never** add `X-Frame-Options`, `frame-ancestors`, or `Content-Security-Policy` — the operator owns this. Legacy per-tenant portal origins (`portal.${TENANT_DOMAIN}`) are stripped on reconcile. |
+| `linkTarget` | `embedded` and `newwindow` both load inside gentian-ui; CSP must still allow the kernel portal. Default `newwindow` is fine. |
+| Operator version | Reconcile the tenant after upgrading gentian-os so ingress snippets are updated. |
+
+### 6b. Double CSP headers (Element and similar)
+
+Some charts (notably **Element** / opendesk-element-web nginx) already send:
+
+```http
+Content-Security-Policy: frame-ancestors 'self'
+```
+
+If ingress **appends** a second header with the portal origin, the browser
+enforces **both** policies — `'self'` still blocks embedding from
+`portal.${KERNEL_DOMAIN}`. Symptom: portal tile opens but the iframe is blank
+with the Firefox message above; `curl -sI` shows **two** `content-security-policy`
+lines.
+
+The operator **replaces** upstream CSP for standard AppProfile ingresses
+(`chat`, `meet`, `projects`, `webmail`, …): it clears `X-Frame-Options` and
+`Content-Security-Policy`, then sets a single:
+
+```http
+Content-Security-Policy: frame-ancestors 'self' https://portal.<kernel-domain>
+```
+
+**Exception — CryptPad** (`pad` / `pad-sandbox` kernel ingresses only): the
+operator **appends** a second CSP header so upstream `script-src` (no
+`'unsafe-eval'`) stays intact. Do not copy CryptPad's append-only pattern into
+AppProfiles.
+
+### 6c. AppProfile checklist (all profiles)
+
+These profiles rely on the operator and need **no** CSP annotations:
+
+- `element`, `jitsi`, `openproject`, `ox-appsuite`, `xwiki`
+
+Add only non-CSP ingress annotations your chart needs (proxy timeouts, body size):
+
+```yaml
+ingress:
+  subDomain: chat
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "100M"
+    # NO frame-ancestors / X-Frame-Options / Content-Security-Policy here
+```
+
+**No other app-level CORS setup is required** for normal same-origin app UIs.
+TLS and `browserProxy` bearer forwarding are platform-managed (§5d–5e).
 
 ### 6b. Kernel diagram service (CryptPad)
 
@@ -419,7 +466,8 @@ Before opening a PR, verify:
 - [ ] OIDC uses full `OIDCClientSpec`, realm is `${TENANT_ID}`
 - [ ] Secrets only in `valueMapping` / `appSecrets`, never in `extraValues`
 - [ ] `reloader.stakater.com/auto: "true"` in `podAnnotations`
-- [ ] (automatic) Operator injects portal `frame-ancestors` on app Ingress — no profile annotation needed
+- [ ] (automatic) Operator injects portal `frame-ancestors` on app Ingress — no CSP annotations in profile
+- [ ] `ingress.annotations` contains no `frame-ancestors`, `X-Frame-Options`, or `Content-Security-Policy`
 - [ ] (CryptPad / multi-host) `additionalIngresses` use flat subdomains; no per-host CSP in annotations — operator sets `pad-sandbox` policy
 - [ ] `spec.browserProxy` declared if the shell calls this app's REST API
 - [ ] `compositionRef` omitted unless using a non-default composition
