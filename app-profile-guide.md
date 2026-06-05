@@ -107,8 +107,10 @@ The operator seeds OIDC issuer/client credentials in OpenBao as
 
 **ACME staging (dev):** when `tenantDNS01ClusterIssuer` contains `staging`,
 compositions mount `gentian-staging-ca-tls` so Synapse/Jitsi trust
-`id.${KERNEL_DOMAIN}` (LE staging intermediate). Run
-`./update.sh --acme-issuers` to refresh the bundle.
+`id.${KERNEL_DOMAIN}` (LE staging intermediate). `install.sh` and the
+gentian-os operator bootstrap this secret in `gentian-dev` and replicate it
+into each `tenant-*` namespace; run `./update.sh --acme-issuers` to refresh
+the bundle after issuer or kernel cert changes.
 
 ---
 
