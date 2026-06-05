@@ -289,8 +289,9 @@ with the Firefox message above; `curl -sI` shows **two** `content-security-polic
 lines.
 
 The operator **replaces** upstream CSP for standard AppProfile ingresses
-(`chat`, `meet`, `projects`, `webmail`, …): it clears `X-Frame-Options` and
-`Content-Security-Policy`, then sets a single:
+(`chat`, `meet`, `projects`, `webmail`, …): it uses `proxy_hide_header` (stock
+ingress-nginx; microk8s lacks `more_clear_headers`) to strip upstream
+`X-Frame-Options` and `Content-Security-Policy`, then sets a single:
 
 ```http
 Content-Security-Policy: frame-ancestors 'self' https://portal.<kernel-domain>
@@ -319,6 +320,35 @@ ingress:
 
 **No other app-level CORS setup is required** for normal same-origin app UIs.
 TLS and `browserProxy` bearer forwarding are platform-managed (§5d–5e).
+
+**Force ingress reconcile:** after an operator upgrade, bump the tenant to refresh
+ingress annotations (the `gentianos.io/reconcile` timestamp annotation alone does
+not change `spec` — patch any field or delete the app ingress and let the operator
+recreate it):
+
+```bash
+kubectl delete ingress -n tenant-demo ingress-demo-element
+# operator recreates on next tenant reconcile (~seconds)
+```
+
+### 6d. Element SSO — OIDC redirect URI host
+
+Element Web is served at `chat.<tenant-domain>` but the Matrix homeserver (Synapse)
+and OIDC callback live at **`matrix.<tenant-domain>`** (synapse-web ingress).
+Keycloak `redirectUris` must target the homeserver host:
+
+```yaml
+kernelRequirements:
+  identity:
+    oidc:
+      redirectUris:
+        - "https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback"
+```
+
+Using `chat.${TENANT_DOMAIN}` causes OIDC to fail after Keycloak login; Element
+shows **“Invalid username or password”** even though credentials are correct.
+Reconcile the tenant / identity jobs after fixing the AppProfile so the Keycloak
+client `opendesk-synapse` picks up the new redirect URI.
 
 ### 6b. Kernel diagram service (CryptPad)
 
@@ -365,8 +395,9 @@ To enable conference widgets:
 2. Element's `optionalIntegrations` declares `videoconference` from provider `jitsi`
    (creates an `IntegrationBinding`; no extra Helm wiring in the binding itself).
 3. The `app-element` composition deploys **Matrix User Verification Service**
-   (UVS bootstrap Job + service). Jitsi Prosody must use `AUTH_TYPE=hybrid_matrix_token`
-   and `MATRIX_UVS_URL=http://opendesk-matrix-user-verification-service.${TENANT_NAMESPACE}.svc.cluster.local`.
+   (UVS bootstrap Job + service). Jitsi Prosody must use `AUTH_TYPE=hybrid_matrix_token`,
+   `JWT_APP_SECRET` (same value as `settings.jwtAppSecret` / keycloak adapter), and
+   `MATRIX_UVS_URL=http://opendesk-matrix-user-verification-service.${TENANT_NAMESPACE}.svc.cluster.local`.
 4. Set `global.hosts.jitsi: "meet.${TENANT_ID}"` in **both** profiles (with
    `global.domain: "${KERNEL_DOMAIN}"`) so Element's bundled `jitsi.html`
    widget targets `https://meet.${TENANT_DOMAIN}`.
@@ -463,6 +494,7 @@ Before opening a PR, verify:
 - [ ] `global.domain` and `global.hosts` set in `extraValues`
 - [ ] If `global.hosts.keycloak` is present: `global.domain` is `${KERNEL_DOMAIN}`, tenant app hosts use `${TENANT_ID}` prefix
 - [ ] All IdP URLs use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`; redirect URIs use `${TENANT_DOMAIN}`
+- [ ] Element: OIDC redirect is `https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback` (not `chat.`)
 - [ ] OIDC uses full `OIDCClientSpec`, realm is `${TENANT_ID}`
 - [ ] Secrets only in `valueMapping` / `appSecrets`, never in `extraValues`
 - [ ] `reloader.stakater.com/auto: "true"` in `podAnnotations`

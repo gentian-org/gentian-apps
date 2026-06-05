@@ -65,7 +65,8 @@ spec:
         name: "Element (Synapse)"
         accessType: CONFIDENTIAL
         redirectUris:
-          - "https://chat.${TENANT_DOMAIN}/_synapse/client/oidc/callback"
+          # Synapse OIDC callback is served by synapse-web on matrix.<tenant>, not the Element UI host.
+          - "https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback"
       ldap:
         # Per-tenant LDAP search account provisioned by the LDAP init Job on
         # first app install. Credentials are written to OpenBao by the init Job
