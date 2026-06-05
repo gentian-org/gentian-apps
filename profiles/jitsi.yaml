@@ -199,6 +199,10 @@ spec:
             value: "hybrid_matrix_token"
           - name: "JWT_APP_ID"
             value: "meet.${TENANT_DOMAIN}"
+          # Value injected by app-default composition from internal-jwt_app_secret
+          # (Helm set jitsi.prosody.extraEnvs[2].value) — must match keycloak adapter.
+          - name: "JWT_APP_SECRET"
+            value: ""
           - name: "MATRIX_UVS_SYNC_POWER_LEVELS"
             value: "true"
           - name: "MATRIX_UVS_URL"

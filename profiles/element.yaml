@@ -209,12 +209,11 @@ spec:
             - "profile"
       # Tighter rate limits for non-chat Matrix apps and widgets (NeoBoard etc).
       additionalConfiguration:
-        # Disable local password authentication so Element redirects straight
-        # to the OIDC provider instead of showing the username/password form.
-        # The chart hardcodes password_config.enabled: true, so we override it here.
-        password_config:
-          enabled: false
-          localdb_enabled: false
+        # Keep Synapse local password auth enabled (openDesk default) so the
+        # opendesk-synapse-create-account UVS bootstrap Job can log in as @uvs
+        # after register_new_matrix_user. Human users still go through OIDC:
+        # app-element injects sso_redirect_options.immediate on the Element web
+        # config only (not into homeserver.yaml).
         "net.nordeck.element_web.module.widget_lifecycle":
           widget_permissions:
             "https://chat.${TENANT_DOMAIN}/jitsi.html":

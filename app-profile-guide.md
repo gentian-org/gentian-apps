@@ -417,6 +417,12 @@ To enable conference widgets:
 5. Configure shared TURN in `gentian-deployments` → `kernelServices.turn*` on the
    gentian-os Helm chart; compositions substitute `${TURN_*}` into Element Synapse
    and Jitsi Prosody env vars.
+6. **UVS bootstrap** uses `opendesk-synapse-create-account`, which logs in as `@uvs`
+   with a local Matrix password after `register_new_matrix_user`. Do **not** set
+   `password_config.enabled: false` on Synapse — that breaks the bootstrap Job
+   (`Password login has been disabled`) and leaves the Element XApp Not Ready.
+   Human users still use OIDC: `app-element` sets `sso_redirect_options.immediate`
+   on the Element web `config.json` only.
 
 ---
 
