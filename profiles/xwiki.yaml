@@ -179,9 +179,11 @@ spec:
   # must leave unknown ${...} tokens intact when substituting extraValues.
   extraValues:
     global:
-      domain: "${TENANT_DOMAIN}"
+      # Kernel domain so global.hosts.keycloak → id.<kernel> (central IdP).
+      # Wiki URLs use wiki.${TENANT_DOMAIN} explicitly in customConfigs/properties.
+      domain: "${KERNEL_DOMAIN}"
       hosts:
-        xwiki: "wiki"
+        xwiki: "wiki.${TENANT_ID}"
         keycloak: "id"
         nubus: "portal"
       imagePullSecrets:

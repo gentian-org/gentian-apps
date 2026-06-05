@@ -175,6 +175,7 @@ spec:
   extraValues:
     fullnameOverride: "appsuite"
     global:
+      # App zone only — all OIDC endpoints below use id.${KERNEL_DOMAIN} explicitly.
       domain: "${TENANT_DOMAIN}"
       hostname: "webmail.${TENANT_DOMAIN}"
       mysql:

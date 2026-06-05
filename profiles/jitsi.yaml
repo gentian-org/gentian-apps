@@ -97,8 +97,7 @@ spec:
 
   deploymentMethod: crossplane
 
-  # PUBLIC OIDC client — no client secret in valueMapping (aligned with opendesk).
-  valueMapping: {}
+  # PUBLIC OIDC client — no valueMapping needed (no kernel-injected secrets).
 
   appSecrets:
     # JWT token signing secret — shared between Prosody XMPP and the Keycloak adapter.

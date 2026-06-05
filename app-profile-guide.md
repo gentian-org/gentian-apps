@@ -66,6 +66,45 @@ for OIDC. Set `global.domain: "${KERNEL_DOMAIN}"` and prefix tenant app host
 labels with `${TENANT_ID}` (e.g. `jitsi: "meet.${TENANT_ID}"` →
 `meet.demo.desk.gentian.org`). See `gentian-apps` commit `b1203d0`.
 
+### Central IdP — required pattern (all profiles)
+
+Gentian uses a **central Keycloak** on the kernel domain. Realms are **per tenant**
+(`/realms/${TENANT_ID}`), but the IdP hostname is always **`id.${KERNEL_DOMAIN}`**
+— never `id.${TENANT_DOMAIN}` or `id.${TENANT_ID}.…`.
+
+| What | Placeholder / URL | Example (tenant `demo`, kernel `desk.gentian.org`) |
+|---|---|---|
+| IdP base | `https://id.${KERNEL_DOMAIN}` | `https://id.desk.gentian.org` |
+| Realm | `/realms/${TENANT_ID}` | `/realms/demo` |
+| Full issuer | `https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}` | `https://id.desk.gentian.org/realms/demo` |
+| App login redirect | `https://{sub}.${TENANT_DOMAIN}/…` | `https://projects.demo.desk.gentian.org/…` |
+| Portal / post-logout | `https://portal.${KERNEL_DOMAIN}` | `https://portal.desk.gentian.org` |
+
+**Two configuration styles in existing profiles:**
+
+1. **OpenDesk charts with `global.domain` + `global.hosts`** (Element, Jitsi,
+   OpenProject, XWiki): set `global.domain: "${KERNEL_DOMAIN}"`,
+   `global.hosts.keycloak: "id"`, and prefix **tenant app** host labels with
+   `${TENANT_ID}` (`chat.${TENANT_ID}`, `projects.${TENANT_ID}`, …). OIDC
+   redirect URIs and public app URLs still use `${TENANT_DOMAIN}`.
+2. **Explicit OIDC property blocks** (OpenProject `openproject.oidc.*`, OX
+   `com.openexchange.oidc.*`, XWiki `oidc.provider`): every endpoint and issuer
+   must use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`. Charts without
+   `global.hosts.keycloak` (OX) may keep `global.domain: "${TENANT_DOMAIN}"`
+   for the app hostname only — but must not derive IdP URLs from it.
+
+The operator seeds OIDC issuer/client credentials in OpenBao as
+`https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}` (stable across vanity
+`spec.domain` overrides). Profiles that use `valueMapping.oidc.issuerKey`
+(Element/Synapse) rely on that seed; do not hardcode a tenant-scoped IdP host.
+
+**Common IdP mistakes:**
+
+- `global.domain: "${TENANT_DOMAIN}"` with `hosts.keycloak: "id"` → resolves to
+  `id.demo.desk.gentian.org` (404). Use `${KERNEL_DOMAIN}` instead.
+- Hardcoded realm names (`opendesk`, `souvap`) instead of `${TENANT_ID}`.
+- Redirect URIs on `${KERNEL_DOMAIN}` or portal host instead of `${TENANT_DOMAIN}`.
+
 **ACME staging (dev):** when `tenantDNS01ClusterIssuer` contains `staging`,
 compositions mount `gentian-staging-ca-tls` so Synapse/Jitsi trust
 `id.${KERNEL_DOMAIN}` (LE staging intermediate). Run
@@ -249,16 +288,21 @@ ingresses must allow Nextcloud and the portal; do not use `more_clear_headers`
 
 Many Bitnami-family and opendesk charts read `global.domain` and `global.hosts`
 to build their internal URLs. If these are missing, charts fall back to
-`example.com` defaults, which breaks inter-service communication:
+`example.com` defaults, which breaks inter-service communication.
+
+When the chart lists `keycloak` under `global.hosts`, **`global.domain` must be
+`${KERNEL_DOMAIN}`** so Keycloak resolves to the central IdP (see §2). Prefix
+tenant app labels with `${TENANT_ID}`; keep user-facing redirect URIs on
+`${TENANT_DOMAIN}`:
 
 ```yaml
 extraValues:
   global:
-    domain: "${TENANT_DOMAIN}"
+    domain: "${KERNEL_DOMAIN}"
     hosts:
-      openproject: "projects"  # subdomain for this app
-      keycloak: "id"
-      nubus: "portal"
+      openproject: "projects.${TENANT_ID}"  # → projects.demo.desk.gentian.org
+      keycloak: "id"                        # → id.desk.gentian.org
+      nubus: "portal"                       # → portal.desk.gentian.org
 ```
 
 ### 7b. Jitsi + Element (video in Matrix rooms)
@@ -272,8 +316,9 @@ To enable conference widgets:
 3. The `app-element` composition deploys **Matrix User Verification Service**
    (UVS bootstrap Job + service). Jitsi Prosody must use `AUTH_TYPE=hybrid_matrix_token`
    and `MATRIX_UVS_URL=http://opendesk-matrix-user-verification-service.${TENANT_NAMESPACE}.svc.cluster.local`.
-4. Set `global.hosts.jitsi: meet` in **both** profiles so Element's bundled
-   `jitsi.html` widget targets `https://meet.${TENANT_DOMAIN}`.
+4. Set `global.hosts.jitsi: "meet.${TENANT_ID}"` in **both** profiles (with
+   `global.domain: "${KERNEL_DOMAIN}"`) so Element's bundled `jitsi.html`
+   widget targets `https://meet.${TENANT_DOMAIN}`.
 5. Configure shared TURN in `gentian-deployments` → `kernelServices.turn*` on the
    gentian-os Helm chart; compositions substitute `${TURN_*}` into Element Synapse
    and Jitsi Prosody env vars.
@@ -306,6 +351,10 @@ kernelRequirements:
 
 **Per-tenant realm:** All OIDC/LDAP URLs must use `${TENANT_ID}` as the Keycloak
 realm name. Never hardcode `souvap`, `opendesk`, or any literal realm name.
+
+**Central IdP host:** Issuer, authorization, token, JWKS, and logout endpoints
+must use `https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}` (or path-only auth
+URLs resolved against `openproject.oidc.host: "id.${KERNEL_DOMAIN}"`). See §2.
 
 ---
 
@@ -361,6 +410,8 @@ Before opening a PR, verify:
 - [ ] Chart-managed ingress disabled (`ingress.enabled: false` in `extraValues`)
 - [ ] `fullnameOverride` set to match `spec.ingress.serviceName`
 - [ ] `global.domain` and `global.hosts` set in `extraValues`
+- [ ] If `global.hosts.keycloak` is present: `global.domain` is `${KERNEL_DOMAIN}`, tenant app hosts use `${TENANT_ID}` prefix
+- [ ] All IdP URLs use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`; redirect URIs use `${TENANT_DOMAIN}`
 - [ ] OIDC uses full `OIDCClientSpec`, realm is `${TENANT_ID}`
 - [ ] Secrets only in `valueMapping` / `appSecrets`, never in `extraValues`
 - [ ] `reloader.stakater.com/auto: "true"` in `podAnnotations`

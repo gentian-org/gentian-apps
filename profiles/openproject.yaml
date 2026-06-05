@@ -200,9 +200,11 @@ spec:
   # Secret values are injected via set_sensitive (valueMapping) — not here.
   extraValues:
     global:
-      domain: "${TENANT_DOMAIN}"
+      # Kernel domain so global.hosts.keycloak → id.<kernel> (central IdP).
+      # App hostname is set explicitly in openproject.host below.
+      domain: "${KERNEL_DOMAIN}"
       hosts:
-        openproject: "projects"
+        openproject: "projects.${TENANT_ID}"
         keycloak: "id"
         nubus: "portal"
       imagePullSecrets:
