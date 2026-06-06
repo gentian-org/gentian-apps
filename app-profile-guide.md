@@ -350,6 +350,33 @@ shows **“Invalid username or password”** even though credentials are correct
 Reconcile the tenant / identity jobs after fixing the AppProfile so the Keycloak
 client `opendesk-synapse` picks up the new redirect URI.
 
+### 6e. IdP login inside a portal-embedded app (Keycloak `frame-ancestors`)
+
+Portal tiles load tenant apps in an iframe (`portal.<kernel>` → `chat.<tenant>.<kernel>`).
+OIDC SSO then loads **`id.<kernel>` inside the app iframe**. Firefox blocks with
+*“id… will not allow … if another site has embedded it”* when Keycloak's CSP only
+allows `https://portal.<kernel>` — the **immediate parent** is the app origin, not
+the portal.
+
+CSP `host-source` allows at most one `*.` label. `https://*.<kernel>` does **not**
+match `chat.demo.<kernel>`; each tenant needs **`https://*.<tenant-effective-domain>`**
+(e.g. `https://*.demo.desk.gentian.org`).
+
+| Layer | Who sets CSP | Must allow |
+|---|---|---|
+| App ingress (`chat`, `meet`, …) | gentian-os operator | `https://portal.<kernel>` (§6a–6b) |
+| IdP ingress (`id.<kernel>`) | nubus Helm values (`kernel/services/nubus/manifests/<env>/values/`) **and** gentian-os operator | `https://portal.<kernel>` **and** `https://*.<tenant-domain>` per Tenant CR |
+
+Helm values provide the install baseline; the operator patches the Keycloak proxy
+ingress on every tenant reconcile when tenants are added or removed. After changing
+nubus values in Git, sync the nubus manifests app so Crossplane reapplies the release.
+Verify:
+
+```bash
+curl -sI https://id.${KERNEL_DOMAIN}/ | grep -i content-security
+# expect: frame-ancestors 'self' https://portal.<kernel> https://*.demo.<kernel> …
+```
+
 ### 6b. Kernel diagram service (CryptPad)
 
 Diagram editing from Nextcloud Files uses a **shared CryptPad kernel service**
@@ -411,6 +438,11 @@ To enable conference widgets:
    (UVS bootstrap Job + service). Jitsi Prosody must use `AUTH_TYPE=hybrid_matrix_token`,
    `JWT_APP_SECRET` (same value as `settings.jwtAppSecret` / keycloak adapter), and
    `MATRIX_UVS_URL=http://opendesk-matrix-user-verification-service.${TENANT_NAMESPACE}.svc.cluster.local`.
+   The Element composition sets `fullnameOverride: opendesk-matrix-user-verification-service`
+   on the UVS release so that DNS name resolves (without it, Prosody points at a non-existent Service).
+   After OIDC login, the web client must receive `?jwt=…` (not only `?oidc=authorized`); otherwise users
+   join as `@guest.meet.jitsi` and see “Waiting for a moderator”. Enable
+   `enableUserRolesBasedOnToken: true` in `jitsi.web.extraConfig`.
 4. Set `global.hosts.jitsi: "meet.${TENANT_ID}"` in **both** profiles (with
    `global.domain: "${KERNEL_DOMAIN}"`) so Element's bundled `jitsi.html`
    widget targets `https://meet.${TENANT_DOMAIN}`.

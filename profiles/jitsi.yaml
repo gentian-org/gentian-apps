@@ -173,6 +173,8 @@ spec:
         extraConfig:
           doNotStoreRoom: true
           disableThirdPartyRequests: true
+          # JWT from OIDC must drive moderator/lobby_bypass claims in Prosody.
+          enableUserRolesBasedOnToken: true
         extraEnvs:
           TURN_ENABLE: "1"
         resources:
