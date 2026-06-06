@@ -368,9 +368,11 @@ match `chat.demo.<kernel>`; each tenant needs **`https://*.<tenant-effective-dom
 | IdP ingress (`id.<kernel>`) | nubus Helm values (`kernel/services/nubus/manifests/<env>/values/`) **and** gentian-os operator | `https://portal.<kernel>` **and** `https://*.<tenant-domain>` per Tenant CR |
 
 Helm values provide the install baseline; the operator patches the Keycloak proxy
-ingress on every tenant reconcile when tenants are added or removed. After changing
-nubus values in Git, sync the nubus manifests app so Crossplane reapplies the release.
-Verify:
+ingress on every tenant reconcile when tenants are added or removed. The operator
+also clears Keycloak **`X-Frame-Options: SAMEORIGIN`** on kernel and tenant realms
+(broker `/endpoint` callbacks fail in iframes even when `frame-ancestors` is correct).
+After changing nubus values in Git, sync the nubus manifests app so Crossplane
+reapplies the release. Verify:
 
 ```bash
 curl -sI https://id.${KERNEL_DOMAIN}/ | grep -i content-security
