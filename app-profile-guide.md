@@ -443,6 +443,10 @@ To enable conference widgets:
    After OIDC login, the web client must receive `?jwt=…` (not only `?oidc=authorized`); otherwise users
    join as `@guest.meet.jitsi` and see “Waiting for a moderator”. Enable
    `enableUserRolesBasedOnToken: true` in `jitsi.web.extraConfig`.
+   Gentian mounts persistent OIDC/JWT overlays from `gentian-os/overlays/jitsi/`
+   (via `app-default` composition): top-level `window.top.location` for portal iframe
+   SSO, JWT URL normalization after `oidc=authorized`, and Keycloak adapter
+   `preferred_username` fallback when `opendesk_username` is absent.
 4. Set `global.hosts.jitsi: "meet.${TENANT_ID}"` in **both** profiles (with
    `global.domain: "${KERNEL_DOMAIN}"`) so Element's bundled `jitsi.html`
    widget targets `https://meet.${TENANT_DOMAIN}`.
