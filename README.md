@@ -7,8 +7,7 @@ the cluster by ArgoCD.
 
 ```
 profiles/
-  element.yaml         # Element (Matrix chat) — deploy with jitsi for room widgets
-  jitsi.yaml           # Jitsi (video conferencing)
+  element.yaml         # Element (Matrix chat) — includes Jitsi sidecar for video
   openproject.yaml     # OpenProject (project management)
   ox-appsuite.yaml     # OX App Suite (groupware)
   xwiki.yaml           # XWiki (wiki and knowledge management)
