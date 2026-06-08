@@ -350,6 +350,16 @@ shows **“Invalid username or password”** even though credentials are correct
 Reconcile the tenant / identity jobs after fixing the AppProfile so the Keycloak
 client `opendesk-synapse` picks up the new redirect URI.
 
+**Matrix localpart:** use `matrixIdLocalpart: "opendesk_username"` (LDAP `uid`) and
+request scope `opendesk-matrix-scope`. Do not use `preferred_username` — kernel-broker
+tokens may carry `mailPrimaryAddress` there, which is not a valid Matrix localpart.
+
+**Wrong user after switching portal accounts:** portal login uses the **kernel** realm;
+Element/Synapse OIDC uses the **tenant** realm (`demo`, …). A previous user's tenant-realm
+SSO cookie or cached Matrix session in the browser can reopen Chat as the wrong person.
+The Element AppProfile sets `logout_redirect_url`; gentian-ui app tiles pass `login_hint`
+and `prompt=login` (and `#/logout` on `chat.*`) when opening SSO apps from the portal.
+
 ### 6e. IdP login inside a portal-embedded app (Keycloak `frame-ancestors`)
 
 Portal tiles load tenant apps in an iframe (`portal.<kernel>` → `chat.<tenant>.<kernel>`).

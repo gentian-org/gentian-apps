@@ -67,6 +67,9 @@ spec:
         redirectUris:
           # Synapse OIDC callback is served by synapse-web on matrix.<tenant>, not the Element UI host.
           - "https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback"
+        postLogoutRedirectUris:
+          - "https://chat.${TENANT_DOMAIN}/*"
+          - "https://portal.${KERNEL_DOMAIN}/*"
       ldap:
         # Per-tenant LDAP search account provisioned by the LDAP init Job on
         # first app install. Credentials are written to OpenBao by the init Job
@@ -203,12 +206,16 @@ spec:
         oidc:
           # issuer and clientId are injected by ExternalSecret from OpenBao
           # (seeded by the identity-reconciler). Only the static claims remain here.
-          matrixIdLocalpart: "preferred_username"
+          # Use LDAP uid (opendesk_username), not preferred_username — broker tokens
+          # may carry the kernel mailPrimaryAddress as preferred_username.
+          matrixIdLocalpart: "opendesk_username"
           scopes:
             - "openid"
-            - "profile"
+            - "opendesk-matrix-scope"
       # Tighter rate limits for non-chat Matrix apps and widgets (NeoBoard etc).
       additionalConfiguration:
+        # Chain Element logout into the tenant Keycloak session (openDesk default).
+        logout_redirect_url: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/logout?client_id=opendesk-synapse&post_logout_redirect_uri=https%3A%2F%2Fportal.${KERNEL_DOMAIN}"
         # Keep Synapse local password auth enabled (openDesk default) so the
         # opendesk-synapse-create-account UVS bootstrap Job can log in as @uvs
         # after register_new_matrix_user. Human users still go through OIDC:
