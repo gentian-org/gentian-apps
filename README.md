@@ -1,39 +1,54 @@
 # gentian-apps
 
-App Store catalogue for Gentian OS — cluster-scoped `AppProfile` CRs synced to
-the cluster by ArgoCD.
+App Store catalogue for Gentian OS — `AppProfile` CRs plus first-party app implementations.
 
 ## Structure
 
-```
-profiles/
+```text
+profiles/              # AppProfile YAML — synced to cluster by ArgoCD (gentian-appprofiles)
   element.yaml         # Element (Matrix chat) — includes Jitsi sidecar for video
   openproject.yaml     # OpenProject (project management)
   ox-appsuite.yaml     # OX App Suite (groupware)
   xwiki.yaml           # XWiki (wiki and knowledge management)
-  ...
+  app-store.yaml       # first-party app (source in apps/app-store/)
+apps/                  # first-party implementations (FastAPI + React + Helm)
+  _template/           # copy of gentian-app-template
+  app-store/           # tenant admin App Store UI
+contracts/             # integration contract schemas
+icons/                 # shared SVG assets
 ```
 
-## Adding an app
+**Discovery:** catalogue = `profiles/` · implementation = `apps/<name>/`
 
-See [app-profile-guide.md](app-profile-guide.md) for authoring guidelines,
-best practices, and a pre-PR checklist. It documents every class of bug
-that has appeared in the git history of this repo.
+## Guides
 
-Create a new `AppProfile` YAML in `profiles/`. After cluster bootstrap,
-ArgoCD syncs profiles via the **`gentian-appprofiles`** Application
-(created by `gentian-os/install.sh` step 15c), not via `gentian-deployments`.
-The Gentian OS `AppStoreReconciler` builds the `AppCatalogue` CR from them.
+| Guide | Audience |
+|-------|----------|
+| [app-profile-guide.md](app-profile-guide.md) | Publish an **existing** Helm chart (profile YAML only) |
+| [custom-app-guide.md](custom-app-guide.md) | Build a **new** Gentian-native app end-to-end |
+
+## Adding an upstream app
+
+Add `profiles/<app>.yaml` — see [app-profile-guide.md](app-profile-guide.md).
 
 ```bash
-# Verify the catalogue after sync:
 kubectl gentian apps list
 ```
+
+## Adding a first-party app
+
+1. Copy `apps/_template/` → `apps/<name>/`
+2. Implement backend + frontend + chart
+3. Add `profiles/<name>.yaml`
+4. CI (`.github/workflows/apps-ci.yaml`) publishes images + OCI chart
+
+See [custom-app-guide.md](custom-app-guide.md).
 
 ## Related repos
 
 | Repo | Purpose |
-|---|---|
-| `gentian-os` | Orchestrator, CRDs, Helm chart |
-| `gentian-deployments` | Per-environment config, Tenant CRs, ArgoCD app-of-apps |
-| `gentian-apps` | This repo — app store catalogue (AppProfile CRs) |
+|------|---------|
+| [gentian-os](https://github.com/gentian-org/gentian-os) | Orchestrator, CRDs, kernel |
+| [gentian-deployments](https://github.com/gentian-org/gentian-deployments) | Per-environment tenant state |
+| [gentian-app-template](https://github.com/gentian-org/gentian-app-template) | Scaffold for new apps |
+| [gentian-ui](https://github.com/gentian-org/gentian-ui) | Portal shell |

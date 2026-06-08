@@ -1,5 +1,9 @@
 # AppProfile Authoring Guide
 
+This guide covers **catalogue entries for existing upstream Helm charts** (profile
+YAML only). To **build a new Gentian-native app** (FastAPI + React + Helm), see
+[custom-app-guide.md](custom-app-guide.md).
+
 This guide captures the accumulated learnings and best practices from the existing
 AppProfile implementations. Read it before writing a new profile — every section
 corresponds to a class of bug that was caught in git history.
