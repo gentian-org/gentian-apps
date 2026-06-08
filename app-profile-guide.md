@@ -354,6 +354,11 @@ client `opendesk-synapse` picks up the new redirect URI.
 request scope `opendesk-matrix-scope`. Do not use `preferred_username` — kernel-broker
 tokens may carry `mailPrimaryAddress` there, which is not a valid Matrix localpart.
 
+**Loading screen / `net.nordeck.element_web.module.opendesk` error:** the
+`opendesk-element-web` image bundles the Nordeck OpenDesk module; `additionalConfiguration`
+must include its `banner` URLs (`portal_url`, `ics_*`, `portal_logo_svg_url`) and
+`custom_css_variables` — see `profiles/element.yaml`.
+
 **Wrong user after switching portal accounts:** portal login uses the **kernel** realm;
 Element/Synapse OIDC uses the **tenant** realm (`demo`, …). A previous user's tenant-realm
 SSO cookie or cached Matrix session in the browser can reopen Chat as the wrong person.

@@ -216,6 +216,18 @@ spec:
       additionalConfiguration:
         # Chain Element logout into the tenant Keycloak session (openDesk default).
         logout_redirect_url: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/logout?client_id=opendesk-synapse&post_logout_redirect_uri=https%3A%2F%2Fportal.${KERNEL_DOMAIN}"
+        # Required by opendesk-element-web (Nordeck OpenDesk module). Without this
+        # block Element throws "value is required" at startup and stays on loading.
+        "net.nordeck.element_web.module.opendesk":
+          config:
+            banner:
+              ics_navigation_json_url: "https://ics.${KERNEL_DOMAIN}/navigation.json"
+              ics_silent_url: "https://ics.${KERNEL_DOMAIN}/silent"
+              portal_logo_svg_url: "https://portal.${KERNEL_DOMAIN}/univention/portal/icons/logos/domain.svg"
+              portal_url: "https://portal.${KERNEL_DOMAIN}/"
+            custom_css_variables:
+              --cpd-color-bg-action-primary-rest: "#3B8C72"
+              --cpd-color-text-action-accent: "#3B8C72"
         # Keep Synapse local password auth enabled (openDesk default) so the
         # opendesk-synapse-create-account UVS bootstrap Job can log in as @uvs
         # after register_new_matrix_user. Human users still go through OIDC:
