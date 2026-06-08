@@ -310,7 +310,7 @@ AppProfiles.
 
 These profiles rely on the operator and need **no** CSP annotations:
 
-- `element`, `jitsi`, `openproject`, `ox-appsuite`, `xwiki`
+- `element`, `openproject`, `ox-appsuite`, `xwiki`
 
 Add only non-CSP ingress annotations your chart needs (proxy timeouts, body size):
 
@@ -449,26 +449,22 @@ extraValues:
 
 ### 7b. Jitsi + Element (video in Matrix rooms)
 
-OpenDesk keeps Jitsi and Element as **separate AppProfiles** in the same tenant.
-To enable conference widgets:
+Jitsi is bundled as an **Element sidecar** (similar to how CryptPad is wired from
+Nextcloud in openDesk — one install, not a separate tenant app). Installing
+`element` on a tenant deploys Jitsi at `meet.<tenant>` for Element room widgets
+and portal realtime links.
 
-1. Install both `element` and `jitsi` on the tenant (`spec.apps`).
-2. Element's `optionalIntegrations` declares `videoconference` from provider `jitsi`
-   (creates an `IntegrationBinding`; no extra Helm wiring in the binding itself).
+1. Install only `element` on the tenant (`spec.apps`). Do **not** add a separate
+   `jitsi` profile — there is no standalone Jitsi AppProfile in the catalogue.
+2. The `element` AppProfile declares `spec.sidecars` with the `opendesk-jitsi`
+   chart, OIDC client `opendesk-jitsi`, and `additionalIngresses` for
+   `meet.<tenant>` → `jitsi-web`.
 3. The `app-element` composition deploys **Matrix User Verification Service**
-   (UVS bootstrap Job + service). Jitsi Prosody must use `AUTH_TYPE=hybrid_matrix_token`,
-   `JWT_APP_SECRET` (same value as `settings.jwtAppSecret` / keycloak adapter), and
+   (UVS bootstrap Job + service) and the Jitsi sidecar release. Prosody uses
+   `AUTH_TYPE=hybrid_matrix_token`, `JWT_APP_SECRET` (same value as
+   `settings.jwtAppSecret` / keycloak adapter), and
    `MATRIX_UVS_URL=http://opendesk-matrix-user-verification-service.${TENANT_NAMESPACE}.svc.cluster.local`.
-   The Element composition sets `fullnameOverride: opendesk-matrix-user-verification-service`
-   on the UVS release so that DNS name resolves (without it, Prosody points at a non-existent Service).
-   After OIDC login, the web client must receive `?jwt=…` (not only `?oidc=authorized`); otherwise users
-   join as `@guest.meet.jitsi` and see “Waiting for a moderator”. Enable
-   `enableUserRolesBasedOnToken: true` in `jitsi.web.extraConfig`.
-   Gentian mounts persistent OIDC/JWT overlays from `gentian-os/overlays/jitsi/`
-   (via `app-default` composition): top-level `window.top.location` for portal iframe
-   SSO, JWT URL normalization after `oidc=authorized`, and Keycloak adapter
-   `preferred_username` fallback when `opendesk_username` is absent.
-4. Set `global.hosts.jitsi: "meet.${TENANT_ID}"` in **both** profiles (with
+4. Set `global.hosts.jitsi: "meet.${TENANT_ID}"` in Element `extraValues` (with
    `global.domain: "${KERNEL_DOMAIN}"`) so Element's bundled `jitsi.html`
    widget targets `https://meet.${TENANT_DOMAIN}`.
 5. Configure shared TURN in `gentian-deployments` → `kernelServices.turn*` on the
@@ -488,6 +484,9 @@ To enable conference widgets:
    ```bash
    kubectl delete job -n tenant-demo opendesk-matrix-user-verification-service-bootstrap --ignore-not-found
    ```
+
+Sidecar OIDC clients and internal secrets use the synthetic app key
+`element-jitsi` in OpenBao and Keycloak jobs (`SidecarAppName` in the API).
 
 ---
 

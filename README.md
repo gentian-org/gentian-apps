@@ -6,7 +6,10 @@ App Store catalogue for Gentian OS — `AppProfile` CRs plus first-party app imp
 
 ```text
 profiles/              # AppProfile YAML — synced to cluster by ArgoCD (gentian-appprofiles)
-  openproject.yaml     # upstream chart (profile only)
+  element.yaml         # Element (Matrix chat) — includes Jitsi sidecar for video
+  openproject.yaml     # OpenProject (project management)
+  ox-appsuite.yaml     # OX App Suite (groupware)
+  xwiki.yaml           # XWiki (wiki and knowledge management)
   app-store.yaml       # first-party app (source in apps/app-store/)
 apps/                  # first-party implementations (FastAPI + React + Helm)
   _template/           # copy of gentian-app-template

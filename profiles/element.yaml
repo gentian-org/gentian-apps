@@ -39,7 +39,7 @@ metadata:
     gentianos.io/profile-name: element
 spec:
   displayName: "Element (Matrix)"
-  description: "Federated team chat and collaboration based on the Matrix protocol, with Synapse homeserver."
+  description: "Federated team chat and collaboration based on the Matrix protocol, with Synapse homeserver and bundled Jitsi for video conferencing."
   logo: "data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMERCRDhCIiByb2xlPSJpbWciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+RWxlbWVudDwvdGl0bGU+PHBhdGggZD0iTTEyIDBDNS4zNzMgMCAwIDUuMzczIDAgMTJzNS4zNzMgMTIgMTIgMTIgMTItNS4zNzMgMTItMTJTMTguNjI3IDAgMTIgMHptLTEuMzE0IDQuNzE1YzMuMjg5IDAgNS45NTYgMi42NiA1Ljk1NiA1Ljk0MyAwIC40ODQtLjM5NC44NzctLjg3OS44NzdzLS44NzktLjM5My0uODc5LS44NzdjMC0yLjMxMy0xLjg4LTQuMTg5LTQuMTk4LTQuMTg5LS40ODYgMC0uODc5LS4zOTMtLjg3OS0uODc3cy4zOTItLjg3Ny44NzktLjg3N3ptLTUuMDkyIDkuNTA0Yy0uNDg2IDAtLjg3OS0uMzk0LS44NzktLjg3NyAwLTMuMjgzIDIuNjY2LTUuOTQ1IDUuOTU2LTUuOTQ1LjQ4NSAwIC44NzkuMzkzLjg3OS44NzdzLS4zOTQuODc2LS44NzkuODc2Yy0yLjMxOSAwLTQuMTk4IDEuODc3LTQuMTk4IDQuMTkxIDAgLjQ4NC0uMzk1Ljg3OC0uODc5Ljg3OHptNy43MzUgNS4wNjdjLTMuMjkgMC01Ljk1Ny0yLjY2Mi01Ljk1Ny01Ljk0NCAwLS40ODQuMzk0LS44NzguODc5LS44NzhzLjg3OS4zOTQuODc5Ljg3OGMwIDIuMzEzIDEuODggNC4xODkgNC4xOTkgNC4xODkuNDg1IDAgLjg3OS4zOTMuODc5Ljg3NyAwIC40ODYtLjM5NC44NzgtLjg3OS44Nzh6bTAtMi42ODNjLS40ODUgMC0uODgtLjM5My0uODgtLjg3NiAwLS40ODQuMzk1LS44NzguODgtLjg3OCAyLjMxOCAwIDQuMTk5LTEuODc2IDQuMTk5LTQuMTkgMC0uNDg0LjM5My0uODc3Ljg3OS0uODc3LjQ4NSAwIC44NzkuMzkzLjg3OS44NzcgMCAzLjI4Mi0yLjY2NyA1Ljk0NC01Ljk1NyA1Ljk0NHoiLz48L3N2Zz4K"
 
   portalTiles:
@@ -97,10 +97,194 @@ spec:
       capabilities:
         - webdav:read
         - webdav:write
-    - contract: videoconference
-      provider: jitsi
-      capabilities:
-        - jitsi:widget
+
+  sidecars:
+    - name: jitsi
+      chart:
+        repository: "oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-jitsi"
+        name: opendesk-jitsi
+        version: "3.5.1"
+      kernelRequirements:
+        identity:
+          oidc:
+            clientId: "opendesk-jitsi"
+            name: "Jitsi Meet"
+            accessType: PUBLIC
+            redirectUris:
+              - "https://meet.${TENANT_DOMAIN}/*"
+      stableServiceName: jitsi-web
+      stableServicePort: 80
+      appSecrets:
+        - name: jwt_app_secret
+          valuePath: "settings.jwtAppSecret.value"
+        - name: jicofo_auth_password
+          valuePath: "jitsi.jicofo.xmpp.password"
+        - name: jicofo_component_secret
+          valuePath: "jitsi.jicofo.xmpp.componentSecret"
+        - name: jvb_auth_password
+          valuePath: "jitsi.jvb.xmpp.password"
+      extraValues:
+        global:
+          domain: "${KERNEL_DOMAIN}"
+          hosts:
+            element: "chat.${TENANT_ID}"
+            synapse: "matrix.${TENANT_ID}"
+            jitsi: "meet.${TENANT_ID}"
+            keycloak: "id"
+            nubus: "portal"
+            intercomService: "ics"
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          enabled: true
+          readOnlyRootFilesystem: true
+          privileged: false
+          capabilities:
+            drop:
+              - "ALL"
+          seccompProfile:
+            type: "RuntimeDefault"
+          runAsUser: 1993
+          runAsGroup: 1993
+          runAsNonRoot: true
+        settings:
+          keycloakClientId: "opendesk-jitsi"
+          keycloakRealm: "${TENANT_ID}"
+        jitsi:
+          publicURL: "https://meet.${TENANT_DOMAIN}"
+          web:
+            replicaCount: 1
+            podAnnotations:
+              reloader.stakater.com/auto: "true"
+            ingress:
+              enabled: false
+            extraConfig:
+              # openDesk default: functional.dataProtection.jitsiRoomHistory.enabled=true
+              # → doNotStoreRoom=false (room history may be kept in browser storage).
+              doNotStoreRoom: false
+              disableThirdPartyRequests: true
+              # Gentian addition: map JWT moderator claims (not in upstream values-jitsi.yaml.gotmpl).
+              enableUserRolesBasedOnToken: true
+            extraEnvs:
+              TURN_ENABLE: "1"
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "64Mi"
+              limits:
+                cpu: "1"
+                memory: "256Mi"
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities: {}
+              privileged: false
+              readOnlyRootFilesystem: false
+              runAsGroup: 0
+              runAsNonRoot: false
+              runAsUser: 0
+              seccompProfile:
+                type: "RuntimeDefault"
+          prosody:
+            extraEnvs:
+              - name: "AUTH_TYPE"
+                value: "hybrid_matrix_token"
+              - name: "JWT_APP_ID"
+                value: "meet.${TENANT_DOMAIN}"
+              - name: "JWT_APP_SECRET"
+                value: ""
+              - name: "MATRIX_UVS_SYNC_POWER_LEVELS"
+                value: "true"
+              - name: "MATRIX_UVS_URL"
+                value: "http://opendesk-matrix-user-verification-service.${TENANT_NAMESPACE}.svc.cluster.local"
+              - name: "TURN_HOST"
+                value: "${TURN_HOST}"
+              - name: "TURN_PORT"
+                value: "${TURN_PORT}"
+              - name: "TURNS_HOST"
+                value: "${TURN_TLS_HOST}"
+              - name: "TURNS_PORT"
+                value: "${TURN_TLS_PORT}"
+              - name: "TURN_TRANSPORT"
+                value: "${TURN_TRANSPORT}"
+              - name: "TURN_CREDENTIALS"
+                value: "${TURN_CREDENTIALS}"
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "1"
+                memory: "512Mi"
+            persistence:
+              size: "1Gi"
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities: {}
+              privileged: false
+              readOnlyRootFilesystem: false
+              runAsGroup: 0
+              runAsNonRoot: false
+              runAsUser: 0
+              seccompProfile:
+                type: "RuntimeDefault"
+          jicofo:
+            replicaCount: 1
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "1"
+                memory: "512Mi"
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities: {}
+              privileged: false
+              readOnlyRootFilesystem: false
+              runAsGroup: 0
+              runAsNonRoot: false
+              runAsUser: 0
+              seccompProfile:
+                type: "RuntimeDefault"
+          jigasi:
+            replicaCount: 0
+            enabled: false
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities: {}
+              privileged: false
+              readOnlyRootFilesystem: false
+              runAsGroup: 0
+              runAsNonRoot: false
+              runAsUser: 0
+              seccompProfile:
+                type: "RuntimeDefault"
+          jvb:
+            replicaCount: 1
+            publicIPs:
+              - "${NODE_IP}"
+            service:
+              type: "NodePort"
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "2"
+                memory: "1Gi"
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities: {}
+              privileged: false
+              readOnlyRootFilesystem: false
+              runAsGroup: 0
+              runAsNonRoot: false
+              runAsUser: 0
+              seccompProfile:
+                type: "RuntimeDefault"
+        imagePullSecrets:
+          - name: registry-credentials
+        patchJVB:
+          enabled: false
 
   chart:
     repository: "oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-element"
@@ -310,10 +494,12 @@ spec:
   # Pattern B — opendesk-element/synapse chart injects secrets as direct Helm values.
   deploymentMethod: crossplane
 
-  # Use the dedicated app-element Composition which deploys five Helm Releases:
+  # Use the dedicated app-element Composition which deploys five Helm Releases
+  # plus the Jitsi sidecar for video conferencing:
   # opendesk-element (frontend), opendesk-synapse (homeserver),
   # opendesk-synapse-create-account + opendesk-matrix-user-verification-service
-  # (Jitsi hybrid_matrix_token auth), and opendesk-synapse-web (matrix ingress).
+  # (Jitsi hybrid_matrix_token auth), opendesk-synapse-web (matrix ingress),
+  # and opendesk-jitsi (meet.<tenant> for Element widgets).
   compositionRef: app-element
 
   # Ingress managed by the operator's ensureIngress reconciler.
@@ -332,6 +518,13 @@ spec:
       nginx.ingress.kubernetes.io/proxy-body-size: "100M"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
       nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+
+  additionalIngresses:
+    - subDomain: meet
+      serviceName: jitsi-web
+      servicePort: 80
+      ingressClassName: nginx
+      tlsEnabled: true
 
   # BrowserProxy routes expose the Matrix Client-Server API to the shell via a CORS-safe
   # server-side proxy. The shell forwards the user's bearer token to Synapse.
