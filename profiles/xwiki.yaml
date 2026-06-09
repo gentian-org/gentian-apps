@@ -136,8 +136,8 @@ spec:
       userKey: "externalDB.user"
       passwordKey: "externalDB.password"
     smtp:
-      # XWiki properties map key — bracket notation for the key with special chars.
-      passwordKey: 'properties[property:xwiki:Mail.MailConfig^Mail.SendMailConfigClass.password]'
+      # Escaped Helm --set path (bracket notation breaks app-default set[] parsing).
+      passwordKey: 'properties.property\:xwiki\:Mail.MailConfig\^Mail.SendMailConfigClass.password'
     ldap:
       # Dot-escaped path: "xwiki.cfg" is the YAML map key; the rest is the
       # xwiki.cfg config key (with literal dots, escaped for Helm --set).
