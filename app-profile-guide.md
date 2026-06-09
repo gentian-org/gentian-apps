@@ -386,7 +386,8 @@ and `prompt=login` (and `#/logout` on `chat.*`) when opening SSO apps from the p
 ### 6e. IdP login inside a portal-embedded app (Keycloak `frame-ancestors`)
 
 Portal tiles load tenant apps in an iframe (`portal.<kernel>` → `chat.<tenant>.<kernel>`).
-OIDC SSO then loads **`id.<kernel>` inside the app iframe**. Firefox blocks with
+OIDC SSO then loads **`id.<kernel>` inside the app iframe** (or a nested iframe such
+as Nordeck ICS silent login on `ics.<kernel>`). Firefox blocks with
 *“id… will not allow … if another site has embedded it”* when Keycloak's CSP only
 allows `https://portal.<kernel>` — the **immediate parent** is the app origin, not
 the portal.
@@ -398,7 +399,7 @@ match `chat.demo.<kernel>`; each tenant needs **`https://*.<tenant-effective-dom
 | Layer | Who sets CSP | Must allow |
 |---|---|---|
 | App ingress (`chat`, `meet`, …) | gentian-os operator | `https://portal.<kernel>` (§6a–6b) |
-| IdP ingress (`id.<kernel>`) | nubus Helm values (`kernel/services/nubus/manifests/<env>/values/`) **and** gentian-os operator | `https://portal.<kernel>` **and** `https://*.<tenant-domain>` per Tenant CR |
+| IdP ingress (`id.<kernel>`) | nubus Helm values (`kernel/services/nubus/manifests/<env>/values/`) **and** gentian-os operator | `https://portal.<kernel>` **and** `https://*.<kernel>` (kernel-zone apps such as Files, ICS) **and** `https://*.<tenant-domain>` per Tenant CR |
 
 Helm values provide the install baseline; the operator patches the Keycloak proxy
 ingress on every tenant reconcile when tenants are added or removed. The operator
