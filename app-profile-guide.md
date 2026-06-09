@@ -398,8 +398,13 @@ match `chat.demo.<kernel>`; each tenant needs **`https://*.<tenant-effective-dom
 
 | Layer | Who sets CSP | Must allow |
 |---|---|---|
-| App ingress (`chat`, `meet`, …) | gentian-os operator | `https://portal.<kernel>` (§6a–6b) |
-| IdP ingress (`id.<kernel>`) | nubus Helm values (`kernel/services/nubus/manifests/<env>/values/`) **and** gentian-os operator | `https://portal.<kernel>` **and** `https://*.<kernel>` (kernel-zone apps such as Files, ICS) **and** `https://*.<tenant-domain>` per Tenant CR |
+| App ingress (`chat`, `wiki`, …) | gentian-os operator | `https://portal.<kernel>` (§6a–6b) |
+| IdP ingress (`id.<kernel>`) | gentian-os `KeycloakPlatformReconciler` (ingress patch + realm `X-Frame-Options` jobs) | `https://portal.<kernel>`, `https://*.<kernel>`, `https://*.<tenant-effective-domain>`, **and** explicit `https://{ingress.subDomain}.<tenant-effective-domain>` for every **installed OIDC AppProfile** (discovered automatically — no manual subdomain list) |
+
+**Do not maintain a static IdP allowlist in AppProfiles or Nubus values.** When you add
+a new OIDC app, declare `kernelRequirements.identity.oidc` and `ingress.subDomain`;
+the operator adds the app origin to `id.<kernel>` on the next tenant or AppProfile
+reconcile. `install.sh` step 16a verifies the IdP ingress converged.
 
 Helm values provide the install baseline; the operator patches the Keycloak proxy
 ingress on every tenant reconcile when tenants are added or removed. The operator
