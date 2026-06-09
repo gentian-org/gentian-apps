@@ -203,12 +203,15 @@ spec:
     imagePullSecrets:
       - name: registry-credentials
 
-    # External DB — all connection fields injected via valueMapping.database.*Key.
-    # customKeyRef.enabled: false disables Kubernetes Secret lookup; all values
-    # come from direct Helm injection (Pattern B).
+    # External DB — connection fields injected via valueMapping.database.*Key.
+    # customKeyRef MUST be enabled when fullnameOverride is set: the chart writes
+    # DB_PASSWORD into a Secret named after fullname ("xwiki") but the pod
+    # defaults to .Release.Name ("xwiki-<hash>-release") when customKeyRef is off.
     externalDB:
       customKeyRef:
-        enabled: false
+        enabled: true
+        name: xwiki
+        key: DB_PASSWORD
 
     securityContext:
       enabled: true
