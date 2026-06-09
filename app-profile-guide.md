@@ -266,7 +266,21 @@ frame-ancestors`**.
 ### 6a. Firefox “will not allow … if another site has embedded it”
 
 That message means the app's CSP (or `X-Frame-Options`) does **not** include
-`https://portal.${KERNEL_DOMAIN}` in `frame-ancestors`.
+`https://portal.${KERNEL_DOMAIN}` in `frame-ancestors`, or Keycloak (`id.<kernel>`)
+does not yet allow the app origin (`https://chat.<tenant>`, etc.) when OIDC loads
+inside a WinBox iframe.
+
+**Launch behaviour (gentian-ui):**
+
+| Click | Behaviour |
+|---|---|
+| Normal click on an `embedded` tile | Opens in WinBox (portal shell iframe) |
+| **Ctrl/Cmd+click** (any tile) | Opens in a **new browser tab** |
+| `newwindow` tile (e.g. OX App Suite) | Normal click → new tab (app blocks iframes) |
+
+The gentian-os **KeycloakPlatformReconciler** converges `id.<kernel>` ingress CSP
+and Keycloak realm `X-Frame-Options` for all tenants; `install.sh` verifies this
+before declaring the cluster ready.
 
 **Do not fix this in AppProfiles.** The gentian-os operator injects NGINX
 `configuration-snippet` directives on every app `Ingress` it manages.
