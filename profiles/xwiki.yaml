@@ -368,13 +368,19 @@ spec:
     cluster:
       replicas: 1
 
+    # First-boot extension install (swp flavor) is memory-heavy; cap JVM heap
+    # below the container limit so Jetty/OS overhead does not trigger OOMKill.
+    javaOpts:
+      - "-Xms1g"
+      - "-Xmx3g"
+
     resources:
       limits:
         cpu: "4"
-        memory: "4Gi"
+        memory: "6Gi"
       requests:
         cpu: "500m"
-        memory: "1Gi"
+        memory: "2Gi"
 
     podAnnotations:
       # Stakater Reloader restarts the pod when the ExternalSecret updates
