@@ -281,7 +281,7 @@ spec:
               seccompProfile:
                 type: "RuntimeDefault"
         imagePullSecrets:
-          - name: registry-credentials
+          - registry-credentials
         patchJVB:
           enabled: false
 
@@ -329,10 +329,9 @@ spec:
   # the tenant's domain.
   extraValues:
     global:
-      # Kernel/platform domain so global.hosts.keycloak resolves to id.<kernel>
-      # (e.g. id.desk.gentian.org), not id.<tenant> (404). Tenant-scoped app
-      # hostnames use ${TENANT_ID} prefix — see commit b1203d0 / app-profile-guide.
       domain: "${KERNEL_DOMAIN}"
+      imagePullSecrets:
+        - registry-credentials
       hosts:
         element: "chat.${TENANT_ID}"
         synapse: "matrix.${TENANT_ID}"
@@ -460,7 +459,7 @@ spec:
 
     # Pull the opendesk image from registry.opencode.de.
     imagePullSecrets:
-      - name: registry-credentials
+      - registry-credentials
 
     podSecurityContext:
       enabled: true
