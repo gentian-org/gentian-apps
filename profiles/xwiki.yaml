@@ -237,6 +237,8 @@ spec:
       # YAML map key "xwiki.cfg" contains a literal dot — must be quoted.
       "xwiki.cfg":
         "xwiki.url.protocol": "https"
+        # Redirect unauthenticated users to Keycloak (tenant realm → kernel IdP SSO).
+        "xwiki.authentication.authclass": "org.xwiki.contrib.oidc.auth.OIDCAuthServiceImpl"
         # LDAP authenticator configuration.
         "xwiki.authentication.ldap.UID_attr": "uid"
         "xwiki.authentication.ldap.photo_attribute": "jpegPhoto"
@@ -244,8 +246,8 @@ spec:
         # LDAP connection — ${LDAP_HOST} and ${LDAP_BASE_DN} substituted by operator.
         "xwiki.authentication.ldap.server": "${LDAP_HOST}"
         "xwiki.authentication.ldap.port": 389
-        # bind_DN uses the standard per-tenant ldapsearch_xwiki account.
-        "xwiki.authentication.ldap.bind_DN": "uid=ldapsearch_xwiki,cn=users,${LDAP_BASE_DN}"
+        # bind_DN uses the per-tenant service account from ldap-bind-<tenant>-xwiki.
+        "xwiki.authentication.ldap.bind_DN": "uid=app-xwiki-${TENANT_ID},ou=${TENANT_ID},${LDAP_BASE_DN}"
         # bind_pass injected via valueMapping.ldap.bindPasswordKey (from OpenBao).
         "xwiki.authentication.ldap.base_DN": "${LDAP_BASE_DN}"
         "xwiki.authentication.ldap.groupcache_expiration": 300
