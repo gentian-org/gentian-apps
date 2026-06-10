@@ -338,8 +338,10 @@ spec:
       # OIDCIssuer uses per-tenant realm (${TENANT_ID}) — NOT hardcoded "opendesk".
       "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.OIDCIssuer": "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
 
-      # Auth service — delegates password auth to the OIDC bridge.
-      "property:xwiki:XWiki.AuthService.Configuration^XWiki.AuthService.ConfigurationClass.authService": "keycloak-bridge-auth"
+      # Do NOT set XWiki.AuthService.Configuration.authService to keycloak-bridge-auth.
+      # openDesk uses that Nubus portal bridge; it overrides xwiki.cfg authclass and
+      # shows the native login form when Gentian portal SSO is not bridged into XWiki.
+      # OIDC redirect is driven solely by xwiki.authentication.authclass above.
 
       # UI / theme settings aligned with opendesk Iceberg theme.
       "property:xwiki:XWiki.XWikiPreferences^XWiki.XWikiPreferences.colorTheme": "FlamingoThemes.Iceberg"
