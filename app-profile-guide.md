@@ -276,7 +276,10 @@ inside a WinBox iframe.
 |---|---|
 | Normal click on an `embedded` tile | Opens in WinBox (portal shell iframe) |
 | **Ctrl/Cmd+click** (any tile) | Opens in a **new browser tab** |
-| `newwindow` tile (e.g. OX App Suite) | Normal click → new tab (app blocks iframes) |
+| `newwindow` tile (e.g. OX App Suite) | Normal click → new tab (app blocks iframes; use only when the app cannot run in WinBox) |
+
+OIDC apps that work in the portal shell (Element, XWiki, …) should use **`linkTarget: embedded`**
+in `portalTiles`. Reserve `newwindow` for apps that block iframe embedding (OX App Suite).
 
 The gentian-os **KeycloakPlatformReconciler** converges `id.<kernel>` ingress CSP
 and Keycloak realm `X-Frame-Options` for all tenants; `install.sh` verifies this

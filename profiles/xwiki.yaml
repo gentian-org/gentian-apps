@@ -114,7 +114,7 @@ spec:
       displayName:
         de_DE: "Wissen"
         en_US: "Wiki"
-      linkTarget: newwindow
+      linkTarget: embedded
       allowedGroup: "App Users"
 
   chart:
