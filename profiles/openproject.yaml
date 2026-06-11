@@ -317,7 +317,13 @@ spec:
       reloader.stakater.com/auto: "true"
 
     # Rails seeder needs more than the namespace LimitRange default (512 Mi OOMKills).
+    # Run only on first install — re-running on every Helm upgrade caused a
+    # Crossplane release reconcile loop when the seeder hook failed or was slow.
     seederJob:
+      annotations:
+        helm.sh/hook: post-install
+        helm.sh/hook-weight: "5"
+        helm.sh/hook-delete-policy: hook-succeeded,before-hook-creation
       resources:
         limits:
           cpu: "2"
