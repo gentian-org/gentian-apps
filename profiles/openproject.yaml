@@ -316,6 +316,16 @@ spec:
       # after credential rotation), ensuring the new secret values are picked up.
       reloader.stakater.com/auto: "true"
 
+    # Rails seeder needs more than the namespace LimitRange default (512 Mi OOMKills).
+    seederJob:
+      resources:
+        limits:
+          cpu: "2"
+          memory: "768Mi"
+        requests:
+          cpu: "100m"
+          memory: "512Mi"
+
     serviceAccount:
       create: true
 
