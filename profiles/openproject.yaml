@@ -312,9 +312,9 @@ spec:
       runAsNonRoot: true
 
     podAnnotations:
-      # Stakater Reloader restarts the pod when the ExternalSecret updates (e.g.
-      # after credential rotation), ensuring the new secret values are picked up.
-      reloader.stakater.com/auto: "true"
+      # Reload only when credential secrets change — not on gentian-staging-ca-tls
+      # rotation, which caused hundreds of needless restarts per hour.
+      secret.reloader.stakater.com/reload: openproject-sensitive-values
 
     # Rails seeder needs more than the namespace LimitRange default (512 Mi OOMKills).
     # Run only on first install — re-running on every Helm upgrade caused a
