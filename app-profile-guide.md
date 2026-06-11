@@ -375,6 +375,15 @@ client `opendesk-synapse` picks up the new redirect URI.
 request scope `opendesk-matrix-scope`. Do not use `preferred_username` — kernel-broker
 tokens may carry `mailPrimaryAddress` there, which is not a valid Matrix localpart.
 
+**Kernel IdP broker (tenant realm):** after portal login, Element/XWiki hit
+`/realms/${TENANT_ID}/broker/kernel/endpoint`. A **502** on that URL (Synapse
+`mapping_error`, empty localpart, or Firefox framing on a Cloudflare error page) is
+usually **operator/IAM**, not AppProfile YAML: broker token exchange must use the
+**in-cluster** Keycloak URL (not `https://id.${KERNEL_DOMAIN}` from inside the cluster),
+and tenant-realm IdP mappers must import `opendesk_username` from the broker token
+(LDAP `uid`). Confirm `keycloak-broker-idp-${TENANT_ID}` and OIDC pack jobs completed.
+See `gentian-os/docs/design/iam.md`.
+
 **Loading screen / `net.nordeck.element_web.module.opendesk` error:** the
 `opendesk-element-web` image bundles the Nordeck OpenDesk module; `additionalConfiguration`
 must include its `banner` URLs (`portal_url`, `ics_*`, `portal_logo_svg_url`) and
@@ -421,7 +430,7 @@ curl -sI https://id.${KERNEL_DOMAIN}/ | grep -i content-security
 # expect: frame-ancestors 'self' https://portal.<kernel> https://*.demo.<kernel> …
 ```
 
-### 6b. Kernel diagram service (CryptPad)
+### 6f. Kernel diagram service (CryptPad)
 
 Diagram editing from Nextcloud Files uses a **shared CryptPad kernel service**
 (like Collabora in §9b of `gentian-os/docs/architecture.md`), not a per-tenant
@@ -434,7 +443,7 @@ There is **no portal tile** and **no tenant ingress** — manifests live under
 ingresses must allow Nextcloud and the portal; do not use `more_clear_headers`
 (microk8s ingress-nginx lacks it) — append with `add_header … always` only.
 
-### 6c. Kernel file share (Nextcloud Files)
+### 6g. Kernel file share (Nextcloud Files)
 
 Nextcloud Files is a **shared kernel service** at `files.<kernel_domain>` (not an
 AppProfile). The gentian-os operator does **not** manage its Ingress — CSP lives in
@@ -446,6 +455,91 @@ Use the same **replace** pattern as Element (§6b): `proxy_hide_header` for upst
 `add_header Content-Security-Policy "frame-ancestors 'self' https://portal.<kernel-domain>" always`.
 Do **not** use `more_clear_headers` or `more_set_headers` — they are ignored on
 microk8s and leave `X-Frame-Options: SAMEORIGIN`, which blocks the portal iframe.
+
+#### SSO topology — kernel realm, not tenant broker
+
+Nextcloud is **not** an AppProfile and does **not** follow the tenant-realm +
+kernel-IdP-broker path used by Element, XWiki, and other installed apps.
+
+| Aspect | Tenant AppProfiles (Element, XWiki, …) | Nextcloud Files |
+|---|---|---|
+| Keycloak realm | `${TENANT_ID}` | **`kernel`** |
+| Portal → app SSO | Tenant realm + kernel IdP broker | Direct **kernel** OIDC (`opendesk-nextcloud`) |
+| Primary user-id claim | Often `opendesk_username` (LDAP `uid`) | **`opendesk_useruuid`** (LDAP `entryUUID`) |
+| User provisioning | App-specific (e.g. Synapse shadow user) | Nubus LDAP listener → NC **LDAP backend**; OIDC **`auto_provision: false`** |
+
+**Implication for debugging:** Element can work while Nextcloud fails (or vice versa).
+Fixing tenant-realm broker mappers or `${TENANT_ID}` OIDC packs does **not** by itself
+fix Files login — kernel-realm claims and NC LDAP mappings must also be correct.
+
+OIDC provider settings (management chart / `user_oidc:provider opendesk`):
+
+- `mappingUid`: `opendesk_useruuid`
+- `auto_provision`: `false` — NC refuses to create users on OIDC login; the LDAP
+  listener must provision the user first, and the OIDC claim must match the **existing**
+  NC username (which equals LDAP `entryUUID`).
+
+#### After tenant purge/redeploy — “Failed to provision the user”
+
+Symptom on `https://files.${KERNEL_DOMAIN}` after deleting and recreating a tenant
+(or individual App Users):
+
+```text
+Access forbidden
+Failed to provision the user
+```
+
+**Cause:** Purge deletes LDAP users and recreates them at the same DN with a **new**
+`entryUUID`. The Nubus listener reprovisions LDAP/NC correctly, but Nextcloud may still
+hold the **old** UUID as `owncloud_name` in `oc_ldap_user_mapping`. Keycloak (kernel
+realm) and the OIDC token carry the **new** `opendesk_useruuid`; Nextcloud looks up
+that ID, finds no user, and with `auto_provision: false` rejects login.
+
+**Three-way check** (all must match for OIDC login):
+
+| Source | Field | Example |
+|---|---|---|
+| LDAP | `entryUUID` on `uid=<user>,ou=users,ou=<tenant>,…` | `0fd28258-…` |
+| Keycloak kernel user | attribute `entryUUID` → claim `opendesk_useruuid` | same |
+| Nextcloud | `oc_ldap_user_mapping.owncloud_name` **and** `directory_uuid` | same |
+
+Compare with:
+
+```bash
+# Nextcloud user list (username = entryUUID for LDAP users)
+kubectl exec -n gentian-dev deploy/nextcloud-dev-aio -- \
+  php /var/www/html/occ user:list
+
+# LDAP mapping in Postgres
+kubectl exec -n gentian-infra-dev opendesk-postgresql-dev-0 -- \
+  psql -U nextcloud_user -d nextcloud \
+  -c "SELECT ldap_dn, directory_uuid, owncloud_name FROM oc_ldap_user_mapping WHERE ldap_dn LIKE '%<tenant>%';"
+
+# Recognized UUID?
+kubectl exec -n gentian-dev deploy/nextcloud-dev-aio -- \
+  php /var/www/html/occ ldap:check-user <entryUUID-from-ldap>
+```
+
+**Fix** (cluster ops — run when `owncloud_name` ≠ current LDAP `entryUUID`):
+
+```bash
+OLD=<stale-nc-username-uuid>
+kubectl exec -n gentian-dev deploy/nextcloud-dev-aio -- \
+  php /var/www/html/occ ldap:update-uuid --userId="${OLD}" -n
+
+kubectl exec -n gentian-dev deploy/nextcloud-dev-aio -- \
+  sh -c "echo y | php /var/www/html/occ ldap:reset-user ${OLD}"
+```
+
+`ldap:reset-user` renames the NC account to the current LDAP `entryUUID`. Plain
+`occ user:delete` often fails for LDAP-backed users (interactive prompt / backend
+restrictions); prefer `ldap:update-uuid` + `ldap:reset-user`.
+
+**Prevention:** On tenant **deletion**, gentian-os should run
+`nextcloud-group-delete-<tenant>` to remove NC users whose LDAP DN is under
+`ou=<tenant>,…` before a redeploy recreates them with new UUIDs
+(`gentian-os/internal/controller/storage_reconciler.go`). If that job did not run
+during purge, expect this drift on the next Files login.
 
 ---
 
@@ -544,6 +638,78 @@ realm name. Never hardcode `souvap`, `opendesk`, or any literal realm name.
 must use `https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}` (or path-only auth
 URLs resolved against `openproject.oidc.host: "id.${KERNEL_DOMAIN}"`). See §2.
 
+### 8a. openDesk supplier charts on Gentian — integration boundary
+
+Many AppProfiles wrap **openDesk Helm charts** (XWiki, Element, OX, OpenProject, …).
+Gentian still runs the **Nubus/UCS stack** for LDAP, UDM, portal tiles, and
+openDesk directory attributes — but **authentication topology is not identical**
+to upstream openDesk. Copy chart *data* (LDAP attribute names, OIDC client IDs,
+flavors, themes, MBA groups); do **not** copy every auth-related value verbatim.
+
+| Area | Upstream openDesk | Gentian AppProfile |
+|---|---|---|
+| Keycloak realm | Single `opendesk` realm | **Per-tenant** realm `${TENANT_ID}`; humans log in at **kernel** realm on the portal |
+| IdP hostname | `id.<domain>` on app domain | Always `id.${KERNEL_DOMAIN}` (§2) |
+| Portal → app SSO | Often `keycloak-bridge-auth` (Nubus session bridge) | **Direct OIDC** to tenant realm + kernel IdP broker (operator-managed) |
+| Nextcloud Files | Same `opendesk` realm as portal | **Kernel realm only** — not tenant broker; claim `opendesk_useruuid` (`entryUUID`) — see §6g |
+| LDAP bind DN | Global `uid=ldapsearch_<app>,cn=users,…` | Per-tenant `uid=app-<app>-${TENANT_ID},ou=${TENANT_ID},…` (operator-provisioned) |
+| `global.domain` + `hosts.keycloak` | Same realm/host for portal and apps | `global.domain: "${KERNEL_DOMAIN}"`, tenant app hosts prefixed with `${TENANT_ID}` |
+
+**Keep from openDesk profiles:** `kernelRequirements.identity.oidc.clientId` values
+that match the embedded openDesk OIDC pack catalog (`opendesk-xwiki`,
+`opendesk-matrix-scope`, …), LDAP group mappings, UI themes, chart versions,
+`workplaceServices.*` pointing at `portal.${KERNEL_DOMAIN}` where the chart
+expects Nubus navigation.
+
+**Do not copy into Gentian profiles:**
+
+| Upstream setting | Why |
+|---|---|
+| `keycloak-bridge-auth` (`XWiki.AuthService.Configuration.authService`) | openDesk Nubus bridge assumes portal and app share one Keycloak realm/session. Gentian uses split realms; this property **overrides** `OIDCAuthServiceImpl` and users see the **native login form** instead of Keycloak redirect. |
+| Hardcoded realm `opendesk` / `souvap` in `oidc.provider` or `OIDCIssuer` | Wrong realm; use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`. |
+| `portalTiles.linkTarget: newwindow` on OIDC apps that support iframes | Opens a new tab on normal click; use **`embedded`** so gentian-ui WinBox behaviour matches other portal apps (§6a). Reserve `newwindow` for iframe blockers (OX App Suite). |
+
+**XWiki pattern (reference):** set `xwiki.authentication.authclass` to
+`org.xwiki.contrib.oidc.auth.OIDCAuthServiceImpl` in `customConfigs`, configure
+`oidc.provider` / `oidc.clientid` / LDAP import blocks with Gentian placeholders,
+and **omit** `keycloak-bridge-auth`. See `profiles/xwiki.yaml`.
+
+**OIDC token claims:** if the chart maps local users from an openDesk-specific
+claim (e.g. XWiki `oidc.user.opendesk_username`), declare the matching
+`clientId` in `kernelRequirements.identity.oidc` so the operator applies the
+openDesk OIDC pack (protocol mappers, LDAP `uid` → claim). Profile authors
+define the client; **mapper wiring is operator/IAM**, not `extraValues`.
+
+**Operator-owned (do not hand-craft in AppProfiles):** tenant-realm browser flow
+(auto-redirect to kernel IdP), first-broker-login auto-link by email, IdP ingress
+`frame-ancestors` for installed OIDC apps, portal/app ingress CSP, staging CA /
+JVM truststore for Java charts on ACME staging. See `gentian-os/docs/design/iam.md`.
+
+**Custom (non-openDesk) apps:** use generic `kernelRequirements.identity.oidc` and
+LDAP placeholders only — do not reuse openDesk-only mechanisms (`keycloak-bridge-auth`,
+`opendesk-*` scope names, MBA attribute names) unless you intentionally integrate
+with the openDesk directory model.
+
+### 8b. SSO smoke-test after publishing a profile
+
+1. Log in at **`https://portal.${KERNEL_DOMAIN}`** (kernel realm).
+2. Click the app tile (normal click, not Ctrl) — should open in **WinBox** if
+   `linkTarget: embedded`.
+3. Expect redirect to **`https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/…`**, not
+   a native app login form.
+4. After login, the app UI loads; OIDC callback URL must stay on
+   **`https://<subDomain>.${TENANT_DOMAIN}/…`**.
+
+| Symptom | Likely profile issue |
+|---|---|
+| Native username/password form (XWiki, etc.) | `keycloak-bridge-auth` or missing `OIDCAuthServiceImpl` / `oidc.skipped: false` |
+| `redirect_uri` mismatch | `redirectUris` use wrong host (`chat.` vs `matrix.` for Element — §6d) or `${KERNEL_DOMAIN}` instead of `${TENANT_DOMAIN}` |
+| Blank iframe / Firefox framing error | Missing IdP `frame-ancestors` — ensure `ingress.subDomain` + OIDC client declared; operator reconciles (§6e) |
+| HTTP 500 on OIDC callback (empty username claim) | Chart expects `opendesk_username` (or similar) but `clientId` not in openDesk pack / wrong mapper — fix `clientId`, not chart templates |
+| 502 on `/realms/<tenant>/broker/kernel/endpoint` | Broker token/JWKS fetch or oversized headers — operator Keycloak ingress / internal `tokenUrl`; not AppProfile (§6d) |
+| Element works; Nextcloud “Failed to provision the user” | **Different SSO path** — kernel OIDC + stale NC `entryUUID` after purge; see §6g (not tenant OIDC pack) |
+| “Unexpected error” from identity provider | Usually stale broker links after IAM flow changes — operator purge/re-link; not an AppProfile field |
+
 ---
 
 ## 9. Secret rotation — Reloader annotation
@@ -601,7 +767,13 @@ Before opening a PR, verify:
 - [ ] If `global.hosts.keycloak` is present: `global.domain` is `${KERNEL_DOMAIN}`, tenant app hosts use `${TENANT_ID}` prefix
 - [ ] All IdP URLs use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`; redirect URIs use `${TENANT_DOMAIN}`
 - [ ] Element: OIDC redirect is `https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback` (not `chat.`)
+- [ ] Element: `matrixIdLocalpart: "opendesk_username"` (not `preferred_username`) — §6d
+- [ ] After tenant purge/redeploy: if Files login fails, check NC `entryUUID` drift (§6g) — not an AppProfile fix
 - [ ] OIDC uses full `OIDCClientSpec`, realm is `${TENANT_ID}`
+- [ ] openDesk charts: no `keycloak-bridge-auth`; OIDC via tenant realm + `id.${KERNEL_DOMAIN}` (§8a)
+- [ ] openDesk charts: per-tenant LDAP bind / realm placeholders, not upstream `opendesk` realm or global bind DN
+- [ ] OIDC apps in portal: `portalTiles.linkTarget: embedded` unless the app blocks iframes (§6a, §8a)
+- [ ] `clientId` matches an openDesk OIDC pack when the chart depends on openDesk-specific claims/scopes
 - [ ] Secrets only in `valueMapping` / `appSecrets`, never in `extraValues`
 - [ ] `reloader.stakater.com/auto: "true"` in `podAnnotations`
 - [ ] (automatic) Operator injects portal `frame-ancestors` on app Ingress — no CSP annotations in profile
