@@ -411,7 +411,11 @@ spec:
       OPENPROJECT_SEED_LDAP_OPENDESK_SECURITY: "plain_ldap"
       OPENPROJECT_SEED_LDAP_OPENDESK_BINDUSER: "${LDAP_BIND_DN}"
       OPENPROJECT_SEED_LDAP_OPENDESK_BASEDN: "${LDAP_BASE_DN}"
-      OPENPROJECT_SEED_LDAP_OPENDESK_SYNC__USERS: "true"
+      # OIDC (Keycloak) is the sole human login path. LDAP user sync must stay off —
+      # pre-provisioned LDAP users get auth_source_id set and OpenProject refuses to
+      # remap them to OIDC ("Account already exists" on john-doe@…). Group sync below
+      # still attaches OIDC-created users to project groups once they exist.
+      OPENPROJECT_SEED_LDAP_OPENDESK_SYNC__USERS: "false"
       OPENPROJECT_SEED_LDAP_OPENDESK_FILTER: "(&(objectClass=opendeskProjectmanagementUser)(opendeskProjectmanagementEnabled=TRUE))"
       OPENPROJECT_SEED_LDAP_OPENDESK_LOGIN__MAPPING: "uid"
       OPENPROJECT_SEED_LDAP_OPENDESK_FIRSTNAME__MAPPING: "givenName"
@@ -420,7 +424,7 @@ spec:
       OPENPROJECT_SEED_LDAP_OPENDESK_ADMIN__MAPPING: "opendeskProjectmanagementAdmin"
       OPENPROJECT_SEED_LDAP_OPENDESK_GROUPFILTER_OPENDESK_BASE: "${LDAP_BASE_DN}"
       OPENPROJECT_SEED_LDAP_OPENDESK_GROUPFILTER_OPENDESK_FILTER: "(&(objectClass=opendeskProjectmanagementGroup)(opendeskProjectmanagementEnabled=TRUE))"
-      OPENPROJECT_SEED_LDAP_OPENDESK_GROUPFILTER_OPENDESK_SYNC__USERS: "true"
+      OPENPROJECT_SEED_LDAP_OPENDESK_GROUPFILTER_OPENDESK_SYNC__USERS: "false"
       OPENPROJECT_SEED_LDAP_OPENDESK_GROUPFILTER_OPENDESK_GROUP__ATTRIBUTE: "cn"
 
       # ── API authentication ────────────────────────────────────────────────
