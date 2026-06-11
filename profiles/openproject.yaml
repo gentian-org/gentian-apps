@@ -37,7 +37,8 @@
 #   (e.g. http://nubus-dev-keycloak.gentian-dev.svc.cluster.local:8080/...).
 #
 #   S3 storage uses external MinIO with path-style access. The bucket name and MinIO
-#   username follow the pattern openproject-${TENANT_ID}. The MinIO secret key is
+#   username follow the pattern ${TENANT_ID}-openproject (provisioned by the
+#   app-default s3-init Job). The MinIO secret key is
 #   seeded into OpenBao by the storage reconciler (Inc 7) and injected via
 #   valueMapping.s3.secretKeyKey. Bucket and access key are non-secret derived values
 #   set in extraValues.
@@ -120,7 +121,7 @@ spec:
       displayName:
         de_DE: "Projekte"
         en_US: "Projects"
-      linkTarget: newwindow
+      linkTarget: embedded
       allowedGroup: "App Users"
 
   chart:
@@ -255,9 +256,9 @@ spec:
       enableSignatureV4Streaming: false
       endpoint: "${S3_ENDPOINT}"
       host: "${S3_ENDPOINT}"
-      bucketName: "openproject-${TENANT_ID}"
+      bucketName: "${TENANT_ID}-openproject"
       auth:
-        accessKeyId: "openproject_${TENANT_ID}"
+        accessKeyId: "${TENANT_ID}-openproject"
 
     # Persist=false: all user-uploaded files go to S3 (aligned with opendesk).
     persistence:
