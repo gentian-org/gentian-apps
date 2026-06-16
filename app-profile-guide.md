@@ -377,6 +377,13 @@ shows **“Invalid username or password”** even though credentials are correct
 Reconcile the tenant / identity jobs after fixing the AppProfile so the Keycloak
 client `opendesk-synapse` picks up the new redirect URI.
 
+On **ACME staging** clusters, the same message after the matrix host routes
+correctly usually means Synapse failed the **token/userinfo exchange** (Twisted
+HTTPS to `id.<kernel>` on the hairpin path). The `app-element` composition
+points server-side OIDC endpoints at in-cluster Keycloak (`KEYCLOAK_INTERNAL_URL`
+in `gentian-kernel-services`); confirm the Element XApp reconciled after the
+operator upgrade.
+
 **Matrix localpart:** use `matrixIdLocalpart: "opendesk_username"` (LDAP `uid`) and
 request scope `opendesk-matrix-scope`. Do not use `preferred_username` — kernel-broker
 tokens may carry `mailPrimaryAddress` there, which is not a valid Matrix localpart.
@@ -710,6 +717,7 @@ with the openDesk directory model.
 |---|---|
 | Native username/password form (XWiki, etc.) | `keycloak-bridge-auth` or missing `OIDCAuthServiceImpl` / `oidc.skipped: false` |
 | `redirect_uri` mismatch | `redirectUris` use wrong host (`chat.` vs `matrix.` for Element — §6d) or `${KERNEL_DOMAIN}` instead of `${TENANT_DOMAIN}` |
+| Element **“Invalid username or password”** after matrix host works | Wrong OIDC redirect URI (§6d), missing `opendesk_username` / Livecollaboration role (IAM), or Synapse token exchange still hitting public `id.<kernel>` on staging — operator `KEYCLOAK_INTERNAL_URL` + `app-element` reconcile (§6d, `security.md` §9.1) |
 | Blank iframe / Firefox framing error | Missing IdP `frame-ancestors` — ensure `ingress.subDomain` + OIDC client declared; operator reconciles (§6e) |
 | HTTP 500 on OIDC callback (empty username claim) | Chart expects `opendesk_username` (or similar) but `clientId` not in openDesk pack / wrong mapper — fix `clientId`, not chart templates |
 | “Account already exists” / email already exists on OIDC login | LDAP `SYNC__USERS` pre-created the user with `ldap_auth_source_id` set (OpenProject 16.x; older releases used `auth_source_id`) — OpenProject cannot remap LDAP users to OIDC (OP-7253). Keep `OPENPROJECT_SEED_LDAP_*_SYNC__USERS: "false"`; OIDC creates users on first login, LDAP group sync only links existing users. **Remediation** (one-off `rails runner` in `openproject-web`): `User.where.not(ldap_auth_source_id: nil).update_all(ldap_auth_source_id: nil)` to unlink LDAP; or `User.find_by(mail: "<email>")&.destroy` if the account has no data to keep; then OIDC login recreates the user. Do **not** use `auth_source_id` (removed in 16.x) or `LdapAuthSource.update_all(sync_users: …)` (column removed in 16.x) |
