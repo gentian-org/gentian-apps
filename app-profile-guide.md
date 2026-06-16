@@ -402,6 +402,15 @@ See `gentian-os/docs/design/iam.md`.
 must include its `banner` URLs (`portal_url`, `ics_*`, `portal_logo_svg_url`) and
 `custom_css_variables` — see `profiles/element.yaml`.
 
+**Loading screen flicker / white page after SSO succeeds:** Matrix login can work
+(Synapse logs show `POST /_matrix/client/v3/login` 200) while the Nordeck banner still
+loops on ICS silent login. On `ROUTING_MODE=gateway`, intercom chart ingress is disabled;
+set public `BASE_URL` / `INTERCOM_URL` to `https://ics.<kernel>` in
+`gentian-os/kernel/services/intercom-service/values/gateway.yaml` (not the in-cluster
+Service URL). ICS logs repeating `Silent login, logged in false` confirm this. After
+ArgoCD sync, `curl -I https://ics.<kernel>/silent` should not redirect with
+`redirect_uri=http://intercom-service-*:8008/callback`.
+
 **Wrong user after switching portal accounts:** portal login uses the **kernel** realm;
 Element/Synapse OIDC uses the **tenant** realm (`demo`, …). A previous user's tenant-realm
 SSO cookie or cached Matrix session in the browser can reopen Chat as the wrong person.
