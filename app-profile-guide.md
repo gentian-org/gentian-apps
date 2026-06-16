@@ -111,12 +111,13 @@ The operator seeds OIDC issuer/client credentials in OpenBao as
 
 **ACME staging (dev):** when `tenantDNS01ClusterIssuer` contains `staging`,
 compositions mount `gentian-staging-ca-tls` and (for Synapse) set
-`use_insecure_ssl_client_just_for_testing_do_not_use` so in-cluster OIDC
-discovery can reach `id.${KERNEL_DOMAIN}` — see
-`gentian-os/docs/design/security.md` §9. `install.sh` and the
-gentian-os operator bootstrap this secret in `gentian-dev` and replicate it
-into each `tenant-*` namespace; run `./update.sh --acme-issuers` to refresh
-the bundle after issuer or kernel cert changes.
+`use_insecure_ssl_client_just_for_testing_do_not_use` plus explicit OIDC
+endpoints with `discover: false` and `user_profile_method: userinfo_endpoint` in
+`additionalConfiguration.oidc_providers` (see `gentian-os/docs/design/security.md`
+§9). `install.sh` and the gentian-os operator bootstrap `gentian-staging-ca-tls`
+in `gentian-dev` and replicate it into each `tenant-*` namespace; run
+`./update.sh --acme-issuers` to refresh the bundle after issuer or kernel cert
+changes.
 
 ---
 
