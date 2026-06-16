@@ -356,7 +356,12 @@ kubectl delete ingress -n tenant-demo ingress-demo-element
 ### 6d. Element SSO — OIDC redirect URI host
 
 Element Web is served at `chat.<tenant-domain>` but the Matrix homeserver (Synapse)
-and OIDC callback live at **`matrix.<tenant-domain>`** (synapse-web ingress).
+and OIDC callback live at **`matrix.<tenant-domain>`** (synapse-web Service).
+The `element` AppProfile declares `additionalIngresses` for `matrix` →
+`synapse-web:8008`; the operator creates the edge route (HTTPRoute when
+`ROUTING_MODE=gateway`, nginx Ingress otherwise). The synapse-web Helm release
+has chart ingress disabled to avoid duplicate routes.
+
 Keycloak `redirectUris` must target the homeserver host:
 
 ```yaml
@@ -769,6 +774,7 @@ Before opening a PR, verify:
 - [ ] If `global.hosts.keycloak` is present: `global.domain` is `${KERNEL_DOMAIN}`, tenant app hosts use `${TENANT_ID}` prefix
 - [ ] All IdP URLs use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`; redirect URIs use `${TENANT_DOMAIN}`
 - [ ] Element: OIDC redirect is `https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback` (not `chat.`)
+- [ ] Element: `additionalIngresses` includes `matrix` → `synapse-web:8008` (required for `ROUTING_MODE=gateway`) — §6d
 - [ ] Element: `matrixIdLocalpart: "opendesk_username"` (not `preferred_username`) — §6d
 - [ ] After tenant purge/redeploy: if Files login fails, check NC `entryUUID` drift (§6g) — not an AppProfile fix
 - [ ] OIDC uses full `OIDCClientSpec`, realm is `${TENANT_ID}`

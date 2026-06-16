@@ -496,7 +496,7 @@ spec:
   # plus the Jitsi sidecar for video conferencing:
   # opendesk-element (frontend), opendesk-synapse (homeserver),
   # opendesk-synapse-create-account + opendesk-matrix-user-verification-service
-  # (Jitsi hybrid_matrix_token auth), opendesk-synapse-web (matrix ingress),
+  # (Jitsi hybrid_matrix_token auth), opendesk-synapse-web (matrix nginx proxy),
   # and opendesk-jitsi (meet.<tenant> for Element widgets).
   compositionRef: app-element
 
@@ -518,6 +518,18 @@ spec:
       nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
 
   additionalIngresses:
+    # matrix.<tenant> → synapse-web (/_matrix, /_synapse, OIDC callback). Required
+    # for ROUTING_MODE=gateway: the synapse-web chart ingress is disabled in
+    # app-element; the operator provisions the HTTPRoute (or nginx Ingress).
+    - subDomain: matrix
+      serviceName: synapse-web
+      servicePort: 8008
+      ingressClassName: nginx
+      tlsEnabled: true
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "100M"
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+        nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
     - subDomain: meet
       serviceName: jitsi-web
       servicePort: 80
