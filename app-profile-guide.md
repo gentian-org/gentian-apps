@@ -170,18 +170,18 @@ the Crossplane `ExternalSecret` → Helm `set[]` pipeline at deploy time.
 
 ---
 
-## 5. Ingress, TLS and CORS
+## 5. Edge routing, TLS and CORS
 
 ### 5a. How TLS is provisioned
 
 Setting `spec.ingress` (with `tlsEnabled: true`, the default) tells the
 gentian-os controller to create:
 
-1. A Kubernetes `Ingress` at `{subDomain}.{effectiveDomain}` → `Service:{servicePort}`.
+1. A Gateway API `HTTPRoute` at `{subDomain}.{effectiveDomain}` → `Service:{servicePort}`.
 2. One **DNS-01 wildcard** cert-manager `Certificate` per tenant
    (`tenant-{tenant}-wildcard-tls`) covering `*.{effectiveDomain}`.
 
-All app ingresses for that tenant reference the same TLS secret.
+All app routes for that tenant reference the same TLS secret on the tenant Gateway.
 **Do not** set per-app HTTP-01 issuers in profiles — `spec.ingress.clusterIssuer`
 is reserved for a possible future mode and is **ignored** by the operator today.
 See [gentian-os/docs/architecture.md](../gentian-os/docs/architecture.md) §6.1.
@@ -191,17 +191,18 @@ ingress:
   subDomain: "projects"        # → projects.demo.desk.gentian.org
   serviceName: "openproject"   # must match the Kubernetes Service name
   servicePort: 8080
-  ingressClassName: "nginx"
   tlsEnabled: true             # default
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "128m"  # bridged to Envoy policy
 ```
 
 **`subDomain` capitalization matters.** The field is validated; `subdomain`
-(lowercase) is silently ignored, leaving the app with no ingress.
+(lowercase) is silently ignored, leaving the app with no edge route.
 
 ### 5b. Always disable chart-managed ingress
 
-Every chart that ships its own `Ingress` resource must have it disabled,
-otherwise two `Ingress` objects collide on the same host:
+Every chart that ships its own `Ingress` or Gateway route must have it disabled,
+otherwise two edge routes collide on the same host:
 
 ```yaml
 extraValues:
@@ -282,19 +283,21 @@ inside a WinBox iframe.
 OIDC apps that work in the portal shell (Element, XWiki, …) should use **`linkTarget: embedded`**
 in `portalTiles`. Reserve `newwindow` for apps that block iframe embedding (OX App Suite).
 
-The gentian-os **KeycloakPlatformReconciler** converges `id.<kernel>` ingress CSP
+The gentian-os **KeycloakPlatformReconciler** converges `id.<kernel>` HTTPRoute CSP
 and Keycloak realm `X-Frame-Options` for all tenants; `install.sh` verifies this
 before declaring the cluster ready.
 
-**Do not fix this in AppProfiles.** The gentian-os operator injects NGINX
-`configuration-snippet` directives on every app `Ingress` it manages.
+**Do not fix this in AppProfiles.** The gentian-os operator injects edge
+`frame-ancestors` policy on every HTTPRoute it manages (via Envoy
+`ResponseHeaderModifier` filters; AppProfile `nginx.ingress.kubernetes.io/*`
+annotation keys are bridged to equivalent Envoy policy).
 
 | Check | Action |
 |---|---|
 | Portal URL | Users must use `portal.${KERNEL_DOMAIN}` — **not** `portal.${TENANT_DOMAIN}` (404 on multi-tenant). |
 | Profile `ingress.annotations` | **Never** add `X-Frame-Options`, `frame-ancestors`, or `Content-Security-Policy` — the operator owns this. Legacy per-tenant portal origins (`portal.${TENANT_DOMAIN}`) are stripped on reconcile. |
 | `linkTarget` | `embedded` and `newwindow` both load inside gentian-ui; CSP must still allow the kernel portal. Default `newwindow` is fine. |
-| Operator version | Reconcile the tenant after upgrading gentian-os so ingress snippets are updated. |
+| Operator version | Reconcile the tenant after upgrading gentian-os so HTTPRoute policies are updated. |
 
 ### 6b. Double CSP headers (Element and similar)
 
@@ -310,16 +313,14 @@ enforces **both** policies — `'self'` still blocks embedding from
 with the Firefox message above; `curl -sI` shows **two** `content-security-policy`
 lines.
 
-The operator **replaces** upstream CSP for standard AppProfile ingresses
-(`chat`, `meet`, `projects`, `webmail`, …): it uses `proxy_hide_header` (stock
-ingress-nginx; microk8s lacks `more_clear_headers`) to strip upstream
-`X-Frame-Options` and `Content-Security-Policy`, then sets a single:
+The operator **replaces** upstream CSP for standard AppProfile routes by clearing
+upstream `X-Frame-Options` and `Content-Security-Policy`, then setting a single:
 
 ```http
 Content-Security-Policy: frame-ancestors 'self' https://portal.<kernel-domain>
 ```
 
-**Exception — CryptPad** (`pad` / `pad-sandbox` kernel ingresses only): the
+**Exception — CryptPad** (`pad` / `pad-sandbox` kernel HTTPRoutes only): the
 operator **appends** a second CSP header so upstream `script-src` (no
 `'unsafe-eval'`) stays intact. Do not copy CryptPad's append-only pattern into
 AppProfiles.
@@ -330,7 +331,8 @@ These profiles rely on the operator and need **no** CSP annotations:
 
 - `element`, `openproject`, `ox-appsuite`, `xwiki`
 
-Add only non-CSP ingress annotations your chart needs (proxy timeouts, body size):
+Add only non-CSP `ingress.annotations` your chart needs (proxy timeouts, body size —
+bridged to Envoy `BackendTrafficPolicy`):
 
 ```yaml
 ingress:
@@ -343,13 +345,13 @@ ingress:
 **No other app-level CORS setup is required** for normal same-origin app UIs.
 TLS and `browserProxy` bearer forwarding are platform-managed (§5d–5e).
 
-**Force ingress reconcile:** after an operator upgrade, bump the tenant to refresh
-ingress annotations (the `gentianos.io/reconcile` timestamp annotation alone does
-not change `spec` — patch any field or delete the app ingress and let the operator
+**Force edge route reconcile:** after an operator upgrade, bump the tenant to refresh
+route policy (the `gentianos.io/reconcile` timestamp annotation alone does
+not change `spec` — patch any field or delete the app HTTPRoute and let the operator
 recreate it):
 
 ```bash
-kubectl delete ingress -n tenant-demo ingress-demo-element
+kubectl delete httproute -n tenant-demo httproute-demo-element
 # operator recreates on next tenant reconcile (~seconds)
 ```
 
@@ -358,8 +360,7 @@ kubectl delete ingress -n tenant-demo ingress-demo-element
 Element Web is served at `chat.<tenant-domain>` but the Matrix homeserver (Synapse)
 and OIDC callback live at **`matrix.<tenant-domain>`** (synapse-web Service).
 The `element` AppProfile declares `additionalIngresses` for `matrix` →
-`synapse-web:8008`; the operator creates the edge route (HTTPRoute when
-`ROUTING_MODE=gateway`, nginx Ingress otherwise). The synapse-web Helm release
+`synapse-web:8008`; the operator creates the HTTPRoute. The synapse-web Helm release
 has chart ingress disabled to avoid duplicate routes.
 
 Keycloak `redirectUris` must target the homeserver host:
@@ -432,13 +433,13 @@ match `chat.demo.<kernel>`; each tenant needs **`https://*.<tenant-effective-dom
 
 | Layer | Who sets CSP | Must allow |
 |---|---|---|
-| App ingress (`chat`, `wiki`, …) | gentian-os operator | `https://portal.<kernel>` (§6a–6b) |
-| IdP ingress (`id.<kernel>`) | gentian-os `KeycloakPlatformReconciler` (ingress patch + realm `X-Frame-Options` jobs) | `https://portal.<kernel>`, `https://*.<kernel>`, `https://*.<tenant-effective-domain>`, **and** explicit `https://{ingress.subDomain}.<tenant-effective-domain>` for every **installed OIDC AppProfile** (discovered automatically — no manual subdomain list) |
+| App HTTPRoute (`chat`, `wiki`, …) | gentian-os operator | `https://portal.<kernel>` (§6a–6b) |
+| IdP HTTPRoute (`id.<kernel>`) | gentian-os `KeycloakPlatformReconciler` (HTTPRoute patch + realm `X-Frame-Options` jobs) | `https://portal.<kernel>`, `https://*.<kernel>`, `https://*.<tenant-effective-domain>`, **and** explicit `https://{ingress.subDomain}.<tenant-effective-domain>` for every **installed OIDC AppProfile** (discovered automatically — no manual subdomain list) |
 
 **Do not maintain a static IdP allowlist in AppProfiles or Nubus values.** When you add
 a new OIDC app, declare `kernelRequirements.identity.oidc` and `ingress.subDomain`;
 the operator adds the app origin to `id.<kernel>` on the next tenant or AppProfile
-reconcile. `install.sh` step 16a verifies the IdP ingress converged.
+reconcile. `install.sh` step 16a verifies the IdP HTTPRoute converged.
 
 Helm values provide the install baseline; the operator patches the Keycloak proxy
 ingress on every tenant reconcile when tenants are added or removed. The operator
@@ -460,23 +461,20 @@ AppProfile. One instance at `pad.<kernel_domain>` plus
 `pad-sandbox.<kernel_domain>` for the crypto sandbox origin serves all tenants;
 Nextcloud embeds it from `files.<kernel_domain>`.
 
-There is **no portal tile** and **no tenant ingress** — manifests live under
+There is **no portal tile** and **no tenant HTTPRoute** — manifests live under
 `gentian-os/kernel/services/cryptpad/`. CSP `frame-ancestors` on the kernel
-ingresses must allow Nextcloud and the portal; do not use `more_clear_headers`
-(microk8s ingress-nginx lacks it) — append with `add_header … always` only.
+HTTPRoutes must allow Nextcloud and the portal.
 
 ### 6g. Kernel file share (Nextcloud Files)
 
 Nextcloud Files is a **shared kernel service** at `files.<kernel_domain>` (not an
-AppProfile). The gentian-os operator does **not** manage its Ingress — CSP lives in
+AppProfile). The gentian-os operator does **not** manage its HTTPRoute — CSP lives in
 `gentian-os/kernel/services/nextcloud/manifests/<env>/configmap.yaml` and is
 re-applied by `./update.sh --nextcloud-office`.
 
-Use the same **replace** pattern as Element (§6b): `proxy_hide_header` for upstream
-`X-Frame-Options` and `Content-Security-Policy`, then a single
-`add_header Content-Security-Policy "frame-ancestors 'self' https://portal.<kernel-domain>" always`.
-Do **not** use `more_clear_headers` or `more_set_headers` — they are ignored on
-microk8s and leave `X-Frame-Options: SAMEORIGIN`, which blocks the portal iframe.
+Use the same **replace** pattern as Element (§6b): clear upstream
+`X-Frame-Options` and `Content-Security-Policy`, then set a single
+`frame-ancestors 'self' https://portal.<kernel-domain>` response header.
 
 #### SSO topology — kernel realm, not tenant broker
 
@@ -703,8 +701,8 @@ openDesk OIDC pack (protocol mappers, LDAP `uid` → claim). Profile authors
 define the client; **mapper wiring is operator/IAM**, not `extraValues`.
 
 **Operator-owned (do not hand-craft in AppProfiles):** tenant-realm browser flow
-(auto-redirect to kernel IdP), first-broker-login auto-link by email, IdP ingress
-`frame-ancestors` for installed OIDC apps, portal/app ingress CSP, staging CA /
+(auto-redirect to kernel IdP), first-broker-login auto-link by email, IdP HTTPRoute
+`frame-ancestors` for installed OIDC apps, portal/app HTTPRoute CSP, staging CA /
 JVM truststore for Java charts on ACME staging. See `gentian-os/docs/design/iam.md`.
 
 **Custom (non-openDesk) apps:** use generic `kernelRequirements.identity.oidc` and
@@ -730,7 +728,7 @@ with the openDesk directory model.
 | Blank iframe / Firefox framing error | Missing IdP `frame-ancestors` — ensure `ingress.subDomain` + OIDC client declared; operator reconciles (§6e) |
 | HTTP 500 on OIDC callback (empty username claim) | Chart expects `opendesk_username` (or similar) but `clientId` not in openDesk pack / wrong mapper — fix `clientId`, not chart templates |
 | “Account already exists” / email already exists on OIDC login | LDAP `SYNC__USERS` pre-created the user with `ldap_auth_source_id` set (OpenProject 16.x; older releases used `auth_source_id`) — OpenProject cannot remap LDAP users to OIDC (OP-7253). Keep `OPENPROJECT_SEED_LDAP_*_SYNC__USERS: "false"`; OIDC creates users on first login, LDAP group sync only links existing users. **Remediation** (one-off `rails runner` in `openproject-web`): `User.where.not(ldap_auth_source_id: nil).update_all(ldap_auth_source_id: nil)` to unlink LDAP; or `User.find_by(mail: "<email>")&.destroy` if the account has no data to keep; then OIDC login recreates the user. Do **not** use `auth_source_id` (removed in 16.x) or `LdapAuthSource.update_all(sync_users: …)` (column removed in 16.x) |
-| 502 on `/realms/<tenant>/broker/kernel/endpoint` | Broker token/JWKS fetch or oversized headers — operator Keycloak ingress / internal `tokenUrl`; not AppProfile (§6d) |
+| 502 on `/realms/<tenant>/broker/kernel/endpoint` | Broker token/JWKS fetch or oversized headers — operator Keycloak HTTPRoute / internal `tokenUrl`; not AppProfile (§6d) |
 | Element works; Nextcloud “Failed to provision the user” | **Different SSO path** — kernel OIDC + stale NC `entryUUID` after purge; see §6g (not tenant OIDC pack) |
 | “Unexpected error” from identity provider | Usually stale broker links after IAM flow changes — operator purge/re-link; not an AppProfile field |
 
@@ -791,7 +789,7 @@ Before opening a PR, verify:
 - [ ] If `global.hosts.keycloak` is present: `global.domain` is `${KERNEL_DOMAIN}`, tenant app hosts use `${TENANT_ID}` prefix
 - [ ] All IdP URLs use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`; redirect URIs use `${TENANT_DOMAIN}`
 - [ ] Element: OIDC redirect is `https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback` (not `chat.`)
-- [ ] Element: `additionalIngresses` includes `matrix` → `synapse-web:8008` (required for `ROUTING_MODE=gateway`) — §6d
+- [ ] Element: `additionalIngresses` includes `matrix` → `synapse-web:8008` (required) — §6d
 - [ ] Element: `matrixIdLocalpart: "opendesk_username"` (not `preferred_username`) — §6d
 - [ ] After tenant purge/redeploy: if Files login fails, check NC `entryUUID` drift (§6g) — not an AppProfile fix
 - [ ] OIDC uses full `OIDCClientSpec`, realm is `${TENANT_ID}`
@@ -801,7 +799,7 @@ Before opening a PR, verify:
 - [ ] `clientId` matches an openDesk OIDC pack when the chart depends on openDesk-specific claims/scopes
 - [ ] Secrets only in `valueMapping` / `appSecrets`, never in `extraValues`
 - [ ] `reloader.stakater.com/auto: "true"` in `podAnnotations`
-- [ ] (automatic) Operator injects portal `frame-ancestors` on app Ingress — no CSP annotations in profile
+- [ ] (automatic) Operator injects portal `frame-ancestors` on app HTTPRoutes — no CSP annotations in profile
 - [ ] `ingress.annotations` contains no `frame-ancestors`, `X-Frame-Options`, or `Content-Security-Policy`
 - [ ] (CryptPad / multi-host) `additionalIngresses` use flat subdomains; no per-host CSP in annotations — operator sets `pad-sandbox` policy
 - [ ] `spec.browserProxy` declared if the shell calls this app's REST API
