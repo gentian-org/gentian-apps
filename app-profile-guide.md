@@ -329,7 +329,7 @@ AppProfiles.
 
 These profiles rely on the operator and need **no** CSP annotations:
 
-- `element`, `openproject`, `ox-appsuite`, `xwiki`
+- `app-store`, `element`, `openproject`, `ox-appsuite`, `xwiki`
 
 Add only non-CSP `ingress.annotations` your chart needs (proxy timeouts, body size —
 bridged to Envoy `BackendTrafficPolicy`):
@@ -405,12 +405,36 @@ must include its `banner` URLs (`portal_url`, `ics_*`, `portal_logo_svg_url`) an
 
 **Loading screen flicker / white page after SSO succeeds:** Matrix login can work
 (Synapse logs show `POST /_matrix/client/v3/login` 200) while the Nordeck banner still
-loops on ICS silent login. On `ROUTING_MODE=gateway`, intercom chart ingress is disabled;
-set public `BASE_URL` / `INTERCOM_URL` to `https://ics.<kernel>` in
-`gentian-os/kernel/services/intercom-service/values/gateway.yaml` (not the in-cluster
-Service URL). ICS logs repeating `Silent login, logged in false` confirm this. After
-ArgoCD sync, `curl -I https://ics.<kernel>/silent` should not redirect with
-`redirect_uri=http://intercom-service-*:8008/callback`.
+loops on ICS silent login. Common causes:
+
+1. **Wrong ICS `BASE_URL`** — on `ROUTING_MODE=gateway`, intercom chart ingress is disabled;
+   set public `BASE_URL` / `INTERCOM_URL` to `https://ics.<kernel>` via the cluster-scoped
+   `intercom-gateway-values` ConfigMap (rendered at install/update from `KERNEL_DOMAIN`).
+   ICS logs repeating `Silent login, logged in false` with
+   `redirect_uri=http://intercom-service-*:8008/callback` confirm this. After fix,
+   `curl -I https://ics.<kernel>/silent` should redirect with
+   `redirect_uri=https%3A%2F%2Fics.<kernel>%2Fcallback`.
+
+2. **Intercom cannot reach Redis** — ICS stores OIDC sessions in Redis. If intercom logs
+   `Redis error: getaddrinfo ENOTFOUND redis-*`, fix the Redis host (use
+   `redis-<env>-master.gentian-infra-<env>.svc.cluster.local`, not headless) and restart
+   intercom after Redis is healthy:
+   `kubectl rollout restart deployment/intercom-service-dev -n gentian-dev`.
+   `install.sh` / `update.sh` run `verify_intercom_ics` to catch this.
+
+3. **Stale ICS session cookies** — after Redis/BASE_URL fixes, intercom may still log
+   `Error verifying ICS OIDC access_token` + `Silent login, logged in false` in a tight
+   loop while Element's Nordeck banner flickers. The browser is retrying
+   `https://ics.<kernel>/navigation.json` with an invalid ICS session cookie from an
+   earlier broken deploy. **Clear site data for `ics.<kernel>`** (Firefox: Storage tab →
+   delete all cookies for that host), reload the portal, then reopen Element.
+
+4. **Silent login blocked in nested iframes** — Nordeck loads `ics_silent_url` inside
+   `chat.<tenant>` inside the portal WinBox. If step 3 did not help, Firefox (and other
+   browsers with strict third-party cookie rules) may not send the Keycloak kernel session
+   cookie to `id.<kernel>` inside that hidden iframe (`login_required` / silent login
+   false) even though portal login works. **Workaround:** Ctrl/Cmd+click the Element tile
+   to open Chat in a top-level tab (gentian-ui `linkTarget: embedded` override).
 
 **Wrong user after switching portal accounts:** portal login uses the **kernel** realm;
 Element/Synapse OIDC uses the **tenant** realm (`demo`, …). A previous user's tenant-realm
@@ -722,12 +746,20 @@ with the openDesk directory model.
 4. After login, the app UI loads; OIDC callback URL must stay on
    **`https://<subDomain>.${TENANT_DOMAIN}/…`**.
 
+**Install command readiness:** `gtnctl apps install <app> --tenant <tenant>` commits
+to GitOps, applies the Tenant CR, then **blocks until the Crossplane App claim is
+Ready** (default timeout 15 minutes). It exits non-zero if init Jobs fail (for
+example `openproject-s3-init`, `openproject-oidc-seed`) or the Helm release does
+not converge. Do not treat a successful Git push as “installed” — wait for the
+CLI to report Ready or inspect `kubectl get app <app> -n tenant-<tenant>`.
+
 | Symptom | Likely profile issue |
 |---|---|
 | Native username/password form (XWiki, etc.) | `keycloak-bridge-auth` or missing `OIDCAuthServiceImpl` / `oidc.skipped: false` |
 | `redirect_uri` mismatch | `redirectUris` use wrong host (`chat.` vs `matrix.` for Element — §6d) or `${KERNEL_DOMAIN}` instead of `${TENANT_DOMAIN}` |
 | Element **“Invalid username or password”** after matrix host works | Wrong OIDC redirect URI (§6d), missing `opendesk_username` / Livecollaboration role (IAM), or Synapse token exchange still hitting public `id.<kernel>` on staging — operator `KEYCLOAK_INTERNAL_URL` + `app-element` reconcile (§6d, `security.md` §9.1) |
-| Blank iframe / Firefox framing error | Missing IdP `frame-ancestors` — ensure `ingress.subDomain` + OIDC client declared; operator reconciles (§6e) |
+| Blank iframe / Firefox framing error | Missing IdP `frame-ancestors` — ensure `ingress.subDomain` + OIDC client declared; operator reconciles (§6e). **First** verify edge headers with `curl -sI https://<subDomain>.<tenant-domain>/ | grep -i content-security-policy` — a single `frame-ancestors 'self' https://portal.<kernel>` line means CSP is fine and the failure is elsewhere (often OIDC — next row). |
+| OpenProject login 404 on `/auth/keycloak` | OIDC auth provider not seeded — `openproject-oidc-seed` Job failed or ran before DB migrations. Not a CSP issue; fix the Job (see §6f). Portal iframe may look like a framing/CORS error when SSO never starts. |
 | HTTP 500 on OIDC callback (empty username claim) | Chart expects `opendesk_username` (or similar) but `clientId` not in openDesk pack / wrong mapper — fix `clientId`, not chart templates |
 | “Account already exists” / email already exists on OIDC login | LDAP `SYNC__USERS` pre-created the user with `ldap_auth_source_id` set (OpenProject 16.x; older releases used `auth_source_id`) — OpenProject cannot remap LDAP users to OIDC (OP-7253). Keep `OPENPROJECT_SEED_LDAP_*_SYNC__USERS: "false"`; OIDC creates users on first login, LDAP group sync only links existing users. **Remediation** (one-off `rails runner` in `openproject-web`): `User.where.not(ldap_auth_source_id: nil).update_all(ldap_auth_source_id: nil)` to unlink LDAP; or `User.find_by(mail: "<email>")&.destroy` if the account has no data to keep; then OIDC login recreates the user. Do **not** use `auth_source_id` (removed in 16.x) or `LdapAuthSource.update_all(sync_users: …)` (column removed in 16.x) |
 | 502 on `/realms/<tenant>/broker/kernel/endpoint` | Broker token/JWKS fetch or oversized headers — operator Keycloak HTTPRoute / internal `tokenUrl`; not AppProfile (§6d) |
