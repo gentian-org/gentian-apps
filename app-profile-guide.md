@@ -408,6 +408,15 @@ must include its `banner` URLs (`portal_url`, `ics_*`, `portal_logo_svg_url`) an
 loops on ICS silent login. This is **kernel intercom (Pattern A)**, not tenant
 Crossplane — Element's Nordeck config points at `https://ics.${KERNEL_DOMAIN}`.
 
+**Loading screen flicker during SSO (Synapse `invalid_scope`):** tenant Crossplane.
+The manifest-bridge OIDC pack Job creates `opendesk-matrix-scope`, but
+provider-keycloak `Client` reconciliation can strip it from `opendesk-synapse`.
+`app-element` emits matching `ClientDefaultScopes` MRs and sequences them before
+Synapse/Element Helm releases. Symptom: Synapse logs
+`Received OIDC callback with error: invalid_scope Invalid scopes: openid opendesk-matrix-scope`
+and Element reloads in a tight loop. Verify:
+`kubectl get clientdefaultscopes | grep element-keycloak-default-scopes`.
+
 Common causes:
 
 1. **Wrong ICS `BASE_URL` on the intercom pod** — with `ROUTING_MODE=gateway`, chart
