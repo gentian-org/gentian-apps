@@ -405,15 +405,19 @@ must include its `banner` URLs (`portal_url`, `ics_*`, `portal_logo_svg_url`) an
 
 **Loading screen flicker / white page after SSO succeeds:** Matrix login can work
 (Synapse logs show `POST /_matrix/client/v3/login` 200) while the Nordeck banner still
-loops on ICS silent login. Common causes:
+loops on ICS silent login. This is **kernel intercom (Pattern A)**, not tenant
+Crossplane — Element's Nordeck config points at `https://ics.${KERNEL_DOMAIN}`.
 
-1. **Wrong ICS `BASE_URL`** — on `ROUTING_MODE=gateway`, intercom chart ingress is disabled;
-   set public `BASE_URL` / `INTERCOM_URL` to `https://ics.<kernel>` via the cluster-scoped
-   `intercom-gateway-values` ConfigMap (rendered at install/update from `KERNEL_DOMAIN`).
-   ICS logs repeating `Silent login, logged in false` with
-   `redirect_uri=http://intercom-service-*:8008/callback` confirm this. After fix,
-   `curl -I https://ics.<kernel>/silent` should redirect with
-   `redirect_uri=https%3A%2F%2Fics.<kernel>%2Fcallback`.
+Common causes:
+
+1. **Wrong ICS `BASE_URL` on the intercom pod** — with `ROUTING_MODE=gateway`, chart
+   ingress is disabled and the Helm Secret defaults to `http://intercom-service-<env>:8008`.
+   `kernel/services/intercom-service/values/gateway.yaml` must set `extraEnvVars`
+   (`BASE_URL`, `INTERCOM_URL`, `NODE_EXTRA_CA_CERTS`) so they override `envFrom`.
+   Argo CD `valuesFrom` on `intercom-gateway-values` alone is not reliable; re-sync
+   `intercom-service-dev` after install/update. Symptom: ICS `/silent` HTTP 500 and logs
+   `Issuer.discover() failed … unable to get local issuer certificate` when
+   `NODE_EXTRA_CA_CERTS` is unset on the pod.
 
 2. **Intercom cannot reach Redis** — ICS stores OIDC sessions in Redis. If intercom logs
    `Redis error: getaddrinfo ENOTFOUND redis-*`, fix the Redis host (use
