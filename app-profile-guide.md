@@ -463,7 +463,9 @@ Nextcloud embeds it from `files.<kernel_domain>`.
 
 There is **no portal tile** and **no tenant HTTPRoute** — manifests live under
 `gentian-os/kernel/services/cryptpad/`. CSP `frame-ancestors` on the kernel
-HTTPRoutes must allow Nextcloud and the portal.
+HTTPRoutes is computed centrally in the operator (`cryptpadSandboxFrameAncestorOrigins`):
+**pad** + **portal** + **files** on `pad-sandbox`, **files** + **portal** on `pad`.
+Do not duplicate CSP in AppProfile annotations.
 
 ### 6g. Kernel file share (Nextcloud Files)
 
