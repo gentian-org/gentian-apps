@@ -16,12 +16,19 @@ corresponds to a class of bug that was caught in git history.
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
-  name: <app-id>                        # lowercase, kebab-case
+  name: <app-id>                        # lowercase, kebab-case (unique CR name)
   labels:
-    gentianos.io/profile-name: <app-id> # must match metadata.name
+    gentianos.io/profile-name: <app-id> # must match metadata.name (controller also sets family/version labels)
 spec:
   deploymentMethod: crossplane          # ALWAYS crossplane — never tofu-controller
+  family: <logical-app-id>              # groups versions/flavors; usually same as metadata.name
+  catalogueVersion: "1.0.0"             # semver catalogue revision (immutable once published)
+  edition: full                         # minimal | standard | full | performant
+  offeringTier: free                    # free | hardened | supported
 ```
+
+See [app-profile-versioning.md](../gentian-os/docs/design/app-profile-versioning.md) for
+versioning rules, naming conventions, and how flavors relate to `AppProduct`.
 
 ---
 
