@@ -15,7 +15,7 @@ web:
   replicaCount: 1
 
 ingress:
-  enabled: true
+  enabled: false
   className: nginx
   subDomain: store
   tlsEnabled: true

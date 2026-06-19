@@ -55,8 +55,7 @@ spec:
       appsRepo: "https://github.com/gentian-org/gentian-apps"
       appsBranch: main
     ingress:
-      enabled: true
-      subDomain: store
+      enabled: false
 
   ingress:
     subDomain: store

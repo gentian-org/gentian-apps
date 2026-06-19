@@ -498,7 +498,7 @@ spec:
   # opendesk-synapse-create-account + opendesk-matrix-user-verification-service
   # (Jitsi hybrid_matrix_token auth), opendesk-synapse-web (matrix nginx proxy),
   # and opendesk-jitsi (meet.<tenant> for Element widgets).
-  compositionRef: app-element
+  provisioningMode: element
 
   # Ingress managed by the operator's ensureIngress reconciler.
   # Creates Ingress "chat.<tenant-domain>" → Service element:8080 (frontend).
