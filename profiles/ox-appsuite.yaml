@@ -179,6 +179,8 @@ spec:
       # App zone only — all OIDC endpoints below use id.${KERNEL_DOMAIN} explicitly.
       domain: "${TENANT_DOMAIN}"
       hostname: "webmail.${TENANT_DOMAIN}"
+      core-cacheservice:
+        enabled: false
       mysql:
         host: "${MYSQL_HOST}"
         readHost: "${MYSQL_HOST}"
@@ -202,10 +204,25 @@ spec:
         enabled: false
       istio:
         enabled: false
+      # openDesk disables separate cache/spellcheck deployments; core-mw uses
+      # in-process cache and tolerates missing spellcheck when disabled.
+      core-cacheservice:
+        enabled: false
+      core-spellcheck:
+        enabled: false
       core-mw:
         masterAdmin: "admin"
         serverName: "oxserver"
         replicaCount: 1
+        # Explicit limits required: tenant LimitRange defaults cpu to 500m when
+        # limits are omitted, which rejects the chart default 1000m CPU request.
+        resources:
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+          requests:
+            cpu: "500m"
+            memory: "2Gi"
         redis:
           enabled: true
           mode: "standalone"
