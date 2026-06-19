@@ -21,14 +21,15 @@ metadata:
     gentianos.io/profile-name: <app-id> # must match metadata.name (controller also sets family/version labels)
 spec:
   deploymentMethod: crossplane          # ALWAYS crossplane — never tofu-controller
-  family: <logical-app-id>              # groups versions/flavors; usually same as metadata.name
-  catalogueVersion: "1.0.0"             # semver catalogue revision (immutable once published)
-  edition: full                         # minimal | standard | full | performant
-  offeringTier: free                    # free | hardened | supported
+  family: <logical-app-id>
+  catalogueVersion: "1.0.0"
+  edition: full
+  trustTier: certified              # platform | certified | experimental
+  license: Apache-2.0               # SPDX; proprietary for gentian-premium
 ```
 
-See [app-profile-versioning.md](../gentian-os/docs/design/app-profile-versioning.md) for
-versioning rules, naming conventions, and how flavors relate to `AppProduct`.
+Commerce (customer, price, invoice) is handled in **CRM/ERP (Odoo)** — see
+[business-logic-plan.md](../gentian-os/docs/design/business-logic-plan.md).
 
 ---
 
