@@ -824,7 +824,8 @@ spec:
               providerConfigRef:
                 name: kubernetes
             {{- end }}
-{{- /* Canonicalize extraVals so Helm values hashing is stable across reconciles */}}
+
+            {{- /* Canonicalize extraVals so Helm values hashing is stable across reconciles */}}
             {{- $extraVals = $extraVals | toJson | fromJson }}
 
             {{- /* ── Emit Helm Release ────────────────────────────────────────── */}}

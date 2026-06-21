@@ -5,12 +5,13 @@ App Store catalogue for Gentian OS — `AppProfile` CRs plus first-party app imp
 ## Structure
 
 ```text
-profiles/              # AppProfile YAML — synced to cluster by ArgoCD (gentian-appprofiles)
-  element.yaml         # Element (Matrix chat) — includes Jitsi sidecar for video
-  openproject.yaml     # OpenProject (project management)
-  ox-appsuite.yaml     # OX App Suite (groupware)
-  xwiki.yaml           # XWiki (wiki and knowledge management)
-  app-store.yaml       # first-party app (source in apps/app-store/)
+profiles/              # App catalogue bundles — synced by Argo CD gentian-catalogue
+  CATALOGUE.md         # layout and workflow
+  element/             # AppProfile + app-element composition + Jitsi overlay assets
+  openproject/
+  ox-appsuite/
+  xwiki/
+  app-store/
 apps/                  # first-party implementations (FastAPI + React + Helm)
   _template/           # copy of gentian-app-template
   app-store/           # tenant admin App Store UI
@@ -29,7 +30,7 @@ icons/                 # shared SVG assets
 
 ## Adding an upstream app
 
-Add `profiles/<app>.yaml` — see [app-profile-guide.md](app-profile-guide.md).
+Add `profiles/<app>/` (see [profiles/CATALOGUE.md](profiles/CATALOGUE.md) and [app-profile-guide.md](app-profile-guide.md)).
 
 ```bash
 kubectl gentian apps list
@@ -39,7 +40,7 @@ kubectl gentian apps list
 
 1. Copy `apps/_template/` → `apps/<name>/`
 2. Implement backend + frontend + chart
-3. Add `profiles/<name>.yaml`
+3. Add `profiles/<name>/profile.yaml` (+ `kustomization.yaml`)
 4. CI (`.github/workflows/apps-ci.yaml`) publishes images + OCI chart
 
 See [custom-app-guide.md](custom-app-guide.md).

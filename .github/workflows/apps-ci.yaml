@@ -66,9 +66,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install PyYAML
         run: pip install pyyaml
-      - name: Validate AppProfile YAML
+      - name: Validate profile bundles
         run: |
-          for f in profiles/*.yaml; do
-            echo "Checking $f"
-            python3 -c "import yaml; yaml.safe_load(open('$f'))"
+          for d in profiles/*/; do
+            name="$(basename "$d")"
+            echo "Checking profiles/${name}"
+            test -f "${d}kustomization.yaml"
+            test -f "${d}profile.yaml"
+            python3 -c "import yaml; yaml.safe_load(open('${d}profile.yaml'))"
+            kubectl kustomize "$d" >/dev/null
           done
