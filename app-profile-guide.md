@@ -685,6 +685,10 @@ and portal realtime links.
    Replace `demo_element` / `@uvs:demo.desk.gentian.org` with the tenant DB name and
    Synapse `server_name` for your tenant.
 
+   If bootstrap logs show `profiles_user_id_key` duplicate but `users` has no `@uvs`
+   row, also run `DELETE FROM demo_element.profiles WHERE user_id = 'uvs';` then
+   delete the bootstrap Job and re-sync (or delete `element-*-uvs-bootstrap-release`).
+
 Sidecar OIDC clients and internal secrets use the synthetic app key
 `element-jitsi` in OpenBao and Keycloak jobs (`SidecarAppName` in the API).
 
@@ -798,7 +802,22 @@ CLI to report Ready or inspect `kubectl get app <app> -n tenant-<tenant>`.
 | Blank iframe / Firefox framing error | Missing IdP `frame-ancestors` — ensure `ingress.subDomain` + OIDC client declared; operator reconciles (§6e). **First** verify edge headers with `curl -sI https://<subDomain>.<tenant-domain>/ | grep -i content-security-policy` — a single `frame-ancestors 'self' https://portal.<kernel>` line means CSP is fine and the failure is elsewhere (often OIDC — next row). |
 | OpenProject login 404 on `/auth/keycloak` | OIDC auth provider not seeded — `openproject-oidc-seed` Job failed or ran before DB migrations. Not a CSP issue; fix the Job (see §6f). Portal iframe may look like a framing/CORS error when SSO never starts. |
 | HTTP 500 on OIDC callback (empty username claim) | Chart expects `opendesk_username` (or similar) but `clientId` not in openDesk pack / wrong mapper — fix `clientId`, not chart templates |
-| “Account already exists” / email already exists on OIDC login | LDAP `SYNC__USERS` pre-created the user with `ldap_auth_source_id` set (OpenProject 16.x; older releases used `auth_source_id`) — OpenProject cannot remap LDAP users to OIDC (OP-7253). Keep `OPENPROJECT_SEED_LDAP_*_SYNC__USERS: "false"`; OIDC creates users on first login, LDAP group sync only links existing users. **Remediation** (one-off `rails runner` in `openproject-web`): `User.where.not(ldap_auth_source_id: nil).update_all(ldap_auth_source_id: nil)` to unlink LDAP; or `User.find_by(mail: "<email>")&.destroy` if the account has no data to keep; then OIDC login recreates the user. Do **not** use `auth_source_id` (removed in 16.x) or `LdapAuthSource.update_all(sync_users: …)` (column removed in 16.x) |
+| Element **“Account already exists”** (`john-doe@…` on OIDC login) | **Element / Synapse reinstall drift** — not OpenProject. Postgres still holds `@<uid>:<server_name>` from a prior Element install with a broken or stale OIDC link (`user_external_ids.external_id` empty or wrong `opendesk_useruuid`). Synapse cannot adopt the new OIDC subject while the email is taken. **Remediation:** delete the stale Matrix user, then log in again via OIDC (creates a fresh link with `subject_template: {{ user.opendesk_useruuid }}`):
+
+```bash
+MXID='@john-doe:demo.desk.gentian.org'   # uid + Synapse server_name
+DB=demo_element                          # tenant DB from element AppProfile database.name
+kubectl exec -n platform-kernel postgres-1 -c postgres -- psql -U postgres -d "${DB}" -c "
+BEGIN;
+DELETE FROM demo_element.user_external_ids WHERE user_id = '${MXID}';
+DELETE FROM demo_element.user_threepids WHERE user_id = '${MXID}';
+DELETE FROM demo_element.profiles WHERE user_id = 'john-doe';  -- orphan profile row if users row missing
+DELETE FROM demo_element.users WHERE name = '${MXID}';
+COMMIT;"
+```
+
+Also check orphaned `@uvs` bootstrap state (UVS pod `CreateContainerConfigError`, bootstrap loops on login): see §7b stale `@uvs` user **and** `DELETE FROM demo_element.profiles WHERE user_id = 'uvs';` if register hits `profiles_user_id_key` duplicate. |
+| “Account already exists” / email already exists on OIDC login (**OpenProject**) | LDAP `SYNC__USERS` pre-created the user with `ldap_auth_source_id` set (OpenProject 16.x; older releases used `auth_source_id`) — OpenProject cannot remap LDAP users to OIDC (OP-7253). Keep `OPENPROJECT_SEED_LDAP_*_SYNC__USERS: "false"`; OIDC creates users on first login, LDAP group sync only links existing users. **Remediation** (one-off `rails runner` in `openproject-web`): `User.where.not(ldap_auth_source_id: nil).update_all(ldap_auth_source_id: nil)` to unlink LDAP; or `User.find_by(mail: "<email>")&.destroy` if the account has no data to keep; then OIDC login recreates the user. Do **not** use `auth_source_id` (removed in 16.x) or `LdapAuthSource.update_all(sync_users: …)` (column removed in 16.x) |
 | 502 on `/realms/<tenant>/broker/kernel/endpoint` | Broker token/JWKS fetch or oversized headers — operator Keycloak HTTPRoute / internal `tokenUrl`; not AppProfile (§6d) |
 | Element works; Nextcloud “Failed to provision the user” | **Different SSO path** — kernel OIDC + stale NC `entryUUID` after purge; see §6g (not tenant OIDC pack) |
 | “Unexpected error” from identity provider | Usually stale broker links after IAM flow changes — operator purge/re-link; not an AppProfile field |
