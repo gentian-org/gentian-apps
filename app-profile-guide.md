@@ -669,6 +669,22 @@ and portal realtime links.
    kubectl delete job -n tenant-demo opendesk-matrix-user-verification-service-bootstrap --ignore-not-found
    ```
 
+   **Stale `@uvs` user (reinstall):** if bootstrap logs loop on
+   `Invalid username or password`, the Matrix `@uvs` service account from a prior
+   Element install still exists in Postgres with an old password while OpenBao holds
+   the current derived secret. Remove the user, delete the bootstrap Job, then retry
+   install (or re-sync the Element `App`):
+
+   ```bash
+   kubectl exec -n platform-kernel postgres-1 -c postgres -- \
+     psql -U postgres -d demo_element \
+     -c "DELETE FROM demo_element.users WHERE name = '@uvs:demo.desk.gentian.org';"
+   kubectl delete job -n tenant-demo opendesk-matrix-user-verification-service-bootstrap --ignore-not-found
+   ```
+
+   Replace `demo_element` / `@uvs:demo.desk.gentian.org` with the tenant DB name and
+   Synapse `server_name` for your tenant.
+
 Sidecar OIDC clients and internal secrets use the synthetic app key
 `element-jitsi` in OpenBao and Keycloak jobs (`SidecarAppName` in the API).
 
