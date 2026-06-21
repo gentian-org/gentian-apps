@@ -947,7 +947,7 @@ spec:
             {{- /* Jitsi: mount Gentian OIDC/JWT overlays over chart ConfigMaps */}}
             {{- if eq $scName "jitsi" }}
             {{- if eq (len $jitsiOverlayData) 0 }}
-              {{- fail "gentian-jitsi-oidc-overlays ConfigMap missing in crossplane-system — re-apply profile compositions (install/update Crossplane step)" }}
+              {{- fail "gentian-jitsi-oidc-overlays ConfigMap missing in crossplane-system — run profile assetsScript (apply-assets.sh) via install/update Crossplane step" }}
             {{- end }}
             {{- $jitsiOidcCM := printf "%s-oidc-overlays" $scXrName }}
             {{- $jitsiWebOverlayItems := list

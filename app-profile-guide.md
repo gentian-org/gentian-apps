@@ -812,6 +812,21 @@ Only set `compositionRef` when using a non-default composition:
 | `app-element` | Element (Matrix) — uses the element-specific composition |
 | `app-ox` | OX App Suite — uses the ox-specific composition |
 
+Ship profile compositions under `profiles/<name>/composition.yaml` in this repo.
+When a composition needs cluster-scoped prerequisites before tenant installs
+(e.g. a ConfigMap fetched via `function-extra-resources`), declare an executable
+script in the profile folder and reference it from the AppProfile:
+
+```yaml
+spec:
+  compositionRef: app-element
+  assetsScript: apply-assets.sh   # profiles/element/apply-assets.sh
+```
+
+`gentian-os` install/update runs `assetsScript` once per profile (before
+`kubectl apply` on `composition.yaml`). The script receives `PROFILE_NAME`,
+`PROFILE_DIR`, and `GENTIAN_APPS_PATH` in its environment.
+
 ---
 
 ## 11. Image pull secrets
