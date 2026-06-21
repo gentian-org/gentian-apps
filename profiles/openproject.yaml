@@ -71,6 +71,7 @@ spec:
   trustTier: certified
   license: Apache-2.0
   logo: "data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMUE2N0EzIiByb2xlPSJpbWciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+T3BlblByb2plY3Q8L3RpdGxlPjxwYXRoIGQ9Ik0zIDNoMTh2MThIM1Yzem0yIDJ2MTRoMTRWNUg1em0yIDNoMTB2Mkg3Vjh6bTAgM2g4djJIN3YtMnptMCAzaDZ2Mkg3di0yeiIvPjwvc3ZnPg=="
+  compositionRef: app-openproject
 
   kernelRequirements:
     identity:
