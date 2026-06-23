@@ -12,11 +12,7 @@
 #      Syncs Nubus LDAP users into OX contexts.
 #
 # TODO (orchestrator): OX requires three sequential Helm releases (bootstrap → appsuite →
-# connector). The AppProfile CRD supports a single chart reference. The orchestrator's
-# Composition for ox-appsuite must deploy all three and gate them on the previous wave
-# completing (bootstrap wait: true before appsuite starts; connector after appsuite
-# SOAP endpoint is available). Until that Composition exists, OX is deployed at the
-# kernel level via kernel/services/ox-appsuite/manifests/dev/.
+# connector). The app-ox composition deploys all three plus Nubus consumer registration.
 #
 # Secret inventory:
 #   Kernel-provided (injected via valueMapping):

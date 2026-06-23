@@ -116,6 +116,22 @@ spec:
             {{- if $ccLdapBindDn }}{{- $ldapBindDn = $ccLdapBindDn }}{{- end }}
             {{- end }}
 
+            {{- /* Kernel service namespace + OX multi-chart wiring */}}
+            {{- $servicesNs := dig "network.servicesNamespace" "gentian-dev" $ccData }}
+            {{- $nubusRelease := "nubus-dev" }}
+            {{- $releaseInstance := printf "%s-release" $xrName }}
+            {{- $coreMwSelector := printf "app.kubernetes.io/instance=%s,app.kubernetes.io/name=core-mw" $releaseInstance }}
+            {{- $oxSoapServer := printf "http://%s-core-mw-admin.%s.svc.cluster.local" $releaseInstance $ns }}
+            {{- $provisioningApiBase := printf "http://%s-provisioning-api.%s.svc.cluster.local" $nubusRelease $servicesNs }}
+            {{- $provisioningApiSubscriptions := printf "%s/v1/subscriptions" $provisioningApiBase }}
+            {{- $provisioningAdminSecret := printf "%s-provisioning-api-admin" $nubusRelease }}
+            {{- $ksResEarly := dig "kernelServices" list $extraRes }}
+            {{- $ksCMEarly  := default dict (index $ksResEarly 0) }}
+            {{- $ksDataEarly := dig "data" dict $ksCMEarly }}
+            {{- $smtpHost := dig "mail.smtpHost" "" $ccData }}
+            {{- if not $smtpHost }}{{- $smtpHost = dig "SMTP_HOST" "" $ksDataEarly }}{{- end }}
+            {{- $imapHost := printf "mail.%s" $domain }}
+
             {{- /* ── ExternalSecret data[] entries (same logic as app-default) ─ */}}
             {{- $esData := list }}
 
@@ -404,7 +420,6 @@ spec:
             {{- $ccSmtpHost := dig "mail.smtpHost" "" $ccData }}
             {{- if $ccSmtpHost }}{{- $smtpHost = $ccSmtpHost }}{{- end }}
             {{- if not $smtpHost }}{{- $smtpHost = dig "SMTP_HOST" "" $ksCMData }}{{- end }}
-            {{- $imapHost := printf "mail.%s" $domain }}
             {{- $raw := $pSpec.extraValues | toJson }}
             {{- $raw = $raw | replace "${TENANT_DOMAIN}" $domain }}
             {{- $raw = $raw | replace "${TENANT_NAMESPACE}" $ns }}
@@ -574,6 +589,54 @@ spec:
                 name: kubernetes
             {{- end }}
 
+            {{- /* ── ox-connector-provisioning-api ExternalSecret ─────────────── */}}
+            {{- /* Nubus provisioning API consumer registration + connector auth. */}}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-connector-provisioning-es
+              name: {{ $xrName }}-connector-provisioning-es
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: external-secrets.io/v1
+                  kind: ExternalSecret
+                  metadata:
+                    name: ox-connector-provisioning-api
+                    namespace: {{ $ns }}
+                  spec:
+                    refreshInterval: 1h
+                    secretStoreRef:
+                      kind: ClusterSecretStore
+                      name: openbao
+                    target:
+                      name: ox-connector-provisioning-api
+                      creationPolicy: Owner
+                      deletionPolicy: Retain
+                      template:
+                        engineVersion: v2
+                        data:
+                          password: {{ "{{ index . \"connector_password\" }}" }}
+                          registration: |
+                            {
+                              "name": "ox-connector",
+                              "realms_topics": [
+                                {"realm": "udm", "topic": "users/user"},
+                                {"realm": "udm", "topic": "groups/group"}
+                              ],
+                              "request_prefill": true,
+                              "password": {{ "{{ index . \"connector_password\" | quote }}" }}
+                            }
+                    data:
+                      - secretKey: connector_password
+                        remoteRef:
+                          key: gentian-os/tenants/{{ $tenant }}/apps/{{ $app }}/internal/connector_provisioning_api_password
+                          property: value
+              providerConfigRef:
+                name: kubernetes
+
             {{- /* ── Helm Release ──────────────────────────────────────────── */}}
             ---
             apiVersion: helm.crossplane.io/v1beta1
@@ -606,6 +669,238 @@ spec:
                 set:
                   {{ toYaml $relSet | nindent 18 }}
                 {{- end }}
+              providerConfigRef:
+                name: kubernetes
+
+            {{- /* ── Release 2: opendesk-open-xchange-bootstrap ──────────────── */}}
+            {{- /* One-shot Job: OX context + filestore registration via admin pod. */}}
+            {{- $bootstrapVals := dict
+                "fullnameOverride" "opendesk-open-xchange-bootstrap"
+                "coreMiddleware" (dict
+                  "selector" $coreMwSelector
+                  "adminSelector" "roles.middleware.open-xchange.com/admin=true"
+                )
+                "filestore" (dict
+                  "identifier" "ox-filestore-s3"
+                  "size" 10000
+                )
+                "cleanup" (dict
+                  "deletePodsOnSuccess" true
+                  "deletePodsOnSuccessTimeout" 3600
+                )
+            }}
+            ---
+            apiVersion: helm.crossplane.io/v1beta1
+            kind: Release
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-bootstrap-release
+              name: {{ $xrName }}-bootstrap-release
+            spec:
+              forProvider:
+                chart:
+                  repository: oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-open-xchange-bootstrap
+                  name: opendesk-open-xchange-bootstrap
+                  version: "4.0.2"
+                namespace: {{ $ns }}
+                wait: true
+                values:
+                  {{ toYaml $bootstrapVals | nindent 18 }}
+              providerConfigRef:
+                name: kubernetes
+
+            {{- /* ── Release 3: ox-connector (Nubus LDAP → OX user sync) ─────── */}}
+            {{- $connectorVals := dict
+                "openXchange" (dict
+                  "domainName" $domain
+                  "auth" (dict
+                    "username" "admin"
+                    "existingSecret" (dict
+                      "name" $secretName
+                      "keyMapping" (dict "password" "internal-ox_admin_password")
+                    )
+                  )
+                  "oxDefaultContext" "1"
+                  "oxSoapServer" $oxSoapServer
+                  "oxLocalTimezone" "Europe/Berlin"
+                  "oxLanguage" "de_DE"
+                  "oxSmtpServer" (printf "smtp://%s" $smtpHost)
+                  "oxImapServer" (printf "imap://%s" $imapHost)
+                )
+                "provisioningApi" (dict
+                  "connection" (dict "baseUrl" $provisioningApiBase)
+                  "auth" (dict
+                    "username" "ox-connector"
+                    "existingSecret" (dict
+                      "name" "ox-connector-provisioning-api"
+                      "keyMapping" (dict "password" "password")
+                    )
+                  )
+                )
+                "replicaCount" 1
+            }}
+            ---
+            apiVersion: helm.crossplane.io/v1beta1
+            kind: Release
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-connector-release
+              name: {{ $xrName }}-connector-release
+            spec:
+              forProvider:
+                chart:
+                  repository: oci://registry.opencode.de/bmi/opendesk/components/supplier/univention/charts-mirror
+                  name: ox-connector
+                  version: "0.34.0"
+                namespace: {{ $ns }}
+                wait: false
+                values:
+                  {{ toYaml $connectorVals | nindent 18 }}
+              providerConfigRef:
+                name: kubernetes
+
+            {{- /* ── Register ox-connector with Nubus provisioning API ───────── */}}
+            {{- /* Per-tenant consumer (kernel nubus chart intentionally omits OX). */}}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-connector-register-role
+              name: {{ $xrName }}-connector-register-role
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: rbac.authorization.k8s.io/v1
+                  kind: Role
+                  metadata:
+                    name: {{ $app }}-read-provisioning-api-admin
+                    namespace: {{ $servicesNs }}
+                  rules:
+                    - apiGroups: [""]
+                      resources: ["secrets"]
+                      resourceNames: [{{ $provisioningAdminSecret | quote }}]
+                      verbs: ["get"]
+              providerConfigRef:
+                name: kubernetes
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-connector-register-rb
+              name: {{ $xrName }}-connector-register-rb
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: rbac.authorization.k8s.io/v1
+                  kind: RoleBinding
+                  metadata:
+                    name: {{ $app }}-read-provisioning-api-admin
+                    namespace: {{ $servicesNs }}
+                  subjects:
+                    - kind: ServiceAccount
+                      name: app-init
+                      namespace: {{ $ns }}
+                  roleRef:
+                    apiGroup: rbac.authorization.k8s.io
+                    kind: Role
+                    name: {{ $app }}-read-provisioning-api-admin
+              providerConfigRef:
+                name: kubernetes
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-connector-register-cm
+              name: {{ $xrName }}-connector-register-cm
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: ConfigMap
+                  metadata:
+                    name: {{ $app }}-connector-register
+                    namespace: {{ $ns }}
+                  data:
+                    register.sh: |
+                      #!/bin/sh
+                      set -eu
+                      echo "[ox-consumer-register] waiting for provisioning API..."
+                      until curl -sf "${PROVISIONING_API_BASE}/health" >/dev/null 2>&1 \
+                        || curl -sf "${PROVISIONING_API_BASE%/}/" >/dev/null 2>&1; do
+                        sleep 5
+                      done
+                      ADMIN_PW=$(kubectl get secret "${PROVISIONING_ADMIN_SECRET}" \
+                        -n "${SERVICES_NS}" -o jsonpath='{.data.password}' | base64 -d)
+                      HTTP=$(curl -sf -o /tmp/resp -w '%{http_code}' \
+                        -u "admin:${ADMIN_PW}" \
+                        -H 'Content-Type: application/json' \
+                        -d @/secrets/registration \
+                        "${PROVISIONING_API_SUBSCRIPTIONS}" || echo "000")
+                      case "${HTTP}" in
+                        201) echo "[ox-consumer-register] consumer registered" ;;
+                        200) echo "[ox-consumer-register] consumer already registered" ;;
+                        *) echo "[ox-consumer-register] ERROR: HTTP ${HTTP}"; cat /tmp/resp; exit 1 ;;
+                      esac
+              providerConfigRef:
+                name: kubernetes
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-connector-register-job
+              name: {{ $xrName }}-connector-register-job
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: batch/v1
+                  kind: Job
+                  metadata:
+                    name: {{ $app }}-connector-register
+                    namespace: {{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: gentian-os
+                      gentianos.io/tenant: {{ $tenant }}
+                      gentianos.io/app: {{ $app }}
+                  spec:
+                    ttlSecondsAfterFinished: 3600
+                    backoffLimit: 10
+                    template:
+                      spec:
+                        serviceAccountName: app-init
+                        restartPolicy: OnFailure
+                        volumes:
+                          - name: scripts
+                            configMap:
+                              name: {{ $app }}-connector-register
+                          - name: consumer-secret
+                            secret:
+                              secretName: ox-connector-provisioning-api
+                              optional: false
+                        containers:
+                          - name: register
+                            image: {{ $appInitImage | quote }}
+                            command:
+                              - /bin/sh
+                              - /scripts/register.sh
+                            volumeMounts:
+                              - name: scripts
+                                mountPath: /scripts
+                              - name: consumer-secret
+                                mountPath: /secrets
+                                readOnly: true
+                            env:
+                              - name: SERVICES_NS
+                                value: {{ $servicesNs | quote }}
+                              - name: PROVISIONING_ADMIN_SECRET
+                                value: {{ $provisioningAdminSecret | quote }}
+                              - name: PROVISIONING_API_BASE
+                                value: {{ $provisioningApiBase | quote }}
+                              - name: PROVISIONING_API_SUBSCRIPTIONS
+                                value: {{ $provisioningApiSubscriptions | quote }}
               providerConfigRef:
                 name: kubernetes
 
