@@ -645,6 +645,35 @@ spec:
                 name: kubernetes
             {{- end }}
 
+            {{- /* Stable alias for core-mw http-api (UI middleware does not proxy API). */}}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-api-stable-svc
+              name: {{ $xrName }}-api-stable-svc
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Service
+                  metadata:
+                    name: appsuite-api
+                    namespace: {{ $ns }}
+                  spec:
+                    selector:
+                      app.kubernetes.io/instance: {{ $xrName }}-release
+                      app.kubernetes.io/name: core-mw
+                      roles.middleware.open-xchange.com/http-api: "true"
+                    ports:
+                    - name: http
+                      port: 80
+                      targetPort: http
+                      protocol: TCP
+              providerConfigRef:
+                name: kubernetes
+
             {{- /* ── Emit LDAP-search-init resources (when AppProfile requires ldap.search) */}}
             {{- $identity      := default dict $kr.identity }}
             {{- $ldapReqs := default dict (dig "ldap" dict $identity) }}
