@@ -832,9 +832,13 @@ spec:
                         [ "${code}" != "000" ] && [ "${code}" != "502" ] && [ "${code}" != "503" ]; do
                         sleep 5
                       done
-                      ADMIN_PW=$(kubectl get secret "${PROVISIONING_ADMIN_SECRET}" \
-                        -n "${SERVICES_NS}" -o jsonpath='{.data.password}' | base64 -d)
-                      HTTP=$(curl -sf -o /tmp/resp -w '%{http_code}' \
+                      TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+                      ADMIN_PW=$(curl -sf \
+                        --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                        -H "Authorization: Bearer ${TOKEN}" \
+                        "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${SERVICES_NS}/secrets/${PROVISIONING_ADMIN_SECRET}" \
+                        | jq -r '.data.password' | base64 -d)
+                      HTTP=$(curl -s -o /tmp/resp -w '%{http_code}' \
                         -u "admin:${ADMIN_PW}" \
                         -H 'Content-Type: application/json' \
                         -d @/secrets/registration \
@@ -869,6 +873,11 @@ spec:
                     ttlSecondsAfterFinished: 3600
                     backoffLimit: 10
                     template:
+                      metadata:
+                        labels:
+                          app.kubernetes.io/managed-by: gentian-os
+                          gentianos.io/tenant: {{ $tenant }}
+                          gentianos.io/app: {{ $app }}
                       spec:
                         serviceAccountName: app-init
                         restartPolicy: OnFailure
