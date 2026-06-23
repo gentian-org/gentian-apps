@@ -618,7 +618,7 @@ spec:
                       template:
                         engineVersion: v2
                         data:
-                          password: {{ "{{ index . \"connector_password\" }}" }}
+                          password: '{{ "{{ index . \"connector_password\" }}" }}'
                           registration: |
                             {
                               "name": "ox-connector",
@@ -627,7 +627,7 @@ spec:
                                 {"realm": "udm", "topic": "groups/group"}
                               ],
                               "request_prefill": true,
-                              "password": {{ "{{ index . \"connector_password\" | quote }}" }}
+                              "password": "{{ "{{ index . \"connector_password\" }}" }}"
                             }
                     data:
                       - secretKey: connector_password
