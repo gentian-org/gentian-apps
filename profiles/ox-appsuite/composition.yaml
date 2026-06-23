@@ -828,8 +828,8 @@ spec:
                       #!/bin/sh
                       set -eu
                       echo "[ox-consumer-register] waiting for provisioning API..."
-                      until curl -sf "${PROVISIONING_API_BASE}/health" >/dev/null 2>&1 \
-                        || curl -sf "${PROVISIONING_API_BASE%/}/" >/dev/null 2>&1; do
+                      until code=$(curl -s -o /dev/null -w '%{http_code}' "${PROVISIONING_API_SUBSCRIPTIONS}"); \
+                        [ "${code}" != "000" ] && [ "${code}" != "502" ] && [ "${code}" != "503" ]; do
                         sleep 5
                       done
                       ADMIN_PW=$(kubectl get secret "${PROVISIONING_ADMIN_SECRET}" \
