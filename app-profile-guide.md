@@ -759,6 +759,23 @@ Sidecar OIDC clients and internal secrets use the synthetic app key
 
 ## 8. OIDC client spec
 
+Gentian supports two OIDC integration paths. Choose based on whether the app
+needs only standard SSO or openDesk-style custom scopes and protocol mappers.
+
+| Path | Use when | gentian-apps | gentian-os |
+|---|---|---|---|
+| **A — composition Client MR** | Standard SSO (client id, redirects, confidential secret) | `kernelRequirements.identity.oidc` only | `app-default` (or profile composition) emits Keycloak `Client` + default scopes |
+| **B — OIDC pack** | Custom client scope, protocol mappers, LDAP group → Keycloak client role | Pack entry in `OIDCPackCatalog` (`profiles/opendesk-oidc-catalog/catalog.yaml`) | Operator `ResolvePack` provisioning Jobs |
+
+**Path A (most new apps, including Odoo):** declare `clientId`, `redirectUris`,
+and `accessType` in the profile. Do **not** add the client to `OIDCPackCatalog`.
+
+**Path B (openDesk supplier charts):** keep the historical `opendesk-*` `clientId`
+and add or extend the matching pack in `OIDCPackCatalog`. Optional
+`oidcPackRef` when the pack key differs from `clientId`. Pack scopes and
+`fullScopeAllowed` are read from the cluster catalog by compositions — no
+per-`clientId` dicts in composition YAML.
+
 Use the full `OIDCClientSpec` struct. The old `oidc: true` shorthand is removed:
 
 ```yaml
@@ -806,7 +823,7 @@ flavors, themes, MBA groups); do **not** copy every auth-related value verbatim.
 | `global.domain` + `hosts.keycloak` | Same realm/host for portal and apps | `global.domain: "${KERNEL_DOMAIN}"`, tenant app hosts prefixed with `${TENANT_ID}` |
 
 **Keep from openDesk profiles:** `kernelRequirements.identity.oidc.clientId` values
-that match the embedded openDesk OIDC pack catalog (`opendesk-xwiki`,
+that match an entry in the cluster `OIDCPackCatalog` (`opendesk-xwiki`,
 `opendesk-matrix-scope`, …), LDAP group mappings, UI themes, chart versions,
 `workplaceServices.*` pointing at `portal.${KERNEL_DOMAIN}` where the chart
 expects Nubus navigation.

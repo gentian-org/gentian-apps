@@ -15,6 +15,9 @@ metadata:
   labels:
     gentianos.io/oidc-catalog: opendesk
 spec:
+  extraManagedByAttributeGroups:
+    - FileshareAdmin
+    - LivecollaborationAdmin
   mapperTemplates:
     opendesk_useruuid:
       protocolMapper: oidc-usermodel-attribute-mapper

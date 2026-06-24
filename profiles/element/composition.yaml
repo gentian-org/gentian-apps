@@ -53,6 +53,16 @@ spec:
                   - key: gentianos.io/config-type
                     type: Value
                     value: cluster-config
+            - kind: OIDCPackCatalog
+              into: oidcPackCatalog
+              apiVersion: gentianos.io/v1alpha1
+              type: Selector
+              selector:
+                maxMatch: 1
+                matchLabels:
+                  - key: gentianos.io/oidc-catalog
+                    type: Value
+                    value: opendesk
             - kind: ConfigMap
               into: jitsiOidcOverlays
               apiVersion: v1
@@ -114,13 +124,22 @@ spec:
             {{- $appInitImage  := dig "appInit.image"  "ghcr.io/gentian-org/gentian-app-init:develop" $ccData }}
             {{- $kr            := default dict $pSpec.kernelRequirements }}
             {{- $identity      := default dict $kr.identity }}
-            {{- /* OpenDesk OIDC pack scopes: manifest-bridge Jobs create the ClientScope;
-                 ClientDefaultScopes below re-attaches them after provider-keycloak Client sync. */}}
-            {{- $oidcPackDefaultScopes := dict
-                "opendesk-synapse" (list "profile" "email" "roles" "web-origins" "acr" "opendesk-matrix-scope")
-                "opendesk-jitsi" (list "profile" "email" "roles" "web-origins" "acr" "opendesk-jitsi-scope")
-            }}
-            {{- $oidcPackFullScopeAllowed := dict "opendesk-synapse" false "opendesk-jitsi" true }}
+            {{- /* OpenDesk OIDC pack scopes from cluster OIDCPackCatalog. */}}
+            {{- $oidcPackDefaultScopes := dict }}
+            {{- $oidcPackFullScopeAllowed := dict }}
+            {{- $catalogRes := dig "oidcPackCatalog" list $extraRes }}
+            {{- if gt (len $catalogRes) 0 }}
+            {{- $catSpec := dig "spec" dict (index $catalogRes 0) }}
+            {{- $catPacks := default dict $catSpec.packs }}
+            {{- range $clientId, $pack := $catPacks }}
+            {{- $scopes := default list $pack.defaultScopes }}
+            {{- if $pack.scopeName }}
+            {{- $scopes = append $scopes $pack.scopeName }}
+            {{- end }}
+            {{- $_ := set $oidcPackDefaultScopes $clientId $scopes }}
+            {{- $_ := set $oidcPackFullScopeAllowed $clientId (default false $pack.fullScopeAllowed) }}
+            {{- end }}
+            {{- end }}
 
             {{- /* ── Build ExternalSecret data[] entries (identical to app-default) ── */}}
             {{- $esData := list }}
