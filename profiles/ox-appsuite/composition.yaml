@@ -686,13 +686,13 @@ spec:
             {{- end }}
             {{- $bootstrapReady := false }}
             {{- with (index $obsRes (printf "%s-bootstrap-job" $app)) }}
-            {{- if ge (int (default 0 (dig "resource" "status" "succeeded" 0 .))) 1 }}
+            {{- if ge (int (default 0 (dig "resource" "status" "atProvider" "manifest" "status" "succeeded" 0 .))) 1 }}
             {{- $bootstrapReady = true }}
             {{- end }}
             {{- end }}
             {{- $registerReady := false }}
             {{- with (index $obsRes (printf "%s-connector-register-job" $app)) }}
-            {{- if ge (int (default 0 (dig "resource" "status" "succeeded" 0 .))) 1 }}
+            {{- if ge (int (default 0 (dig "resource" "status" "atProvider" "manifest" "status" "succeeded" 0 .))) 1 }}
             {{- $registerReady = true }}
             {{- end }}
             {{- end }}
