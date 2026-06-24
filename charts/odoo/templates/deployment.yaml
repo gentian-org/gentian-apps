@@ -1,0 +1,155 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "odoo.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "odoo.name" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "odoo.name" . }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "odoo.name" . }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
+                echo "waiting for postgres..."
+                sleep 2
+              done
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-port
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-user
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-password
+      containers:
+        - name: odoo
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              python3 /opt/odoo/src/odoo/odoo-bin \
+                -d "${DB_NAME}" \
+                --config=/etc/odoo/odoo.conf \
+                -i {{ .Values.gentian.initModules }} \
+                --without-demo=all \
+                --stop-after-init || true
+              exec python3 /opt/odoo/src/odoo/odoo-bin \
+                -d "${DB_NAME}" \
+                --config=/etc/odoo/odoo.conf
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-port
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-password
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-name
+            - name: GENTIAN_TENANT_ID
+              value: {{ .Values.tenantId | quote }}
+            - name: GENTIAN_CONFIG_PATH
+              value: {{ .Values.gentian.configPath | quote }}
+            - name: GENTIAN_BINDINGS_SECRET
+              value: {{ .Values.gentian.bindingsPath | quote }}
+          volumeMounts:
+            - name: odoo-data
+              mountPath: /opt/odoo/data
+            - name: extra-addons
+              mountPath: {{ .Values.gentian.modulesPath }}
+            - name: odoo-config
+              mountPath: /etc/odoo
+            - name: gentian-config
+              mountPath: /etc/gentian
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /web/health
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /web/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: odoo-data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "odoo.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: extra-addons
+          emptyDir: {}
+        - name: odoo-config
+          configMap:
+            name: {{ include "odoo.fullname" . }}-config
+        - name: gentian-config
+          configMap:
+            name: {{ include "odoo.fullname" . }}-config
+            items:
+              - key: config.json
+                path: config.json
+        - name: tmp
+          emptyDir: {}

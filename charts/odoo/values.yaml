@@ -1,0 +1,56 @@
+nameOverride: odoo
+fullnameOverride: odoo
+
+tenantId: ""
+
+image:
+  repository: ghcr.io/gentian-org/ocb
+  tag: latest
+  pullPolicy: IfNotPresent
+
+existingSecret:
+  name: odoo-secrets
+
+database:
+  host: ""
+  port: "5432"
+  name: ""
+  user: ""
+  password: ""
+
+oidc:
+  issuer: ""
+  clientId: ""
+  clientSecret: ""
+
+ldap:
+  host: ""
+  port: "389"
+  baseDn: ""
+  bindDn: ""
+  bindPassword: ""
+
+gentian:
+  configPath: /etc/gentian/config.json
+  bindingsPath: /etc/gentian/bindings.json
+  modulesPath: /opt/odoo/custom-addons
+  initModules: "base,web,gentian_os"
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: ""
+
+ingress:
+  enabled: false
+
+service:
+  port: 8069
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "2Gi"
+  limits:
+    cpu: "2000m"
+    memory: "4Gi"

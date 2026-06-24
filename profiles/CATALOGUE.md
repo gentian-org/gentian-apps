@@ -21,6 +21,8 @@ profiles/<name>/
 | `openproject` | `app-openproject` | — |
 | `ox-appsuite` | `app-ox` | — |
 | `element` | `app-element` | Jitsi OIDC overlay ConfigMap |
+| `opendesk-oidc-catalog` | — | OpenDesk OIDC pack catalogue CR |
+| `odoo-free-base` | — (`app-default`) | — |
 
 ## Adding a simple app
 
