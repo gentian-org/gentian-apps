@@ -986,7 +986,7 @@ from the base bundle (cluster-scoped Composition name `app-odoo`).
 | Platform architecture | [architecture.md](../../../gentian-os/docs/architecture.md) |
 | AppProfile authoring | [app-profile-guide.md](../../app-profile-guide.md) |
 | IAM / portal tiles | [iam.md](../../../gentian-os/docs/design/iam.md), [portal-admin-tile.md](../../docs/portal-admin-tile.md) |
-| OIDC catalogue decoupling (pre-work) | [oidc-cleanup.md](../../../gentian-os/docs/design/oidc-cleanup.md) |
+| OIDC paths (path A vs pack catalogue) | [app-profile-guide.md](../../app-profile-guide.md) §8 |
 | Commerce Odoo (platform) | [business-logic-plan.md](../../../gentian-os/docs/design/business-logic-plan.md) |
 | Legacy Odoo deployment | `server/base/odoo/`, `odoo-modules/docs/modules-management.md` |
 | **`gentian_os` addon source** | `odoo-modules/gentian_os/` (to be created) |
