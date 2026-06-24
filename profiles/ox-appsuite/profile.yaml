@@ -49,6 +49,9 @@ metadata:
   name: ox-appsuite
   labels:
     gentianos.io/profile-name: ox-appsuite
+  annotations:
+    gentianos.io/gateway-root-redirect: /appsuite/
+    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/appsuite/api","serviceName":"appsuite-api"}]'
 spec:
   displayName: "OX App Suite"
   description: "Open-source groupware suite providing webmail, calendar, contacts, and tasks with Keycloak SSO and LDAP user sync."

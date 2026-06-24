@@ -45,6 +45,55 @@ For apps with a shared runtime and thin module entries (Odoo, OX-style), use
 App-specific install parameters (e.g. Odoo module technical name) belong in
 `spec.extraValues` and the profile-scoped composition — not in gentian-os CRDs.
 
+### Profile annotations vs composition — where to put app-specific config
+
+Gentian-os should stay **generic**. When a behaviour is shared across apps or
+owned by the **operator** (gateway routes, OIDC fallbacks, auto-install base
+profiles), declare it on the **AppProfile metadata** using `gentianos.io/*`
+annotations. When behaviour is **deploy sequencing**, **one-off Jobs**, or
+**upstream-chart workarounds** that should eventually move upstream, put it in the
+profile's **`composition.yaml`** (`app-ox`, `app-element`, …).
+
+| Put it in… | When | Examples |
+|---|---|---|
+| **`spec.kernelRequirements` + `valueMapping`** | Any app needs a standard kernel function (OIDC, LDAP, DB, S3, mail) | `clientId`, `redirectUris`, `databasePerTenant` |
+| **Profile annotation** | Operator or gateway reconciler must do the same thing for many apps; value is small and stable | `gentianos.io/deployment-role`, `gentianos.io/gateway-api-backends`, `gentianos.io/oidc-default-redirect-uris` |
+| **`spec.extraValues`** | Helm chart needs non-secret structured config; composition passes it through | Odoo `module: crm`, chart feature flags |
+| **`composition.yaml`** | Custom Crossplane MR graph, bootstrap Jobs, RBAC, chart-specific sequencing | OX bootstrap Job, Element Jitsi overlay, module install Jobs |
+| **Upstream chart / vendor** | Fix belongs in the supplier chart long-term | OX `initconfigdb -i`, Keycloak client scopes in openDesk |
+
+**Never** add per-app fields to the `AppProfile` CRD. **Never** hardcode
+profile names in gentian-os reconcilers — if you need a new operator behaviour,
+add a **well-known annotation** (or extend an existing generic `spec` block used
+by all apps) and set it from `gentian-apps/profiles/<name>/profile.yaml`.
+
+#### Gateway annotations
+
+| Annotation | Format | Purpose |
+|---|---|---|
+| `gentianos.io/gateway-root-redirect` | Path string | Redirect `GET /` on the app hostname (e.g. `/appsuite/`) |
+| `gentianos.io/gateway-api-backends` | JSON array | Extra path prefixes routed to additional Services on the same host |
+
+```yaml
+metadata:
+  annotations:
+    gentianos.io/gateway-root-redirect: /appsuite/
+    gentianos.io/gateway-api-backends: |
+      [{"pathPrefix":"/appsuite/api","serviceName":"appsuite-api"}]
+```
+
+#### OIDC redirect fallback
+
+Prefer **`spec.kernelRequirements.identity.oidc.redirectUris`** (substitutes
+`${TENANT_DOMAIN}`). When legacy Jobs cannot rely on spec alone, use:
+
+| Annotation | Format |
+|---|---|
+| `gentianos.io/oidc-default-redirect-uris` | JSON array of URIs with `${TENANT_DOMAIN}` |
+
+If both spec and annotation are empty, the operator falls back to
+`https://{tenant-domain}/{profile-name}/*` (discouraged — set explicit URIs).
+
 ---
 
 ## 2. Placeholders (substituted at deploy time)
