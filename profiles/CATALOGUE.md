@@ -8,11 +8,15 @@ ArgoCD ApplicationSet **`gentian-catalogue`** (one Application per bundle).
 ```
 profiles/<name>/
   kustomization.yaml    # required — ArgoCD entrypoint
-  profile.yaml          # AppProfile CR (required)
+  profile.yaml          # AppProfile CR (tenant-installable apps)
+  catalog.yaml          # platform catalogue CR (e.g. OIDCPackCatalog) — no profile.yaml
   composition.yaml      # Crossplane Composition (optional — custom MR graph)
   assets/               # optional cluster-scoped manifests (ConfigMaps, …)
   jitsi-overlay/        # optional source files (built into assets via kustomize)
 ```
+
+Tenant apps require `profile.yaml`. Platform catalogue bundles (e.g.
+`opendesk-oidc-catalog`) ship a cluster-scoped CR via `catalog.yaml` instead.
 
 | Profile | composition | cluster assets |
 |---------|-------------|----------------|

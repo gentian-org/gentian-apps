@@ -72,7 +72,13 @@ jobs:
             name="$(basename "$d")"
             echo "Checking profiles/${name}"
             test -f "${d}kustomization.yaml"
-            test -f "${d}profile.yaml"
-            python3 -c "import yaml; yaml.safe_load(open('${d}profile.yaml'))"
+            if test -f "${d}profile.yaml"; then
+              python3 -c "import yaml; yaml.safe_load(open('${d}profile.yaml'))"
+            elif test -f "${d}catalog.yaml"; then
+              python3 -c "import yaml; yaml.safe_load(open('${d}catalog.yaml'))"
+            else
+              echo "profiles/${name}: expected profile.yaml (AppProfile) or catalog.yaml (platform catalogue CR)" >&2
+              exit 1
+            fi
             kubectl kustomize "$d" >/dev/null
           done
