@@ -685,7 +685,7 @@ spec:
             {{- end }}
             {{- end }}
             {{- $bootstrapReady := false }}
-            {{- with (index $obsRes (printf "%s-bootstrap-release" $app)) }}
+            {{- with (index $obsRes (printf "%s-bootstrap-job" $app)) }}
             {{- range (dig "resource" "status" "conditions" list .) }}
             {{- if and (eq .type "Ready") (eq .status "True") }}
             {{- $bootstrapReady = true }}
@@ -702,40 +702,255 @@ spec:
             {{- end }}
 
             {{- if $appSuiteReady }}
-            {{- /* ── Release 2: opendesk-open-xchange-bootstrap ──────────────── */}}
-            {{- /* One-shot Job: OX context + filestore registration via admin pod. */}}
-            {{- $bootstrapVals := dict
-                "fullnameOverride" "opendesk-open-xchange-bootstrap"
-                "coreMiddleware" (dict
-                  "selector" $coreMwSelector
-                  "adminSelector" "roles.middleware.open-xchange.com/admin=true"
-                )
-                "filestore" (dict
-                  "identifier" "ox-filestore-s3"
-                  "size" 10000
-                )
-                "cleanup" (dict
-                  "deletePodsOnSuccess" true
-                  "deletePodsOnSuccessTimeout" 3600
-                )
-            }}
+            {{- /* ── OX bootstrap Job (replaces upstream chart) ──────────────── */}}
+            {{- /* Upstream bootstrap swallows errors (|| echo) and skips -i on   */}}
+            {{- /* initconfigdb, so reinstall leaves an empty MariaDB without OX   */}}
+            {{- /* schema and SOAP admin never registers OXSecondaryAccountService. */}}
             ---
-            apiVersion: helm.crossplane.io/v1beta1
-            kind: Release
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
             metadata:
               annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-bootstrap-release
-              name: {{ $xrName }}-bootstrap-release
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-bootstrap-role
+              name: {{ $xrName }}-bootstrap-role
             spec:
               forProvider:
-                chart:
-                  repository: oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-open-xchange-bootstrap
-                  name: opendesk-open-xchange-bootstrap
-                  version: "4.0.2"
-                namespace: {{ $ns }}
-                wait: true
-                values:
-                  {{ toYaml $bootstrapVals | nindent 18 }}
+                manifest:
+                  apiVersion: rbac.authorization.k8s.io/v1
+                  kind: Role
+                  metadata:
+                    name: {{ $app }}-bootstrap
+                    namespace: {{ $ns }}
+                  rules:
+                    - apiGroups: [""]
+                      resources: ["pods"]
+                      verbs: ["get", "list"]
+                    - apiGroups: [""]
+                      resources: ["pods/exec"]
+                      verbs: ["create"]
+                    - apiGroups: ["apps"]
+                      resources: ["deployments"]
+                      verbs: ["get", "list", "patch"]
+                    - apiGroups: ["apps"]
+                      resources: ["deployments/status"]
+                      verbs: ["get"]
+              providerConfigRef:
+                name: kubernetes
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-bootstrap-rb
+              name: {{ $xrName }}-bootstrap-rb
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: rbac.authorization.k8s.io/v1
+                  kind: RoleBinding
+                  metadata:
+                    name: {{ $app }}-bootstrap
+                    namespace: {{ $ns }}
+                  subjects:
+                    - kind: ServiceAccount
+                      name: {{ $app }}-bootstrap
+                      namespace: {{ $ns }}
+                  roleRef:
+                    apiGroup: rbac.authorization.k8s.io
+                    kind: Role
+                    name: {{ $app }}-bootstrap
+              providerConfigRef:
+                name: kubernetes
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-bootstrap-sa
+              name: {{ $xrName }}-bootstrap-sa
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: ServiceAccount
+                  metadata:
+                    name: {{ $app }}-bootstrap
+                    namespace: {{ $ns }}
+              providerConfigRef:
+                name: kubernetes
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-bootstrap-cm
+              name: {{ $xrName }}-bootstrap-cm
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: ConfigMap
+                  metadata:
+                    name: {{ $app }}-bootstrap
+                    namespace: {{ $ns }}
+                  data:
+                    bootstrap.sh: |
+                      #!/bin/bash
+                      set -eu
+
+                      admin_pod() {
+                        kubectl get pod -n "${NAMESPACE}" -l "${ADMIN_SELECTOR}" \
+                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true
+                      }
+
+                      mw_owner_kind() {
+                        kubectl get pod -n "${NAMESPACE}" -l "${ADMIN_SELECTOR}" \
+                          -o jsonpath='{.items[0].metadata.ownerReferences[0].kind}' 2>/dev/null || true
+                      }
+
+                      exec_mw() {
+                        kubectl exec --namespace="${NAMESPACE}" "${ADMIN_POD}" -c core-mw -- bash -c "$1"
+                      }
+
+                      wait_soap() {
+                        local svc="$1"
+                        until exec_mw "curl -sf -o /dev/null http://127.0.0.1/webservices/${svc}?wsdl"; do
+                          echo "[ox-bootstrap] waiting for ${svc} WSDL..."
+                          sleep 5
+                        done
+                        echo "[ox-bootstrap] ${svc} WSDL ready"
+                      }
+
+                      echo "[ox-bootstrap] locating admin pod..."
+                      until ADMIN_POD="$(admin_pod)" && [ -n "${ADMIN_POD}" ]; do
+                        sleep 2
+                      done
+                      MW_KIND="$(mw_owner_kind)"
+                      [ "${MW_KIND}" = "StatefulSet" ] && MW_TYPE="statefulset" || MW_TYPE="deployment"
+                      echo "[ox-bootstrap] using ${MW_TYPE} pod ${ADMIN_POD}"
+
+                      until exec_mw 'echo core-mw running...' >/dev/null 2>&1; do
+                        echo "[ox-bootstrap] waiting for core-mw container..."
+                        sleep 2
+                      done
+
+                      echo "[ox-bootstrap] initializing configDB (-i recreates on reinstall)..."
+                      exec_mw '/opt/open-xchange/sbin/initconfigdb \
+                        --mysql-args "--skip-ssl-verify-server-cert" \
+                        -i \
+                        --configdb-user "${MYSQL_USER}" \
+                        --configdb-pass "${MYSQL_PASSWORD}" \
+                        --configdb-host "${MYSQL_HOST}" \
+                        --mysql-root-passwd "${MYSQL_PASSWORD}" \
+                        --configdb-dbname "${MYSQL_DATABASE}"'
+
+                      echo "[ox-bootstrap] waiting for admin RMI (port 8009)..."
+                      until exec_mw 'nc -z localhost 8009' >/dev/null 2>&1; do
+                        sleep 5
+                      done
+
+                      wait_soap OXUtilService
+
+                      register_or_skip() {
+                        local step="$1"
+                        shift
+                        if exec_mw "$@"; then
+                          echo "[ox-bootstrap] ${step} ok"
+                        else
+                          echo "[ox-bootstrap] ${step} skipped (may already be registered)"
+                        fi
+                      }
+
+                      echo "[ox-bootstrap] registering filestore..."
+                      register_or_skip "registerfilestore" '/opt/open-xchange/sbin/registerfilestore \
+                        -A "${MASTER_ADMIN_USER}" -P "${MASTER_ADMIN_PW}" \
+                        -t s3://ox-filestore-s3 -s 10000'
+
+                      echo "[ox-bootstrap] registering server..."
+                      register_or_skip "registerserver" '/opt/open-xchange/sbin/registerserver \
+                        -A "${MASTER_ADMIN_USER}" -P "${MASTER_ADMIN_PW}" \
+                        -n oxserver'
+
+                      echo "[ox-bootstrap] registering database..."
+                      register_or_skip "registerdatabase" '/opt/open-xchange/sbin/registerdatabase \
+                        -A "${MASTER_ADMIN_USER}" -P "${MASTER_ADMIN_PW}" \
+                        --name "PRIMARYDB" \
+                        --hostname "${MYSQL_HOST}" \
+                        --dbuser "${MYSQL_USER}" \
+                        --dbpasswd "${MYSQL_PASSWORD}" \
+                        --master true'
+
+                      echo "[ox-bootstrap] restarting core-mw (${SELECTOR})..."
+                      kubectl --namespace="${NAMESPACE}" rollout restart "${MW_TYPE}" --selector="${SELECTOR}"
+                      kubectl --namespace="${NAMESPACE}" rollout status "${MW_TYPE}" --selector="${SELECTOR}" --timeout=900s
+
+                      echo "[ox-bootstrap] re-locating admin pod after restart..."
+                      until ADMIN_POD="$(admin_pod)" && [ -n "${ADMIN_POD}" ]; do
+                        sleep 2
+                      done
+                      until exec_mw 'echo core-mw running...' >/dev/null 2>&1; do
+                        sleep 2
+                      done
+
+                      for svc in OXUtilService OXUserService OXContextService OXSecondaryAccountService; do
+                        wait_soap "${svc}"
+                      done
+
+                      echo "[ox-bootstrap] bootstrap complete"
+              providerConfigRef:
+                name: kubernetes
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-bootstrap-job
+              name: {{ $xrName }}-bootstrap-job
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: batch/v1
+                  kind: Job
+                  metadata:
+                    name: {{ $app }}-bootstrap
+                    namespace: {{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: gentian-os
+                      gentianos.io/tenant: {{ $tenant }}
+                      gentianos.io/app: {{ $app }}
+                  spec:
+                    ttlSecondsAfterFinished: 3600
+                    backoffLimit: 6
+                    activeDeadlineSeconds: 1800
+                    template:
+                      metadata:
+                        labels:
+                          app.kubernetes.io/managed-by: gentian-os
+                          gentianos.io/tenant: {{ $tenant }}
+                          gentianos.io/app: {{ $app }}
+                      spec:
+                        serviceAccountName: {{ $app }}-bootstrap
+                        restartPolicy: OnFailure
+                        volumes:
+                          - name: scripts
+                            configMap:
+                              name: {{ $app }}-bootstrap
+                        containers:
+                          - name: bootstrap
+                            image: docker.io/alpine/k8s:1.27.4
+                            command:
+                              - /bin/bash
+                              - /scripts/bootstrap.sh
+                            volumeMounts:
+                              - name: scripts
+                                mountPath: /scripts
+                            env:
+                              - name: NAMESPACE
+                                value: {{ $ns | quote }}
+                              - name: ADMIN_SELECTOR
+                                value: "roles.middleware.open-xchange.com/admin=true"
+                              - name: SELECTOR
+                                value: {{ $coreMwSelector | quote }}
               providerConfigRef:
                 name: kubernetes
 
@@ -959,7 +1174,8 @@ spec:
                   name: ox-connector
                   version: "0.34.0"
                 namespace: {{ $ns }}
-                wait: false
+                wait: true
+                timeout: 900
                 values:
                   {{ toYaml $connectorVals | nindent 18 }}
               providerConfigRef:

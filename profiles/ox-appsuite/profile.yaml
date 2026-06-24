@@ -1,9 +1,9 @@
 # AppProfile — OX App Suite (groupware)
 #
 # Source charts (three-stage deployment):
-#   1. opendesk-open-xchange-bootstrap v4.0.2
-#      oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-open-xchange-bootstrap
-#      One-shot DB migration + context creation. Must complete before appsuite starts.
+#   1. ox-appsuite-bootstrap Job (composition-managed; replaces upstream chart)
+#      One-shot configDB init + filestore/server/database registration via admin pod.
+#      Must complete before ox-connector starts.
 #   2. appsuite-public-sector v2.26.32  ← primary chart declared below
 #      oci://registry.opencode.de/bmi/opendesk/components/supplier/open-xchange/charts-mirror
 #      Main OX App Suite deployment.
@@ -11,8 +11,10 @@
 #      oci://registry.opencode.de/bmi/opendesk/components/supplier/univention/charts-mirror
 #      Syncs Nubus LDAP users into OX contexts.
 #
-# TODO (orchestrator): OX requires three sequential Helm releases (bootstrap → appsuite →
-# connector). The app-ox composition deploys all three plus Nubus consumer registration.
+# Deployment order (app-ox composition):
+#   1. appsuite-public-sector Helm release
+#   2. ox-appsuite-bootstrap Job (configDB + registrations)
+#   3. ox-connector-register Job + ox-connector Helm release
 #
 # Secret inventory:
 #   Kernel-provided (injected via valueMapping):
@@ -209,6 +211,7 @@ spec:
       core-mw:
         masterAdmin: "admin"
         serverName: "oxserver"
+        enableDBConnectionCheck: true
         replicaCount: 1
         # Explicit limits required: tenant LimitRange defaults cpu to 500m when
         # limits are omitted, which rejects the chart default 1000m CPU request.
