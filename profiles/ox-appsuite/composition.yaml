@@ -686,18 +686,14 @@ spec:
             {{- end }}
             {{- $bootstrapReady := false }}
             {{- with (index $obsRes (printf "%s-bootstrap-job" $app)) }}
-            {{- range (dig "resource" "status" "conditions" list .) }}
-            {{- if and (eq .type "Ready") (eq .status "True") }}
+            {{- if ge (int (default 0 (dig "resource" "status" "succeeded" 0 .))) 1 }}
             {{- $bootstrapReady = true }}
-            {{- end }}
             {{- end }}
             {{- end }}
             {{- $registerReady := false }}
             {{- with (index $obsRes (printf "%s-connector-register-job" $app)) }}
-            {{- range (dig "resource" "status" "conditions" list .) }}
-            {{- if and (eq .type "Ready") (eq .status "True") }}
+            {{- if ge (int (default 0 (dig "resource" "status" "succeeded" 0 .))) 1 }}
             {{- $registerReady = true }}
-            {{- end }}
             {{- end }}
             {{- end }}
 
@@ -814,7 +810,7 @@ spec:
 
                       wait_soap() {
                         local svc="$1"
-                        until exec_mw "curl -sf -o /dev/null http://127.0.0.1/webservices/${svc}?wsdl"; do
+                        until exec_mw "curl -sf -o /dev/null http://127.0.0.1:8009/webservices/${svc}?wsdl"; do
                           echo "[ox-bootstrap] waiting for ${svc} WSDL..."
                           sleep 5
                         done
@@ -1175,7 +1171,6 @@ spec:
                   version: "0.34.0"
                 namespace: {{ $ns }}
                 wait: true
-                timeout: 900
                 values:
                   {{ toYaml $connectorVals | nindent 18 }}
               providerConfigRef:
