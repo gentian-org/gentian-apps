@@ -672,6 +672,28 @@ spec:
               providerConfigRef:
                 name: kubernetes
 
+            {{- /* ── Observed Helm release readiness ─────────────────────────── */}}
+            {{- /* function-sequencer does not treat provider-helm Release CRs as */}}
+            {{- /* ready; gate bootstrap/connector on observed Ready conditions. */}}
+            {{- $obsRes := default dict .observed.resources }}
+            {{- $appSuiteReady := false }}
+            {{- with (index $obsRes (printf "%s-release" $app)) }}
+            {{- range (dig "resource" "status" "conditions" list .) }}
+            {{- if and (eq .type "Ready") (eq .status "True") }}
+            {{- $appSuiteReady = true }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- $bootstrapReady := false }}
+            {{- with (index $obsRes (printf "%s-bootstrap-release" $app)) }}
+            {{- range (dig "resource" "status" "conditions" list .) }}
+            {{- if and (eq .type "Ready") (eq .status "True") }}
+            {{- $bootstrapReady = true }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+
+            {{- if $appSuiteReady }}
             {{- /* ── Release 2: opendesk-open-xchange-bootstrap ──────────────── */}}
             {{- /* One-shot Job: OX context + filestore registration via admin pod. */}}
             {{- $bootstrapVals := dict
@@ -706,56 +728,6 @@ spec:
                 wait: true
                 values:
                   {{ toYaml $bootstrapVals | nindent 18 }}
-              providerConfigRef:
-                name: kubernetes
-
-            {{- /* ── Release 3: ox-connector (Nubus LDAP → OX user sync) ─────── */}}
-            {{- $connectorVals := dict
-                "openXchange" (dict
-                  "domainName" $domain
-                  "auth" (dict
-                    "username" "admin"
-                    "existingSecret" (dict
-                      "name" $secretName
-                      "keyMapping" (dict "password" "internal-ox_admin_password")
-                    )
-                  )
-                  "oxDefaultContext" "1"
-                  "oxSoapServer" $oxSoapServer
-                  "oxLocalTimezone" "Europe/Berlin"
-                  "oxLanguage" "de_DE"
-                  "oxSmtpServer" (printf "smtp://%s" $smtpHost)
-                  "oxImapServer" (printf "imap://%s" $imapHost)
-                )
-                "provisioningApi" (dict
-                  "connection" (dict "baseUrl" $provisioningApiBase)
-                  "auth" (dict
-                    "username" "ox-connector"
-                    "existingSecret" (dict
-                      "name" "ox-connector-provisioning-api"
-                      "keyMapping" (dict "password" "password")
-                    )
-                  )
-                )
-                "replicaCount" 1
-            }}
-            ---
-            apiVersion: helm.crossplane.io/v1beta1
-            kind: Release
-            metadata:
-              annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-connector-release
-              name: {{ $xrName }}-connector-release
-            spec:
-              forProvider:
-                chart:
-                  repository: oci://registry.opencode.de/bmi/opendesk/components/supplier/univention/charts-mirror
-                  name: ox-connector
-                  version: "0.34.0"
-                namespace: {{ $ns }}
-                wait: false
-                values:
-                  {{ toYaml $connectorVals | nindent 18 }}
               providerConfigRef:
                 name: kubernetes
 
@@ -912,6 +884,59 @@ spec:
                                 value: {{ $provisioningApiSubscriptions | quote }}
               providerConfigRef:
                 name: kubernetes
+            {{- end }}
+
+            {{- if $bootstrapReady }}
+            {{- /* ── Release 3: ox-connector (Nubus LDAP → OX user sync) ─────── */}}
+            {{- $connectorVals := dict
+                "openXchange" (dict
+                  "domainName" $domain
+                  "auth" (dict
+                    "username" "admin"
+                    "existingSecret" (dict
+                      "name" $secretName
+                      "keyMapping" (dict "password" "internal-ox_admin_password")
+                    )
+                  )
+                  "oxDefaultContext" "1"
+                  "oxSoapServer" $oxSoapServer
+                  "oxLocalTimezone" "Europe/Berlin"
+                  "oxLanguage" "de_DE"
+                  "oxSmtpServer" (printf "smtp://%s" $smtpHost)
+                  "oxImapServer" (printf "imap://%s" $imapHost)
+                )
+                "provisioningApi" (dict
+                  "connection" (dict "baseUrl" $provisioningApiBase)
+                  "auth" (dict
+                    "username" "ox-connector"
+                    "existingSecret" (dict
+                      "name" "ox-connector-provisioning-api"
+                      "keyMapping" (dict "password" "password")
+                    )
+                  )
+                )
+                "replicaCount" 1
+            }}
+            ---
+            apiVersion: helm.crossplane.io/v1beta1
+            kind: Release
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-connector-release
+              name: {{ $xrName }}-connector-release
+            spec:
+              forProvider:
+                chart:
+                  repository: oci://registry.opencode.de/bmi/opendesk/components/supplier/univention/charts-mirror
+                  name: ox-connector
+                  version: "0.34.0"
+                namespace: {{ $ns }}
+                wait: false
+                values:
+                  {{ toYaml $connectorVals | nindent 18 }}
+              providerConfigRef:
+                name: kubernetes
+            {{- end }}
 
             {{- /* ── Emit stable service alias ─────────────────────────────────── */}}
             {{- /* OX umbrella chart creates release-prefixed subchart services      */}}
@@ -1446,25 +1471,7 @@ spec:
                 name: kubernetes
             {{- end }}
 
-    # ── Step 3: Gate OX Helm releases (appsuite → bootstrap → connector) ─────
-    - step: sequence-ox-releases
-      functionRef:
-        name: function-sequencer
-      input:
-        apiVersion: sequencer.fn.crossplane.io/v1beta1
-        kind: Input
-        rules:
-          - sequence:
-            - ox-appsuite-release
-            - ox-appsuite-bootstrap-release
-          - sequence:
-            - ox-appsuite-bootstrap-release
-            - ox-appsuite-connector-release
-          - sequence:
-            - ox-appsuite-connector-release
-            - ox-appsuite-connector-register-job
-
-    # ── Step 4: Mark XR Ready when all composed resources are Ready ───────────
+    # ── Step 3: Mark XR Ready when all composed resources are Ready ───────────
     - step: automatically-detect-ready-composed-resources
       functionRef:
         name: function-auto-ready
