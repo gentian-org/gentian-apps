@@ -1088,9 +1088,8 @@ spec:
                         "${PROVISIONING_API_SUBSCRIPTIONS}" || echo "000")
                       case "${HTTP}" in
                         201) echo "[ox-consumer-register] consumer registered" ;;
-                        200) echo "[ox-consumer-register] consumer already registered" ;;
-                        409)
-                          echo "[ox-consumer-register] stale registration — deleting ox-connector"
+                        200|409)
+                          echo "[ox-consumer-register] consumer already registered — re-registering to trigger prefill"
                           DEL=$(curl -s -o /tmp/resp -w '%{http_code}' \
                             -u "admin:${ADMIN_PW}" \
                             -X DELETE \
@@ -1105,7 +1104,7 @@ spec:
                             -d @/secrets/registration \
                             "${PROVISIONING_API_SUBSCRIPTIONS}" || echo "000")
                           case "${HTTP}" in
-                            201|200) echo "[ox-consumer-register] consumer re-registered" ;;
+                            201|200) echo "[ox-consumer-register] consumer re-registered (prefill requested)" ;;
                             *) echo "[ox-consumer-register] ERROR: HTTP ${HTTP}"; cat /tmp/resp; exit 1 ;;
                           esac
                           ;;
