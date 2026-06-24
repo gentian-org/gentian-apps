@@ -724,11 +724,15 @@ spec:
                     - apiGroups: [""]
                       resources: ["pods/exec"]
                       verbs: ["create"]
+                    - apiGroups: [""]
+                      resources: ["secrets"]
+                      resourceNames: [{{ $secretName | quote }}]
+                      verbs: ["get"]
                     - apiGroups: ["apps"]
-                      resources: ["deployments"]
+                      resources: ["deployments", "statefulsets"]
                       verbs: ["get", "list", "patch"]
                     - apiGroups: ["apps"]
-                      resources: ["deployments/status"]
+                      resources: ["deployments/status", "statefulsets/status"]
                       verbs: ["get"]
               providerConfigRef:
                 name: kubernetes
@@ -792,20 +796,42 @@ spec:
                   data:
                     bootstrap.sh: |
                       #!/bin/bash
-                      set -eu
+                      set -euo pipefail
 
                       admin_pod() {
                         kubectl get pod -n "${NAMESPACE}" -l "${ADMIN_SELECTOR}" \
+                          --field-selector=status.phase=Running \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true
                       }
 
                       mw_owner_kind() {
-                        kubectl get pod -n "${NAMESPACE}" -l "${ADMIN_SELECTOR}" \
-                          -o jsonpath='{.items[0].metadata.ownerReferences[0].kind}' 2>/dev/null || true
+                        local pod
+                        pod="$(admin_pod)"
+                        [ -n "${pod}" ] || return 1
+                        kubectl get pod -n "${NAMESPACE}" "${pod}" \
+                          -o jsonpath='{.metadata.ownerReferences[0].kind}' 2>/dev/null || true
                       }
 
                       exec_mw() {
-                        kubectl exec --namespace="${NAMESPACE}" "${ADMIN_POD}" -c core-mw -- bash -c "$1"
+                        local pod
+                        pod="$(admin_pod)"
+                        [ -n "${pod}" ] || return 1
+                        kubectl exec --namespace="${NAMESPACE}" "${pod}" -c core-mw -- bash -c "$1"
+                      }
+
+                      wait_mw_ready() {
+                        local label="${1:-core-mw}"
+                        until exec_mw 'echo core-mw running...' >/dev/null 2>&1; do
+                          echo "[ox-bootstrap] waiting for ${label}..."
+                          sleep 2
+                        done
+                      }
+
+                      restart_mw() {
+                        echo "[ox-bootstrap] restarting core-mw (${SELECTOR})..."
+                        kubectl --namespace="${NAMESPACE}" rollout restart "${MW_TYPE}" --selector="${SELECTOR}"
+                        kubectl --namespace="${NAMESPACE}" rollout status "${MW_TYPE}" --selector="${SELECTOR}" --timeout=900s
+                        wait_mw_ready "core-mw after restart"
                       }
 
                       wait_soap() {
@@ -817,6 +843,50 @@ spec:
                         echo "[ox-bootstrap] ${svc} WSDL ready"
                       }
 
+                      wait_admin_rmi() {
+                        local out
+                        echo "[ox-bootstrap] waiting for admin RMI service (OXUtil_V2)..."
+                        while true; do
+                          if out="$(exec_mw "/opt/open-xchange/sbin/listserver -A ${MASTER_ADMIN_USER} -P ${MASTER_ADMIN_PW}" 2>&1)"; then
+                            echo "[ox-bootstrap] admin RMI ready"
+                            return 0
+                          fi
+                          if echo "${out}" | grep -q 'OXUtil_V2" is not available'; then
+                            echo "[ox-bootstrap] OXUtil_V2 not ready yet..."
+                            sleep 5
+                            continue
+                          fi
+                          echo "[ox-bootstrap] admin RMI accepting connections"
+                          return 0
+                        done
+                      }
+
+                      register_required() {
+                        local step="$1"
+                        shift
+                        local out attempt=1 max=120
+                        while [ "${attempt}" -le "${max}" ]; do
+                          if out="$(exec_mw "$@" 2>&1)"; then
+                            echo "[ox-bootstrap] ${step} ok"
+                            return 0
+                          fi
+                          if echo "${out}" | grep -q 'OXUtil_V2" is not available'; then
+                            echo "[ox-bootstrap] ${step} waiting for admin RMI (${attempt}/${max})..."
+                            sleep 5
+                            attempt=$((attempt + 1))
+                            continue
+                          fi
+                          if echo "${out}" | grep -qiE 'already registered|already exists|duplicate'; then
+                            echo "[ox-bootstrap] ${step} skipped (already registered)"
+                            return 0
+                          fi
+                          echo "${out}" >&2
+                          return 1
+                        done
+                        echo "[ox-bootstrap] ${step} timed out waiting for admin RMI" >&2
+                        return 1
+                      }
+
                       echo "[ox-bootstrap] locating admin pod..."
                       until ADMIN_POD="$(admin_pod)" && [ -n "${ADMIN_POD}" ]; do
                         sleep 2
@@ -825,10 +895,7 @@ spec:
                       [ "${MW_KIND}" = "StatefulSet" ] && MW_TYPE="statefulset" || MW_TYPE="deployment"
                       echo "[ox-bootstrap] using ${MW_TYPE} pod ${ADMIN_POD}"
 
-                      until exec_mw 'echo core-mw running...' >/dev/null 2>&1; do
-                        echo "[ox-bootstrap] waiting for core-mw container..."
-                        sleep 2
-                      done
+                      wait_mw_ready "core-mw container"
 
                       echo "[ox-bootstrap] initializing configDB (-i recreates on reinstall)..."
                       exec_mw '/opt/open-xchange/sbin/initconfigdb \
@@ -840,53 +907,31 @@ spec:
                         --mysql-root-passwd "${MYSQL_PASSWORD}" \
                         --configdb-dbname "${MYSQL_DATABASE}"'
 
-                      echo "[ox-bootstrap] waiting for admin RMI (port 8009)..."
-                      until exec_mw 'nc -z localhost 8009' >/dev/null 2>&1; do
-                        sleep 5
-                      done
+                      restart_mw
 
                       wait_soap OXUtilService
-
-                      register_or_skip() {
-                        local step="$1"
-                        shift
-                        if exec_mw "$@"; then
-                          echo "[ox-bootstrap] ${step} ok"
-                        else
-                          echo "[ox-bootstrap] ${step} skipped (may already be registered)"
-                        fi
-                      }
+                      wait_admin_rmi
 
                       echo "[ox-bootstrap] registering filestore..."
-                      register_or_skip "registerfilestore" '/opt/open-xchange/sbin/registerfilestore \
-                        -A "${MASTER_ADMIN_USER}" -P "${MASTER_ADMIN_PW}" \
-                        -t s3://ox-filestore-s3 -s 10000'
+                      register_required "registerfilestore" "/opt/open-xchange/sbin/registerfilestore \
+                        -A ${MASTER_ADMIN_USER} -P ${MASTER_ADMIN_PW} \
+                        -t s3://ox-filestore-s3 -s 10000 --if-nonexistent"
 
                       echo "[ox-bootstrap] registering server..."
-                      register_or_skip "registerserver" '/opt/open-xchange/sbin/registerserver \
-                        -A "${MASTER_ADMIN_USER}" -P "${MASTER_ADMIN_PW}" \
-                        -n oxserver'
+                      register_required "registerserver" "/opt/open-xchange/sbin/registerserver \
+                        -A ${MASTER_ADMIN_USER} -P ${MASTER_ADMIN_PW} \
+                        -n oxserver"
 
                       echo "[ox-bootstrap] registering database..."
-                      register_or_skip "registerdatabase" '/opt/open-xchange/sbin/registerdatabase \
-                        -A "${MASTER_ADMIN_USER}" -P "${MASTER_ADMIN_PW}" \
-                        --name "PRIMARYDB" \
+                      register_required "registerdatabase" '/opt/open-xchange/sbin/registerdatabase \
+                        -A '"${MASTER_ADMIN_USER}"' -P '"${MASTER_ADMIN_PW}"' \
+                        --name PRIMARYDB \
                         --hostname "${MYSQL_HOST}" \
                         --dbuser "${MYSQL_USER}" \
                         --dbpasswd "${MYSQL_PASSWORD}" \
                         --master true'
 
-                      echo "[ox-bootstrap] restarting core-mw (${SELECTOR})..."
-                      kubectl --namespace="${NAMESPACE}" rollout restart "${MW_TYPE}" --selector="${SELECTOR}"
-                      kubectl --namespace="${NAMESPACE}" rollout status "${MW_TYPE}" --selector="${SELECTOR}" --timeout=900s
-
-                      echo "[ox-bootstrap] re-locating admin pod after restart..."
-                      until ADMIN_POD="$(admin_pod)" && [ -n "${ADMIN_POD}" ]; do
-                        sleep 2
-                      done
-                      until exec_mw 'echo core-mw running...' >/dev/null 2>&1; do
-                        sleep 2
-                      done
+                      restart_mw
 
                       for svc in OXUtilService OXUserService OXContextService OXSecondaryAccountService; do
                         wait_soap "${svc}"
@@ -947,6 +992,13 @@ spec:
                                 value: "roles.middleware.open-xchange.com/admin=true"
                               - name: SELECTOR
                                 value: {{ $coreMwSelector | quote }}
+                              - name: MASTER_ADMIN_USER
+                                value: "admin"
+                              - name: MASTER_ADMIN_PW
+                                valueFrom:
+                                  secretKeyRef:
+                                    name: {{ $secretName }}
+                                    key: internal-ox_admin_password
               providerConfigRef:
                 name: kubernetes
 
