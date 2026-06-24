@@ -206,14 +206,15 @@ mappers, and LDAP-group → client-role mappings** (e.g. `opendesk_username`,
 
 | Path | When | Gentian-os change per new app? |
 |---|---|---|
-| **`app-default` / `app-odoo` Client MR** | Standard OIDC client + redirect URIs; app uses LDAP or generic claims | **No** — only `AppProfile.kernelRequirements.identity.oidc` |
+| **`app-default` Client MR** | Standard OIDC client + redirect URIs; app uses LDAP or generic claims | **No** — only `AppProfile.kernelRequirements.identity.oidc` |
 | **Operator OIDC pack Job** | openDesk-style custom scopes/mappers/roles | **Yes today** — pack keyed by `clientId` in embedded catalog |
 | **Minimal client Job** | Legacy fallback if composition does not emit Client MR | **No** — basic client only |
 
-**Odoo** should use the **composition Client MR** path:
+**Odoo** uses the **composition Client MR** path via **`app-default`** (omit
+`compositionRef` on the base AppProfile):
 
-- `app-odoo` emits `openidclient.keycloak.crossplane.io/Client` (same as
-  `app-default` §630+).
+- `app-default` emits `openidclient.keycloak.crossplane.io/Client` when
+  `kernelRequirements.identity.oidc` is set (same as any catalogue app).
 - Operator **skips** duplicate client/pack Jobs when `crossplaneOwnsOIDCClient` is
   true (no pack on `clientId` — see `tenant_identity_manifests.go`).
 - **`gentian_os`** handles tier-3 RBAC via **LDAP group membership**, not
