@@ -688,11 +688,15 @@ spec:
             {{- with (index $obsRes (printf "%s-bootstrap-job" $app)) }}
             {{- if ge (int (default 0 (dig "resource" "status" "atProvider" "manifest" "status" "succeeded" 0 .))) 1 }}
             {{- $bootstrapReady = true }}
+            {{- else if dig "resource" "status" "atProvider" "manifest" "status" "completionTime" "" . }}
+            {{- $bootstrapReady = true }}
             {{- end }}
             {{- end }}
             {{- $registerReady := false }}
             {{- with (index $obsRes (printf "%s-connector-register-job" $app)) }}
             {{- if ge (int (default 0 (dig "resource" "status" "atProvider" "manifest" "status" "succeeded" 0 .))) 1 }}
+            {{- $registerReady = true }}
+            {{- else if dig "resource" "status" "atProvider" "manifest" "status" "completionTime" "" . }}
             {{- $registerReady = true }}
             {{- end }}
             {{- end }}
