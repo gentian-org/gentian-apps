@@ -31,6 +31,20 @@ spec:
 Commerce (customer, price, invoice) is handled in **CRM/ERP (Odoo)** — see
 [business-logic-plan.md](../gentian-os/docs/design/business-logic-plan.md).
 
+### Base + module profile bundles
+
+For apps with a shared runtime and thin module entries (Odoo, OX-style), use
+**metadata annotations** — do not add per-app fields to `AppProfile` spec:
+
+| Annotation | Values | Purpose |
+|---|---|---|
+| `gentianos.io/deployment-role` | `standalone` (default), `base`, `module` | How the operator/composition deploys this entry |
+| `gentianos.io/requires-profile` | AppProfile name | Base profile auto-installed when `deployment-role=module` |
+| `gentianos.io/platform-app` | `"true"` | Hidden from App Store listing (required base runtimes) |
+
+App-specific install parameters (e.g. Odoo module technical name) belong in
+`spec.extraValues` and the profile-scoped composition — not in gentian-os CRDs.
+
 ---
 
 ## 2. Placeholders (substituted at deploy time)

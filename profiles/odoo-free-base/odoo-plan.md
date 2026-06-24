@@ -126,10 +126,10 @@ should **implicitly ensure** `odoo-free-base` is present in `Tenant.spec.apps`
 **Implementation sketch:** extend tenant reconciliation:
 
 ```go
-// Pseudocode — operator tenant_controller
+// Pseudocode — operator (implemented via gentianos.io/requires-profile)
 for each app in tenant.Spec.Apps {
-    if profile.Spec.Family == "odoo" && profile.Name != "odoo-free-base" {
-        ensureAppClaim("odoo-free-base")
+    if profile.annotations["gentianos.io/deployment-role"] == "module" {
+        ensureAppClaim(profile.annotations["gentianos.io/requires-profile"])
     }
 }
 ```
@@ -137,32 +137,39 @@ for each app in tenant.Spec.Apps {
 Alternative considered: explicit base install first — rejected for UX; the app
 store can still show a dependency note in metadata.
 
-### 3.3 New AppProfile fields (gentian-os)
+### 3.3 Profile bundle annotations (not CRD fields)
 
-Module profiles need a way to declare **no chart / module-only** behaviour.
-Prefer extending the CRD over many one-off compositions:
+Module profiles need **no chart / module-only** behaviour without adding
+per-app fields to `AppProfile`. Use **generic annotations** on the profile
+metadata; app-specific install parameters live in `extraValues` and the
+profile-scoped composition (`app-odoo`).
 
 ```yaml
 # odoo-crm/profile.yaml (illustrative)
+metadata:
+  annotations:
+    gentianos.io/deployment-role: module
+    gentianos.io/requires-profile: odoo-free-base
 spec:
   family: odoo
   edition: crm
-  deploymentRole: module          # NEW: base | module (default: standalone)
-  odooModule:                     # NEW: when deploymentRole=module
-    technicalName: crm
-    dependsOn: [base]             # optional Odoo module deps
-  requiresBaseProfile: odoo-free-base
+  compositionRef: app-odoo
+  extraValues:
+    odoo:
+      module: crm
+      dependsOn: [base]
 ```
 
-| Field | Purpose |
+| Annotation | Purpose |
 |---|---|
-| `deploymentRole: base` | Full Helm release + shared ingress |
-| `deploymentRole: module` | Crossplane Job `odoo-bin -i <module> --stop-after-init`; portal tile only |
-| `family: odoo` | Groups profiles; shared DB name, ingress host, composition |
-| `requiresBaseProfile` | Admission + operator auto-install |
+| `gentianos.io/deployment-role: base` | Full Helm release + shared ingress |
+| `gentianos.io/deployment-role: module` | Composition runs module install Job; portal tile only |
+| `gentianos.io/requires-profile` | Operator auto-installs named base profile |
+| `spec.family` | Groups profiles; shared DB name, ingress host, composition |
+| `spec.extraValues` (per profile) | App-specific install params (`odoo.module`, …) read by `app-odoo` |
 
-Until CRD fields land, `app-odoo` can key off profile name prefix `odoo-` and
-an annotation `gentianos.io/odoo-role: base|module`.
+The operator understands only the **generic** annotations above. Odoo module
+technical names, depends-on lists, and Job commands are **not** platform CRD fields.
 
 ---
 
@@ -897,7 +904,7 @@ from the base bundle (cluster-scoped Composition name `app-odoo`).
 
 ### Phase 0 — Design sign-off
 
-- [ ] Confirm `deploymentRole` / auto-base semantics with platform team
+- [ ] Confirm `deployment-role` / auto-base semantics with platform team
 - [ ] Pick Odoo version (18 OCB from `server/` vs latest LTS)
 - [ ] Confirm Community-only scope for `odoo-free-*` naming
 
@@ -911,7 +918,7 @@ from the base bundle (cluster-scoped Composition name `app-odoo`).
 
 ### Phase 2 — Module profiles
 
-- [ ] CRD / annotation for `deploymentRole: module`
+- [ ] CRD / annotation for `deployment-role: module`
 - [ ] Operator auto-install base
 - [ ] Module install Job in composition + `gentian_os` post-install hook
 - [ ] First modules: `odoo-crm`, `odoo-contacts`, `odoo-calendar` (low deps)
