@@ -652,7 +652,7 @@ spec:
                   name: {{ $chart.name }}
                   version: {{ $chart.version | quote }}
                 namespace: {{ $ns }}
-                wait: false
+                wait: true
                 {{- if gt (len $esData) 0 }}
                 valuesFrom:
                   - secretKeyRef:
@@ -1446,7 +1446,25 @@ spec:
                 name: kubernetes
             {{- end }}
 
-    # ── Step 3: Mark XR Ready when all composed resources are Ready ───────────
+    # ── Step 3: Gate OX Helm releases (appsuite → bootstrap → connector) ─────
+    - step: sequence-ox-releases
+      functionRef:
+        name: function-sequencer
+      input:
+        apiVersion: sequencer.fn.crossplane.io/v1beta1
+        kind: Input
+        rules:
+          - sequence:
+            - ox-appsuite-release
+            - ox-appsuite-bootstrap-release
+          - sequence:
+            - ox-appsuite-bootstrap-release
+            - ox-appsuite-connector-release
+          - sequence:
+            - ox-appsuite-connector-release
+            - ox-appsuite-connector-register-job
+
+    # ── Step 4: Mark XR Ready when all composed resources are Ready ───────────
     - step: automatically-detect-ready-composed-resources
       functionRef:
         name: function-auto-ready

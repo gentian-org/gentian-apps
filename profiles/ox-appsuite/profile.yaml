@@ -231,6 +231,38 @@ spec:
           default:
             oidcLogin: true
             oidcPath: "/oidc/"
+        defaultScaling:
+          nodes:
+            default:
+              roles:
+                - http-api
+                - sync
+                - admin
+                - businessmobility
+                - request-analyzer
+        roles:
+          admin:
+            values:
+              features:
+                status:
+                  admin: "enabled"
+              packages:
+                status:
+                  open-xchange-admin-contextrestore: "enabled"
+                  open-xchange-admin-oauth-provider: "enabled"
+                  open-xchange-admin-soap: "enabled"
+                  open-xchange-admin-soap-usercopy: "enabled"
+                  open-xchange-admin-user-copy: "enabled"
+        scaling:
+          nodes:
+            groupware:
+              replicas: 1
+              roles:
+                - http-api
+                - sync
+                - businessmobility
+                - request-analyzer
+                - admin
         packages:
           status:
             open-xchange-oidc: "enabled"
@@ -297,6 +329,10 @@ spec:
           /opt/open-xchange/etc/ldapauth.properties:
             java.naming.provider.url: "ldap://${LDAP_HOST}/ou=users,${LDAP_BASE_DN}"
             bindDN: "${LDAP_BIND_DN}"
+          /opt/open-xchange/etc/AdminDaemon.properties:
+            MASTER_ACCOUNT_OVERRIDE: "true"
+          /opt/open-xchange/etc/AdminUser.properties:
+            USERNAME_CHANGEABLE: "true"
       ingress:
         enabled: false
         dav:
