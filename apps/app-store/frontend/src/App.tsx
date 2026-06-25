@@ -191,11 +191,6 @@ export default function App() {
       }
       if (isAppReady(current)) {
         setNotice({ kind: "success", text: `${label} is installed and ready.` });
-      } else {
-        setNotice({
-          kind: "info",
-          text: `${label} is provisioning. Status updates automatically under Pending.`,
-        });
       }
     } catch (e) {
       setNotice({
