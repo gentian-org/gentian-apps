@@ -181,12 +181,20 @@ export default function App() {
 
       const apps = await refresh();
       const current = apps.find((app) => app.profile === profile);
+      if (!current) {
+        setInstalled((prev) => prev.filter((app) => app.profile !== profile));
+        setNotice({
+          kind: "error",
+          text: `${label} install did not persist. The tenant may be GitOps-managed and Argo CD reverted the change — retry after the platform update or install via kubectl gentian apps install.`,
+        });
+        return;
+      }
       if (isAppReady(current)) {
         setNotice({ kind: "success", text: `${label} is installed and ready.` });
       } else {
         setNotice({
           kind: "info",
-          text: `${label} install started. It will appear under Pending until provisioning finishes.`,
+          text: `${label} is provisioning. Status updates automatically under Pending.`,
         });
       }
     } catch (e) {

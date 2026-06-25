@@ -21,6 +21,11 @@ def _tenant_namespace(tenant_id: str) -> str:
     return f"tenant-{tenant_id}"
 
 
+def _tenant_has_profile(tenant_cr: dict[str, Any], profile: str) -> bool:
+    apps = tenant_cr.get("spec", {}).get("apps") or []
+    return any(app.get("profile") == profile for app in apps)
+
+
 def _is_platform_app(k8s: K8sClient, profile: str) -> bool:
     try:
         app_profile = k8s.get_app_profile(profile)
@@ -121,12 +126,23 @@ def install_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
 
     if settings.install_mode == "k8s":
         try:
+            tenant_cr = k8s.get_tenant(tenant)
             result = k8s.add_tenant_app(tenant, profile)
         except Exception as exc:
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to update tenant apps: {exc}",
             ) from exc
+        tenant_cr = k8s.get_tenant(tenant)
+        if result == "installed" and not _tenant_has_profile(tenant_cr, profile):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Install of '{profile}' did not persist on tenant '{tenant}'. "
+                    "If this tenant is Argo CD–managed, enable ignoreDifferences on "
+                    "Tenant.spec.apps or use gitops install mode."
+                ),
+            )
         ns = settings.tenant_namespace or _tenant_namespace(tenant)
         claim = k8s.get_app_claim(ns, profile)
         return {
