@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     # Dev bypass when OIDC not configured
     auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
 
+    public_base_url: str | None = Field(default=None, alias="PUBLIC_BASE_URL")
+
     cors_origins: str = Field(default="*", alias="BACKEND_CORS_ORIGINS")
 
     @property

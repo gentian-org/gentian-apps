@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiFetch } from "./api";
 
 type CatalogueApp = {
   name: string;
@@ -48,33 +49,7 @@ type Notice = {
   text: string;
 };
 
-const API = "/api/v1";
 const STATUS_POLL_MS = 4000;
-
-function parseApiError(body: string, fallback: string): string {
-  try {
-    const data = JSON.parse(body) as { detail?: string | { msg?: string }[] };
-    if (typeof data.detail === "string") return data.detail;
-    if (Array.isArray(data.detail)) {
-      return data.detail.map((item) => item.msg || "").filter(Boolean).join("; ") || fallback;
-    }
-  } catch {
-    // plain text error body
-  }
-  return body || fallback;
-}
-
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(parseApiError(body, res.statusText));
-  }
-  return res.json() as Promise<T>;
-}
 
 function statusLabel(app: InstalledApp): { text: string; className: string } {
   if (app.ready) {
@@ -109,7 +84,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    refresh().catch((e: Error) => setNotice({ kind: "error", text: e.message }));
+    refresh().catch((e: Error) => {
+      if (e.message !== "Redirecting to sign in…") {
+        setNotice({ kind: "error", text: e.message });
+      }
+    });
   }, [refresh]);
 
   useEffect(() => {
