@@ -959,13 +959,22 @@ spec:
                       wait_mw_ready "core-mw container"
 
                       echo "[ox-bootstrap] initializing configDB..."
-                      exec_mw '/opt/open-xchange/sbin/initconfigdb \
+                      if ! out="$(exec_mw '/opt/open-xchange/sbin/initconfigdb \
                         --mysql-args "--skip-ssl-verify-server-cert" \
                         --configdb-user "${MYSQL_USER}" \
                         --configdb-pass "${MYSQL_PASSWORD}" \
                         --configdb-host "${MYSQL_HOST}" \
                         --mysql-root-passwd "${MYSQL_PASSWORD}" \
-                        --configdb-dbname "${MYSQL_DATABASE}"'
+                        --configdb-dbname "${MYSQL_DATABASE}"' 2>&1)"; then
+                        if echo "${out}" | grep -q 'exists, use the -i switch'; then
+                          echo "[ox-bootstrap] configDB already initialized"
+                        else
+                          echo "${out}" >&2
+                          exit 1
+                        fi
+                      else
+                        echo "[ox-bootstrap] configDB initialized"
+                      fi
 
                       restart_mw
 
