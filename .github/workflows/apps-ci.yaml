@@ -59,8 +59,9 @@ jobs:
       - name: Package and push chart
         if: github.event_name != 'pull_request'
         run: |
+          CHART_VERSION=$(grep '^version:' apps/app-store/chart/Chart.yaml | awk '{print $2}')
           helm package apps/app-store/chart -d /tmp
-          helm push /tmp/app-store-0.1.6.tgz oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+          helm push "/tmp/app-store-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
 
   validate-profiles:
     runs-on: ubuntu-latest
