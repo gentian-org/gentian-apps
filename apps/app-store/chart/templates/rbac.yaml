@@ -54,3 +54,85 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ include "gentian-app.fullname" . }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "gentian-app.fullname" . }}-kernel-purge
+  namespace: {{ .Values.gentian.kernelNamespace }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec"]
+    verbs: ["create", "get", "list"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["delete", "list"]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["databases"]
+    verbs: ["delete", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "gentian-app.fullname" . }}-kernel-purge
+  namespace: {{ .Values.gentian.kernelNamespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "gentian-app.fullname" . }}-kernel-purge
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "gentian-app.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "gentian-app.fullname" . }}-openbao-purge
+  namespace: openbao
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec"]
+    verbs: ["create", "get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "gentian-app.fullname" . }}-openbao-purge
+  namespace: openbao
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "gentian-app.fullname" . }}-openbao-purge
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "gentian-app.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "gentian-app.fullname" . }}-operator-token
+  namespace: gentian-system
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    resourceNames: ["gentian-os"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "gentian-app.fullname" . }}-operator-token
+  namespace: gentian-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "gentian-app.fullname" . }}-operator-token
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "gentian-app.fullname" . }}
+    namespace: {{ .Release.Namespace }}

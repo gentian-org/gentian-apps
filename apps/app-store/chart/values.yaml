@@ -5,13 +5,13 @@ tenantNamespace: tenant-demo
 api:
   image:
     repository: ghcr.io/gentian-org/app-store-api
-    tag: "0.1.8"
+    tag: "0.1.9"
   replicaCount: 1
 
 web:
   image:
     repository: ghcr.io/gentian-org/app-store-web
-    tag: "0.1.8"
+    tag: "0.1.9"
   replicaCount: 1
 
 ingress:
@@ -38,6 +38,7 @@ gentian:
   deploymentsPath: /data/gentian-deployments
   appsRepo: https://github.com/gentian-org/gentian-apps
   appsBranch: main
+  kernelNamespace: platform-kernel
 
 gitOps:
   enabled: false

@@ -36,6 +36,8 @@ spec:
               value: {{ .Values.gentian.deploymentsRepo | quote }}
             - name: GENTIAN_DEPLOYMENTS_PATH
               value: {{ .Values.gentian.deploymentsPath | quote }}
+            - name: KERNEL_NAMESPACE
+              value: {{ .Values.gentian.kernelNamespace | quote }}
             - name: AUTH_DISABLED
               value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
             {{- with .Values.oidc }}

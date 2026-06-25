@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.auth import get_current_user
 from app.core.config import get_settings
 from app.services.catalogue import PLATFORM_ANNOTATION
 from app.services.gitops import DeploymentsGitOps, GitOpsError
 from app.services.k8s_client import K8sClient
+from app.services.purge import AppPurger
 
 router = APIRouter(prefix="/tenant/apps", tags=["tenant-apps"])
 
@@ -162,13 +163,27 @@ def install_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
 
 
 @router.delete("/{profile}")
-def uninstall_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
+def uninstall_app(
+    profile: str,
+    purge: bool = Query(default=False, description="Delete persistent DB, S3, secrets, and kernel artifacts"),
+    user: dict = Depends(get_current_user),
+) -> dict:
     settings = get_settings()
     tenant = settings.tenant_id
     ns = settings.tenant_namespace or _tenant_namespace(tenant)
 
+    if _is_platform_app(K8sClient(), profile):
+        raise HTTPException(status_code=400, detail=f"Cannot uninstall platform app '{profile}'")
+
     if settings.install_mode == "k8s":
         k8s = K8sClient()
+        tenant_cr: dict[str, Any] | None = None
+        profile_cr: dict[str, Any] | None = None
+        try:
+            profile_cr = k8s.get_app_profile(profile)
+        except Exception:
+            profile_cr = None
+
         try:
             result = k8s.remove_tenant_app(tenant, profile)
         except Exception as exc:
@@ -176,16 +191,45 @@ def uninstall_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
                 status_code=500,
                 detail=f"Failed to update tenant apps: {exc}",
             ) from exc
-        if k8s.app_claim_exists(ns, profile):
-            k8s.delete_app_claim(ns, profile)
-        return {"status": result, "mode": "k8s", "tenant": tenant, "profile": profile}
+
+        claim = k8s.get_app_claim(ns, profile)
+        if claim:
+            claim_name = claim.get("metadata", {}).get("name") or profile
+            k8s.delete_app_claim(ns, claim_name)
+
+        if result != "not_installed" or claim is not None:
+            k8s.wait_app_claim_gone(ns, profile)
+
+        warnings: list[str] = []
+        if purge:
+            try:
+                tenant_cr = k8s.get_tenant(tenant)
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail=f"Failed to load tenant: {exc}") from exc
+            warnings = AppPurger(kernel_namespace=settings.kernel_namespace).purge(
+                tenant, profile, tenant_cr, profile_cr
+            )
+
+        return {
+            "status": result,
+            "mode": "k8s",
+            "tenant": tenant,
+            "profile": profile,
+            "purged": purge,
+            "warnings": warnings,
+        }
 
     try:
         gitops = DeploymentsGitOps()
         result = gitops.uninstall_app(tenant, profile, _actor(user))
     except GitOpsError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    return {"status": result, "mode": "gitops", "tenant": tenant, "profile": profile}
+    if purge:
+        raise HTTPException(
+            status_code=501,
+            detail="Purge is only supported when installMode is k8s (in-cluster tenant patch).",
+        )
+    return {"status": result, "mode": "gitops", "tenant": tenant, "profile": profile, "purged": False}
 
 
 @router.get("/{profile}/status")

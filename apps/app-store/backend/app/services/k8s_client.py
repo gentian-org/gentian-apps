@@ -123,3 +123,13 @@ class K8sClient:
             if exc.status == 404:
                 return False
             raise
+
+    def wait_app_claim_gone(
+        self, namespace: str, profile: str, timeout_seconds: int = 120
+    ) -> bool:
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline:
+            if self.get_app_claim(namespace, profile) is None:
+                return True
+            time.sleep(2)
+        return self.get_app_claim(namespace, profile) is None

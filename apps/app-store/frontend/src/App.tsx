@@ -69,15 +69,18 @@ function AppListCard({
   catalogue,
   busy,
   onUninstall,
+  onPurge,
 }: {
   app: InstalledApp;
   catalogue: CatalogueResponse | null;
   busy: string | null;
   onUninstall: (profile: string) => void;
+  onPurge: (profile: string) => void;
 }) {
   const ready = isAppReady(app);
   const statusText = ready ? "Installed and ready" : app.message || "Pending";
   const statusClass = ready ? "text-emerald-700" : "text-amber-700";
+  const isBusy = busy === app.profile;
 
   return (
     <li className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -85,14 +88,25 @@ function AppListCard({
         <p className="font-medium">{displayNameFor(app.profile, catalogue)}</p>
         <p className={`text-xs ${statusClass}`}>{statusText}</p>
       </div>
-      <button
-        type="button"
-        disabled={busy === app.profile || !ready}
-        onClick={() => onUninstall(app.profile)}
-        className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
-      >
-        {busy === app.profile ? "Working…" : "Uninstall"}
-      </button>
+      <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
+        <button
+          type="button"
+          disabled={isBusy}
+          onClick={() => onUninstall(app.profile)}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
+        >
+          {isBusy ? "Working…" : "Uninstall"}
+        </button>
+        <button
+          type="button"
+          disabled={isBusy}
+          onClick={() => onPurge(app.profile)}
+          className="rounded-lg border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+          title="Uninstall and permanently delete databases, storage, and secrets"
+        >
+          Purge
+        </button>
+      </div>
     </li>
   );
 }
@@ -103,6 +117,7 @@ export default function App() {
   const [selected, setSelected] = useState<CatalogueApp | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [purgeTarget, setPurgeTarget] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async () => {
@@ -202,28 +217,44 @@ export default function App() {
     }
   }
 
-  async function uninstall(profile: string) {
+  async function uninstall(profile: string, purge = false) {
     setBusy(profile);
     setNotice(null);
     try {
-      const result = await apiFetch<{ status: string }>(`/tenant/apps/${profile}`, {
-        method: "DELETE",
-      });
+      const query = purge ? "?purge=true" : "";
+      const result = await apiFetch<{ status: string; warnings?: string[] }>(
+        `/tenant/apps/${profile}${query}`,
+        { method: "DELETE" },
+      );
       await refresh();
       const label = displayNameFor(profile, catalogue);
-      if (result.status === "not_installed") {
+      if (result.status === "not_installed" && !purge) {
         setNotice({ kind: "info", text: `${label} was not installed.` });
+      } else if (purge) {
+        const warn =
+          result.warnings && result.warnings.length > 0
+            ? ` Some steps reported warnings: ${result.warnings.join(" ")}`
+            : "";
+        setNotice({
+          kind: "success",
+          text: `${label} purged. Persistent data and kernel artifacts were removed.${warn}`,
+        });
       } else {
         setNotice({ kind: "success", text: `${label} uninstall requested.` });
       }
     } catch (e) {
       setNotice({
         kind: "error",
-        text: e instanceof Error ? e.message : "Uninstall failed",
+        text: e instanceof Error ? e.message : purge ? "Purge failed" : "Uninstall failed",
       });
     } finally {
       setBusy(null);
+      setPurgeTarget(null);
     }
+  }
+
+  function requestPurge(profile: string) {
+    setPurgeTarget(profile);
   }
 
   const noticeStyles =
@@ -269,7 +300,8 @@ export default function App() {
                 app={app}
                 catalogue={catalogue}
                 busy={busy}
-                onUninstall={uninstall}
+                onUninstall={(profile) => uninstall(profile)}
+                onPurge={requestPurge}
               />
             ))}
           </ul>
@@ -288,7 +320,8 @@ export default function App() {
                 app={app}
                 catalogue={catalogue}
                 busy={busy}
-                onUninstall={uninstall}
+                onUninstall={(profile) => uninstall(profile)}
+                onPurge={requestPurge}
               />
             ))}
           </ul>
@@ -367,6 +400,37 @@ export default function App() {
           })}
         </div>
       </section>
+
+      {purgeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-red-800">Purge app?</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              This uninstalls{" "}
+              <span className="font-medium">{displayNameFor(purgeTarget, catalogue)}</span> and
+              permanently deletes its databases, object storage, OpenBao secrets, and kernel
+              provisioning artifacts. This cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPurgeTarget(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busy === purgeTarget}
+                onClick={() => uninstall(purgeTarget, true)}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {busy === purgeTarget ? "Purging…" : "Purge"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
