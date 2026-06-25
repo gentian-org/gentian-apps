@@ -5,13 +5,13 @@ tenantNamespace: tenant-demo
 api:
   image:
     repository: ghcr.io/gentian-org/app-store-api
-    tag: "0.1.5"
+    tag: "0.1.6"
   replicaCount: 1
 
 web:
   image:
     repository: ghcr.io/gentian-org/app-store-web
-    tag: "0.1.5"
+    tag: "0.1.6"
   replicaCount: 1
 
 ingress:
@@ -27,7 +27,9 @@ oidc: {}
 database: {}
 
 auth:
-  disabled: false
+  # Embedded in the Gentian portal iframe; portal login gates access (Tenant Admins).
+  # Set to false only when exposing the store URL directly with its own OIDC flow.
+  disabled: true
 
 installMode: k8s
 

@@ -9,10 +9,69 @@ export function clearAccessToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-export function redirectToLogin(): void {
-  const returnTo = encodeURIComponent(window.location.href);
-  const loginUrl = `/oauth/login?return_to=${returnTo}`;
-  (window.top ?? window).location.href = loginUrl;
+function isEmbedded(): boolean {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
+function loginUrl(returnTo: string): string {
+  return `/oauth/login?return_to=${encodeURIComponent(returnTo)}`;
+}
+
+/** Complete OIDC sign-in without breaking out of a cross-origin portal iframe. */
+export function redirectToLogin(): Promise<void> {
+  const target = loginUrl(window.location.href);
+
+  if (!isEmbedded()) {
+    window.location.assign(target);
+    return new Promise(() => undefined);
+  }
+
+  return new Promise((resolve, reject) => {
+    const popup = window.open(target, "gentian-app-store-auth", "width=520,height=720");
+    if (!popup) {
+      reject(
+        new Error(
+          "Sign-in was blocked. Allow pop-ups for this site, or open the App Store in a new tab.",
+        ),
+      );
+      return;
+    }
+
+    const cleanup = () => {
+      window.clearInterval(pollTimer);
+      window.removeEventListener("storage", onStorage);
+    };
+
+    const finish = () => {
+      cleanup();
+      if (getAccessToken()) {
+        resolve();
+      } else {
+        reject(new Error("Sign-in was cancelled or did not complete."));
+      }
+    };
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === TOKEN_KEY && event.newValue) {
+        finish();
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
+    const pollTimer = window.setInterval(() => {
+      if (getAccessToken()) {
+        finish();
+        return;
+      }
+      if (popup.closed) {
+        finish();
+      }
+    }, 400);
+  });
 }
 
 function parseApiError(body: string, fallback: string): string {
@@ -28,9 +87,8 @@ function parseApiError(body: string, fallback: string): string {
   return body || fallback;
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function fetchWithAuth<T>(url: string, init?: RequestInit): Promise<T> {
   const token = getAccessToken();
-  const url = path.startsWith("/api/") ? path : `${API_PREFIX}${path}`;
   const res = await fetch(url, {
     ...init,
     headers: {
@@ -41,12 +99,30 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   });
   if (res.status === 401) {
     clearAccessToken();
-    redirectToLogin();
-    throw new Error("Redirecting to sign in…");
+    await redirectToLogin();
+    const retryToken = getAccessToken();
+    const retry = await fetch(url, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(retryToken ? { Authorization: `Bearer ${retryToken}` } : {}),
+        ...(init?.headers || {}),
+      },
+    });
+    if (!retry.ok) {
+      const body = await retry.text();
+      throw new Error(parseApiError(body, retry.statusText));
+    }
+    return retry.json() as Promise<T>;
   }
   if (!res.ok) {
     const body = await res.text();
     throw new Error(parseApiError(body, res.statusText));
   }
   return res.json() as Promise<T>;
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const url = path.startsWith("/api/") ? path : `${API_PREFIX}${path}`;
+  return fetchWithAuth<T>(url, init);
 }
