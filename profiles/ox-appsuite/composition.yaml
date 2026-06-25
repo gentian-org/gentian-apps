@@ -890,7 +890,7 @@ spec:
                             attempt=$((attempt + 1))
                             continue
                           fi
-                          if echo "${out}" | grep -qiE 'already registered|already exists|duplicate|context [0-9]+ exists'; then
+                          if echo "${out}" | grep -qiE 'already registered|already exists|duplicate'; then
                             echo "[ox-bootstrap] ${step} skipped (already registered)"
                             return 0
                           fi
@@ -898,6 +898,53 @@ spec:
                           return 1
                         done
                         echo "[ox-bootstrap] ${step} timed out waiting for admin RMI" >&2
+                        return 1
+                      }
+
+                      context_list() {
+                        exec_mw "/opt/open-xchange/sbin/listcontext -A ${MASTER_ADMIN_USER} -P ${MASTER_ADMIN_PW}" 2>&1
+                      }
+
+                      context_exists() {
+                        local out="$1"
+                        echo "${out}" | awk 'NR>1 && $1==1 {found=1} END {exit !found}'
+                      }
+
+                      ensure_context() {
+                        local out
+                        out="$(context_list)" || true
+                        if context_exists "${out}"; then
+                          echo "[ox-bootstrap] context 1 already present"
+                          return 0
+                        fi
+                        CONTEXT_ADMIN_PW="$(context_admin_pw)"
+                        CONTEXT_ADMIN_EMAIL="oxadmin@${DOMAIN}"
+                        echo "[ox-bootstrap] creating default context 1..."
+                        if out="$(exec_mw "/opt/open-xchange/sbin/createcontext \
+                          -A ${MASTER_ADMIN_USER} -P ${MASTER_ADMIN_PW} \
+                          -c 1 -N ${TENANT} -q -1 \
+                          -u oxadmin -d 'OX Admin' -g OX -s Admin \
+                          -p ${CONTEXT_ADMIN_PW} -e ${CONTEXT_ADMIN_EMAIL} \
+                          -l de_DE -t Europe/Berlin \
+                          -L 1,context1,${TENANT} \
+                          --access-combination-name all" 2>&1)"; then
+                          echo "[ox-bootstrap] createcontext ok"
+                        else
+                          local create_err="${out}"
+                          out="$(context_list)" || true
+                          if context_exists "${out}"; then
+                            echo "[ox-bootstrap] createcontext ok (context 1 visible after create)"
+                          else
+                            echo "${create_err}" >&2
+                            return 1
+                          fi
+                        fi
+                        out="$(context_list)" || true
+                        if context_exists "${out}"; then
+                          echo "[ox-bootstrap] context 1 verified"
+                          return 0
+                        fi
+                        echo "[ox-bootstrap] createcontext finished but context 1 is missing" >&2
                         return 1
                       }
 
@@ -911,10 +958,9 @@ spec:
 
                       wait_mw_ready "core-mw container"
 
-                      echo "[ox-bootstrap] initializing configDB (-i recreates on reinstall)..."
+                      echo "[ox-bootstrap] initializing configDB..."
                       exec_mw '/opt/open-xchange/sbin/initconfigdb \
                         --mysql-args "--skip-ssl-verify-server-cert" \
-                        -i \
                         --configdb-user "${MYSQL_USER}" \
                         --configdb-pass "${MYSQL_PASSWORD}" \
                         --configdb-host "${MYSQL_HOST}" \
@@ -945,17 +991,7 @@ spec:
                         --dbpasswd "${MYSQL_PASSWORD}" \
                         --master true'
 
-                      CONTEXT_ADMIN_PW="$(context_admin_pw)"
-                      CONTEXT_ADMIN_EMAIL="oxadmin@${DOMAIN}"
-                      echo "[ox-bootstrap] creating default context 1..."
-                      register_required "createcontext" "/opt/open-xchange/sbin/createcontext \
-                        -A ${MASTER_ADMIN_USER} -P ${MASTER_ADMIN_PW} \
-                        -c 1 -N ${TENANT} -q -1 \
-                        -u oxadmin -d 'OX Admin' -g OX -s Admin \
-                        -p ${CONTEXT_ADMIN_PW} -e ${CONTEXT_ADMIN_EMAIL} \
-                        -l de_DE -t Europe/Berlin \
-                        -L 1,context1,${TENANT} \
-                        --access-combination-name all"
+                      ensure_context
 
                       restart_mw
 
