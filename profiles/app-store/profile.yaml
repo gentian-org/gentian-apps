@@ -31,7 +31,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: app-store
-    version: "0.2.0"
+    version: "0.2.1"
 
   deploymentMethod: crossplane
 
@@ -50,13 +50,12 @@ spec:
   extraValues:
     tenantId: "${TENANT_ID}"
     tenantNamespace: "${TENANT_NAMESPACE}"
-    installMode: k8s
+    installMode: gitops
     gentian:
       deploymentsRepo: "https://github.com/gentian-org/gentian-deployments"
       appsRepo: "https://github.com/gentian-org/gentian-apps"
       appsBranch: main
       lifecycleUrl: "http://gentian-os.gentian-system.svc.cluster.local:8082"
-      lifecycleBackend: kubernetes
     ingress:
       enabled: false
     auth:

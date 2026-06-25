@@ -5,13 +5,13 @@ tenantNamespace: tenant-demo
 api:
   image:
     repository: ghcr.io/gentian-org/app-store-api
-    tag: "0.2.0"
+    tag: "0.2.1"
   replicaCount: 1
 
 web:
   image:
     repository: ghcr.io/gentian-org/app-store-web
-    tag: "0.2.0"
+    tag: "0.2.1"
   replicaCount: 1
 
 ingress:
@@ -31,7 +31,7 @@ auth:
   # Set to false only when exposing the store URL directly with its own OIDC flow.
   disabled: true
 
-installMode: k8s
+installMode: gitops
 
 gentian:
   deploymentsRepo: https://github.com/gentian-org/gentian-deployments
@@ -39,7 +39,6 @@ gentian:
   appsRepo: https://github.com/gentian-org/gentian-apps
   appsBranch: main
   lifecycleUrl: http://gentian-os.gentian-system.svc.cluster.local:8082
-  lifecycleBackend: kubernetes
 
 gitOps:
   enabled: false

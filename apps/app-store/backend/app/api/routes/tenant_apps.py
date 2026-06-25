@@ -60,7 +60,6 @@ def install_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
         result = get_lifecycle_client().install(
             profile,
             _actor(user),
-            backend=settings.lifecycle_backend,
         )
     except LifecycleError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -68,7 +67,7 @@ def install_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
     ready = bool(result.get("ready"))
     return {
         "status": status,
-        "mode": result.get("backend", settings.lifecycle_backend),
+        "mode": "gitops",
         "tenant": settings.tenant_id,
         "profile": profile,
         **_claim_status_from_result({"ready": ready, "message": result.get("message")}),
@@ -87,13 +86,12 @@ def uninstall_app(
             profile,
             _actor(user),
             purge=purge,
-            backend=settings.lifecycle_backend,
         )
     except LifecycleError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {
         "status": result.get("status", "uninstalled"),
-        "mode": result.get("backend", settings.lifecycle_backend),
+        "mode": "gitops",
         "tenant": settings.tenant_id,
         "profile": profile,
         "purged": bool(result.get("purged")),

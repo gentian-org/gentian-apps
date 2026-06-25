@@ -10,10 +10,10 @@ Tenant-admin web UI to browse the Gentian app catalogue and install/uninstall ap
 - `DELETE /api/v1/tenant/apps/{profile}`
 - `GET /api/v1/tenant/apps/{profile}/status`
 
-## Install modes
+## App lifecycle
 
 Install/uninstall/purge are implemented once in **gentian-os** (`internal/applifecycle`)
-and exposed via:
+via **GitOps** (edit `gentian-deployments`, commit, push, Argo CD sync, wait).
 
 | Surface | Entry |
 |---------|--------|
@@ -21,8 +21,7 @@ and exposed via:
 | HTTP | `GENTIAN_LIFECYCLE_URL` → operator `:8082/v1/tenants/{tenant}/apps/{profile}` |
 | App Store API | Thin HTTP client to the operator lifecycle API |
 
-`GENTIAN_LIFECYCLE_BACKEND` / `--backend` selects `kubernetes` (patch Tenant CR) or
-`gitops` (edit gentian-deployments).
+The App Store Install button and `kubectl gentian apps install` run the same flow.
 
 ## Local dev
 

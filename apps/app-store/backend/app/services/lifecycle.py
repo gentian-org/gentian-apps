@@ -32,26 +32,20 @@ class LifecycleClient:
             data = res.json()
             return data.get("apps", [])
 
-    def install(self, profile: str, actor: str, backend: str | None = None) -> dict[str, Any]:
-        params = {}
-        if backend:
-            params["backend"] = backend
+    def install(self, profile: str, actor: str) -> dict[str, Any]:
         with httpx.Client(timeout=900.0) as client:
             res = client.post(
                 self._url(profile),
-                params=params,
                 headers=self._headers(actor),
             )
             if not res.is_success:
                 raise LifecycleError(_detail(res))
             return res.json()
 
-    def uninstall(self, profile: str, actor: str, purge: bool = False, backend: str | None = None) -> dict[str, Any]:
+    def uninstall(self, profile: str, actor: str, purge: bool = False) -> dict[str, Any]:
         params: dict[str, str] = {}
         if purge:
             params["purge"] = "true"
-        if backend:
-            params["backend"] = backend
         with httpx.Client(timeout=900.0) as client:
             res = client.delete(
                 self._url(profile),
