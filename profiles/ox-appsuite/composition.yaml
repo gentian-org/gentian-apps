@@ -802,6 +802,10 @@ spec:
                       #!/bin/bash
                       set -euo pipefail
 
+                      context_admin_pw() {
+                        printf '%s' "${MASTER_ADMIN_PW}:1:ox-context" | sha256sum | awk '{print substr($1,1,32)}'
+                      }
+
                       admin_pod() {
                         kubectl get pod -n "${NAMESPACE}" -l "${ADMIN_SELECTOR}" \
                           --field-selector=status.phase=Running \
@@ -880,7 +884,7 @@ spec:
                             attempt=$((attempt + 1))
                             continue
                           fi
-                          if echo "${out}" | grep -qiE 'already registered|already exists|duplicate'; then
+                          if echo "${out}" | grep -qiE 'already registered|already exists|duplicate|context [0-9]+ exists'; then
                             echo "[ox-bootstrap] ${step} skipped (already registered)"
                             return 0
                           fi
@@ -934,6 +938,18 @@ spec:
                         --dbuser "${MYSQL_USER}" \
                         --dbpasswd "${MYSQL_PASSWORD}" \
                         --master true'
+
+                      CONTEXT_ADMIN_PW="$(context_admin_pw)"
+                      CONTEXT_ADMIN_EMAIL="oxadmin@${DOMAIN}"
+                      echo "[ox-bootstrap] creating default context 1..."
+                      register_required "createcontext" "/opt/open-xchange/sbin/createcontext \
+                        -A ${MASTER_ADMIN_USER} -P ${MASTER_ADMIN_PW} \
+                        -c 1 -N ${TENANT} -q -1 \
+                        -u oxadmin -d 'OX Admin' -g OX -s Admin \
+                        -p ${CONTEXT_ADMIN_PW} -e ${CONTEXT_ADMIN_EMAIL} \
+                        -l de_DE -t Europe/Berlin \
+                        -L 1,context1,${TENANT} \
+                        --access-combination-name all"
 
                       restart_mw
 
@@ -1003,6 +1019,10 @@ spec:
                                   secretKeyRef:
                                     name: {{ $secretName }}
                                     key: internal-ox_admin_password
+                              - name: TENANT
+                                value: {{ $tenant | quote }}
+                              - name: DOMAIN
+                                value: {{ $domain | quote }}
               providerConfigRef:
                 name: kubernetes
 
@@ -1182,6 +1202,53 @@ spec:
 
             {{- if and $bootstrapReady $registerReady }}
             {{- /* ── Release 3: ox-connector (Nubus LDAP → OX user sync) ─────── */}}
+            {{- /* Sync ox-contexts.json on every pod start: upstream entrypoint only */}}
+            {{- /* seeds master creds when the PVC file is missing, so reinstalls */}}
+            {{- /* leave stale SOAP passwords on the connector PVC. */}}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-connector-entrypoint-cm
+              name: {{ $xrName }}-connector-entrypoint-cm
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: ConfigMap
+                  metadata:
+                    name: {{ $app }}-connector-entrypoint-sync
+                    namespace: {{ $ns }}
+                  data:
+                    sync-ox-credentials.sh: |
+                      #!/bin/bash
+                      set -euo pipefail
+                      export OX_CREDENTIALS_FILE="${OX_CREDENTIALS_FILE:-/etc/ox-secrets/ox-contexts.json}"
+                      mkdir -p /etc/ox-secrets
+                      CONTEXT_ADMIN_PW="$(printf '%s' "${OX_MASTER_PASSWORD}:${DEFAULT_CONTEXT}:ox-context" | sha256sum | awk '{print substr($1,1,32)}')"
+                      if [[ ! -f "${OX_CREDENTIALS_FILE}" ]]; then
+                        jq --null-input \
+                          --arg user "${OX_MASTER_ADMIN}" \
+                          --arg pass "${OX_MASTER_PASSWORD}" \
+                          '{"master": {adminuser: $user, adminpass: $pass}}' \
+                          > "${OX_CREDENTIALS_FILE}"
+                      fi
+                      tmp="$(mktemp)"
+                      jq \
+                        --arg user "${OX_MASTER_ADMIN}" \
+                        --arg pass "${OX_MASTER_PASSWORD}" \
+                        --arg ctx "${DEFAULT_CONTEXT}" \
+                        --arg cuser "oxadmin" \
+                        --arg cpass "${CONTEXT_ADMIN_PW}" \
+                        '.master.adminuser = $user
+                         | .master.adminpass = $pass
+                         | .[$ctx] = {adminuser: $cuser, adminpass: $cpass}' \
+                        "${OX_CREDENTIALS_FILE}" > "${tmp}"
+                      mv "${tmp}" "${OX_CREDENTIALS_FILE}"
+                      chmod 600 "${OX_CREDENTIALS_FILE}"
+              providerConfigRef:
+                name: kubernetes
             {{- $connectorVals := dict
                 "openXchange" (dict
                   "domainName" $domain
@@ -1207,6 +1274,22 @@ spec:
                       "name" "ox-connector-provisioning-api"
                       "keyMapping" (dict "password" "password")
                     )
+                  )
+                )
+                "extraVolumes" (list
+                  (dict
+                    "name" "connector-entrypoint-sync"
+                    "configMap" (dict
+                      "name" (printf "%s-connector-entrypoint-sync" $app)
+                      "defaultMode" 493
+                    )
+                  )
+                )
+                "extraVolumeMounts" (list
+                  (dict
+                    "name" "connector-entrypoint-sync"
+                    "mountPath" "/entrypoint.d/80-sync-ox-credentials.sh"
+                    "subPath" "sync-ox-credentials.sh"
                   )
                 )
                 "replicaCount" 1
