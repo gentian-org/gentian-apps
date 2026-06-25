@@ -910,35 +910,56 @@ spec:
                         echo "${out}" | awk 'NR>1 && $1==1 {found=1} END {exit !found}'
                       }
 
-                      ensure_context() {
-                        local out
-                        out="$(context_list)" || true
-                        if context_exists "${out}"; then
-                          echo "[ox-bootstrap] context 1 already present"
-                          return 0
-                        fi
+                      create_context_cmd() {
                         CONTEXT_ADMIN_PW="$(context_admin_pw)"
                         CONTEXT_ADMIN_EMAIL="oxadmin@${DOMAIN}"
-                        echo "[ox-bootstrap] creating default context 1..."
-                        if out="$(exec_mw "/opt/open-xchange/sbin/createcontext \
+                        exec_mw "/opt/open-xchange/sbin/createcontext \
                           -A ${MASTER_ADMIN_USER} -P ${MASTER_ADMIN_PW} \
                           -c 1 -N ${TENANT} -q -1 \
                           -u oxadmin -d 'OX Admin' -g OX -s Admin \
                           -p ${CONTEXT_ADMIN_PW} -e ${CONTEXT_ADMIN_EMAIL} \
                           -l de_DE -t Europe/Berlin \
                           -L 1,context1,${TENANT} \
-                          --access-combination-name all" 2>&1)"; then
-                          echo "[ox-bootstrap] createcontext ok"
-                        else
-                          local create_err="${out}"
+                          --access-combination-name all"
+                      }
+
+                      drop_orphan_context_schema() {
+                        local err="$1"
+                        local db
+                        db="$(echo "${err}" | sed -n 's/.*Database "\([^"]*\)" already exists.*/\1/p')"
+                        [ -n "${db}" ] || return 1
+                        echo "[ox-bootstrap] dropping orphaned schema ${db}..."
+                        exec_mw "mariadb --skip-ssl -h \"\${MYSQL_HOST}\" -u \"\${MYSQL_USER}\" -p\"\${MYSQL_PASSWORD}\" \
+                          -e 'DROP DATABASE IF EXISTS \`${db}\`;'"
+                      }
+
+                      ensure_context() {
+                        local out create_err attempt=1
+                        out="$(context_list)" || true
+                        if context_exists "${out}"; then
+                          echo "[ox-bootstrap] context 1 already present"
+                          return 0
+                        fi
+                        echo "[ox-bootstrap] creating default context 1..."
+                        while [ "${attempt}" -le 2 ]; do
+                          if out="$(create_context_cmd 2>&1)"; then
+                            echo "[ox-bootstrap] createcontext ok"
+                            break
+                          fi
+                          create_err="${out}"
                           out="$(context_list)" || true
                           if context_exists "${out}"; then
                             echo "[ox-bootstrap] createcontext ok (context 1 visible after create)"
-                          else
-                            echo "${create_err}" >&2
-                            return 1
+                            break
                           fi
-                        fi
+                          if [ "${attempt}" -eq 1 ] && echo "${create_err}" | grep -q 'Database .* already exists'; then
+                            drop_orphan_context_schema "${create_err}" || true
+                            attempt=$((attempt + 1))
+                            continue
+                          fi
+                          echo "${create_err}" >&2
+                          return 1
+                        done
                         out="$(context_list)" || true
                         if context_exists "${out}"; then
                           echo "[ox-bootstrap] context 1 verified"
