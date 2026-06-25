@@ -106,28 +106,28 @@ spec:
         de_DE: "E-Mail"
         en_US: "Mail"
       linkSuffix: "#app=io.ox/mail"
-      linkTarget: newwindow
+      linkTarget: embedded
       allowedGroup: "managed-by-attribute-Groupware"
     - name: ox-calendar
       displayName:
         de_DE: "Kalender"
         en_US: "Calendar"
       linkSuffix: "#app=io.ox/calendar"
-      linkTarget: newwindow
+      linkTarget: embedded
       allowedGroup: "managed-by-attribute-Groupware"
     - name: ox-contacts
       displayName:
         de_DE: "Adressbuch"
         en_US: "Contacts"
       linkSuffix: "#app=io.ox/contacts"
-      linkTarget: newwindow
+      linkTarget: embedded
       allowedGroup: "managed-by-attribute-Groupware"
     - name: ox-tasks
       displayName:
         de_DE: "Aufgaben"
         en_US: "Tasks"
       linkSuffix: "#app=io.ox/tasks"
-      linkTarget: newwindow
+      linkTarget: embedded
       allowedGroup: "managed-by-attribute-Groupware"
 
   chart:
