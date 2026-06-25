@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: {{ include "gentian-app.fullname" . }}-api
   labels:
-    app.kubernetes.io/name: {{ include "gentian-app.name" . }}-api
+    {{- include "gentian-app.api.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.api.replicaCount }}
   selector:
@@ -12,7 +12,7 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ include "gentian-app.name" . }}-api
+        {{- include "gentian-app.api.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "gentian-app.fullname" . }}
       containers:
@@ -38,9 +38,26 @@ spec:
               value: {{ .Values.gentian.deploymentsPath | quote }}
             - name: AUTH_DISABLED
               value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
-          envFrom:
-            - secretRef:
-                name: {{ .Values.existingSecret.name }}
+            {{- with .Values.oidc }}
+            {{- if .issuer }}
+            - name: OIDC_ISSUER
+              value: {{ .issuer | quote }}
+            {{- end }}
+            {{- if .clientId }}
+            - name: OIDC_CLIENT_ID
+              value: {{ .clientId | quote }}
+            {{- end }}
+            {{- if .clientSecret }}
+            - name: OIDC_CLIENT_SECRET
+              value: {{ .clientSecret | quote }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.database }}
+            {{- if and .host .user .password .name }}
+            - name: DATABASE_URL
+              value: {{ printf "postgresql://%s:%s@%s:%s/%s" .user .password .host (default "5432" .port) .name | quote }}
+            {{- end }}
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -68,9 +85,17 @@ spec:
             - -c
             - |
               set -e
-              if [ ! -d {{ .Values.gentian.deploymentsPath }}/.git ]; then
-                git clone "${GENTIAN_DEPLOYMENTS_REPO}" {{ .Values.gentian.deploymentsPath }}
-              fi
+              for attempt in 1 2 3 4 5; do
+                if [ -d {{ .Values.gentian.deploymentsPath }}/.git ]; then
+                  exit 0
+                fi
+                if git clone "${GENTIAN_DEPLOYMENTS_REPO}" {{ .Values.gentian.deploymentsPath }}; then
+                  exit 0
+                fi
+                echo "git clone attempt ${attempt} failed; retrying..."
+                sleep 15
+              done
+              exit 1
           env:
             - name: GENTIAN_DEPLOYMENTS_REPO
               value: {{ .Values.gentian.deploymentsRepo | quote }}

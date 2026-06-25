@@ -5,8 +5,6 @@ import re
 import tempfile
 from pathlib import Path
 
-from git import Repo
-
 from app.core.config import get_settings
 
 
@@ -22,7 +20,9 @@ class DeploymentsGitOps:
     if not self._repo_url and not self._work_path:
       raise GitOpsError("GENTIAN_DEPLOYMENTS_REPO or GENTIAN_DEPLOYMENTS_PATH required")
 
-  def _repo(self) -> Repo:
+  def _repo(self):
+    from git import Repo
+
     if self._work_path and Path(self._work_path, ".git").exists():
       repo = Repo(self._work_path)
       repo.remotes.origin.pull(rebase=True)

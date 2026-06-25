@@ -10,6 +10,7 @@ metadata:
     gentianos.io/profile-name: app-store
   annotations:
     gentianos.io/platform-app: "true"
+    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/api","serviceName":"app-store-api","port":8000}]'
 spec:
   displayName: "App Store"
   description: "Browse the Gentian app catalogue and install or uninstall applications for your tenant."
@@ -30,7 +31,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: app-store
-    version: "0.1.0"
+    version: "0.1.1"
 
   deploymentMethod: crossplane
 

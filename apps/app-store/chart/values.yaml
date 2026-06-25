@@ -5,13 +5,13 @@ tenantNamespace: tenant-demo
 api:
   image:
     repository: ghcr.io/gentian-org/app-store-api
-    tag: "0.1.0"
+    tag: "0.1.1"
   replicaCount: 1
 
 web:
   image:
     repository: ghcr.io/gentian-org/app-store-web
-    tag: "0.1.0"
+    tag: "0.1.1"
   replicaCount: 1
 
 ingress:
@@ -21,7 +21,10 @@ ingress:
   tlsEnabled: true
 
 existingSecret:
-  name: app-store-secrets
+  name: app-store-sensitive-values
+
+oidc: {}
+database: {}
 
 auth:
   disabled: false
