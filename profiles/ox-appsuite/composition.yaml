@@ -1234,7 +1234,7 @@ spec:
                           '{"master": {adminuser: $user, adminpass: $pass}}' \
                           > "${OX_CREDENTIALS_FILE}"
                       fi
-                      tmp="$(mktemp)"
+                      tmp="${OX_CREDENTIALS_FILE}.tmp"
                       jq \
                         --arg user "${OX_MASTER_ADMIN}" \
                         --arg pass "${OX_MASTER_PASSWORD}" \
