@@ -4,6 +4,8 @@ metadata:
   name: {{ include "gentian-app.fullname" . }}
   labels:
     {{- include "gentian-app.labels" . | nindent 4 }}
+  annotations:
+    {{- include "gentian-app.helm.annotations" . | nindent 4 }}
 rules:
   - apiGroups: ["gentianos.io"]
     resources: ["tenants"]
@@ -18,6 +20,8 @@ metadata:
   name: {{ include "gentian-app.fullname" . }}
   labels:
     {{- include "gentian-app.labels" . | nindent 4 }}
+  annotations:
+    {{- include "gentian-app.helm.annotations" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

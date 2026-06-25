@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.auth import get_current_user
 from app.core.config import get_settings
+from app.services.catalogue import PLATFORM_ANNOTATION
 from app.services.gitops import DeploymentsGitOps, GitOpsError
 from app.services.k8s_client import K8sClient
 
@@ -18,6 +19,15 @@ def _actor(user: dict) -> str:
 
 def _tenant_namespace(tenant_id: str) -> str:
     return f"tenant-{tenant_id}"
+
+
+def _is_platform_app(k8s: K8sClient, profile: str) -> bool:
+    try:
+        app_profile = k8s.get_app_profile(profile)
+    except Exception:
+        return False
+    annotations = app_profile.get("metadata", {}).get("annotations") or {}
+    return annotations.get(PLATFORM_ANNOTATION) == "true"
 
 
 def _claim_status(claim: dict[str, Any] | None) -> dict[str, Any]:
@@ -69,22 +79,13 @@ def _merge_installed(k8s: K8sClient, tenant: str, ns: str) -> list[dict[str, Any
         tenant_profiles = []
 
     for profile in tenant_profiles:
+        if _is_platform_app(k8s, profile):
+            continue
         claim = k8s.get_app_claim(ns, profile)
         entry: dict[str, Any] = {"profile": profile, **_claim_status(claim)}
         if claim:
             entry["name"] = claim.get("metadata", {}).get("name")
         profiles[profile] = entry
-
-    # Surface orphan claims (e.g. created before tenant.spec.apps caught up).
-    for claim in k8s.list_apps_in_namespace(ns):
-        profile = claim.get("spec", {}).get("profileRef", {}).get("name")
-        if not profile or profile in profiles:
-            continue
-        profiles[profile] = {
-            "profile": profile,
-            "name": claim.get("metadata", {}).get("name"),
-            **_claim_status(claim),
-        }
 
     return list(profiles.values())
 
@@ -148,6 +149,7 @@ def install_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
 def uninstall_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
     settings = get_settings()
     tenant = settings.tenant_id
+    ns = settings.tenant_namespace or _tenant_namespace(tenant)
 
     if settings.install_mode == "k8s":
         k8s = K8sClient()
@@ -158,6 +160,8 @@ def uninstall_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
                 status_code=500,
                 detail=f"Failed to update tenant apps: {exc}",
             ) from exc
+        if k8s.app_claim_exists(ns, profile):
+            k8s.delete_app_claim(ns, profile)
         return {"status": result, "mode": "k8s", "tenant": tenant, "profile": profile}
 
     try:
