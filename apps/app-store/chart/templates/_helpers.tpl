@@ -6,6 +6,12 @@
 {{- printf "%s-%s" .Release.Name (include "gentian-app.name" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "gentian-app.labels" -}}
+app.kubernetes.io/name: {{ include "gentian-app.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
 {{- define "gentian-app.api.labels" -}}
 app.kubernetes.io/name: {{ include "gentian-app.name" . }}-api
 app.kubernetes.io/instance: {{ .Release.Name }}

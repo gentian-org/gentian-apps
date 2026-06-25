@@ -39,8 +39,8 @@ jobs:
           context: apps/app-store/backend
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:0.1.2
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:0.1.1
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:0.1.0
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:${{ github.sha }}
 
       - name: Build and push Web image
@@ -49,8 +49,8 @@ jobs:
           context: apps/app-store/frontend
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:0.1.2
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:0.1.1
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:0.1.0
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:${{ github.sha }}
 
       - name: Install Helm
@@ -60,7 +60,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           helm package apps/app-store/chart -d /tmp
-          helm push /tmp/app-store-0.1.1.tgz oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+          helm push /tmp/app-store-0.1.2.tgz oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
 
   validate-profiles:
     runs-on: ubuntu-latest

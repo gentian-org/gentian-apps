@@ -66,14 +66,14 @@ spec:
             httpGet:
               path: /readyz
               port: 8000
-          {{- if .Values.gitOps.enabled }}
+          {{- if and .Values.gitOps.enabled (eq .Values.installMode "gitops") }}
           volumeMounts:
             - name: deployments-checkout
               mountPath: {{ .Values.gentian.deploymentsPath }}
           {{- end }}
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
-      {{- if .Values.gitOps.enabled }}
+      {{- if and .Values.gitOps.enabled (eq .Values.installMode "gitops") }}
       volumes:
         - name: deployments-checkout
           emptyDir: {}

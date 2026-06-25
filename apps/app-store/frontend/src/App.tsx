@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type CatalogueApp = {
   name: string;
@@ -10,10 +10,21 @@ type CatalogueApp = {
   installedCount: number;
 };
 
+type AppCondition = {
+  type?: string;
+  status?: string;
+  reason?: string;
+  message?: string;
+};
+
 type InstalledApp = {
   profile: string;
   source: string;
+  name?: string;
   ready?: boolean;
+  phase?: string;
+  message?: string;
+  conditions?: AppCondition[];
 };
 
 type CatalogueResponse = {
@@ -23,7 +34,35 @@ type CatalogueResponse = {
   lastUpdated?: string;
 };
 
+type InstallResponse = {
+  status: string;
+  mode: string;
+  profile: string;
+  phase?: string;
+  ready?: boolean;
+  message?: string;
+};
+
+type Notice = {
+  kind: "success" | "error" | "info";
+  text: string;
+};
+
 const API = "/api/v1";
+const STATUS_POLL_MS = 4000;
+
+function parseApiError(body: string, fallback: string): string {
+  try {
+    const data = JSON.parse(body) as { detail?: string | { msg?: string }[] };
+    if (typeof data.detail === "string") return data.detail;
+    if (Array.isArray(data.detail)) {
+      return data.detail.map((item) => item.msg || "").filter(Boolean).join("; ") || fallback;
+    }
+  } catch {
+    // plain text error body
+  }
+  return body || fallback;
+}
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, {
@@ -32,9 +71,23 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(body || res.statusText);
+    throw new Error(parseApiError(body, res.statusText));
   }
   return res.json() as Promise<T>;
+}
+
+function statusLabel(app: InstalledApp): { text: string; className: string } {
+  if (app.ready) {
+    return { text: "Ready", className: "text-emerald-700" };
+  }
+  if (app.phase === "pending" || app.phase === "provisioning") {
+    return { text: app.message || "Provisioning…", className: "text-amber-700" };
+  }
+  return { text: app.message || "Pending", className: "text-slate-500" };
+}
+
+function displayNameFor(profile: string, catalogue: CatalogueResponse | null): string {
+  return catalogue?.apps.find((app) => app.name === profile)?.displayName || profile;
 }
 
 export default function App() {
@@ -42,32 +95,79 @@ export default function App() {
   const [installed, setInstalled] = useState<InstalledApp[]>([]);
   const [selected, setSelected] = useState<CatalogueApp | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async () => {
-    setError(null);
     const [cat, inst] = await Promise.all([
       apiFetch<CatalogueResponse>("/catalogue/"),
       apiFetch<{ apps: InstalledApp[] }>("/tenant/apps/installed"),
     ]);
     setCatalogue(cat);
     setInstalled(inst.apps);
+    return inst.apps;
   }, []);
 
   useEffect(() => {
-    refresh().catch((e: Error) => setError(e.message));
+    refresh().catch((e: Error) => setNotice({ kind: "error", text: e.message }));
   }, [refresh]);
 
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
   const installedSet = new Set(installed.map((a) => a.profile));
+  const hasProvisioning = installed.some((app) => !app.ready);
+
+  useEffect(() => {
+    if (!hasProvisioning) {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      return;
+    }
+    if (pollRef.current) return;
+    pollRef.current = setInterval(() => {
+      refresh().catch(() => undefined);
+    }, STATUS_POLL_MS);
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [hasProvisioning, refresh]);
 
   async function install(profile: string) {
     setBusy(profile);
-    setError(null);
+    setNotice(null);
     try {
-      await apiFetch(`/tenant/apps/${profile}/install`, { method: "POST" });
-      await refresh();
+      const result = await apiFetch<InstallResponse>(`/tenant/apps/${profile}/install`, {
+        method: "POST",
+      });
+      const apps = await refresh();
+      const label = displayNameFor(profile, catalogue);
+      if (result.status === "already_installed") {
+        setNotice({ kind: "info", text: `${label} is already installed for this tenant.` });
+        return;
+      }
+      const current = apps.find((app) => app.profile === profile);
+      if (current?.ready) {
+        setNotice({ kind: "success", text: `${label} installed and ready.` });
+      } else {
+        setNotice({
+          kind: "info",
+          text: `${label} install requested. Provisioning is in progress — status updates automatically.`,
+        });
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Install failed");
+      setNotice({
+        kind: "error",
+        text: e instanceof Error ? e.message : "Install failed",
+      });
     } finally {
       setBusy(null);
     }
@@ -75,16 +175,34 @@ export default function App() {
 
   async function uninstall(profile: string) {
     setBusy(profile);
-    setError(null);
+    setNotice(null);
     try {
-      await apiFetch(`/tenant/apps/${profile}`, { method: "DELETE" });
+      const result = await apiFetch<{ status: string }>(`/tenant/apps/${profile}`, {
+        method: "DELETE",
+      });
       await refresh();
+      const label = displayNameFor(profile, catalogue);
+      if (result.status === "not_installed") {
+        setNotice({ kind: "info", text: `${label} was not installed.` });
+      } else {
+        setNotice({ kind: "success", text: `${label} uninstall requested.` });
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Uninstall failed");
+      setNotice({
+        kind: "error",
+        text: e instanceof Error ? e.message : "Uninstall failed",
+      });
     } finally {
       setBusy(null);
     }
   }
+
+  const noticeStyles =
+    notice?.kind === "error"
+      ? "border-red-200 bg-red-50 text-red-800"
+      : notice?.kind === "success"
+        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+        : "border-sky-200 bg-sky-50 text-sky-800";
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl p-6 md:p-10">
@@ -103,9 +221,9 @@ export default function App() {
         )}
       </header>
 
-      {error && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800">
-          {error}
+      {notice && (
+        <div className={`mb-6 rounded-lg border px-4 py-3 ${noticeStyles}`}>
+          {notice.text}
         </div>
       )}
 
@@ -115,27 +233,31 @@ export default function App() {
           <p className="text-slate-500">No apps installed yet.</p>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {installed.map((app) => (
-              <li
-                key={app.profile}
-                className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-              >
-                <div>
-                  <p className="font-medium">{app.profile}</p>
-                  <p className="text-xs text-slate-500">
-                    {app.ready ? "Ready" : "Pending"} · {app.source}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={busy === app.profile}
-                  onClick={() => uninstall(app.profile)}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
+            {installed.map((app) => {
+              const status = statusLabel(app);
+              return (
+                <li
+                  key={app.profile}
+                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
                 >
-                  Uninstall
-                </button>
-              </li>
-            ))}
+                  <div className="min-w-0 pr-3">
+                    <p className="font-medium">
+                      {displayNameFor(app.profile, catalogue)}
+                    </p>
+                    <p className={`text-xs ${status.className}`}>{status.text}</p>
+                    <p className="text-xs text-slate-400">{app.source}</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy === app.profile || (!app.ready && app.phase === "provisioning")}
+                    onClick={() => uninstall(app.profile)}
+                    className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {busy === app.profile ? "Working…" : "Uninstall"}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -143,60 +265,72 @@ export default function App() {
       <section>
         <h2 className="mb-4 text-lg font-semibold">Catalogue</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(catalogue?.apps || []).map((app) => (
-            <article
-              key={app.name}
-              className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-200"
-            >
-              <div className="flex items-start gap-3">
-                {app.logo ? (
-                  <img src={app.logo} alt="" className="h-10 w-10 rounded-lg" />
-                ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-sm font-bold text-indigo-700">
-                    {app.displayName.slice(0, 1)}
+          {(catalogue?.apps || []).map((app) => {
+            const installedApp = installed.find((item) => item.profile === app.name);
+            const isInstalled = installedSet.has(app.name);
+            const isProvisioning = isInstalled && installedApp && !installedApp.ready;
+
+            return (
+              <article
+                key={app.name}
+                className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-200"
+              >
+                <div className="flex items-start gap-3">
+                  {app.logo ? (
+                    <img src={app.logo} alt="" className="h-10 w-10 rounded-lg object-contain" />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-sm font-bold text-indigo-700">
+                      {app.displayName.slice(0, 1)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate font-semibold">{app.displayName}</h3>
+                    <p className="text-xs text-slate-500">v{app.chartVersion}</p>
                   </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate font-semibold">{app.displayName}</h3>
-                  <p className="text-xs text-slate-500">v{app.chartVersion}</p>
                 </div>
-              </div>
-              <p className="mt-3 line-clamp-3 flex-1 text-sm text-slate-600">
-                {app.description || "No description."}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-1">
-                {app.kernelRequirements.map((req) => (
-                  <span
-                    key={req}
-                    className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700"
-                  >
-                    {req}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelected(app)}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
-                >
-                  Details
-                </button>
-                {installedSet.has(app.name) ? (
-                  <span className="flex items-center text-sm text-emerald-700">Installed</span>
-                ) : (
+                <p className="mt-3 line-clamp-3 flex-1 text-sm text-slate-600">
+                  {app.description || "No description."}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {app.kernelRequirements.map((req) => (
+                    <span
+                      key={req}
+                      className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700"
+                    >
+                      {req}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-4 flex items-center gap-2">
                   <button
                     type="button"
-                    disabled={busy === app.name}
-                    onClick={() => install(app.name)}
-                    className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    onClick={() => setSelected(app)}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
                   >
-                    Install
+                    Details
                   </button>
-                )}
-              </div>
-            </article>
-          ))}
+                  {isInstalled ? (
+                    <span
+                      className={`text-sm ${isProvisioning ? "text-amber-700" : "text-emerald-700"}`}
+                    >
+                      {isProvisioning
+                        ? installedApp?.message || "Provisioning…"
+                        : "Installed"}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy === app.name}
+                      onClick={() => install(app.name)}
+                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {busy === app.name ? "Installing…" : "Install"}
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </div>
       </section>
 

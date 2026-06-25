@@ -36,6 +36,47 @@ class K8sClient:
         # Tenant CRs are cluster-scoped in gentian-os
         return self._custom.get_cluster_custom_object(GROUP, VERSION, "tenants", name)
 
+    def list_tenant_profiles(self, tenant_name: str) -> list[str]:
+        tenant = self.get_tenant(tenant_name)
+        apps = tenant.get("spec", {}).get("apps") or []
+        return [a["profile"] for a in apps if a.get("profile")]
+
+    def add_tenant_app(self, tenant_name: str, profile: str) -> str:
+        tenant = self.get_tenant(tenant_name)
+        apps = list(tenant.get("spec", {}).get("apps") or [])
+        if any(a.get("profile") == profile for a in apps):
+            return "already_installed"
+        apps.append({"profile": profile})
+        self._custom.patch_cluster_custom_object(
+            GROUP,
+            VERSION,
+            "tenants",
+            tenant_name,
+            {"spec": {"apps": apps}},
+        )
+        return "installed"
+
+    def remove_tenant_app(self, tenant_name: str, profile: str) -> str:
+        tenant = self.get_tenant(tenant_name)
+        apps = list(tenant.get("spec", {}).get("apps") or [])
+        next_apps = [a for a in apps if a.get("profile") != profile]
+        if len(next_apps) == len(apps):
+            return "not_installed"
+        self._custom.patch_cluster_custom_object(
+            GROUP,
+            VERSION,
+            "tenants",
+            tenant_name,
+            {"spec": {"apps": next_apps}},
+        )
+        return "uninstalled"
+
+    def get_app_claim(self, namespace: str, profile: str) -> dict[str, Any] | None:
+        for claim in self.list_apps_in_namespace(namespace):
+            if claim.get("spec", {}).get("profileRef", {}).get("name") == profile:
+                return claim
+        return None
+
     def list_apps_in_namespace(self, namespace: str) -> list[dict[str, Any]]:
         try:
             result = self._custom.list_namespaced_custom_object(

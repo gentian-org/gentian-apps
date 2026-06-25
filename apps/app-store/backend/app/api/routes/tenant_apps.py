@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.auth import get_current_user
@@ -18,20 +20,47 @@ def _tenant_namespace(tenant_id: str) -> str:
     return f"tenant-{tenant_id}"
 
 
-@router.get("/installed")
-def list_installed(user: dict = Depends(get_current_user)) -> dict:
-    settings = get_settings()
-    tenant = settings.tenant_id
-    k8s = K8sClient()
-    ns = settings.tenant_namespace or _tenant_namespace(tenant)
+def _claim_status(claim: dict[str, Any] | None) -> dict[str, Any]:
+    if claim is None:
+        return {
+            "phase": "pending",
+            "ready": False,
+            "message": "Waiting for the platform to create the app claim",
+            "conditions": [],
+        }
+    conditions = claim.get("status", {}).get("conditions", [])
+    ready = any(c.get("type") == "Ready" and c.get("status") == "True" for c in conditions)
+    message = ""
+    for cond in conditions:
+        if cond.get("status") != "True" and cond.get("message"):
+            message = str(cond.get("message"))
+            break
+    if ready:
+        phase = "ready"
+        message = message or "Application is ready"
+    elif message:
+        phase = "provisioning"
+    else:
+        phase = "provisioning"
+        message = "Provisioning in progress"
+    return {
+        "phase": phase,
+        "ready": ready,
+        "message": message,
+        "conditions": conditions,
+        "claim": claim.get("metadata", {}).get("name"),
+    }
 
-    installed: list[dict] = []
+
+def _merge_installed(k8s: K8sClient, tenant: str, ns: str) -> list[dict[str, Any]]:
+    profiles: dict[str, dict[str, Any]] = {}
+
     try:
         tenant_cr = k8s.get_tenant(tenant)
         for app in tenant_cr.get("spec", {}).get("apps", []):
             profile = app.get("profile")
             if profile:
-                installed.append({"profile": profile, "source": "tenant"})
+                profiles[profile] = {"profile": profile, "source": "tenant"}
     except Exception:
         pass
 
@@ -41,28 +70,24 @@ def list_installed(user: dict = Depends(get_current_user)) -> dict:
         profile = spec.get("profileRef", {}).get("name")
         if not profile:
             continue
-        conditions = claim.get("status", {}).get("conditions", [])
-        ready = any(c.get("type") == "Ready" and c.get("status") == "True" for c in conditions)
-        installed.append(
-            {
-                "profile": profile,
-                "source": "app-claim",
-                "name": meta.get("name"),
-                "ready": ready,
-                "conditions": conditions,
-            }
-        )
+        status_info = _claim_status(claim)
+        profiles[profile] = {
+            "profile": profile,
+            "source": "app-claim",
+            "name": meta.get("name"),
+            **status_info,
+        }
 
-    # dedupe by profile
-    seen: set[str] = set()
-    unique: list[dict] = []
-    for item in installed:
-        p = item["profile"]
-        if p in seen:
-            continue
-        seen.add(p)
-        unique.append(item)
-    return {"tenant": tenant, "namespace": ns, "apps": unique}
+    return list(profiles.values())
+
+
+@router.get("/installed")
+def list_installed(user: dict = Depends(get_current_user)) -> dict:
+    settings = get_settings()
+    tenant = settings.tenant_id
+    k8s = K8sClient()
+    ns = settings.tenant_namespace or _tenant_namespace(tenant)
+    return {"tenant": tenant, "namespace": ns, "apps": _merge_installed(k8s, tenant, ns)}
 
 
 @router.post("/{profile}/install")
@@ -77,14 +102,22 @@ def install_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
         raise HTTPException(status_code=404, detail=f"AppProfile '{profile}' not found") from exc
 
     if settings.install_mode == "k8s":
+        try:
+            result = k8s.add_tenant_app(tenant, profile)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update tenant apps: {exc}",
+            ) from exc
         ns = settings.tenant_namespace or _tenant_namespace(tenant)
-        claim_name = profile
-        if k8s.app_claim_exists(ns, claim_name):
-            return {"status": "already_installed", "mode": "k8s"}
-        tenant_cr = k8s.get_tenant(tenant)
-        domain = tenant_cr.get("spec", {}).get("domain") or f"{tenant}.example.local"
-        k8s.create_app_claim(ns, claim_name, profile, ns, domain)
-        return {"status": "installed", "mode": "k8s", "claim": claim_name}
+        claim = k8s.get_app_claim(ns, profile)
+        return {
+            "status": result,
+            "mode": "k8s",
+            "tenant": tenant,
+            "profile": profile,
+            **_claim_status(claim),
+        }
 
     try:
         gitops = DeploymentsGitOps()
@@ -100,13 +133,15 @@ def uninstall_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
     tenant = settings.tenant_id
 
     if settings.install_mode == "k8s":
-        ns = settings.tenant_namespace or _tenant_namespace(tenant)
-        claim_name = profile
         k8s = K8sClient()
-        if not k8s.app_claim_exists(ns, claim_name):
-            return {"status": "not_installed", "mode": "k8s"}
-        k8s.delete_app_claim(ns, claim_name)
-        return {"status": "uninstalled", "mode": "k8s"}
+        try:
+            result = k8s.remove_tenant_app(tenant, profile)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update tenant apps: {exc}",
+            ) from exc
+        return {"status": result, "mode": "k8s", "tenant": tenant, "profile": profile}
 
     try:
         gitops = DeploymentsGitOps()
@@ -122,11 +157,5 @@ def app_status(profile: str, user: dict = Depends(get_current_user)) -> dict:
     settings = get_settings()
     ns = settings.tenant_namespace or _tenant_namespace(settings.tenant_id)
     k8s = K8sClient()
-    for claim in k8s.list_apps_in_namespace(ns):
-        if claim.get("spec", {}).get("profileRef", {}).get("name") == profile:
-            return {
-                "profile": profile,
-                "claim": claim.get("metadata", {}).get("name"),
-                "conditions": claim.get("status", {}).get("conditions", []),
-            }
-    return {"profile": profile, "claim": None, "conditions": []}
+    claim = k8s.get_app_claim(ns, profile)
+    return {"profile": profile, **_claim_status(claim)}

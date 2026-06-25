@@ -14,7 +14,7 @@ metadata:
 spec:
   displayName: "App Store"
   description: "Browse the Gentian app catalogue and install or uninstall applications for your tenant."
-  logo: "data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjNEY0NkU1IiByb2xlPSJpbWciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMyAzaDE4djE4SDNWM3ptMiAyaDE0djE0SDVWNWptMiAyaDEwdjJIN1Y3em0wIDNoOHYySDd2LTJ6bTAgM2g2djJIN3YtMnoiLz48L3N2Zz4="
+  logo: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgcm9sZT0iaW1nIj48cmVjdCB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHJ4PSI2IiBmaWxsPSIjRUVGMkZGIi8+PHBhdGggZmlsbD0iIzRGNDZFNSIgZD0iTTYuNSA4LjVoMTFhLjUuNSAwIDAgMSAuNDkuNDJMMTcuMiAxN2ExLjUgMS41IDAgMCAxLTEuNDggMS4yNUg4LjI4QTEuNSAxLjUgMCAwIDEgNi44IDE3bC0uODEtOC4wOGEuNS41IDAgMCAxIC40OS0uNDJ6Ii8+PHBhdGggZmlsbD0iIzYzNjZGMSIgZD0iTTYgOC41aDEydjEuMjVINlY4LjV6Ii8+PHBhdGggZmlsbD0iIzQzMzhDQSIgZD0iTTkuMjUgNS43NWg1LjVMMTUuNSA4LjVIOC41bC43NS0yLjc1eiIvPjxyZWN0IHg9IjguMjUiIHk9IjExIiB3aWR0aD0iMi41IiBoZWlnaHQ9IjIuNSIgcng9Ii42IiBmaWxsPSIjQzdEMkZFIi8+PHJlY3QgeD0iMTAuNzUiIHk9IjExIiB3aWR0aD0iMi41IiBoZWlnaHQ9IjIuNSIgcng9Ii42IiBmaWxsPSIjQTVCNEZDIi8+PHJlY3QgeD0iMTMuMjUiIHk9IjExIiB3aWR0aD0iMi41IiBoZWlnaHQ9IjIuNSIgcng9Ii42IiBmaWxsPSIjODE4Q0Y4Ii8+PHJlY3QgeD0iOS41IiB5PSIxNCIgd2lkdGg9IjIuNSIgaGVpZ2h0PSIyLjUiIHJ4PSIuNiIgZmlsbD0iI0E1QjRGQyIvPjxyZWN0IHg9IjEyIiB5PSIxNCIgd2lkdGg9IjIuNSIgaGVpZ2h0PSIyLjUiIHJ4PSIuNiIgZmlsbD0iI0M3RDJGRSIvPjwvc3ZnPg=="
 
   kernelRequirements:
     identity:
@@ -31,7 +31,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: app-store
-    version: "0.1.1"
+    version: "0.1.2"
 
   deploymentMethod: crossplane
 
@@ -50,7 +50,7 @@ spec:
   extraValues:
     tenantId: "${TENANT_ID}"
     tenantNamespace: "${TENANT_NAMESPACE}"
-    installMode: gitops
+    installMode: k8s
     gentian:
       deploymentsRepo: "https://github.com/gentian-org/gentian-deployments"
       appsRepo: "https://github.com/gentian-org/gentian-apps"
