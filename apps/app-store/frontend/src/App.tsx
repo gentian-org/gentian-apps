@@ -20,10 +20,9 @@ type AppCondition = {
 
 type InstalledApp = {
   profile: string;
-  source: string;
   name?: string;
   ready?: boolean;
-  phase?: string;
+  phase?: "pending" | "provisioning" | "ready";
   message?: string;
   conditions?: AppCondition[];
 };
@@ -33,6 +32,12 @@ type CatalogueResponse = {
   catalogueRepo: string;
   catalogueBranch: string;
   lastUpdated?: string;
+};
+
+type InstalledResponse = {
+  apps: InstalledApp[];
+  ready: InstalledApp[];
+  pending: InstalledApp[];
 };
 
 type InstallResponse = {
@@ -51,18 +56,45 @@ type Notice = {
 
 const STATUS_POLL_MS = 4000;
 
-function statusLabel(app: InstalledApp): { text: string; className: string } {
-  if (app.ready) {
-    return { text: "Ready", className: "text-emerald-700" };
-  }
-  if (app.phase === "pending" || app.phase === "provisioning") {
-    return { text: app.message || "Provisioning…", className: "text-amber-700" };
-  }
-  return { text: app.message || "Pending", className: "text-slate-500" };
-}
-
 function displayNameFor(profile: string, catalogue: CatalogueResponse | null): string {
   return catalogue?.apps.find((app) => app.name === profile)?.displayName || profile;
+}
+
+function isAppReady(app: InstalledApp | undefined): boolean {
+  return app?.ready === true;
+}
+
+function AppListCard({
+  app,
+  catalogue,
+  busy,
+  onUninstall,
+}: {
+  app: InstalledApp;
+  catalogue: CatalogueResponse | null;
+  busy: string | null;
+  onUninstall: (profile: string) => void;
+}) {
+  const ready = isAppReady(app);
+  const statusText = ready ? "Installed and ready" : app.message || "Pending";
+  const statusClass = ready ? "text-emerald-700" : "text-amber-700";
+
+  return (
+    <li className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="min-w-0 pr-3">
+        <p className="font-medium">{displayNameFor(app.profile, catalogue)}</p>
+        <p className={`text-xs ${statusClass}`}>{statusText}</p>
+      </div>
+      <button
+        type="button"
+        disabled={busy === app.profile || !ready}
+        onClick={() => onUninstall(app.profile)}
+        className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
+      >
+        {busy === app.profile ? "Working…" : "Uninstall"}
+      </button>
+    </li>
+  );
 }
 
 export default function App() {
@@ -76,7 +108,7 @@ export default function App() {
   const refresh = useCallback(async () => {
     const [cat, inst] = await Promise.all([
       apiFetch<CatalogueResponse>("/catalogue/"),
-      apiFetch<{ apps: InstalledApp[] }>("/tenant/apps/installed"),
+      apiFetch<InstalledResponse>("/tenant/apps/installed"),
     ]);
     setCatalogue(cat);
     setInstalled(inst.apps);
@@ -97,11 +129,13 @@ export default function App() {
     };
   }, []);
 
-  const installedSet = new Set(installed.map((a) => a.profile));
-  const hasProvisioning = installed.some((app) => !app.ready);
+  const installedByProfile = new Map(installed.map((app) => [app.profile, app]));
+  const readyApps = installed.filter((app) => isAppReady(app));
+  const pendingApps = installed.filter((app) => !isAppReady(app));
+  const hasPending = pendingApps.length > 0;
 
   useEffect(() => {
-    if (!hasProvisioning) {
+    if (!hasPending) {
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
@@ -118,7 +152,7 @@ export default function App() {
         pollRef.current = null;
       }
     };
-  }, [hasProvisioning, refresh]);
+  }, [hasPending, refresh]);
 
   async function install(profile: string) {
     setBusy(profile);
@@ -127,19 +161,32 @@ export default function App() {
       const result = await apiFetch<InstallResponse>(`/tenant/apps/${profile}/install`, {
         method: "POST",
       });
-      const apps = await refresh();
       const label = displayNameFor(profile, catalogue);
       if (result.status === "already_installed") {
-        setNotice({ kind: "info", text: `${label} is already installed for this tenant.` });
+        await refresh();
+        setNotice({ kind: "info", text: `${label} is already on this tenant.` });
         return;
       }
+
+      setInstalled((current) => {
+        const next = current.filter((app) => app.profile !== profile);
+        next.push({
+          profile,
+          ready: false,
+          phase: result.phase === "ready" ? "ready" : "pending",
+          message: result.message || "Install requested — provisioning in progress",
+        });
+        return next;
+      });
+
+      const apps = await refresh();
       const current = apps.find((app) => app.profile === profile);
-      if (current?.ready) {
-        setNotice({ kind: "success", text: `${label} installed and ready.` });
+      if (isAppReady(current)) {
+        setNotice({ kind: "success", text: `${label} is installed and ready.` });
       } else {
         setNotice({
           kind: "info",
-          text: `${label} install requested. Provisioning is in progress — status updates automatically.`,
+          text: `${label} install started. It will appear under Pending until provisioning finishes.`,
         });
       }
     } catch (e) {
@@ -206,37 +253,41 @@ export default function App() {
         </div>
       )}
 
+      {pendingApps.length > 0 && (
+        <section className="mb-10">
+          <h2 className="mb-4 text-lg font-semibold">Pending</h2>
+          <p className="mb-4 text-sm text-slate-600">
+            These apps are being provisioned. Status refreshes automatically every few seconds.
+          </p>
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {pendingApps.map((app) => (
+              <AppListCard
+                key={app.profile}
+                app={app}
+                catalogue={catalogue}
+                busy={busy}
+                onUninstall={uninstall}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="mb-10">
         <h2 className="mb-4 text-lg font-semibold">Installed</h2>
-        {installed.length === 0 ? (
-          <p className="text-slate-500">No apps installed yet.</p>
+        {readyApps.length === 0 ? (
+          <p className="text-slate-500">No apps are fully ready yet.</p>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {installed.map((app) => {
-              const status = statusLabel(app);
-              return (
-                <li
-                  key={app.profile}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-                >
-                  <div className="min-w-0 pr-3">
-                    <p className="font-medium">
-                      {displayNameFor(app.profile, catalogue)}
-                    </p>
-                    <p className={`text-xs ${status.className}`}>{status.text}</p>
-                    <p className="text-xs text-slate-400">{app.source}</p>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={busy === app.profile || (!app.ready && app.phase === "provisioning")}
-                    onClick={() => uninstall(app.profile)}
-                    className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    {busy === app.profile ? "Working…" : "Uninstall"}
-                  </button>
-                </li>
-              );
-            })}
+            {readyApps.map((app) => (
+              <AppListCard
+                key={app.profile}
+                app={app}
+                catalogue={catalogue}
+                busy={busy}
+                onUninstall={uninstall}
+              />
+            ))}
           </ul>
         )}
       </section>
@@ -245,9 +296,9 @@ export default function App() {
         <h2 className="mb-4 text-lg font-semibold">Catalogue</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {(catalogue?.apps || []).map((app) => {
-            const installedApp = installed.find((item) => item.profile === app.name);
-            const isInstalled = installedSet.has(app.name);
-            const isProvisioning = isInstalled && installedApp && !installedApp.ready;
+            const installedApp = installedByProfile.get(app.name);
+            const ready = isAppReady(installedApp);
+            const pending = Boolean(installedApp) && !ready;
 
             return (
               <article
@@ -288,13 +339,14 @@ export default function App() {
                   >
                     Details
                   </button>
-                  {isInstalled ? (
+                  {ready ? (
+                    <span className="text-sm font-medium text-emerald-700">Installed</span>
+                  ) : pending ? (
                     <span
-                      className={`text-sm ${isProvisioning ? "text-amber-700" : "text-emerald-700"}`}
+                      className="rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800"
+                      title={installedApp?.message}
                     >
-                      {isProvisioning
-                        ? installedApp?.message || "Provisioning…"
-                        : "Installed"}
+                      Pending
                     </span>
                   ) : (
                     <button

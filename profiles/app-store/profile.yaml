@@ -31,7 +31,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: app-store
-    version: "0.1.3"
+    version: "0.1.4"
 
   deploymentMethod: crossplane
 

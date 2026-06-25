@@ -25,57 +25,65 @@ def _claim_status(claim: dict[str, Any] | None) -> dict[str, Any]:
         return {
             "phase": "pending",
             "ready": False,
-            "message": "Waiting for the platform to create the app claim",
+            "message": "Install requested — waiting for the app claim to be created",
             "conditions": [],
         }
     conditions = claim.get("status", {}).get("conditions", [])
     ready = any(c.get("type") == "Ready" and c.get("status") == "True" for c in conditions)
     message = ""
     for cond in conditions:
+        if cond.get("type") == "Ready" and cond.get("status") == "True":
+            break
         if cond.get("status") != "True" and cond.get("message"):
             message = str(cond.get("message"))
             break
     if ready:
-        phase = "ready"
-        message = message or "Application is ready"
-    elif message:
-        phase = "provisioning"
-    else:
-        phase = "provisioning"
-        message = "Provisioning in progress"
+        return {
+            "phase": "ready",
+            "ready": True,
+            "message": "Installed and ready",
+            "conditions": conditions,
+            "claim": claim.get("metadata", {}).get("name"),
+        }
     return {
-        "phase": phase,
-        "ready": ready,
-        "message": message,
+        "phase": "provisioning",
+        "ready": False,
+        "message": message or "Provisioning in progress",
         "conditions": conditions,
         "claim": claim.get("metadata", {}).get("name"),
     }
 
 
 def _merge_installed(k8s: K8sClient, tenant: str, ns: str) -> list[dict[str, Any]]:
+    """Build install status from tenant.spec.apps, enriched with App claim conditions."""
     profiles: dict[str, dict[str, Any]] = {}
 
     try:
         tenant_cr = k8s.get_tenant(tenant)
-        for app in tenant_cr.get("spec", {}).get("apps", []):
-            profile = app.get("profile")
-            if profile:
-                profiles[profile] = {"profile": profile, "source": "tenant"}
+        tenant_profiles = [
+            app.get("profile")
+            for app in tenant_cr.get("spec", {}).get("apps", [])
+            if app.get("profile")
+        ]
     except Exception:
-        pass
+        tenant_profiles = []
 
+    for profile in tenant_profiles:
+        claim = k8s.get_app_claim(ns, profile)
+        entry: dict[str, Any] = {"profile": profile, **_claim_status(claim)}
+        if claim:
+            entry["name"] = claim.get("metadata", {}).get("name")
+        profiles[profile] = entry
+
+    # Surface orphan claims (e.g. created before tenant.spec.apps caught up).
     for claim in k8s.list_apps_in_namespace(ns):
-        meta = claim.get("metadata", {})
-        spec = claim.get("spec", {})
-        profile = spec.get("profileRef", {}).get("name")
-        if not profile:
+        profile = claim.get("spec", {}).get("profileRef", {}).get("name")
+        if not profile or profile in profiles:
             continue
-        status_info = _claim_status(claim)
         profiles[profile] = {
             "profile": profile,
-            "source": "app-claim",
-            "name": meta.get("name"),
-            **status_info,
+            "name": claim.get("metadata", {}).get("name"),
+            **_claim_status(claim),
         }
 
     return list(profiles.values())
@@ -87,7 +95,16 @@ def list_installed(user: dict = Depends(get_current_user)) -> dict:
     tenant = settings.tenant_id
     k8s = K8sClient()
     ns = settings.tenant_namespace or _tenant_namespace(tenant)
-    return {"tenant": tenant, "namespace": ns, "apps": _merge_installed(k8s, tenant, ns)}
+    apps = _merge_installed(k8s, tenant, ns)
+    ready = [app for app in apps if app.get("ready")]
+    pending = [app for app in apps if not app.get("ready")]
+    return {
+        "tenant": tenant,
+        "namespace": ns,
+        "apps": apps,
+        "ready": ready,
+        "pending": pending,
+    }
 
 
 @router.post("/{profile}/install")
