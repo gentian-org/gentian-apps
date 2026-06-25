@@ -309,7 +309,7 @@ spec:
           com.openexchange.oauth.provider.jwt.jwksUri: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/certs"
           com.openexchange.mail.authType: "xoauth2"
           com.openexchange.mail.loginSource: "name"
-          com.openexchange.mail.mailServer: "mail.${TENANT_DOMAIN}"
+          com.openexchange.mail.mailServer: "${IMAP_HOST}"
           com.openexchange.mail.mailServerSource: "global"
           com.openexchange.mail.transport.authType: "xoauth2"
           com.openexchange.mail.transportServer: "${SMTP_HOST}"

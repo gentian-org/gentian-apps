@@ -130,7 +130,13 @@ spec:
             {{- $ksDataEarly := dig "data" dict $ksCMEarly }}
             {{- $smtpHost := dig "mail.smtpHost" "" $ccData }}
             {{- if not $smtpHost }}{{- $smtpHost = dig "SMTP_HOST" "" $ksDataEarly }}{{- end }}
-            {{- $imapHost := printf "mail.%s" $domain }}
+            {{- /* OX middleware runs in-cluster; public mail.<tenant> DNS is not */}}
+            {{- /* reachable from pods (no IMAP on the HTTP gateway). Use kernel */}}
+            {{- /* Dovecot like SMTP uses internal postfix (install-lib hairpin is */}}
+            {{- /* only for mail.<kernel-domain>, not per-tenant subdomains). */}}
+            {{- $imapHost := dig "mail.imapHost" "" $ccData }}
+            {{- if not $imapHost }}{{- $imapHost = dig "IMAP_HOST" "" $ksDataEarly }}{{- end }}
+            {{- if not $imapHost }}{{- $imapHost = printf "dovecot-dev.%s.svc.cluster.local" $servicesNs }}{{- end }}
 
             {{- /* ── ExternalSecret data[] entries (same logic as app-default) ─ */}}
             {{- $esData := list }}
