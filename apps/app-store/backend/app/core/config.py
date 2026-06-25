@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     # Install mode: gitops (default) or k8s (App claims)
     install_mode: str = Field(default="gitops", alias="INSTALL_MODE")
 
+    lifecycle_url: str | None = Field(
+        default="http://gentian-os.gentian-system.svc.cluster.local:8082",
+        alias="GENTIAN_LIFECYCLE_URL",
+    )
+    lifecycle_backend: str = Field(default="kubernetes", alias="GENTIAN_LIFECYCLE_BACKEND")
+
     kernel_namespace: str = Field(default="platform-kernel", alias="KERNEL_NAMESPACE")
 
     # Dev bypass when OIDC not configured

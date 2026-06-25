@@ -28,6 +28,10 @@ spec:
               value: {{ .Values.tenantNamespace | quote }}
             - name: INSTALL_MODE
               value: {{ .Values.installMode | quote }}
+            - name: GENTIAN_LIFECYCLE_URL
+              value: {{ .Values.gentian.lifecycleUrl | quote }}
+            - name: GENTIAN_LIFECYCLE_BACKEND
+              value: {{ .Values.gentian.lifecycleBackend | quote }}
             - name: GENTIAN_APPS_REPO
               value: {{ .Values.gentian.appsRepo | quote }}
             - name: GENTIAN_APPS_BRANCH
@@ -36,8 +40,6 @@ spec:
               value: {{ .Values.gentian.deploymentsRepo | quote }}
             - name: GENTIAN_DEPLOYMENTS_PATH
               value: {{ .Values.gentian.deploymentsPath | quote }}
-            - name: KERNEL_NAMESPACE
-              value: {{ .Values.gentian.kernelNamespace | quote }}
             - name: AUTH_DISABLED
               value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
             {{- with .Values.oidc }}

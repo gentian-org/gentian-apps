@@ -2,14 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core.auth import get_current_user
 from app.core.config import get_settings
-from app.services.catalogue import PLATFORM_ANNOTATION
-from app.services.gitops import DeploymentsGitOps, GitOpsError
-from app.services.k8s_client import K8sClient
-from app.services.purge import AppPurger
+from app.services.lifecycle import LifecycleError, get_lifecycle_client
 
 router = APIRouter(prefix="/tenant/apps", tags=["tenant-apps"])
 
@@ -18,97 +15,39 @@ def _actor(user: dict) -> str:
     return str(user.get("preferred_username") or user.get("sub") or "unknown")
 
 
-def _tenant_namespace(tenant_id: str) -> str:
-    return f"tenant-{tenant_id}"
-
-
-def _tenant_has_profile(tenant_cr: dict[str, Any], profile: str) -> bool:
-    apps = tenant_cr.get("spec", {}).get("apps") or []
-    return any(app.get("profile") == profile for app in apps)
-
-
-def _is_platform_app(k8s: K8sClient, profile: str) -> bool:
-    try:
-        app_profile = k8s.get_app_profile(profile)
-    except Exception:
-        return False
-    annotations = app_profile.get("metadata", {}).get("annotations") or {}
-    return annotations.get(PLATFORM_ANNOTATION) == "true"
-
-
-def _claim_status(claim: dict[str, Any] | None) -> dict[str, Any]:
-    if claim is None:
-        return {
-            "phase": "pending",
-            "ready": False,
-            "message": "Install requested — waiting for the app claim to be created",
-            "conditions": [],
-        }
-    conditions = claim.get("status", {}).get("conditions", [])
-    ready = any(c.get("type") == "Ready" and c.get("status") == "True" for c in conditions)
-    message = ""
-    for cond in conditions:
-        if cond.get("type") == "Ready" and cond.get("status") == "True":
-            break
-        if cond.get("status") != "True" and cond.get("message"):
-            message = str(cond.get("message"))
-            break
+def _claim_status_from_result(item: dict[str, Any]) -> dict[str, Any]:
+    ready = bool(item.get("ready"))
     if ready:
         return {
             "phase": "ready",
             "ready": True,
-            "message": "Installed and ready",
-            "conditions": conditions,
-            "claim": claim.get("metadata", {}).get("name"),
+            "message": item.get("message") or "Installed and ready",
         }
     return {
         "phase": "provisioning",
         "ready": False,
-        "message": message or "Provisioning in progress",
-        "conditions": conditions,
-        "claim": claim.get("metadata", {}).get("name"),
+        "message": item.get("message") or "Provisioning in progress",
     }
-
-
-def _merge_installed(k8s: K8sClient, tenant: str, ns: str) -> list[dict[str, Any]]:
-    """Build install status from tenant.spec.apps, enriched with App claim conditions."""
-    profiles: dict[str, dict[str, Any]] = {}
-
-    try:
-        tenant_cr = k8s.get_tenant(tenant)
-        tenant_profiles = [
-            app.get("profile")
-            for app in tenant_cr.get("spec", {}).get("apps", [])
-            if app.get("profile")
-        ]
-    except Exception:
-        tenant_profiles = []
-
-    for profile in tenant_profiles:
-        if _is_platform_app(k8s, profile):
-            continue
-        claim = k8s.get_app_claim(ns, profile)
-        entry: dict[str, Any] = {"profile": profile, **_claim_status(claim)}
-        if claim:
-            entry["name"] = claim.get("metadata", {}).get("name")
-        profiles[profile] = entry
-
-    return list(profiles.values())
 
 
 @router.get("/installed")
 def list_installed(user: dict = Depends(get_current_user)) -> dict:
+    _ = user
     settings = get_settings()
-    tenant = settings.tenant_id
-    k8s = K8sClient()
-    ns = settings.tenant_namespace or _tenant_namespace(tenant)
-    apps = _merge_installed(k8s, tenant, ns)
-    ready = [app for app in apps if app.get("ready")]
-    pending = [app for app in apps if not app.get("ready")]
+    try:
+        lc = get_lifecycle_client()
+        apps = lc.list_installed()
+    except LifecycleError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    entries = [
+        {"profile": app["profile"], **_claim_status_from_result(app)} for app in apps
+    ]
+    ready = [app for app in entries if app.get("ready")]
+    pending = [app for app in entries if not app.get("ready")]
     return {
-        "tenant": tenant,
-        "namespace": ns,
-        "apps": apps,
+        "tenant": settings.tenant_id,
+        "namespace": settings.tenant_namespace,
+        "apps": entries,
         "ready": ready,
         "pending": pending,
     }
@@ -117,49 +56,23 @@ def list_installed(user: dict = Depends(get_current_user)) -> dict:
 @router.post("/{profile}/install")
 def install_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
     settings = get_settings()
-    tenant = settings.tenant_id
-    k8s = K8sClient()
-
     try:
-        k8s.get_app_profile(profile)
-    except Exception as exc:
-        raise HTTPException(status_code=404, detail=f"AppProfile '{profile}' not found") from exc
-
-    if settings.install_mode == "k8s":
-        try:
-            tenant_cr = k8s.get_tenant(tenant)
-            result = k8s.add_tenant_app(tenant, profile)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to update tenant apps: {exc}",
-            ) from exc
-        tenant_cr = k8s.get_tenant(tenant)
-        if result == "installed" and not _tenant_has_profile(tenant_cr, profile):
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    f"Install of '{profile}' did not persist on tenant '{tenant}'. "
-                    "If this tenant is Argo CD–managed, enable ignoreDifferences on "
-                    "Tenant.spec.apps or use gitops install mode."
-                ),
-            )
-        ns = settings.tenant_namespace or _tenant_namespace(tenant)
-        claim = k8s.get_app_claim(ns, profile)
-        return {
-            "status": result,
-            "mode": "k8s",
-            "tenant": tenant,
-            "profile": profile,
-            **_claim_status(claim),
-        }
-
-    try:
-        gitops = DeploymentsGitOps()
-        result = gitops.install_app(tenant, profile, _actor(user))
-    except GitOpsError as exc:
+        result = get_lifecycle_client().install(
+            profile,
+            _actor(user),
+            backend=settings.lifecycle_backend,
+        )
+    except LifecycleError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    return {"status": result, "mode": "gitops", "tenant": tenant, "profile": profile}
+    status = result.get("status", "installed")
+    ready = bool(result.get("ready"))
+    return {
+        "status": status,
+        "mode": result.get("backend", settings.lifecycle_backend),
+        "tenant": settings.tenant_id,
+        "profile": profile,
+        **_claim_status_from_result({"ready": ready, "message": result.get("message")}),
+    }
 
 
 @router.delete("/{profile}")
@@ -169,74 +82,39 @@ def uninstall_app(
     user: dict = Depends(get_current_user),
 ) -> dict:
     settings = get_settings()
-    tenant = settings.tenant_id
-    ns = settings.tenant_namespace or _tenant_namespace(tenant)
-
-    if _is_platform_app(K8sClient(), profile):
-        raise HTTPException(status_code=400, detail=f"Cannot uninstall platform app '{profile}'")
-
-    if settings.install_mode == "k8s":
-        k8s = K8sClient()
-        tenant_cr: dict[str, Any] | None = None
-        profile_cr: dict[str, Any] | None = None
-        try:
-            profile_cr = k8s.get_app_profile(profile)
-        except Exception:
-            profile_cr = None
-
-        try:
-            result = k8s.remove_tenant_app(tenant, profile)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to update tenant apps: {exc}",
-            ) from exc
-
-        claim = k8s.get_app_claim(ns, profile)
-        if claim:
-            claim_name = claim.get("metadata", {}).get("name") or profile
-            k8s.delete_app_claim(ns, claim_name)
-
-        if result != "not_installed" or claim is not None:
-            k8s.wait_app_claim_gone(ns, profile)
-
-        warnings: list[str] = []
-        if purge:
-            try:
-                tenant_cr = k8s.get_tenant(tenant)
-            except Exception as exc:
-                raise HTTPException(status_code=500, detail=f"Failed to load tenant: {exc}") from exc
-            warnings = AppPurger(kernel_namespace=settings.kernel_namespace).purge(
-                tenant, profile, tenant_cr, profile_cr
-            )
-
-        return {
-            "status": result,
-            "mode": "k8s",
-            "tenant": tenant,
-            "profile": profile,
-            "purged": purge,
-            "warnings": warnings,
-        }
-
     try:
-        gitops = DeploymentsGitOps()
-        result = gitops.uninstall_app(tenant, profile, _actor(user))
-    except GitOpsError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-    if purge:
-        raise HTTPException(
-            status_code=501,
-            detail="Purge is only supported when installMode is k8s (in-cluster tenant patch).",
+        result = get_lifecycle_client().uninstall(
+            profile,
+            _actor(user),
+            purge=purge,
+            backend=settings.lifecycle_backend,
         )
-    return {"status": result, "mode": "gitops", "tenant": tenant, "profile": profile, "purged": False}
+    except LifecycleError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {
+        "status": result.get("status", "uninstalled"),
+        "mode": result.get("backend", settings.lifecycle_backend),
+        "tenant": settings.tenant_id,
+        "profile": profile,
+        "purged": bool(result.get("purged")),
+        "warnings": result.get("warnings") or [],
+    }
 
 
 @router.get("/{profile}/status")
 def app_status(profile: str, user: dict = Depends(get_current_user)) -> dict:
     _ = user
     settings = get_settings()
-    ns = settings.tenant_namespace or _tenant_namespace(settings.tenant_id)
-    k8s = K8sClient()
-    claim = k8s.get_app_claim(ns, profile)
-    return {"profile": profile, **_claim_status(claim)}
+    try:
+        apps = get_lifecycle_client().list_installed()
+    except LifecycleError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    for app in apps:
+        if app.get("profile") == profile:
+            return {"profile": profile, **_claim_status_from_result(app)}
+    return {
+        "profile": profile,
+        "phase": "pending",
+        "ready": False,
+        "message": "Not installed",
+    }
