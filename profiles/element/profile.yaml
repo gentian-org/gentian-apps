@@ -49,8 +49,9 @@ spec:
       displayName:
         de_DE: "Chat"
         en_US: "Chat"
-      # embedded opens inside gentian-ui WinBox; Ctrl/Cmd+click opens a real tab.
-      linkTarget: embedded
+      # newwindow: Element/Matrix OIDC cannot complete in portal iframes (WinBox).
+      # Gentian shell opens chat.* in a real browser tab; Ctrl/Cmd+click still works.
+      linkTarget: newwindow
       # Match Jitsi: portal tile visible to all App Users. Synapse OIDC still
       # requires managed-by-attribute-Livecollaboration (via opendeskLivecollaborationEnabled
       # on the App User template and the ldap-app-user-capabilities backfill job).
