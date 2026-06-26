@@ -38,14 +38,20 @@ class LifecycleClient:
         return data.get("apps", [])
 
     def install(self, profile: str, actor: str) -> dict[str, Any]:
-        with httpx.Client(timeout=900.0) as client:
-            res = client.post(
-                self._url(profile),
-                headers=self._headers(actor),
-            )
-            if not res.is_success:
-                raise LifecycleError(_detail(res))
-            return res.json()
+        try:
+            with httpx.Client(timeout=60.0) as client:
+                res = client.post(
+                    self._url(profile),
+                    params={"wait": "false"},
+                    headers=self._headers(actor),
+                )
+        except httpx.TimeoutException as exc:
+            raise LifecycleError("App lifecycle API timed out") from exc
+        except httpx.TransportError as exc:
+            raise LifecycleError("App lifecycle API is unreachable") from exc
+        if not res.is_success:
+            raise LifecycleError(_detail(res))
+        return res.json()
 
     def uninstall(self, profile: str, actor: str, purge: bool = False) -> dict[str, Any]:
         params: dict[str, str] = {}

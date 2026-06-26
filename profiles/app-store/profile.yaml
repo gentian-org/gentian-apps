@@ -32,7 +32,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: app-store
-    version: "0.2.3"
+    version: "0.2.4"
 
   deploymentMethod: crossplane
 

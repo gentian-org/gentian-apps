@@ -224,6 +224,11 @@ export default function App() {
       }
       if (isAppReady(current)) {
         setNotice({ kind: "success", text: `${label} is installed and ready.` });
+      } else {
+        setNotice({
+          kind: "info",
+          text: `${label} install started — provisioning in progress. Status refreshes automatically.`,
+        });
       }
     } catch (e) {
       setNotice({
