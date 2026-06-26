@@ -381,10 +381,10 @@ spec:
 
     resources:
       limits:
-        cpu: "4"
-        memory: "6Gi"
+        cpu: "1"
+        memory: "5Gi"
       requests:
-        cpu: "500m"
+        cpu: "250m"
         memory: "2Gi"
 
     podAnnotations:

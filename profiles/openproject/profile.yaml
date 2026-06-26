@@ -283,26 +283,28 @@ spec:
 
     # appInit: the wait-for-db init container runs a full Rails process.
     # Requires more memory than the namespace LimitRange default (512 Mi causes
-    # OOMKill / exit code 137).
+    # OOMKill / exit code 137). Keep limits modest for homelab tenant quotas.
     appInit:
       resources:
         limits:
-          cpu: "2"
-          memory: "2Gi"
+          cpu: "250m"
+          memory: "1Gi"
         requests:
           cpu: "100m"
           memory: "768Mi"
 
     replicaCount: 1
-    backgroundReplicaCount: 1
+    # Homelab: skip the background worker to stay within typical 32 CPU tenant
+    # quotas alongside Element, OX, and XWiki. Re-enable for production tenants.
+    backgroundReplicaCount: 0
 
     resources:
       limits:
-        cpu: "4"
-        memory: "4Gi"
-      requests:
-        cpu: "500m"
+        cpu: "750m"
         memory: "2Gi"
+      requests:
+        cpu: "250m"
+        memory: "1Gi"
 
     # Security context aligned with opendesk values.yaml.gotmpl.
     containerSecurityContext:
@@ -334,7 +336,7 @@ spec:
         helm.sh/hook-delete-policy: hook-succeeded,before-hook-creation
       resources:
         limits:
-          cpu: "2"
+          cpu: "250m"
           memory: "768Mi"
         requests:
           cpu: "100m"

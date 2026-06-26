@@ -220,6 +220,36 @@ spec:
         enabled: false
       core-spellcheck:
         enabled: false
+      core-documentconverter:
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "2Gi"
+          requests:
+            cpu: "100m"
+            memory: "1Gi"
+      core-imageconverter:
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "2Gi"
+          requests:
+            cpu: "100m"
+            memory: "1Gi"
+      core-ui-middleware:
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "768Mi"
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+      core-guidedtours:
+        enabled: false
+      guard-ui:
+        enabled: false
+      core-user-guide:
+        enabled: false
       core-mw:
         masterAdmin: "admin"
         serverName: "oxserver"
@@ -229,11 +259,11 @@ spec:
         # limits are omitted, which rejects the chart default 1000m CPU request.
         resources:
           limits:
-            cpu: "2"
-            memory: "4Gi"
+            cpu: "1"
+            memory: "3Gi"
           requests:
-            cpu: "500m"
-            memory: "2Gi"
+            cpu: "250m"
+            memory: "1.5Gi"
         redis:
           enabled: true
           mode: "standalone"

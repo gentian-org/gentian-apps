@@ -169,11 +169,11 @@ spec:
               TURN_ENABLE: "1"
             resources:
               requests:
-                cpu: "100m"
+                cpu: "50m"
                 memory: "64Mi"
               limits:
-                cpu: "1"
-                memory: "256Mi"
+                cpu: "500m"
+                memory: "192Mi"
             securityContext:
               allowPrivilegeEscalation: false
               capabilities: {}
@@ -210,11 +210,11 @@ spec:
                 value: "${TURN_CREDENTIALS}"
             resources:
               requests:
-                cpu: "100m"
+                cpu: "50m"
                 memory: "128Mi"
               limits:
-                cpu: "1"
-                memory: "512Mi"
+                cpu: "500m"
+                memory: "384Mi"
             persistence:
               size: "1Gi"
             securityContext:
@@ -231,11 +231,11 @@ spec:
             replicaCount: 1
             resources:
               requests:
-                cpu: "100m"
+                cpu: "50m"
                 memory: "128Mi"
               limits:
-                cpu: "1"
-                memory: "512Mi"
+                cpu: "500m"
+                memory: "384Mi"
             securityContext:
               allowPrivilegeEscalation: false
               capabilities: {}
@@ -267,11 +267,11 @@ spec:
               type: "NodePort"
             resources:
               requests:
-                cpu: "100m"
+                cpu: "50m"
                 memory: "128Mi"
               limits:
-                cpu: "2"
-                memory: "1Gi"
+                cpu: "1"
+                memory: "768Mi"
             securityContext:
               allowPrivilegeEscalation: false
               capabilities: {}

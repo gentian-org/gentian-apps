@@ -648,7 +648,15 @@ spec:
                 "imagePullSecrets" $imagePull
                 "replicaCount"     1
                 "federation" (dict "ingress" (dict "enabled" false))
+                "resources" (dict
+                  "limits" (dict "cpu" "1" "memory" "2Gi")
+                  "requests" (dict "cpu" "250m" "memory" "512Mi")
+                )
             }}
+            {{- $synapseOverlay := dig "synapse" dict $extraVals }}
+            {{- if $synapseOverlay }}
+            {{- $synapseVals = mergeOverwrite $synapseVals $synapseOverlay }}
+            {{- end }}
             {{- /* Staging CA env/volume mounts omitted for Synapse: the chart already
                  sets SSL_CERT_DIR and duplicate extraEnvVars break StatefulSet patches.
                  OIDC token exchange uses KEYCLOAK_INTERNAL_URL (plain HTTP). */}}
@@ -791,7 +799,15 @@ spec:
                 "imagePullSecrets" $imagePull
                 "replicaCount"     1
                 "ingress"          $synapseWebIngress
+                "resources" (dict
+                  "limits" (dict "cpu" "250m" "memory" "256Mi")
+                  "requests" (dict "cpu" "50m" "memory" "64Mi")
+                )
             }}
+            {{- $synapseWebOverlay := dig "synapseWeb" dict $extraVals }}
+            {{- if $synapseWebOverlay }}
+            {{- $synapseWebVals = mergeOverwrite $synapseWebVals $synapseWebOverlay }}
+            {{- end }}
             ---
             apiVersion: helm.crossplane.io/v1beta1
             kind: Release
@@ -961,6 +977,10 @@ spec:
                 "imagePullSecrets" $imagePull
                 "global" (mergeOverwrite (dig "global" dict $scExtraVals) (dict "imagePullSecrets" $imagePull))
             ) }}
+            {{- end }}
+            {{- /* Per-tenant Jitsi overrides (e.g. resources) from App.config.extraValues */}}
+            {{- if and (eq $scName "jitsi") (dig "jitsi" nil $extraVals) }}
+            {{- $scExtraVals = mergeOverwrite $scExtraVals (dict "jitsi" (mergeOverwrite (dig "jitsi" dict $scExtraVals) (dig "jitsi" dict $extraVals))) }}
             {{- end }}
 
             {{- /* Jitsi: mount Gentian OIDC/JWT overlays over chart ConfigMaps */}}

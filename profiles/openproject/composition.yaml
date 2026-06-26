@@ -852,6 +852,13 @@ spec:
                                   secretKeyRef:
                                     name: {{ $secretName }}
                                     key: db-password
+                            resources:
+                              limits:
+                                cpu: 250m
+                                memory: 1Gi
+                              requests:
+                                cpu: 100m
+                                memory: 768Mi
                         containers:
                           - name: oidc-seed
                             image: {{ $opImage | quote }}
@@ -906,6 +913,13 @@ spec:
                                   secretKeyRef:
                                     name: {{ $secretName }}
                                     key: oidc-client-secret
+                            resources:
+                              limits:
+                                cpu: 250m
+                                memory: 1Gi
+                              requests:
+                                cpu: 100m
+                                memory: 768Mi
               providerConfigRef:
                 name: kubernetes
             {{- end }}
