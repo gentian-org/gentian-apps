@@ -19,7 +19,8 @@ spec:
   edition: full
   trustTier: platform
   license: LGPL-3.0
-  logo: "data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjNzE0QjdGIiByb2xlPSJpbWciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptLTEgMTVINXYtMmg2djJ6bTAtNEg1di0yaDZ2MnoiLz48L3N2Zz4="
+  tile:
+    icon: erp
 
   kernelRequirements:
     identity:

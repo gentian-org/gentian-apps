@@ -64,7 +64,8 @@ metadata:
 spec:
   displayName: "XWiki"
   description: "Structured wiki and knowledge management platform with OIDC authentication and LDAP user/group sync."
-  logo: "data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMDI1RThDIiByb2xlPSJpbWciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+WFdpa2k8L3RpdGxlPjxwYXRoIGQ9Ik0xOSAzSDVhMiAyIDAgMCAwLTIgMnYxNGEyIDIgMCAwIDAgMiAyaDE0YTIgMiAwIDAgMCAyLTJWNWEyIDIgMCAwIDAtMi0yem0tMSAxNkg2VjVoMTJ2MTR6bS0yLTlIOFY4aDh2MnptMCA0SDh2LTJoOHYyem0tMyA0SDh2LTJoNXYyeiIvPjwvc3ZnPg=="
+  tile:
+    icon: wiki
 
   kernelRequirements:
     identity:

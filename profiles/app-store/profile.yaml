@@ -14,7 +14,8 @@ metadata:
 spec:
   displayName: "App Store"
   description: "Browse the Gentian app catalogue and install or uninstall applications for your tenant."
-  logo: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzRGNDZFNSIgcm9sZT0iaW1nIj48cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iOSIgaGVpZ2h0PSI5IiByeD0iMi41Ii8+PHJlY3QgeD0iMTMiIHk9IjIiIHdpZHRoPSI5IiBoZWlnaHQ9IjkiIHJ4PSIyLjUiLz48cmVjdCB4PSIyIiB5PSIxMyIgd2lkdGg9IjkiIGhlaWdodD0iOSIgcng9IjIuNSIvPjxyZWN0IHg9IjEzIiB5PSIxMyIgd2lkdGg9IjkiIGhlaWdodD0iOSIgcng9IjIuNSIvPjwvc3ZnPg=="
+  tile:
+    icon: store
 
   kernelRequirements:
     identity:

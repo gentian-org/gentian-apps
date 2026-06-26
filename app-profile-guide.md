@@ -31,6 +31,22 @@ spec:
 Commerce (customer, price, invoice) is handled in **CRM/ERP (Odoo)** — see
 [business-logic-plan.md](../gentian-os/docs/design/business-logic-plan.md).
 
+### Portal app-menu tiles
+
+Gentian portal / app-menu icons use a **two-path** model on `AppProfile.spec.tile`:
+
+| Path | Spec | Notes |
+|---|---|---|
+| **Catalogue** | `tile.icon: mail` | Pick from `gentian-ui/design-system/tiles/catalogue.json` |
+| **Custom** | `tile.image: assets/tile.svg` → run `scripts/sync-profile-tile.py` | Inlines to `tile.logo` data URI |
+
+Per sub-app overrides: `spec.portalTiles[].tile.icon` (e.g. OX mail vs calendar).
+
+The gentian-os LDAP reconciler resolves `tile.icon` to a data URI when writing
+`pathToLogo`. Legacy `spec.logo` still works but is deprecated.
+
+CI: `scripts/validate-profile-tiles.py` (see `.github/workflows/apps-ci.yaml`).
+
 ### Base + module profile bundles
 
 For apps with a shared runtime and thin module entries (Odoo, OX-style), use

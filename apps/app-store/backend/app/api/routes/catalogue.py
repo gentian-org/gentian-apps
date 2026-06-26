@@ -4,6 +4,7 @@ from app.core.auth import get_current_user
 from app.core.config import get_settings
 from app.services.catalogue import build_catalogue
 from app.services.k8s_client import K8sClient
+from app.services.tile_resolver import resolve_tile_logo
 
 router = APIRouter(prefix="/catalogue", tags=["catalogue"])
 
@@ -32,7 +33,7 @@ def get_catalogue_entry(profile_name: str, user: dict = Depends(get_current_user
         "name": profile_name,
         "displayName": spec.get("displayName", profile_name),
         "description": spec.get("description", ""),
-        "logo": spec.get("logo"),
+        "logo": resolve_tile_logo(spec),
         "chartVersion": spec.get("chart", {}).get("version"),
         "kernelRequirements": spec.get("kernelRequirements"),
     }

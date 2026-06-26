@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.services.k8s_client import K8sClient
+from app.services.tile_resolver import resolve_tile_logo
 
 PLATFORM_ANNOTATION = "gentianos.io/platform-app"
 
@@ -31,7 +32,7 @@ def build_catalogue(k8s: K8sClient, include_platform: bool = False) -> dict[str,
                 "name": name,
                 "displayName": entry.get("displayName") or spec.get("displayName", name),
                 "description": entry.get("description") or spec.get("description", ""),
-                "logo": spec.get("logo"),
+                "logo": resolve_tile_logo(spec),
                 "chartVersion": entry.get("chartVersion"),
                 "deploymentMethod": entry.get("deploymentMethod"),
                 "kernelRequirements": entry.get("kernelRequirements", []),

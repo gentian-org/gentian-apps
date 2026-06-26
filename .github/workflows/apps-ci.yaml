@@ -89,3 +89,5 @@ jobs:
             fi
             kubectl kustomize "$d" >/dev/null
           done
+      - name: Validate profile tile specs
+        run: python3 scripts/validate-profile-tiles.py
