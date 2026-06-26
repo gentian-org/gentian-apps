@@ -33,14 +33,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Read app-store release versions
+        id: versions
+        run: |
+          IMAGE_TAG=$(grep 'tag:' apps/app-store/chart/values.yaml | head -1 | awk '{print $2}' | tr -d '"')
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
       - name: Build and push API image
         uses: docker/build-push-action@v6
         with:
           context: apps/app-store/backend
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:0.1.6
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:0.1.5
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:${{ github.sha }}
 
       - name: Build and push Web image
@@ -49,8 +54,7 @@ jobs:
           context: apps/app-store/frontend
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:0.1.6
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:0.1.5
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:${{ github.sha }}
 
       - name: Install Helm

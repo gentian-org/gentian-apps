@@ -1290,7 +1290,7 @@ spec:
                       gentianos.io/tenant: {{ $tenant }}
                       gentianos.io/app: {{ $app }}
                   spec:
-                    ttlSecondsAfterFinished: 3600
+                    ttlSecondsAfterFinished: 600
                     backoffLimit: 10
                     template:
                       spec:
@@ -1449,7 +1449,7 @@ spec:
                       gentianos.io/tenant: {{ $tenant }}
                       gentianos.io/app: {{ $app }}
                   spec:
-                    ttlSecondsAfterFinished: 3600
+                    ttlSecondsAfterFinished: 600
                     backoffLimit: 10
                     template:
                       spec:
