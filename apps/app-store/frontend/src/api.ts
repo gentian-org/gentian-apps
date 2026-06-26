@@ -82,7 +82,17 @@ function parseApiError(body: string, fallback: string): string {
       return data.detail.map((item) => item.msg || "").filter(Boolean).join("; ") || fallback;
     }
   } catch {
-    // plain text error body
+    // plain text or HTML error body
+  }
+  const trimmed = body.trim();
+  if (trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) {
+    if (/504|Gateway time-out/i.test(trimmed)) {
+      return "The server timed out. Please try again in a moment.";
+    }
+    if (/502|Bad gateway/i.test(trimmed)) {
+      return "The server is temporarily unavailable. Please try again.";
+    }
+    return fallback;
   }
   return body || fallback;
 }

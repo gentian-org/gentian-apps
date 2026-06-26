@@ -25,12 +25,17 @@ class LifecycleClient:
         return {"X-Gentian-Actor": actor}
 
     def list_installed(self) -> list[dict[str, Any]]:
-        with httpx.Client(timeout=120.0) as client:
-            res = client.get(self._url(), headers=self._headers("app-store"))
-            if not res.is_success:
-                raise LifecycleError(_detail(res))
-            data = res.json()
-            return data.get("apps", [])
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                res = client.get(self._url(), headers=self._headers("app-store"))
+        except httpx.TimeoutException as exc:
+            raise LifecycleError("App lifecycle API timed out") from exc
+        except httpx.TransportError as exc:
+            raise LifecycleError("App lifecycle API is unreachable") from exc
+        if not res.is_success:
+            raise LifecycleError(_detail(res))
+        data = res.json()
+        return data.get("apps", [])
 
     def install(self, profile: str, actor: str) -> dict[str, Any]:
         with httpx.Client(timeout=900.0) as client:

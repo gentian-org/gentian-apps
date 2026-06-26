@@ -121,13 +121,31 @@ export default function App() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async () => {
-    const [cat, inst] = await Promise.all([
-      apiFetch<CatalogueResponse>("/catalogue/"),
-      apiFetch<InstalledResponse>("/tenant/apps/installed"),
-    ]);
-    setCatalogue(cat);
-    setInstalled(inst.apps);
-    return inst.apps;
+    let nextInstalled: InstalledApp[] = [];
+
+    const cataloguePromise = apiFetch<CatalogueResponse>("/catalogue/")
+      .then((cat) => {
+        setCatalogue(cat);
+      })
+      .catch((e: Error) => {
+        if (e.message !== "Redirecting to sign in…") {
+          setNotice({ kind: "error", text: `Catalogue: ${e.message}` });
+        }
+      });
+
+    const installedPromise = apiFetch<InstalledResponse>("/tenant/apps/installed")
+      .then((inst) => {
+        setInstalled(inst.apps);
+        nextInstalled = inst.apps;
+      })
+      .catch((e: Error) => {
+        if (e.message !== "Redirecting to sign in…") {
+          setNotice({ kind: "error", text: `Installed apps: ${e.message}` });
+        }
+      });
+
+    await Promise.all([cataloguePromise, installedPromise]);
+    return nextInstalled;
   }, []);
 
   useEffect(() => {
