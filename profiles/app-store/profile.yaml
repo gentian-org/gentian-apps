@@ -32,7 +32,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: app-store
-    version: "0.2.1"
+    version: "0.2.2"
 
   deploymentMethod: crossplane
 
@@ -56,7 +56,7 @@ spec:
       deploymentsRepo: "https://github.com/gentian-org/gentian-deployments"
       appsRepo: "https://github.com/gentian-org/gentian-apps"
       appsBranch: main
-      lifecycleUrl: "http://gentian-os.gentian-system.svc.cluster.local:8082"
+      lifecycleUrl: "http://gentian-os-lifecycle.gentian-system.svc.cluster.local:8082"
     ingress:
       enabled: false
     auth:

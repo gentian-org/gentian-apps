@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     install_mode: str = Field(default="gitops", alias="INSTALL_MODE")
 
     lifecycle_url: str | None = Field(
-        default="http://gentian-os.gentian-system.svc.cluster.local:8082",
+        default="http://gentian-os-lifecycle.gentian-system.svc.cluster.local:8082",
         alias="GENTIAN_LIFECYCLE_URL",
     )
 
