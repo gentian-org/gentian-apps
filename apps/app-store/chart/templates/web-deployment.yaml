@@ -3,7 +3,8 @@ kind: Deployment
 metadata:
   name: {{ include "gentian-app.fullname" . }}-web
   labels:
-    {{- include "gentian-app.web.labels" . | nindent 4 }}
+    {{- include "gentian-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
 spec:
   replicas: {{ .Values.web.replicaCount }}
   selector:
@@ -12,19 +13,38 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "gentian-app.web.labels" . | nindent 8 }}
+        {{- include "gentian-app.labels" . | nindent 8 }}
+        app.kubernetes.io/name: {{ include "gentian-app.name" . }}-web
+        app.kubernetes.io/component: web
     spec:
+      securityContext:
+        {{- include "gentian-app.podSecurityContext" . | nindent 8 }}
       containers:
         - name: web
           image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag }}"
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 80
-          volumeMounts:
-            - name: nginx-config
-              mountPath: /etc/nginx/conf.d/default.conf
-              subPath: default.conf
-      volumes:
-        - name: nginx-config
-          configMap:
-            name: {{ include "gentian-app.fullname" . }}-web-nginx
+            - containerPort: {{ .Values.web.port }}
+              name: http
+          securityContext:
+            {{- include "gentian-app.containerSecurityContext" . | nindent 12 }}
+            {{- with .Values.web.securityContext }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
+          {{- with .Values.web.env }}
+          env:
+            {{- range $key, $value := . }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}

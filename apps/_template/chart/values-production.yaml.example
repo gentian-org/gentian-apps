@@ -1,0 +1,40 @@
+# Production overrides — copy to your deploy repo; never commit secrets.
+# See docs/SECURITY.md (M9, M27).
+
+tenantDomain: example.gentian.cloud
+
+auth:
+  disabled: false
+
+api:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  env:
+    ENVIRONMENT: production
+    # HTTPS origin for this app host — required (M9)
+    BACKEND_CORS_ORIGINS: https://app.example.gentian.cloud
+    # From existingSecret via valueMapping in AppProfile
+    # OIDC_ISSUER, OIDC_CLIENT_ID, DATABASE_URL, OPENFGA_*
+
+web:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  env:
+    VITE_OIDC_ISSUER: https://auth.example.gentian.cloud/realms/tenant-demo
+    VITE_OIDC_CLIENT_ID: gentian-app
+    VITE_OIDC_REDIRECT_URI: https://app.example.gentian.cloud/
+    VITE_AUTH_DISABLED: "false"
+
+openfga:
+  apiUrl: ""
+  storeId: ""

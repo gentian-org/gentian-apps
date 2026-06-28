@@ -3,7 +3,8 @@ kind: Deployment
 metadata:
   name: {{ include "gentian-app.fullname" . }}-web
   labels:
-    app.kubernetes.io/name: {{ include "gentian-app.name" . }}-web
+    {{- include "gentian-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
 spec:
   replicas: {{ .Values.web.replicaCount }}
   selector:
@@ -12,11 +13,31 @@ spec:
   template:
     metadata:
       labels:
+        {{- include "gentian-app.labels" . | nindent 8 }}
         app.kubernetes.io/name: {{ include "gentian-app.name" . }}-web
+        app.kubernetes.io/component: web
     spec:
+      securityContext:
+        {{- include "gentian-app.podSecurityContext" . | nindent 8 }}
       containers:
         - name: web
           image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag }}"
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 80
+            - containerPort: {{ .Values.web.port }}
+              name: http
+          securityContext:
+            {{- include "gentian-app.containerSecurityContext" . | nindent 12 }}
+            {{- with .Values.web.securityContext }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}

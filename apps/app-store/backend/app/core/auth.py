@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import get_settings
+from app.core.tenant import assert_tenant_access
 
 _bearer = HTTPBearer(auto_error=False)
 _jwks_cache: dict[str, Any] | None = None
@@ -60,8 +61,7 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
         ) from exc
-    tenant = settings.tenant_id
-    sub = claims.get("preferred_username") or claims.get("sub", "")
-    if tenant and f"admin-{tenant}" not in str(sub) and tenant not in str(sub):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong tenant")
+
+    tenant = assert_tenant_access(claims, settings)
+    claims["tenant"] = tenant
     return claims

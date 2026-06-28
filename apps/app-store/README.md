@@ -2,6 +2,9 @@
 
 Tenant-admin web UI to browse the Gentian app catalogue and install/uninstall apps.
 
+Scaffold follows [gentian-app-template](https://github.com/gentian-org/gentian-app-template):
+Gateway API HTTPRoute (no in-pod nginx), security modules (`tenant`, `authz`, logging), TanStack Router frontend.
+
 ## API
 
 - `GET /api/v1/catalogue/` — available apps (`AppCatalogue` + `AppProfile` metadata)

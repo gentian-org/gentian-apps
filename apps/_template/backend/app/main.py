@@ -1,13 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import health, items
+from app.api.routes import health, items, session
 from app.core.config import get_settings
+from app.core.logging_middleware import RedactingAccessLogMiddleware
 
 settings = get_settings()
 
 app = FastAPI(title=settings.project_name, openapi_url=f"{settings.api_v1_str}/openapi.json")
 
+app.add_middleware(RedactingAccessLogMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -17,4 +19,5 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(session.router, prefix=settings.api_v1_str)
 app.include_router(items.router, prefix=settings.api_v1_str)

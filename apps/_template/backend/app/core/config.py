@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,45 +11,41 @@ class Settings(BaseSettings):
     api_v1_str: str = "/api/v1"
     environment: str = Field(default="local", alias="ENVIRONMENT")
 
-    # Tenant context (set by Helm per deployment)
     tenant_id: str = Field(default="demo", alias="TENANT_ID")
     tenant_namespace: str = Field(default="tenant-demo", alias="TENANT_NAMESPACE")
 
-    # PostgreSQL — injected by ESO from kernel valueMapping
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
 
-    # OIDC — kernel Keycloak tenant realm
     oidc_issuer: str | None = Field(default=None, alias="OIDC_ISSUER")
     oidc_client_id: str | None = Field(default=None, alias="OIDC_CLIENT_ID")
     oidc_client_secret: str | None = Field(default=None, alias="OIDC_CLIENT_SECRET")
     oidc_audience: str | None = Field(default=None, alias="OIDC_AUDIENCE")
 
-    # GitOps (optional — App Store and admin apps)
-    gentian_deployments_path: str | None = Field(
-        default=None, alias="GENTIAN_DEPLOYMENTS_PATH"
-    )
-    gentian_deployments_repo: str | None = Field(
-        default=None, alias="GENTIAN_DEPLOYMENTS_REPO"
-    )
-    gentian_apps_repo: str = Field(
-        default="https://github.com/gentian-org/gentian-apps",
-        alias="GENTIAN_APPS_REPO",
-    )
-    gentian_apps_branch: str = Field(default="main", alias="GENTIAN_APPS_BRANCH")
+    openfga_api_url: str | None = Field(default=None, alias="OPENFGA_API_URL")
+    openfga_store_id: str | None = Field(default=None, alias="OPENFGA_STORE_ID")
 
-    # Install mode: gitops (default) or k8s (App claims)
-    install_mode: str = Field(default="gitops", alias="INSTALL_MODE")
-
-    # Dev bypass when OIDC not configured
     auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
 
-    cors_origins: str = Field(default="*", alias="BACKEND_CORS_ORIGINS")
+    # Never use "*" in production — set explicit origins per tenant app host
+    cors_origins: str = Field(default="http://localhost:5173", alias="BACKEND_CORS_ORIGINS")
 
     @property
     def cors_origin_list(self) -> list[str]:
         if self.cors_origins.strip() == "*":
             return ["*"]
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() in {"production", "prod", "staging"}
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        if self.is_production and self.cors_origins.strip() == "*":
+            raise ValueError("BACKEND_CORS_ORIGINS must not be '*' in production (M9)")
+        if self.is_production and self.auth_disabled:
+            raise ValueError("AUTH_DISABLED must be false in production (M2)")
+        return self
 
 
 @lru_cache

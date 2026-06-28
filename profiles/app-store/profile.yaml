@@ -10,7 +10,7 @@ metadata:
     gentianos.io/profile-name: app-store
   annotations:
     gentianos.io/platform-app: "true"
-    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/api","serviceName":"app-store-api","port":8000}]'
+    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/api","serviceName":"app-store-api","port":8000},{"pathPrefix":"/oauth","serviceName":"app-store-api","port":8000}]'
 spec:
   displayName: "App Store"
   description: "Browse the Gentian app catalogue and install or uninstall applications for your tenant."
@@ -32,7 +32,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: app-store
-    version: "0.2.5"
+    version: "0.3.0"
 
   deploymentMethod: crossplane
 
@@ -61,16 +61,21 @@ spec:
       enabled: false
     auth:
       disabled: true
+    gateway:
+      enabled: true
+      subDomain: store
 
   ingress:
     subDomain: store
     serviceName: app-store-web
-    servicePort: 80
+    servicePort: 8080
     tlsEnabled: true
 
   browserProxy:
     - path: api
       target: "http://app-store-api:8000/api"
+    - path: oauth
+      target: "http://app-store-api:8000/oauth"
 
   portalTiles:
     - name: app-store

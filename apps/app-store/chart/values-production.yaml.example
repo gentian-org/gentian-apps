@@ -1,0 +1,38 @@
+# Production overrides — copy to your deploy repo; never commit secrets.
+
+tenantDomain: example.gentian.cloud
+
+auth:
+  disabled: true
+
+gateway:
+  enabled: true
+  parentGatewayName: tenant-demo-gateway
+  subDomain: store
+
+api:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  env:
+    ENVIRONMENT: production
+    BACKEND_CORS_ORIGINS: https://store.example.gentian.cloud
+
+web:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  env:
+    VITE_AUTH_DISABLED: "true"
+
+openfga:
+  apiUrl: ""
+  storeId: ""

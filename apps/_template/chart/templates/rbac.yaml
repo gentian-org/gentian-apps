@@ -1,17 +1,13 @@
+{{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ include "gentian-app.fullname" . }}
 rules:
+  # Replace with the minimum verbs/resources your app needs.
   - apiGroups: ["gentianos.io"]
-    resources: ["apps"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["gentianos.io"]
-    resources: ["appcatalogues", "appprofiles"]
+    resources: ["appprofiles"]
     verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -24,3 +20,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ include "gentian-app.fullname" . }}
+{{- end }}

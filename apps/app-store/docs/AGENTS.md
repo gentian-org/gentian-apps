@@ -1,45 +1,47 @@
-# AGENTS.md — Gentian app development conventions
+# AGENTS.md — App Store development conventions
 
-This file helps AI coding agents and humans extend Gentian first-party apps.
+Aligned with [gentian-app-template](https://github.com/gentian-org/gentian-app-template).
+See also `docs/SECURITY.md` and `docs/FRONTEND-STACK.md`.
 
 ## Directory map
 
 | Path | Purpose |
 |------|---------|
 | `backend/app/main.py` | FastAPI entrypoint |
-| `backend/app/core/config.py` | Settings from environment (ESO-injected in cluster) |
-| `backend/app/core/auth.py` | OIDC JWT validation |
-| `backend/app/api/routes/` | HTTP routers |
-| `frontend/src/` | React UI |
-| `chart/` | Helm chart (Pattern A `existingSecret`) |
-| `profile/appprofile.yaml.tmpl` | AppProfile skeleton for `gentian-apps/profiles/` |
+| `backend/app/core/` | Config, auth, tenant, authz, logging, OpenFGA client |
+| `backend/app/api/routes/catalogue.py` | App catalogue from K8s CRs |
+| `backend/app/api/routes/tenant_apps.py` | Install/uninstall via lifecycle API |
+| `backend/app/api/routes/oauth.py` | Backend BFF OIDC (iframe-safe sign-in) |
+| `backend/app/services/` | GitOps, lifecycle, K8s client, tile resolver |
+| `frontend/src/pages/StorePage.tsx` | Main App Store UI |
+| `frontend/src/auth/` | AuthProvider + BFF OAuth helpers |
+| `chart/` | Helm chart (HTTPRoute, Pattern A `existingSecret`) |
+| `profile/appprofile.yaml.tmpl` | AppProfile skeleton |
 
 ## Add an API endpoint
 
 1. Create `backend/app/api/routes/<feature>.py` with an `APIRouter`.
 2. Register it in `backend/app/main.py`.
 3. Protect routes with `Depends(get_current_user)` when tenant-scoped.
+4. Use `require_permission()` from `core/authz.py` for sensitive tenant-admin actions.
 
 ## Add a React page
 
 1. Add component under `frontend/src/pages/`.
-2. Wire routing in `frontend/src/App.tsx` (or add a router).
-3. Call backend via `/api/v1/...` (proxied by nginx in production).
+2. Register route in `frontend/src/router.tsx`.
+3. Call backend via `apiFetch()` from `frontend/src/api/client.ts`.
+4. Gateway API routes `/api` and `/oauth` to the API service; static UI to the web service.
 
-## Kernel secrets (cluster)
+## Auth model
 
-Never commit secrets. The orchestrator injects via ExternalSecret:
-
-- `DATABASE_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`
-
-Map keys in `profile/appprofile.yaml.tmpl` `valueMapping` must match Helm `values.yaml`.
+- **Embedded in portal:** `auth.disabled: true` — shell gates tenant-admin access; API uses synthetic admin user.
+- **Direct URL access:** backend `/oauth/*` BFF stores tokens in `localStorage`; iframe uses popup sign-in.
 
 ## Publish a new app version
 
 1. Bump `chart/Chart.yaml` version and image tags in `chart/values.yaml`.
 2. CI builds and pushes images + OCI chart.
-3. Update `gentian-apps/profiles/<app>.yaml` `spec.chart.version`.
-4. AppProfile update reconciler rolls out to tenants.
+3. Update `gentian-apps/profiles/app-store/profile.yaml` `spec.chart.version`.
 
 ## Local dev
 
@@ -47,4 +49,4 @@ Map keys in `profile/appprofile.yaml.tmpl` `valueMapping` must match Helm `value
 docker compose -f docker-compose.dev.yaml up --build
 ```
 
-`AUTH_DISABLED=true` skips OIDC locally.
+Set `AUTH_DISABLED=true` and `VITE_AUTH_DISABLED=true` for UI development without OIDC.

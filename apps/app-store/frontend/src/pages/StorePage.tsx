@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiFetch } from "./api";
+import { apiFetch } from "@/api/client";
 
 type CatalogueApp = {
   name: string;
@@ -111,7 +111,7 @@ function AppListCard({
   );
 }
 
-export default function App() {
+export function StorePage() {
   const [catalogue, setCatalogue] = useState<CatalogueResponse | null>(null);
   const [installed, setInstalled] = useState<InstalledApp[]>([]);
   const [selected, setSelected] = useState<CatalogueApp | null>(null);
