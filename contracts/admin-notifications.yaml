@@ -1,0 +1,51 @@
+# admin-notifications — Gentian kernel contract (v1)
+#
+# Cross-app contract for tenant-scoped administrative broadcasts.
+# Wire format: CloudEvents 1.0 over HTTP (envelope) + Gentian REST publish API.
+
+apiVersion: gentian.org/v1alpha1
+kind: AppContract
+metadata:
+  name: admin-notifications
+  labels:
+    gentian.org/contract-type: event
+spec:
+  description: >
+    Tenant and platform administrators publish scoped notifications to workspace
+    members. v1 persists events and serves the Gentian Portal shell inbox; external
+    consumers (email, Matrix) are optional future subscribers.
+  event:
+  wireFormat: cloudevents-1.0
+  type: gentian.admin.notification.published.v1
+  source: /gentian/admin-notifications
+  audienceExtension: gentianaudience
+  audienceSchema:
+    scope:
+      type: string
+      enum: [platform, tenant]
+    tenant:
+      type: string
+      description: Target tenant id when scope is tenant
+    groups:
+      type: array
+      items:
+        type: string
+      description: Keycloak group paths; defaults to gentian:tenant:<t>:members
+  publishers:
+  - platform superadmin (scope platform or any managed group)
+  - tenant admin (scope tenant, groups within gentian:tenant:<t>:*)
+  rest:
+    publish: POST /api/v1/admin/notifications
+    list: GET /api/v1/admin/notifications
+    inbox: GET /api/v1/notifications/inbox
+    dismiss: POST /api/v1/notifications/{id}/dismiss
+  storage:
+    tables:
+    - admin_notifications
+    - admin_notification_dismissals
+  consumers:
+    v1:
+    - gentian-portal shell inbox
+    future:
+    - postfix outbound email
+    - element matrix room broadcast
