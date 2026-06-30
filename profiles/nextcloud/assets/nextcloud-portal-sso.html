@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Signing in to Files…</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        background: #f5f7f6;
+        color: #1a2e28;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Signing in to Files…</p>
+    <script>
+      function portalApiBase() {
+        const parts = window.location.hostname.split(".");
+        if (parts[0] === "cloud" && parts.length > 2) {
+          return `${window.location.protocol}//${["portal", ...parts.slice(2)].join(".")}/api/v1`;
+        }
+        return `${window.location.protocol}//portal.${parts.slice(-2).join(".")}/api/v1`;
+      }
+
+      async function fetchRequestToken() {
+        const response = await fetch("/login?direct=1", { credentials: "same-origin" });
+        const html = await response.text();
+        const patterns = [
+          /data-requesttoken="([^"]+)"/,
+          /name="requesttoken"\s+value="([^"]+)"/,
+          /requesttoken="([^"]+)"/,
+        ];
+        for (const pattern of patterns) {
+          const match = html.match(pattern);
+          if (match?.[1]) {
+            return match[1];
+          }
+        }
+        return "";
+      }
+
+      function submitLogin(username, password, requestToken) {
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "/login?direct=1";
+        form.style.display = "none";
+
+        for (const [name, value] of [
+          ["user", username],
+          ["password", password],
+          ["requesttoken", requestToken],
+        ]) {
+          if (!value) {
+            continue;
+          }
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = name;
+          input.value = value;
+          form.appendChild(input);
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+      }
+
+      (async () => {
+        const ticket = new URLSearchParams(window.location.search).get("t");
+        if (!ticket) {
+          window.location.replace("/");
+          return;
+        }
+
+        let credentials;
+        try {
+          const response = await fetch(
+            `${portalApiBase()}/session/nextcloud-bridge/redeem/${encodeURIComponent(ticket)}`,
+          );
+          if (!response.ok) {
+            throw new Error("redeem failed");
+          }
+          credentials = await response.json();
+        } catch (_error) {
+          window.location.replace("/login?direct=1");
+          return;
+        }
+
+        const requestToken = await fetchRequestToken();
+        submitLogin(credentials.username, credentials.password, requestToken);
+      })();
+    </script>
+  </body>
+</html>

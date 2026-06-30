@@ -206,9 +206,16 @@ spec:
         - name: gentian-sensitive
           secret:
             secretName: nextcloud-sensitive-values
+        - name: portal-bridge-sso
+          configMap:
+            name: nextcloud-portal-bridge-sso
       extraVolumeMounts:
         - name: gentian-sensitive
           mountPath: /etc/gentian
+          readOnly: true
+        - name: portal-bridge-sso
+          mountPath: /var/www/html/nextcloud-portal-sso.html
+          subPath: nextcloud-portal-sso.html
           readOnly: true
       hooks:
         before-starting: |
@@ -226,8 +233,6 @@ spec:
             $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
             $NC config:app:set richdocuments doc_format --value="odf" || true
           fi
-          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/nextcloud-portal-sso.html \
-            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
         post-installation: |
           #!/bin/bash
           set -eu
@@ -267,8 +272,6 @@ spec:
           $NC config:app:set richdocuments doc_format --value="odf" || true
           $NC richdocuments:activate-config || true
           $NC background:cron || true
-          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/nextcloud-portal-sso.html \
-            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
           echo "[gentian-nextcloud] bootstrap complete for ${CLOUD_URL}"
 
     collabora:
