@@ -1,0 +1,312 @@
+# AppProfile — Nextcloud (per-tenant file sharing + Collabora office)
+#
+# Source chart: https://nextcloud.github.io/helm/ nextcloud v9.0.4
+#   Community-maintained chart (Apache-2.0); docker.io/library/nextcloud app image.
+#   Collabora Online ships as an optional subchart (collabora-online, no account required).
+#
+# Distinct from the kernel Nextcloud Files service at files.<kernel-domain> (§6g
+# app-profile-guide.md). This profile deploys a dedicated Nextcloud instance per tenant
+# for App Store installs and demo tenants.
+#
+# Secret inventory:
+#   Kernel-provided:
+#     oidc_client_secret  → nextcloud.oidcBootstrap.clientSecret (hook + bootstrap)
+#     pg_*                → externalDatabase.{host,database,user,password}
+#     redis_*             → externalRedis.{host,port,password}
+#     ldap_bind_password  → nextcloud.ldapBootstrap.bindPassword
+#   App-internal (1) → appSecrets:
+#     admin_password      → nextcloud.password
+#
+# Bootstrap: post-installation / before-starting hooks (nextcloud/docker entrypoint)
+# configure user_oidc, richdocuments (Collabora), and reverse-proxy settings. No custom
+# composition — app-default handles ExternalSecret, DB, cache, LDAP init, and Helm release.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: nextcloud
+  labels:
+    gentianos.io/profile-name: nextcloud
+spec:
+  displayName: "Nextcloud"
+  description: "Self-hosted file sync and share with Collabora Online document editing, OIDC SSO, and LDAP directory sync."
+  family: nextcloud
+  catalogueVersion: "1.0.0"
+  edition: full
+  trustTier: certified
+  license: AGPL-3.0-only
+  tile:
+    icon: files
+
+  kernelRequirements:
+    identity:
+      oidc:
+        clientId: "opendesk-nextcloud"
+        name: "Nextcloud"
+        accessType: CONFIDENTIAL
+        redirectUris:
+          - "https://cloud.${TENANT_DOMAIN}/*"
+        postLogoutRedirectUris:
+          - "https://cloud.${TENANT_DOMAIN}/"
+          - "https://portal.${KERNEL_DOMAIN}/"
+        backchannelLogoutUrl: "https://cloud.${TENANT_DOMAIN}/apps/user_oidc/backchannel-logout/opendesk"
+      ldap:
+        search: true
+        sync: true
+        interval: "1h"
+    database:
+      engine: postgresql
+      databasePerTenant: true
+    cache:
+      engine: redis
+    mail:
+      smtp:
+        auth: plain
+        port: 587
+
+  provides:
+    - name: file-store
+      protocol: webdav
+    - name: filepicker
+      protocol: ocs
+
+  optionalIntegrations:
+    - contract: central-navigation
+      provider: portal
+      capabilities:
+        - navigation:register
+    - contract: office-editor
+      provider: collabora
+      capabilities:
+        - wopi:edit
+
+  portalTiles:
+    - name: nextcloud
+      displayName:
+        de_DE: "Dateien"
+        en_US: "Files"
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  chart:
+    repository: "https://nextcloud.github.io/helm/"
+    name: nextcloud
+    version: "9.0.4"
+
+  deploymentMethod: crossplane
+
+  valueMapping:
+    oidc:
+      clientSecretKey: "nextcloud.oidcBootstrap.clientSecret"
+    database:
+      hostKey: "externalDatabase.host"
+      nameKey: "externalDatabase.database"
+      userKey: "externalDatabase.user"
+      passwordKey: "externalDatabase.password"
+    cache:
+      hostKey: "externalRedis.host"
+      portKey: "externalRedis.port"
+      passwordKey: "externalRedis.password"
+    ldap:
+      bindPasswordKey: "nextcloud.ldapBootstrap.bindPassword"
+    smtp:
+      passwordKey: "nextcloud.mail.smtp.password"
+
+  appSecrets:
+    - name: admin_password
+      valuePath: "nextcloud.password"
+
+  ingress:
+    subDomain: "cloud"
+    serviceName: "nextcloud"
+    servicePort: 80
+    ingressClassName: "nginx"
+    tlsEnabled: true
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "512M"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+
+  additionalIngresses:
+    - subDomain: collabora
+      serviceName: nextcloud-collabora
+      servicePort: 9980
+      ingressClassName: nginx
+      tlsEnabled: true
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "100M"
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+        nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+
+  extraValues:
+    fullnameOverride: "nextcloud"
+
+    internalDatabase:
+      enabled: false
+
+    externalDatabase:
+      enabled: true
+      type: postgresql
+
+    mariadb:
+      enabled: false
+
+    postgresql:
+      enabled: false
+
+    externalRedis:
+      enabled: true
+
+    redis:
+      enabled: false
+
+    phpClientHttpsFix:
+      enabled: true
+      protocol: https
+
+    ingress:
+      enabled: false
+
+    persistence:
+      enabled: true
+      size: 10Gi
+
+    cronjob:
+      enabled: true
+      type: sidecar
+
+    podAnnotations:
+      secret.reloader.stakater.com/reload: nextcloud-sensitive-values
+
+    nextcloud:
+      host: "cloud.${TENANT_DOMAIN}"
+      username: admin
+      password: ""
+      update: 0
+      mail:
+        enabled: true
+        fromAddress: noreply
+        domain: "${TENANT_DOMAIN}"
+        smtp:
+          host: "${SMTP_HOST}"
+          port: 587
+          secure: tls
+          authtype: LOGIN
+          name: "opendesk-system@${TENANT_DOMAIN}"
+      configs:
+        gentian-proxy.config.php: |-
+          <?php
+          $CONFIG = array(
+            'overwritehost' => 'cloud.${TENANT_DOMAIN}',
+            'overwriteprotocol' => 'https',
+            'overwrite.cli.url' => 'https://cloud.${TENANT_DOMAIN}',
+            'trusted_proxies' => array('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'),
+            'allow_local_remote_servers' => true,
+          );
+      extraVolumes:
+        - name: gentian-sensitive
+          secret:
+            secretName: nextcloud-sensitive-values
+      extraVolumeMounts:
+        - name: gentian-sensitive
+          mountPath: /etc/gentian
+          readOnly: true
+      hooks:
+        before-starting: |
+          #!/bin/bash
+          set -eu
+          NC="php /var/www/html/occ"
+          COLLABORA_INTERNAL="http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980"
+          COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
+          CLOUD_URL="https://cloud.${TENANT_DOMAIN}"
+          if ! $NC status >/dev/null 2>&1; then
+            exit 0
+          fi
+          if $NC app:list --enabled 2>/dev/null | grep -q 'richdocuments:'; then
+            $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
+            $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
+            $NC config:app:set richdocuments doc_format --value="odf" || true
+          fi
+        post-installation: |
+          #!/bin/bash
+          set -eu
+          NC="php /var/www/html/occ"
+          CLOUD_URL="https://cloud.${TENANT_DOMAIN}"
+          COLLABORA_INTERNAL="http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980"
+          COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
+          DISCOVERY_URI="https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/.well-known/openid-configuration"
+          OIDC_SECRET="$(cat /etc/gentian/oidc-client-secret)"
+          LDAP_BIND="$(cat /etc/gentian/ldap-bind-password)"
+          LDAP_HOST="${LDAP_HOST}"
+          LDAP_BASE="${LDAP_BASE_DN}"
+          LDAP_BIND_DN="${LDAP_BIND_DN}"
+          echo "[gentian-nextcloud] waiting for Nextcloud to become ready..."
+          for i in $(seq 1 90); do
+            if $NC status >/dev/null 2>&1; then break; fi
+            sleep 5
+          done
+          $NC app:install user_oidc || true
+          $NC app:enable user_oidc || true
+          $NC app:install richdocuments || true
+          $NC app:enable richdocuments || true
+          $NC user_oidc:provider opendesk \
+            --clientid="opendesk-nextcloud" \
+            --clientsecret="${OIDC_SECRET}" \
+            --discoveryuri="${DISCOVERY_URI}" \
+            --scope="openid profile email opendesk-nextcloud-scope" \
+            --mapping-uid="opendesk_username" \
+            --mapping-display-name="name" \
+            --mapping-email="email" \
+            --unique-uid="1" \
+            --check-bearer="0" || true
+          $NC config:app:set user_oidc id4me --value="0" || true
+          $NC config:system:set allow_local_remote_servers --type=boolean --value=true || true
+          $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
+          $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
+          $NC config:app:set richdocuments doc_format --value="odf" || true
+          $NC richdocuments:activate-config || true
+          if ! $NC ldap:show-config s01 >/dev/null 2>&1; then
+            $NC ldap:create-empty-config || true
+            $NC ldap:set-config s01 ldapHost "${LDAP_HOST}" || true
+            $NC ldap:set-config s01 ldapPort "389" || true
+            $NC ldap:set-config s01 ldapBase "${LDAP_BASE_DN}" || true
+            $NC ldap:set-config s01 ldapAgentName "${LDAP_BIND_DN}" || true
+            $NC ldap:set-config s01 ldapAgentPassword "${LDAP_BIND}" || true
+            $NC ldap:set-config s01 ldapLoginFilter "(&(objectClass=inetOrgPerson)(uid=%uid))" || true
+            $NC ldap:set-config s01 ldapUserFilter "(&(objectClass=inetOrgPerson))" || true
+            $NC ldap:set-config s01 ldapUuidAttribute "entryUUID" || true
+            $NC ldap:set-config s01 ldapExpertUsernameAttr "uid" || true
+            $NC ldap:set-config s01 ldapEmailAttribute "mailPrimaryAddress" || true
+            $NC ldap:set-config s01 ldapDisplayName "displayName" || true
+            $NC ldap:set-config s01 homeFolderNamingRule "uid" || true
+            $NC ldap:set-config s01 hasMemberOfFilterSupport "1" || true
+            $NC ldap:set-config s01 useMemberOfToExtendMembership "1" || true
+            $NC ldap:set-config s01 ldapConfigurationActive "1" || true
+          fi
+          $NC background:cron || true
+          echo "[gentian-nextcloud] bootstrap complete for ${CLOUD_URL}"
+
+    collabora:
+      enabled: true
+      fullnameOverride: nextcloud-collabora
+      collabora:
+        aliasgroups:
+          - host: "https://cloud.${TENANT_DOMAIN}"
+        extra_params: "--o:ssl.enable=false --o:ssl.termination=true --o:net.proto=ipv4"
+        server_name: "collabora.${TENANT_DOMAIN}"
+      ingress:
+        enabled: false
+      resources:
+        limits:
+          cpu: "2"
+          memory: "2Gi"
+        requests:
+          cpu: "250m"
+          memory: "1Gi"
+
+    resources:
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+      requests:
+        cpu: "250m"
+        memory: "512Mi"

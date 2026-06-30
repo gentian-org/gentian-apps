@@ -27,6 +27,7 @@ Tenant apps require `profile.yaml`. Platform catalogue bundles (e.g.
 | `element` | `app-element` | Jitsi OIDC overlay ConfigMap |
 | `opendesk-oidc-catalog` | — | OpenDesk OIDC pack catalogue CR |
 | `odoo-free-base` | — (`app-default`) | — |
+| `nextcloud` | — (`app-default`) | — |
 
 ## Adding a simple app
 
