@@ -406,6 +406,12 @@ spec:
                 "imagePullSecrets" $imagePull
                 "global" (mergeOverwrite (dig "global" dict $elementExtraVals) (dict "imagePullSecrets" $imagePull))
             ) }}
+            {{- $appPodLabels := dict
+                "gentianos.io/app" $app
+                "gentianos.io/tenant" $tenant
+                "app.kubernetes.io/managed-by" "gentian-os"
+            }}
+            {{- $elementExtraVals = mergeOverwrite $elementExtraVals (dict "podLabels" $appPodLabels) }}
 
             {{- /* ── Emit Keycloak Client CR ─────────────────────────────────────────── */}}
             {{- /* When kernelRequirements.identity.oidc is set, the composition   */}}
@@ -583,7 +589,7 @@ spec:
                  http token/userinfo/jwks when KEYCLOAK_INTERNAL_URL is set, use_insecure_ssl
                  (staging fallback), user_profile_method:userinfo_endpoint, and strip
                  homeserver.oidc so the chart does not emit a duplicate block. */}}
-            {{- $publicIdBase := printf "https://id.%s/realms/%s" $kernelDomain $tenant }}
+            {{- $publicIdBase := printf "https://id.%s/auth/realms/%s" $kernelDomain $tenant }}
             {{- $keycloakInternal := dig "KEYCLOAK_INTERNAL_URL" "" $ksCMDataStaging }}
             {{- $serverIdBase := $publicIdBase }}
             {{- if $keycloakInternal }}
@@ -644,6 +650,7 @@ spec:
                 "configuration"    $confVals
                 "fullnameOverride" "opendesk-synapse"
                 "imagePullSecrets" $imagePull
+                "podLabels"        $appPodLabels
                 "replicaCount"     1
                 "federation" (dict "ingress" (dict "enabled" false))
                 "resources" (dict
@@ -795,6 +802,7 @@ spec:
                 "global"           $globalVals
                 "fullnameOverride" "synapse-web"
                 "imagePullSecrets" $imagePull
+                "podLabels"        $appPodLabels
                 "replicaCount"     1
                 "ingress"          $synapseWebIngress
                 "resources" (dict
@@ -1325,6 +1333,12 @@ spec:
                     ttlSecondsAfterFinished: 600
                     backoffLimit: 10
                     template:
+                      metadata:
+                        labels:
+                          app.kubernetes.io/managed-by: gentian-os
+                          gentianos.io/tenant: {{ $tenant }}
+                          gentianos.io/app: {{ $app }}
+                          gentianos.io/component: app-init
                       spec:
                         serviceAccountName: app-init
                         restartPolicy: OnFailure

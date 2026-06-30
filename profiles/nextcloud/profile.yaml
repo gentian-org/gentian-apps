@@ -112,7 +112,7 @@ spec:
   ingress:
     subDomain: "cloud"
     serviceName: "nextcloud"
-    servicePort: 80
+    servicePort: 808080
     ingressClassName: "nginx"
     tlsEnabled: true
     annotations:
