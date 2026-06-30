@@ -80,8 +80,7 @@ spec:
       displayName:
         de_DE: "Dateien"
         en_US: "Files"
-      # Direct OIDC login (provider id 1 from post-install hook); portal adds login_hint.
-      linkSuffix: "/apps/user_oidc/login/1"
+      # Embedded portal tile — gentian-ui opens /nextcloud-portal-sso.html with a bridge ticket.
       linkTarget: embedded
       allowedGroup: "App Users"
 
@@ -227,6 +226,8 @@ spec:
             $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
             $NC config:app:set richdocuments doc_format --value="odf" || true
           fi
+          curl -sfLo /var/www/html/nextcloud-portal-sso.html \
+            "https://portal.${KERNEL_DOMAIN}/nextcloud-portal-sso.html" || true
         post-installation: |
           #!/bin/bash
           set -eu
@@ -259,13 +260,15 @@ spec:
             --check-bearer="0" || true
           $NC config:app:set user_oidc id4me --value="0" || true
           # Single OIDC backend: auto-redirect /login to the opendesk provider (portal SSO).
-          $NC config:app:set user_oidc allow_multiple_user_backends --value="0" || true
+          $NC config:app:set user_oidc allow_multiple_user_backends --value="1" || true
           $NC config:system:set allow_local_remote_servers --type=boolean --value=true || true
           $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
           $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
           $NC config:app:set richdocuments doc_format --value="odf" || true
           $NC richdocuments:activate-config || true
           $NC background:cron || true
+          curl -sfLo /var/www/html/nextcloud-portal-sso.html \
+            "https://portal.${KERNEL_DOMAIN}/nextcloud-portal-sso.html" || true
           echo "[gentian-nextcloud] bootstrap complete for ${CLOUD_URL}"
 
     collabora:
