@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core.auth import get_current_user
 from app.core.config import get_settings
+from app.services.k8s_client import K8sClient
 from app.services.lifecycle import LifecycleError, get_lifecycle_client
+from app.services.tenant_app_status import claim_status_from_result, list_from_k8s
 
 router = APIRouter(prefix="/tenant/apps", tags=["tenant-apps"])
 
@@ -15,42 +17,40 @@ def _actor(user: dict) -> str:
     return str(user.get("preferred_username") or user.get("sub") or "unknown")
 
 
-def _claim_status_from_result(item: dict[str, Any]) -> dict[str, Any]:
-    ready = bool(item.get("ready"))
-    if ready:
-        return {
-            "phase": "ready",
-            "ready": True,
-            "message": item.get("message") or "Installed and ready",
-        }
-    return {
-        "phase": "provisioning",
-        "ready": False,
-        "message": item.get("message") or "Provisioning in progress",
-    }
+def _list_installed_entries() -> tuple[list[dict[str, Any]], str | None]:
+    settings = get_settings()
+    k8s = K8sClient()
+    namespace = settings.tenant_namespace
+
+    lifecycle_warning: str | None = None
+    try:
+        apps = get_lifecycle_client().list_installed()
+        entries = [
+            {"profile": app["profile"], **claim_status_from_result(app)} for app in apps
+        ]
+        return entries, lifecycle_warning
+    except LifecycleError as exc:
+        lifecycle_warning = str(exc)
+        return list_from_k8s(k8s, settings.tenant_id, namespace), lifecycle_warning
 
 
 @router.get("/installed")
 def list_installed(user: dict = Depends(get_current_user)) -> dict:
     _ = user
     settings = get_settings()
-    try:
-        lc = get_lifecycle_client()
-        apps = lc.list_installed()
-    except LifecycleError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    entries = [
-        {"profile": app["profile"], **_claim_status_from_result(app)} for app in apps
-    ]
+    entries, lifecycle_warning = _list_installed_entries()
     ready = [app for app in entries if app.get("ready")]
-    pending = [app for app in entries if not app.get("ready")]
-    return {
+    installing = [app for app in entries if not app.get("ready")]
+    result = {
         "tenant": settings.tenant_id,
         "namespace": settings.tenant_namespace,
         "apps": entries,
         "ready": ready,
-        "pending": pending,
+        "installing": installing,
     }
+    if lifecycle_warning:
+        result["lifecycleWarning"] = lifecycle_warning
+    return result
 
 
 @router.post("/{profile}/install")
@@ -70,7 +70,7 @@ def install_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
         "mode": "gitops",
         "tenant": settings.tenant_id,
         "profile": profile,
-        **_claim_status_from_result({"ready": ready, "message": result.get("message")}),
+        **claim_status_from_result({"ready": ready, "message": result.get("message")}),
     }
 
 
@@ -102,17 +102,13 @@ def uninstall_app(
 @router.get("/{profile}/status")
 def app_status(profile: str, user: dict = Depends(get_current_user)) -> dict:
     _ = user
-    settings = get_settings()
-    try:
-        apps = get_lifecycle_client().list_installed()
-    except LifecycleError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    for app in apps:
+    entries, _ = _list_installed_entries()
+    for app in entries:
         if app.get("profile") == profile:
-            return {"profile": profile, **_claim_status_from_result(app)}
+            return {"profile": profile, **claim_status_from_result(app)}
     return {
         "profile": profile,
-        "phase": "pending",
+        "phase": "installing",
         "ready": False,
         "message": "Not installed",
     }

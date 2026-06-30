@@ -22,7 +22,7 @@ type InstalledApp = {
   profile: string;
   name?: string;
   ready?: boolean;
-  phase?: "pending" | "provisioning" | "ready";
+  phase?: "installing" | "ready";
   message?: string;
   conditions?: AppCondition[];
 };
@@ -37,7 +37,8 @@ type CatalogueResponse = {
 type InstalledResponse = {
   apps: InstalledApp[];
   ready: InstalledApp[];
-  pending: InstalledApp[];
+  installing: InstalledApp[];
+  lifecycleWarning?: string;
 };
 
 type InstallResponse = {
@@ -78,7 +79,7 @@ function AppListCard({
   onPurge: (profile: string) => void;
 }) {
   const ready = isAppReady(app);
-  const statusText = ready ? "Installed and ready" : app.message || "Pending";
+  const statusText = ready ? "Ready" : app.message || "Installing";
   const statusClass = ready ? "text-emerald-700" : "text-amber-700";
   const isBusy = busy === app.profile;
 
@@ -140,7 +141,7 @@ export function StorePage() {
       })
       .catch((e: Error) => {
         if (e.message !== "Redirecting to sign in…") {
-          setNotice({ kind: "error", text: `Installed apps: ${e.message}` });
+          setNotice({ kind: "error", text: `App status: ${e.message}` });
         }
       });
 
@@ -164,11 +165,11 @@ export function StorePage() {
 
   const installedByProfile = new Map(installed.map((app) => [app.profile, app]));
   const readyApps = installed.filter((app) => isAppReady(app));
-  const pendingApps = installed.filter((app) => !isAppReady(app));
-  const hasPending = pendingApps.length > 0;
+  const installingApps = installed.filter((app) => !isAppReady(app));
+  const hasInstalling = installingApps.length > 0;
 
   useEffect(() => {
-    if (!hasPending) {
+    if (!hasInstalling) {
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
@@ -185,7 +186,7 @@ export function StorePage() {
         pollRef.current = null;
       }
     };
-  }, [hasPending, refresh]);
+  }, [hasInstalling, refresh]);
 
   async function install(profile: string) {
     setBusy(profile);
@@ -206,8 +207,8 @@ export function StorePage() {
         next.push({
           profile,
           ready: result.ready === true,
-          phase: result.ready ? "ready" : "provisioning",
-          message: result.message || "Install requested — provisioning in progress",
+          phase: result.ready ? "ready" : "installing",
+          message: result.message || "Install requested — waiting for provisioning",
         });
         return next;
       });
@@ -215,11 +216,11 @@ export function StorePage() {
       await refresh().catch(() => undefined);
 
       if (result.ready) {
-        setNotice({ kind: "success", text: `${label} is installed and ready.` });
+        setNotice({ kind: "success", text: `${label} is ready.` });
       } else {
         setNotice({
           kind: "info",
-          text: `${label} install started — provisioning in progress. Status refreshes automatically.`,
+          text: `${label} is installing. Status refreshes automatically until it becomes ready.`,
         });
       }
     } catch (e) {
@@ -302,14 +303,15 @@ export function StorePage() {
         </div>
       )}
 
-      {pendingApps.length > 0 && (
+      {installingApps.length > 0 && (
         <section className="mb-10">
-          <h2 className="mb-4 text-lg font-semibold">Pending</h2>
+          <h2 className="mb-4 text-lg font-semibold">Installing</h2>
           <p className="mb-4 text-sm text-slate-600">
-            These apps are being provisioned. Status refreshes automatically every few seconds.
+            These apps are on your tenant but not ready yet. Status refreshes automatically every
+            few seconds.
           </p>
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {pendingApps.map((app) => (
+            {installingApps.map((app) => (
               <AppListCard
                 key={app.profile}
                 app={app}
@@ -324,9 +326,9 @@ export function StorePage() {
       )}
 
       <section className="mb-10">
-        <h2 className="mb-4 text-lg font-semibold">Installed</h2>
+        <h2 className="mb-4 text-lg font-semibold">Ready</h2>
         {readyApps.length === 0 ? (
-          <p className="text-slate-500">No apps are fully ready yet.</p>
+          <p className="text-slate-500">No apps are ready yet.</p>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {readyApps.map((app) => (
@@ -349,7 +351,7 @@ export function StorePage() {
           {(catalogue?.apps || []).map((app) => {
             const installedApp = installedByProfile.get(app.name);
             const ready = isAppReady(installedApp);
-            const pending = Boolean(installedApp) && !ready;
+            const installing = Boolean(installedApp) && !ready;
 
             return (
               <article
@@ -391,13 +393,13 @@ export function StorePage() {
                     Details
                   </button>
                   {ready ? (
-                    <span className="text-sm font-medium text-emerald-700">Installed</span>
-                  ) : pending ? (
+                    <span className="text-sm font-medium text-emerald-700">Ready</span>
+                  ) : installing ? (
                     <span
                       className="rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800"
                       title={installedApp?.message}
                     >
-                      Pending
+                      Installing
                     </span>
                   ) : (
                     <button
