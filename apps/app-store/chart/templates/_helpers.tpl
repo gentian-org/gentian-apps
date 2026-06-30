@@ -27,3 +27,6 @@ capabilities:
   drop:
     - ALL
 {{- end }}
+
+{{- define "gentian-app.helm.annotations" -}}
+{{- end }}
