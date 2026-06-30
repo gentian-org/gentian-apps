@@ -66,6 +66,15 @@ if ($user === null) {
 }
 
 $userSession->setUser($user);
+
+$dataDir = (string) \OC::$server->getConfig()->getSystemValue('datadirectory', \OC::$SERVERROOT . '/data');
+$userDir = rtrim($dataDir, '/') . '/' . $username;
+if (!is_dir($userDir . '/files')) {
+    mkdir($userDir . '/files', 0770, true);
+    mkdir($userDir . '/cache', 0770, true);
+}
+\OC::$server->getUserFolder($username);
+
 $userSession->createSessionToken(
     \OC::$server->getRequest(),
     $user->getUID(),
