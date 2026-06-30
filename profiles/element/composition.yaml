@@ -382,7 +382,7 @@ spec:
             {{- $elementConf := dig "configuration" dict $elementExtraVals }}
             {{- $elementAddConf := dig "additionalConfiguration" dict $elementConf }}
             {{- $elementAddConf = mergeOverwrite $elementAddConf (dict
-                "sso_redirect_options" (dict "immediate" true "on_welcome_page" true)
+                "sso_redirect_options" (dict "immediate" false "on_welcome_page" true)
             ) }}
             {{- $elementConf = mergeOverwrite $elementConf (dict "additionalConfiguration" $elementAddConf) }}
             {{- $elementExtraVals = mergeOverwrite $elementExtraVals (dict "configuration" $elementConf) }}
