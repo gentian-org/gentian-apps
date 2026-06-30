@@ -6,7 +6,7 @@
 # reconciler applies them per tenant realm when an AppProfile declares a
 # matching kernelRequirements.identity.oidc.clientId.
 #
-# LDAP groups are tenant-scoped: cn=managed-by-attribute-<App>,ou=<tenant>,...
+# Entitlement groups are Keycloak group names mapped to pack client roles.
 
 apiVersion: gentianos.io/v1alpha1
 kind: OIDCPackCatalog
@@ -99,7 +99,7 @@ spec:
       scopeName: opendesk-jitsi-scope
       scopeDescription: "Scope for the claims required by openDesk's Jitsi instance."
       clientRole: opendesk-jitsi-access-control
-      ldapGroup: managed-by-attribute-Videoconference
+      entitlementGroup: managed-by-attribute-Videoconference
       publicClient: true
       fullScopeAllowed: true
       defaultScopes:
@@ -118,7 +118,7 @@ spec:
       scopeName: opendesk-matrix-scope
       scopeDescription: "Scope for the claims required by openDesk's Matrix instance."
       clientRole: opendesk-matrix-access-control
-      ldapGroup: managed-by-attribute-Livecollaboration
+      entitlementGroup: managed-by-attribute-Livecollaboration
       publicClient: false
       fullScopeAllowed: false
       defaultScopes:
@@ -137,7 +137,7 @@ spec:
       scopeName: opendesk-nextcloud-scope
       scopeDescription: "Scope for the claims required by openDesk's Nextcloud instance."
       clientRole: opendesk-nextcloud-access-control
-      ldapGroup: managed-by-attribute-Fileshare
+      entitlementGroup: managed-by-attribute-Fileshare
       publicClient: false
       fullScopeAllowed: false
       defaultScopes:
@@ -155,7 +155,7 @@ spec:
       scopeName: opendesk-openproject-scope
       scopeDescription: "Scope for the claims required by openDesk's OpenProject instance."
       clientRole: opendesk-openproject-access-control
-      ldapGroup: managed-by-attribute-Projectmanagement
+      entitlementGroup: managed-by-attribute-Projectmanagement
       publicClient: false
       fullScopeAllowed: false
       defaultScopes:
@@ -176,7 +176,7 @@ spec:
       scopeName: opendesk-xwiki-scope
       scopeDescription: "Scope for the claims required by openDesk's XWiki instance."
       clientRole: opendesk-xwiki-access-control
-      ldapGroup: managed-by-attribute-Knowledgemanagement
+      entitlementGroup: managed-by-attribute-Knowledgemanagement
       publicClient: false
       fullScopeAllowed: false
       defaultScopes:
@@ -195,7 +195,7 @@ spec:
       scopeName: opendesk-oxappsuite-scope
       scopeDescription: "Scope for the claims required by openDesk's OX App Suite instance."
       clientRole: opendesk-oxappsuite-access-control
-      ldapGroup: managed-by-attribute-Groupware
+      entitlementGroup: managed-by-attribute-Groupware
       publicClient: false
       fullScopeAllowed: false
       defaultScopes:
