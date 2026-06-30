@@ -222,7 +222,9 @@ spec:
             exit 0
           fi
           if $NC app:list --enabled 2>/dev/null | grep -q 'richdocuments:'; then
-            $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
+            # Use the public Collabora URL for server-side WOPI discovery too. Tenant
+            # baseline NetworkPolicy allows HTTPS egress but not in-cluster :9980.
+            $NC config:app:set richdocuments wopi_url --value="${COLLABORA_PUBLIC}" || true
             $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
             $NC config:app:set richdocuments doc_format --value="odf" || true
           fi
@@ -276,7 +278,7 @@ spec:
           # Single OIDC backend: auto-redirect /login to the opendesk provider (portal SSO).
           $NC config:app:set user_oidc allow_multiple_user_backends --value="1" || true
           $NC config:system:set allow_local_remote_servers --type=boolean --value=true || true
-          $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
+          $NC config:app:set richdocuments wopi_url --value="${COLLABORA_PUBLIC}" || true
           $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
           $NC config:app:set richdocuments doc_format --value="odf" || true
           $NC richdocuments:activate-config || true
@@ -302,6 +304,9 @@ spec:
     collabora:
       enabled: true
       fullnameOverride: nextcloud-collabora
+      podLabels:
+        gentianos.io/app: nextcloud
+        gentianos.io/tenant: ${TENANT_ID}
       collabora:
         aliasgroups:
           - host: "https://cloud.${TENANT_DOMAIN}"
