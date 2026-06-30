@@ -80,6 +80,8 @@ spec:
       displayName:
         de_DE: "Dateien"
         en_US: "Files"
+      # Direct OIDC login (provider id 1 from post-install hook); portal adds login_hint.
+      linkSuffix: "/apps/user_oidc/login/1"
       linkTarget: embedded
       allowedGroup: "App Users"
 
@@ -133,6 +135,11 @@ spec:
 
   extraValues:
     fullnameOverride: "nextcloud"
+
+    # Redis ACL user is provisioned as ${TENANT_ID}-nextcloud; the chart only maps password by default.
+    extraEnvVars:
+      - name: REDIS_HOST_USER
+        value: "${TENANT_ID}-nextcloud"
 
     internalDatabase:
       enabled: false
@@ -227,7 +234,9 @@ spec:
           CLOUD_URL="https://cloud.${TENANT_DOMAIN}"
           COLLABORA_INTERNAL="http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980"
           COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
-          DISCOVERY_URI="https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/.well-known/openid-configuration"
+          # In-cluster discovery for server-side token/JWK calls; the document still advertises
+          # the external authorization_endpoint for browser redirects (same as kernel Files).
+          DISCOVERY_URI="http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
           OIDC_SECRET="$(cat /etc/gentian/oidc-client-secret)"
           echo "[gentian-nextcloud] waiting for Nextcloud to become ready..."
           for i in $(seq 1 90); do
@@ -249,6 +258,8 @@ spec:
             --unique-uid="1" \
             --check-bearer="0" || true
           $NC config:app:set user_oidc id4me --value="0" || true
+          # Single OIDC backend: auto-redirect /login to the opendesk provider (portal SSO).
+          $NC config:app:set user_oidc allow_multiple_user_backends --value="0" || true
           $NC config:system:set allow_local_remote_servers --type=boolean --value=true || true
           $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
           $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
