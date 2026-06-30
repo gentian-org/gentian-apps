@@ -230,6 +230,17 @@ spec:
             "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
           curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
             "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
+          python3 - <<'PY'
+          from pathlib import Path
+          htaccess = Path("/var/www/html/.htaccess")
+          if not htaccess.is_file():
+              raise SystemExit(0)
+          text = htaccess.read_text()
+          old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
+          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
+          if "gentian-portal-bridge" not in text:
+              htaccess.write_text(text.replace(old, new))
+          PY
         post-installation: |
           #!/bin/bash
           set -eu
@@ -273,6 +284,17 @@ spec:
             "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
           curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
             "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
+          python3 - <<'PY'
+          from pathlib import Path
+          htaccess = Path("/var/www/html/.htaccess")
+          if not htaccess.is_file():
+              raise SystemExit(0)
+          text = htaccess.read_text()
+          old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
+          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
+          if "gentian-portal-bridge" not in text:
+              htaccess.write_text(text.replace(old, new))
+          PY
           echo "[gentian-nextcloud] bootstrap complete for ${CLOUD_URL}"
 
     collabora:
