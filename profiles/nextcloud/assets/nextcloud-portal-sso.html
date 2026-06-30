@@ -19,56 +19,6 @@
   <body>
     <p>Signing in to Files…</p>
     <script>
-      function portalApiBase() {
-        const parts = window.location.hostname.split(".");
-        if (parts[0] === "cloud" && parts.length > 2) {
-          return `${window.location.protocol}//${["portal", ...parts.slice(2)].join(".")}/api/v1`;
-        }
-        return `${window.location.protocol}//portal.${parts.slice(-2).join(".")}/api/v1`;
-      }
-
-      async function fetchRequestToken() {
-        const response = await fetch("/login?direct=1", { credentials: "same-origin" });
-        const html = await response.text();
-        const patterns = [
-          /data-requesttoken="([^"]+)"/,
-          /name="requesttoken"\s+value="([^"]+)"/,
-          /requesttoken="([^"]+)"/,
-        ];
-        for (const pattern of patterns) {
-          const match = html.match(pattern);
-          if (match?.[1]) {
-            return match[1];
-          }
-        }
-        return "";
-      }
-
-      function submitLogin(username, password, requestToken) {
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.action = "/login?direct=1";
-        form.style.display = "none";
-
-        for (const [name, value] of [
-          ["user", username],
-          ["password", password],
-          ["requesttoken", requestToken],
-        ]) {
-          if (!value) {
-            continue;
-          }
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = name;
-          input.value = value;
-          form.appendChild(input);
-        }
-
-        document.body.appendChild(form);
-        form.submit();
-      }
-
       (async () => {
         const ticket = new URLSearchParams(window.location.search).get("t");
         if (!ticket) {
@@ -76,22 +26,11 @@
           return;
         }
 
-        let credentials;
-        try {
-          const response = await fetch(
-            `${portalApiBase()}/session/nextcloud-bridge/redeem/${encodeURIComponent(ticket)}`,
-          );
-          if (!response.ok) {
-            throw new Error("redeem failed");
-          }
-          credentials = await response.json();
-        } catch (_error) {
-          window.location.replace("/login?direct=1");
-          return;
-        }
-
-        const requestToken = await fetchRequestToken();
-        submitLogin(credentials.username, credentials.password, requestToken);
+        // Server-side session establishment avoids iframe third-party cookie /
+        // CSRF failures from posting the login form in an embedded WinBox.
+        window.location.replace(
+          `/gentian-portal-bridge.php?t=${encodeURIComponent(ticket)}`,
+        );
       })();
     </script>
   </body>
