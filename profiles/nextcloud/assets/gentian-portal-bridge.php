@@ -20,7 +20,7 @@ if ($ticket === '') {
 
 $portalApi = getenv('GENTIAN_PORTAL_BRIDGE_API');
 if (!is_string($portalApi) || $portalApi === '') {
-    $portalApi = 'http://gentian-portal-gentian-portal-api.platform-kernel.svc.cluster.local:8080/api/v1';
+    $portalApi = 'http://gentian-portal-gentian-portal-api.platform-kernel.svc.cluster.local:8000/api/v1';
 }
 
 $redeemUrl = rtrim($portalApi, '/') . '/session/nextcloud-bridge/redeem/' . rawurlencode($ticket);

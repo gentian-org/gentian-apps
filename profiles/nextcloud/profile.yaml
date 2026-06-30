@@ -230,6 +230,7 @@ spec:
             "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
           curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
             "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
+          sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/gentian-portal-bridge.php 2>/dev/null || true
           python3 - <<'PY'
           from pathlib import Path
           htaccess = Path("/var/www/html/.htaccess")
@@ -284,6 +285,7 @@ spec:
             "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
           curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
             "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
+          sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/gentian-portal-bridge.php 2>/dev/null || true
           python3 - <<'PY'
           from pathlib import Path
           htaccess = Path("/var/www/html/.htaccess")
