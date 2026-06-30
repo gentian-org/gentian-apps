@@ -226,8 +226,6 @@ spec:
             $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
             $NC config:app:set richdocuments doc_format --value="odf" || true
           fi
-          curl -sfLo /var/www/html/nextcloud-portal-sso.html \
-            "https://portal.${KERNEL_DOMAIN}/nextcloud-portal-sso.html" || true
         post-installation: |
           #!/bin/bash
           set -eu
@@ -267,8 +265,8 @@ spec:
           $NC config:app:set richdocuments doc_format --value="odf" || true
           $NC richdocuments:activate-config || true
           $NC background:cron || true
-          curl -sfLo /var/www/html/nextcloud-portal-sso.html \
-            "https://portal.${KERNEL_DOMAIN}/nextcloud-portal-sso.html" || true
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/nextcloud-portal-sso.html \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
           echo "[gentian-nextcloud] bootstrap complete for ${CLOUD_URL}"
 
     collabora:
