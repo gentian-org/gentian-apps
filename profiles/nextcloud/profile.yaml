@@ -13,13 +13,13 @@
 #     oidc_client_secret  → nextcloud.oidcBootstrap.clientSecret (hook + bootstrap)
 #     pg_*                → externalDatabase.{host,database,user,password}
 #     redis_*             → externalRedis.{host,port,password}
-#     ldap_bind_password  → nextcloud.ldapBootstrap.bindPassword
+#     smtp_password       → nextcloud.mail.smtp.password
 #   App-internal (1) → appSecrets:
 #     admin_password      → nextcloud.password
 #
 # Bootstrap: post-installation / before-starting hooks (nextcloud/docker entrypoint)
 # configure user_oidc, richdocuments (Collabora), and reverse-proxy settings. No custom
-# composition — app-default handles ExternalSecret, DB, cache, LDAP init, and Helm release.
+# composition — app-default handles ExternalSecret, DB, cache, and Helm release.
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
@@ -28,7 +28,7 @@ metadata:
     gentianos.io/profile-name: nextcloud
 spec:
   displayName: "Nextcloud"
-  description: "Self-hosted file sync and share with Collabora Online document editing, OIDC SSO, and LDAP directory sync."
+  description: "Self-hosted file sync and share with Collabora Online document editing and OIDC SSO."
   family: nextcloud
   catalogueVersion: "1.0.0"
   edition: full
@@ -49,10 +49,6 @@ spec:
           - "https://cloud.${TENANT_DOMAIN}/"
           - "https://portal.${KERNEL_DOMAIN}/"
         backchannelLogoutUrl: "https://cloud.${TENANT_DOMAIN}/apps/user_oidc/backchannel-logout/opendesk"
-      ldap:
-        search: true
-        sync: true
-        interval: "1h"
     database:
       engine: postgresql
       databasePerTenant: true
@@ -106,8 +102,6 @@ spec:
       hostKey: "externalRedis.host"
       portKey: "externalRedis.port"
       passwordKey: "externalRedis.password"
-    ldap:
-      bindPasswordKey: "nextcloud.ldapBootstrap.bindPassword"
     smtp:
       passwordKey: "nextcloud.mail.smtp.password"
 
@@ -235,10 +229,6 @@ spec:
           COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
           DISCOVERY_URI="https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/.well-known/openid-configuration"
           OIDC_SECRET="$(cat /etc/gentian/oidc-client-secret)"
-          LDAP_BIND="$(cat /etc/gentian/ldap-bind-password)"
-          LDAP_HOST="${LDAP_HOST}"
-          LDAP_BASE="${LDAP_BASE_DN}"
-          LDAP_BIND_DN="${LDAP_BIND_DN}"
           echo "[gentian-nextcloud] waiting for Nextcloud to become ready..."
           for i in $(seq 1 90); do
             if $NC status >/dev/null 2>&1; then break; fi
@@ -264,24 +254,6 @@ spec:
           $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
           $NC config:app:set richdocuments doc_format --value="odf" || true
           $NC richdocuments:activate-config || true
-          if ! $NC ldap:show-config s01 >/dev/null 2>&1; then
-            $NC ldap:create-empty-config || true
-            $NC ldap:set-config s01 ldapHost "${LDAP_HOST}" || true
-            $NC ldap:set-config s01 ldapPort "389" || true
-            $NC ldap:set-config s01 ldapBase "${LDAP_BASE_DN}" || true
-            $NC ldap:set-config s01 ldapAgentName "${LDAP_BIND_DN}" || true
-            $NC ldap:set-config s01 ldapAgentPassword "${LDAP_BIND}" || true
-            $NC ldap:set-config s01 ldapLoginFilter "(&(objectClass=inetOrgPerson)(uid=%uid))" || true
-            $NC ldap:set-config s01 ldapUserFilter "(&(objectClass=inetOrgPerson))" || true
-            $NC ldap:set-config s01 ldapUuidAttribute "entryUUID" || true
-            $NC ldap:set-config s01 ldapExpertUsernameAttr "uid" || true
-            $NC ldap:set-config s01 ldapEmailAttribute "mailPrimaryAddress" || true
-            $NC ldap:set-config s01 ldapDisplayName "displayName" || true
-            $NC ldap:set-config s01 homeFolderNamingRule "uid" || true
-            $NC ldap:set-config s01 hasMemberOfFilterSupport "1" || true
-            $NC ldap:set-config s01 useMemberOfToExtendMembership "1" || true
-            $NC ldap:set-config s01 ldapConfigurationActive "1" || true
-          fi
           $NC background:cron || true
           echo "[gentian-nextcloud] bootstrap complete for ${CLOUD_URL}"
 
