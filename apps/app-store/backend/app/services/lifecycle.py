@@ -24,9 +24,9 @@ class LifecycleClient:
     def _headers(self, actor: str) -> dict[str, str]:
         return {"X-Gentian-Actor": actor}
 
-    def list_installed(self) -> list[dict[str, Any]]:
+    def list_installed(self, timeout: float = 3.0) -> list[dict[str, Any]]:
         try:
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=timeout) as client:
                 res = client.get(self._url(), headers=self._headers("app-store"))
         except httpx.TimeoutException as exc:
             raise LifecycleError("App lifecycle API timed out") from exc

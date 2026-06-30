@@ -21,17 +21,22 @@ def _list_installed_entries() -> tuple[list[dict[str, Any]], str | None]:
     settings = get_settings()
     k8s = K8sClient()
     namespace = settings.tenant_namespace
+    entries = list_from_k8s(k8s, settings.tenant_id, namespace)
 
     lifecycle_warning: str | None = None
     try:
-        apps = get_lifecycle_client().list_installed()
-        entries = [
-            {"profile": app["profile"], **claim_status_from_result(app)} for app in apps
-        ]
-        return entries, lifecycle_warning
+        lifecycle_apps = get_lifecycle_client().list_installed()
+        lifecycle_by_profile = {
+            app["profile"]: app for app in lifecycle_apps if app.get("profile")
+        }
+        for entry in entries:
+            lifecycle_app = lifecycle_by_profile.get(entry["profile"])
+            if lifecycle_app:
+                entry.update(claim_status_from_result(lifecycle_app))
     except LifecycleError as exc:
         lifecycle_warning = str(exc)
-        return list_from_k8s(k8s, settings.tenant_id, namespace), lifecycle_warning
+
+    return entries, lifecycle_warning
 
 
 @router.get("/installed")
