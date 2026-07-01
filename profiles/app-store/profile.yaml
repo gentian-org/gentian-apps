@@ -62,8 +62,10 @@ spec:
     auth:
       disabled: true
     gateway:
-      enabled: true
+      # Kernel operator owns HTTPRoute via spec.ingress + browserProxy; chart route duplicates it.
+      enabled: false
       subDomain: store
+    tenantDomain: "${TENANT_DOMAIN}"
 
   ingress:
     subDomain: store
