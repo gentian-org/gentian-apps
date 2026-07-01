@@ -54,7 +54,7 @@ metadata:
     gentianos.io/gateway-api-backends: '[{"pathPrefix":"/appsuite/api","serviceName":"appsuite-api"}]'
 spec:
   displayName: "OX App Suite (OpenDesk)"
-  description: "Open-source groupware suite providing webmail, calendar, contacts, and tasks with Keycloak SSO and LDAP user sync."
+  description: "Open-source groupware suite providing webmail, calendar, contacts, and tasks with Keycloak SSO."
   tile:
     icon: mail
   compositionRef: app-od-ox
@@ -68,10 +68,6 @@ spec:
         redirectUris:
           - "https://webmail.${TENANT_DOMAIN}/appsuite/api/oidc/auth"
           - "https://webmail.${TENANT_DOMAIN}/appsuite/api/oidc/logout"
-      ldap:
-        search: true
-        sync: true
-        interval: "1h"
     database:
       engine: mariadb
       databasePerTenant: true
@@ -159,8 +155,6 @@ spec:
       secretKeyKey: "appsuite.core-mw.propertiesFiles[/opt/open-xchange/etc/filestore-s3\\.properties].com\\.openexchange\\.filestore\\.s3\\.ox-filestore-s3\\.secretKey"
     cache:
       passwordKey: "appsuite.core-mw.redis.auth.password"
-    ldap:
-      bindPasswordKey: "appsuite.core-mw.propertiesFiles[/opt/open-xchange/etc/ldapauth\\.properties].bindDNPassword"
 
   appSecrets:
     - name: cookie_hash_salt
@@ -371,9 +365,6 @@ spec:
             com.openexchange.filestore.s3.ox-filestore-s3.bucketName: "openxchange-${TENANT_ID}"
             com.openexchange.filestore.s3.ox-filestore-s3.accessKey: "openxchange_${TENANT_ID}"
             com.openexchange.filestore.s3.ox-filestore-s3.pathStyleAccess: "true"
-          /opt/open-xchange/etc/ldapauth.properties:
-            java.naming.provider.url: "ldap://${LDAP_HOST}/ou=users,${LDAP_BASE_DN}"
-            bindDN: "${LDAP_BIND_DN}"
           /opt/open-xchange/etc/AdminDaemon.properties:
             MASTER_ACCOUNT_OVERRIDE: "true"
           /opt/open-xchange/etc/AdminUser.properties:

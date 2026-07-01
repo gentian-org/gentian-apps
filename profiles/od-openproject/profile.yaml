@@ -7,18 +7,16 @@
 # Chart versions from: opendesk/helmfile/environments/default/charts.yaml.gotmpl
 # Images from:         opendesk/helmfile/environments/default/images.yaml.gotmpl
 #
-# Note: The opendesk-openproject-bootstrap chart (v2.3.0) seeds opendesk-specific LDAP
-# schemas and portal configurations at the cluster level. In gentian-os it is deployed
-# once at the kernel level if opendesk LDAP schemas are in use; it is NOT a per-tenant
-# AppProfile dependency and not referenced here.
+# Note: The opendesk-openproject-bootstrap chart (v2.3.0) seeds opendesk-specific
+# schemas and portal configurations at the cluster level. In gentian-os it is NOT a
+# per-tenant AppProfile dependency and not referenced here.
 #
 # Secret inventory:
-#   Kernel-provided (5):
+#   Kernel-provided (4):
 #     oidc_client_secret  → openproject.oidc.secret
 #     pg_password         → postgresql.auth.password
 #     s3_secret_key       → s3.auth.secretAccessKey
 #     smtp_password       → environment.OPENPROJECT_SMTP__PASSWORD
-#     ldap_bind_password  → environment.OPENPROJECT_SEED_LDAP_OPENDESK_BINDPASSWORD
 #   App-internal (2) → appSecrets:
 #     admin_password      → openproject.admin_user.password
 #     api_admin_password  → environment.OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_PASSWORD
@@ -34,7 +32,7 @@
 #   Keycloak URLs by default so the AppProfile is cluster-agnostic. On clusters where
 #   pods cannot reach external addresses (hairpin NAT), override these via
 #   App.spec.config.extraValues to point to the internal Keycloak service URL
-#   (e.g. http://nubus-dev-keycloak.gentian-dev.svc.cluster.local:8080/...).
+#   (e.g. http://keycloak-idp.platform-kernel.svc.cluster.local:8080/...).
 #
 #   S3 storage uses external MinIO with path-style access. The bucket name and MinIO
 #   username follow the pattern ${TENANT_ID}-openproject (provisioned by the
@@ -42,12 +40,6 @@
 #   seeded into OpenBao by the storage reconciler (Inc 7) and injected via
 #   valueMapping.s3.secretKeyKey. Bucket and access key are non-secret derived values
 #   set in extraValues.
-#
-#   LDAP user sync connects to the UCS LDAP directory via the per-tenant bind account
-#   (uid=ldapsearch_openproject,cn=users,...) provisioned by the LDAP reconciler (Inc 4).
-#   The bind password is seeded into OpenBao and injected via valueMapping.ldap.
-#   Non-secret LDAP parameters (host, base DN, bind DN) are injected from operator-
-#   substituted placeholders (${LDAP_HOST}, ${LDAP_BASE_DN}, ${LDAP_BIND_DN}).
 #
 #   The central-navigation API key (OPENPROJECT_SOUVAP__NAVIGATION__SECRET) is a
 #   cluster-wide portal credential shared across all apps. It is wired via the
@@ -63,7 +55,7 @@ metadata:
     gentianos.io/profile-name: od-openproject
 spec:
   displayName: "OpenProject (OpenDesk)"
-  description: "Open-source project management with Gantt charts, Kanban boards, time tracking, and LDAP-synced users."
+  description: "Open-source project management with Gantt charts, Kanban boards, and time tracking."
   # Catalogue identity (see gentian-os/docs/design/app-profile-versioning.md)
   family: openproject
   catalogueVersion: "1.0.0"
@@ -88,13 +80,6 @@ spec:
         postLogoutRedirectUris:
           - "https://projects.${TENANT_DOMAIN}/"
         backchannelLogoutUrl: "https://projects.${TENANT_DOMAIN}/auth/keycloak/backchannel-logout"
-      ldap:
-        # Per-tenant LDAP search account provisioned by the LDAP init Job on
-        # first app install; sync account provisioned by the LDAP reconciler.
-        # Credentials are seeded into OpenBao and injected via valueMapping.ldap.
-        search: true
-        sync: true
-        interval: "1h"
     database:
       engine: postgresql
       databasePerTenant: true
@@ -160,11 +145,6 @@ spec:
       # SMTP password injected from OpenBao (seeded by the mail reconciler).
       # Host, port, and auth method are set in extraValues below.
       passwordKey: "environment.OPENPROJECT_SMTP__PASSWORD"
-    ldap:
-      # LDAP bind password injected from OpenBao (seeded by the LDAP reconciler).
-      # Host, base DN, and bind DN are non-secret and use ${...} placeholders
-      # in extraValues (substituted by the operator from kernel metadata).
-      bindPasswordKey: "environment.OPENPROJECT_SEED_LDAP_OPENDESK_BINDPASSWORD"
 
   appSecrets:
     # Initial admin user password — seeded once on first install. OpenProject
@@ -205,7 +185,6 @@ spec:
 
   # Default values aligned with opendesk/helmfile/apps/openproject/values.yaml.gotmpl.
   # ${TENANT_DOMAIN}, ${TENANT_ID} are substituted by the operator at deploy time.
-  # ${LDAP_HOST}, ${LDAP_BASE_DN}, ${LDAP_BIND_DN} are substituted from kernel metadata.
   # ${SMTP_HOST} is substituted from the kernel mail service address.
   # ${S3_ENDPOINT} is substituted from the kernel MinIO API endpoint.
   # Secret values are injected via set_sensitive (valueMapping) — not here.
@@ -410,32 +389,8 @@ spec:
 
       # ── Portal navigation ─────────────────────────────────────────────────
       OPENPROJECT_HOME__URL: "https://portal.${KERNEL_DOMAIN}/"
-      OPENPROJECT_SOUVAP__NAVIGATION__URL: "https://portal.${KERNEL_DOMAIN}/univention/portal/navigation.json?base=https%3A//portal.${KERNEL_DOMAIN}"
-      # OPENPROJECT_SOUVAP__NAVIGATION__SECRET: wired by central-navigation IntegrationBinding.
-
-      # ── LDAP seeder (static fields — per-cluster params via placeholders) ──
-      # ${LDAP_HOST}, ${LDAP_BASE_DN}, ${LDAP_BIND_DN} are substituted by the
-      # operator from kernel LDAP metadata. BINDPASSWORD comes from valueMapping.
-      OPENPROJECT_SEED_LDAP_OPENDESK_HOST: "${LDAP_HOST}"
-      OPENPROJECT_SEED_LDAP_OPENDESK_PORT: "389"
-      OPENPROJECT_SEED_LDAP_OPENDESK_SECURITY: "plain_ldap"
-      OPENPROJECT_SEED_LDAP_OPENDESK_BINDUSER: "${LDAP_BIND_DN}"
-      OPENPROJECT_SEED_LDAP_OPENDESK_BASEDN: "${LDAP_BASE_DN}"
-      # OIDC (Keycloak) is the sole human login path. LDAP user sync must stay off —
-      # pre-provisioned LDAP users get ldap_auth_source_id set and OpenProject refuses to
-      # remap them to OIDC ("Account already exists" on john-doe@…). Group sync below
-      # still attaches OIDC-created users to project groups once they exist.
-      OPENPROJECT_SEED_LDAP_OPENDESK_SYNC__USERS: "false"
-      OPENPROJECT_SEED_LDAP_OPENDESK_FILTER: "(&(objectClass=opendeskProjectmanagementUser)(opendeskProjectmanagementEnabled=TRUE))"
-      OPENPROJECT_SEED_LDAP_OPENDESK_LOGIN__MAPPING: "uid"
-      OPENPROJECT_SEED_LDAP_OPENDESK_FIRSTNAME__MAPPING: "givenName"
-      OPENPROJECT_SEED_LDAP_OPENDESK_LASTNAME__MAPPING: "sn"
-      OPENPROJECT_SEED_LDAP_OPENDESK_MAIL__MAPPING: "mailPrimaryAddress"
-      OPENPROJECT_SEED_LDAP_OPENDESK_ADMIN__MAPPING: "opendeskProjectmanagementAdmin"
-      OPENPROJECT_SEED_LDAP_OPENDESK_GROUPFILTER_OPENDESK_BASE: "${LDAP_BASE_DN}"
-      OPENPROJECT_SEED_LDAP_OPENDESK_GROUPFILTER_OPENDESK_FILTER: "(&(objectClass=opendeskProjectmanagementGroup)(opendeskProjectmanagementEnabled=TRUE))"
-      OPENPROJECT_SEED_LDAP_OPENDESK_GROUPFILTER_OPENDESK_SYNC__USERS: "false"
-      OPENPROJECT_SEED_LDAP_OPENDESK_GROUPFILTER_OPENDESK_GROUP__ATTRIBUTE: "cn"
+      # OPENPROJECT_SOUVAP__NAVIGATION__URL and OPENPROJECT_SOUVAP__NAVIGATION__SECRET:
+      # wired by central-navigation IntegrationBinding.
 
       # ── API authentication ────────────────────────────────────────────────
       # OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_PASSWORD injected via appSecrets.

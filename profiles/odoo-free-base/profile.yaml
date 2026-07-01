@@ -30,9 +30,6 @@ spec:
         accessType: CONFIDENTIAL
         redirectUris:
           - "https://erp.${TENANT_DOMAIN}/auth_oauth/signin"
-      ldap:
-        sync: true
-        interval: 1h
     database:
       engine: postgresql
       databasePerTenant: true
@@ -80,12 +77,6 @@ spec:
       nameKey: "database.name"
       userKey: "database.user"
       passwordKey: "database.password"
-    ldap:
-      hostKey: "ldap.host"
-      portKey: "ldap.port"
-      baseDnKey: "ldap.baseDn"
-      bindDnKey: "ldap.bindDn"
-      bindPasswordKey: "ldap.bindPassword"
     smtp:
       passwordKey: "smtp.password"
 

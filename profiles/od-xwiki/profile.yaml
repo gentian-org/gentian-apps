@@ -8,13 +8,11 @@
 # Image from:         opendesk/helmfile/environments/default/images.yaml.gotmpl
 #
 # Secret inventory:
-#   Kernel-provided (4):
+#   Kernel-provided (3):
 #     oidc_client_secret  → customConfigs."xwiki.properties"."oidc.secret"
 #                           (set_sensitive path: customConfigs.xwiki\.properties.oidc\.secret)
 #     db_password         → externalDB.password
 #     smtp_password       → properties["property:xwiki:Mail.MailConfig^Mail.SendMailConfigClass.password"]
-#     ldap_bind_password  → customConfigs."xwiki.cfg"."xwiki.authentication.ldap.bind_pass"
-#                           (set_sensitive path: customConfigs.xwiki\.cfg.xwiki\.authentication\.ldap\.bind_pass)
 #   App-internal (0):
 #     None — all credentials are kernel-provisioned.
 #
@@ -25,11 +23,6 @@
 #   "opendesk-xwiki" in the per-tenant Keycloak realm (${TENANT_ID}).
 #   Note: unlike OpenProject/OX, XWiki does NOT use backchannel logout; it uses
 #   RP-Initiated Logout (oidc.logoutMechanism: rpInitiated).
-#
-#   LDAP sync uses the per-tenant bind account uid=ldapsearch_xwiki,cn=users,<base_dn>
-#   provisioned by the LDAP reconciler (Inc 4). Non-secret parameters
-#   (${LDAP_HOST}, ${LDAP_BASE_DN}) are substituted by the operator.
-#   The bind password comes from OpenBao via valueMapping.ldap.bindPasswordKey.
 #
 #   Database: PostgreSQL only (the openDesk default since v1.2.0). The chart's
 #   externalDB.host field accepts a combined "hostname:port" or bare "hostname"
@@ -43,10 +36,10 @@
 #   (e.g. oidc.user.nameFormater: "${oidc.user.opendesk_username._clean._lowerCase}")
 #   are XWiki's own internal template expressions — they are NOT operator placeholders.
 #   The operator substitutes only its known placeholder names (TENANT_DOMAIN,
-#   TENANT_ID, LDAP_HOST, etc.) and must leave unknown ${...} tokens intact.
+#   TENANT_ID, etc.) and must leave unknown ${...} tokens intact.
 #
-#   Central navigation (workplaceServices.portalSecret) is wired by the
-#   central-navigation IntegrationBinding when Nubus is present.
+#   Central navigation (workplaceServices.portalSecret and navigationEndpoint) is
+#   wired by the central-navigation IntegrationBinding.
 #   The Collabora WOPI office integration is wired by the office-editor
 #   IntegrationBinding when Collabora is present.
 #
@@ -63,7 +56,7 @@ metadata:
     gentianos.io/profile-name: od-xwiki
 spec:
   displayName: "XWiki (OpenDesk)"
-  description: "Structured wiki and knowledge management platform with OIDC authentication and LDAP user/group sync."
+  description: "Structured wiki and knowledge management platform with OIDC authentication."
   tile:
     icon: wiki
 
@@ -81,13 +74,6 @@ spec:
           - "https://wiki.${TENANT_DOMAIN}/"
         # XWiki uses RP-Initiated Logout, not backchannel logout.
         # No backchannelLogoutUrl needed.
-      ldap:
-        # Per-tenant LDAP search account provisioned by the LDAP init Job on
-        # first app install; sync account provisioned by the LDAP reconciler.
-        # Credentials are written to OpenBao and injected via valueMapping.ldap.
-        search: true
-        sync: true
-        interval: "5m"
     database:
       engine: postgresql
       databasePerTenant: true
@@ -139,12 +125,8 @@ spec:
     smtp:
       # Escaped Helm --set path (bracket notation breaks app-default set[] parsing).
       passwordKey: 'properties.property\:xwiki\:Mail.MailConfig\^Mail.SendMailConfigClass.password'
-    ldap:
-      # Dot-escaped path: "xwiki.cfg" is the YAML map key; the rest is the
-      # xwiki.cfg config key (with literal dots, escaped for Helm --set).
-      bindPasswordKey: 'customConfigs.xwiki\.cfg.xwiki\.authentication\.ldap\.bind_pass'
 
-  # No appSecrets — all credentials are kernel-provisioned (oidc, db, smtp, ldap).
+  # No appSecrets — all credentials are kernel-provisioned (oidc, db, smtp).
 
   # Operator ingress — chart-managed ingress disabled below (ingress.enabled: false).
   # Portal iframe CSP (frame-ancestors) is injected by the operator (app-profile-guide §6).
@@ -172,7 +154,6 @@ spec:
 
   # Default values aligned with opendesk/helmfile/apps/xwiki/values.yaml.gotmpl.
   # ${TENANT_DOMAIN}, ${TENANT_ID} substituted by the operator at deploy time.
-  # ${LDAP_HOST}, ${LDAP_BASE_DN} substituted from kernel LDAP metadata.
   # ${SMTP_HOST} substituted from the kernel Postfix service address.
   # Secret values injected via set_sensitive (valueMapping) — not here.
   #
@@ -240,19 +221,6 @@ spec:
         "xwiki.url.protocol": "https"
         # Redirect unauthenticated users to Keycloak (tenant realm → kernel IdP SSO).
         "xwiki.authentication.authclass": "org.xwiki.contrib.oidc.auth.OIDCAuthServiceImpl"
-        # LDAP authenticator configuration.
-        "xwiki.authentication.ldap.UID_attr": "uid"
-        "xwiki.authentication.ldap.photo_attribute": "jpegPhoto"
-        "xwiki.authentication.ldap.update_photo": 1
-        # LDAP connection — ${LDAP_HOST} and ${LDAP_BASE_DN} substituted by operator.
-        "xwiki.authentication.ldap.server": "${LDAP_HOST}"
-        "xwiki.authentication.ldap.port": 389
-        # bind_DN uses the per-tenant service account from ldap-bind-<tenant>-xwiki.
-        "xwiki.authentication.ldap.bind_DN": "uid=app-xwiki-${TENANT_ID},ou=${TENANT_ID},${LDAP_BASE_DN}"
-        # bind_pass injected via valueMapping.ldap.bindPasswordKey (from OpenBao).
-        "xwiki.authentication.ldap.base_DN": "${LDAP_BASE_DN}"
-        "xwiki.authentication.ldap.groupcache_expiration": 300
-        "xwiki.authentication.ldap.fields_mapping": "last_name=sn,first_name=givenName,email=mailPrimaryAddress"
 
       # YAML map key "xwiki.properties" contains a literal dot — must be quoted.
       "xwiki.properties":
@@ -279,10 +247,8 @@ spec:
 
         "url.trustedDomains": "id.${KERNEL_DOMAIN}"
 
-        # Central navigation — portalSecret wired by central-navigation IntegrationBinding.
-        "workplaceServices.navigationEndpoint": "https://portal.${KERNEL_DOMAIN}/univention/portal/navigation.json"
+        # Central navigation — wired by central-navigation IntegrationBinding.
         "workplaceServices.base": "https://portal.${KERNEL_DOMAIN}"
-        # workplaceServices.portalSecret: injected by central-navigation IntegrationBinding.
 
         "openoffice.serverType": "0"
         "openoffice.autoStart": "false"
@@ -315,9 +281,6 @@ spec:
       "property:xwiki:XWiki.XWikiServerXwiki^XWiki.XWikiServerClass.server": "wiki.${TENANT_DOMAIN}"
       "property:xwiki:XWiki.XWikiServerXwiki^XWiki.XWikiServerClass.port": 443
 
-      # LDAP admin group mapping — uses ${LDAP_BASE_DN} placeholder.
-      "property:xwiki:XWiki.XWikiPreferences^XWiki.XWikiPreferences.ldap_group_mapping": "xwiki:XWiki.XWikiAdminGroup=cn=managed-by-attribute-KnowledgemanagementAdmin,cn=groups,${LDAP_BASE_DN}"
-
       # Collabora WOPI integration — server URL wired by office-editor IntegrationBinding.
       # Static default points to the cluster-internal Collabora service name.
       "property:xwiki:Collabora.Code.Configuration^Collabora.Code.ConfigurationClass.isEnabled": 1
@@ -334,14 +297,7 @@ spec:
       # property:xwiki:Mail.MailConfig^Mail.SendMailConfigClass.password:
       #   injected via valueMapping.smtp.passwordKey.
 
-      # Link LDAP users with OIDC-authenticated sessions (required for LDAP+OIDC).
-      "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.addOIDCObject": 1
-      # OIDCIssuer uses per-tenant realm (${TENANT_ID}) — NOT hardcoded "opendesk".
-      "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.OIDCIssuer": "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
-
       # Do NOT set XWiki.AuthService.Configuration.authService to keycloak-bridge-auth.
-      # openDesk uses that Nubus portal bridge; it overrides xwiki.cfg authclass and
-      # shows the native login form when Gentian portal SSO is not bridged into XWiki.
       # OIDC redirect is driven solely by xwiki.authentication.authclass above.
 
       # UI / theme settings aligned with opendesk Iceberg theme.
@@ -357,18 +313,6 @@ spec:
       "property:xwiki:FlamingoThemes.Iceberg^FlamingoThemesCode.ThemeClass.navbar-default-link-active-color": "@brand-primary"
       "property:xwiki:FlamingoThemes.Iceberg^FlamingoThemesCode.ThemeClass.brand-primary": "#003063"
       "property:xwiki:FlamingoThemes.Iceberg^FlamingoThemesCode.ThemeClass.navbar-default-bg": "#ffffff"
-
-      # LDAP user import settings — restrict and configure the admin import UI.
-      "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.ldapUserAttributes": "sn,givenname,uid,mailPrimaryAddress"
-      "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.usersAllowedToImport": "globalAdmin"
-      # Enable group and user synchronisation triggers.
-      "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.triggerGroupsUpdate": 1
-      "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.triggerGroupImport": 1
-      "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.forceXWikiUsersGroupMembershipUpdate": 1
-      # Group search DN — ${LDAP_BASE_DN} substituted by operator.
-      "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.ldapGroupImportSearchDN": "${LDAP_BASE_DN}"
-      # Only sync groups marked as KnowledgeManagement groups in LDAP.
-      "property:xwiki:LDAPUserImport.WebHome^LDAPUserImport.LDAPUserImportConfigClass.ldapGroupImportSearchFilter": "(&(objectClass=opendeskKnowledgemanagementGroup)(opendeskKnowledgemanagementEnabled=TRUE))"
 
     cluster:
       replicas: 1
