@@ -687,6 +687,53 @@ restrictions); prefer `ldap:update-uuid` + `ldap:reset-user`.
 (`gentian-os/internal/controller/storage_reconciler.go`). If that job did not run
 during purge, expect this drift on the next Files login.
 
+### 6h. App administrators (`app-admins` → in-app privileged role)
+
+Cross-app **in-app administrators** (Nextcloud `admin` group, future Matrix
+room admins, etc.) are **not** tenant IT admins (`gentian:tenant:<t>:admins`) and
+are **not** the same as portal tile entitlements (`gentian:tenant:<t>:app:<profile>`).
+
+| Group / field | Purpose |
+|---|---|
+| `gentian:tenant:<t>:app-admins` | Workspace members who should receive the **privileged in-app role** in every installed app that declares one |
+| `gentian:tenant:<t>:app:<profile>` | Portal tile + OIDC entitlement only |
+| `spec.provisioning.privilegedRole` on `AppProfile` | Maps `app-admins` members to the app's native admin construct |
+
+**Operator flow** (`gentian-os` tenant reconciler):
+
+1. Bootstrap `gentian:tenant:<t>:app-admins` in Keycloak with other Gentian groups.
+2. After apps are ready, list `app-admins` members and reconcile into each
+   installed profile that sets `spec.provisioning.privilegedRole`.
+3. Requeue periodically (5m) and **immediately** when the Admin Console patches
+   `gentianos.io/app-privilege-requested-at` on the `Tenant` CR (membership change).
+
+**Admin Console:** tenant admins assign members to **App administrator** on the
+Members tab (maps to `app-admins`). This does **not** grant portal tiles — assign
+`app:<profile>` entitlements separately when needed.
+
+**AppProfile example** (per-tenant Nextcloud catalogue entry):
+
+```yaml
+spec:
+  provisioning:
+    privilegedRole:
+      kind: group          # only "group" is supported today
+      name: admin          # Nextcloud group id
+```
+
+Supported provisioners today: **`nextcloud`** (OCS API against the tenant release
+at `http://nextcloud.tenant-<t>.svc.cluster.local`). Other profiles may declare
+the field; the operator reports `not implemented` until a provisioner is added.
+
+**User id mapping:** reconcilers prefer Keycloak attribute `opendesk_username`,
+then email local-part (same as the Nextcloud portal bridge).
+
+**Checklist:**
+
+- [ ] Declare `spec.provisioning.privilegedRole` when the app has a distinct admin group/role
+- [ ] Do **not** conflate `app-admins` with `app:<profile>` unless product policy explicitly requires both
+- [ ] Ensure OIDC users exist in the app (bridge or provisioner creates accounts before admin grant)
+
 ---
 
 ## 7. Global domain and hosts
@@ -971,6 +1018,8 @@ Before opening a PR, verify:
 - [ ] Element: `additionalIngresses` includes `matrix` → `synapse-web:8008` (required) — §6d
 - [ ] Element: `matrixIdLocalpart: "opendesk_username"` (not `preferred_username`) — §6d
 - [ ] After tenant purge/redeploy: if Files login fails, check NC `entryUUID` drift (§6g) — not an AppProfile fix
+- [ ] App admins: `spec.provisioning.privilegedRole` when the app exposes a native admin group (§6h)
+- [ ] App admins: assign humans via `gentian:tenant:<t>:app-admins`, not per-app manual grants
 - [ ] OIDC uses full `OIDCClientSpec`, realm is `${TENANT_ID}`
 - [ ] openDesk charts: no `keycloak-bridge-auth`; OIDC via tenant realm + `id.${KERNEL_DOMAIN}` (§8a)
 - [ ] openDesk charts: per-tenant LDAP bind / realm placeholders, not upstream `opendesk` realm or global bind DN

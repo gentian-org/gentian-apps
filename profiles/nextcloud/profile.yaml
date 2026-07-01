@@ -84,6 +84,11 @@ spec:
       linkTarget: embedded
       allowedGroup: "App Users"
 
+  provisioning:
+    privilegedRole:
+      kind: group
+      name: admin
+
   chart:
     repository: "https://nextcloud.github.io/helm/"
     name: nextcloud
