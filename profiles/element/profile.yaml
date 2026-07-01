@@ -127,6 +127,8 @@ spec:
       extraValues:
         global:
           domain: "${KERNEL_DOMAIN}"
+          podLabels:
+            gentianos.io/allow-root: "true"
           hosts:
             element: "chat.${TENANT_ID}"
             synapse: "matrix.${TENANT_ID}"
@@ -179,9 +181,9 @@ spec:
               capabilities: {}
               privileged: false
               readOnlyRootFilesystem: false
-              runAsGroup: 1993
-              runAsNonRoot: true
-              runAsUser: 1993
+              runAsGroup: 0
+              runAsNonRoot: false
+              runAsUser: 0
               seccompProfile:
                 type: "RuntimeDefault"
           prosody:
@@ -222,9 +224,9 @@ spec:
               capabilities: {}
               privileged: false
               readOnlyRootFilesystem: false
-              runAsGroup: 1993
-              runAsNonRoot: true
-              runAsUser: 1993
+              runAsGroup: 0
+              runAsNonRoot: false
+              runAsUser: 0
               seccompProfile:
                 type: "RuntimeDefault"
           jicofo:
@@ -241,9 +243,9 @@ spec:
               capabilities: {}
               privileged: false
               readOnlyRootFilesystem: false
-              runAsGroup: 1993
-              runAsNonRoot: true
-              runAsUser: 1993
+              runAsGroup: 0
+              runAsNonRoot: false
+              runAsUser: 0
               seccompProfile:
                 type: "RuntimeDefault"
           jigasi:
@@ -254,9 +256,9 @@ spec:
               capabilities: {}
               privileged: false
               readOnlyRootFilesystem: false
-              runAsGroup: 1993
-              runAsNonRoot: true
-              runAsUser: 1993
+              runAsGroup: 0
+              runAsNonRoot: false
+              runAsUser: 0
               seccompProfile:
                 type: "RuntimeDefault"
           jvb:
@@ -277,9 +279,9 @@ spec:
               capabilities: {}
               privileged: false
               readOnlyRootFilesystem: false
-              runAsGroup: 1993
-              runAsNonRoot: true
-              runAsUser: 1993
+              runAsGroup: 0
+              runAsNonRoot: false
+              runAsUser: 0
               seccompProfile:
                 type: "RuntimeDefault"
         imagePullSecrets:
