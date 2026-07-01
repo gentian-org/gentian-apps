@@ -127,7 +127,7 @@ spec:
       extraValues:
         global:
           domain: "${KERNEL_DOMAIN}"
-          podLabels:
+          podAnnotations:
             gentianos.io/allow-root: "true"
           hosts:
             element: "chat.${TENANT_ID}"
