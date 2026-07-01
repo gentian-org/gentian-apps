@@ -99,6 +99,11 @@ spec:
         - webdav:read
         - webdav:write
 
+  security:
+    macWaivers:
+      - policy: gentian-require-non-root
+        scope: sidecar-jitsi
+
   sidecars:
     - name: jitsi
       chart:

@@ -74,6 +74,17 @@ spec:
                   - key: gentianos.io/config-type
                     type: Value
                     value: jitsi-oidc-overlays
+            - kind: ConfigMap
+              into: platformSecurity
+              apiVersion: v1
+              type: Selector
+              selector:
+                maxMatch: 1
+                minMatch: 0
+                matchLabels:
+                  - key: gentianos.io/config-type
+                    type: Value
+                    value: platform-security
 
     # ── Step 2: Render composed resources ─────────────────────────────────────
     # Element variant: deploys five charts plus optional sidecars (Jitsi):
@@ -987,6 +998,25 @@ spec:
             {{- /* Per-tenant Jitsi overrides (e.g. resources) from App.config.extraValues */}}
             {{- if and (eq $scName "jitsi") (dig "jitsi" nil $extraVals) }}
             {{- $scExtraVals = mergeOverwrite $scExtraVals (dict "jitsi" (mergeOverwrite (dig "jitsi" dict $scExtraVals) (dig "jitsi" dict $extraVals))) }}
+            {{- end }}
+
+            {{- /* Approved MAC waivers: AppProfile request ∩ PlatformSecurityPolicy allowlist */}}
+            {{- if eq $scName "jitsi" }}
+            {{- $platformSecRes := dig "platformSecurity" list $extraRes }}
+            {{- $platformSecData := dig "data" dict (default dict (index $platformSecRes 0)) }}
+            {{- $allowed := fromJson (default "[]" (index $platformSecData "allowedMacWaivers.json")) }}
+            {{- $macRequests := default list (dig "security" "macWaivers" list $pSpec) }}
+            {{- $scPodLabels := default dict (dig "podLabels" dict $scExtraVals) }}
+            {{- range $req := $macRequests }}
+              {{- range $a := $allowed }}
+                {{- if and (eq $a.profile $app) (eq $a.policy $req.policy) (eq $a.scope $req.scope) }}
+                  {{- $scPodLabels = mergeOverwrite $scPodLabels (dict (printf "gentianos.io/mac-waiver/%s" $req.policy) "approved") }}
+                {{- end }}
+              {{- end }}
+            {{- end }}
+            {{- if gt (len $scPodLabels) 0 }}
+            {{- $scExtraVals = mergeOverwrite $scExtraVals (dict "podLabels" $scPodLabels) }}
+            {{- end }}
             {{- end }}
 
             {{- /* Jitsi: mount Gentian OIDC/JWT overlays over chart ConfigMaps */}}

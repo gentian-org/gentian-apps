@@ -23,6 +23,15 @@ There are **only two** valid options:
 If neither path is ready yet, **leave the gap** (reconciler reports not implemented /
 fails clearly) rather than hardcoding an exception for a single catalogue entry.
 
+### MAC waivers (Stage 2)
+
+Apps that cannot satisfy baseline Kyverno policies declare requests on
+`AppProfile.spec.security.macWaivers`. **Cluster administrators** approve subsets on
+the cluster singleton `PlatformSecurityPolicy` (Admin Console → **Platform** tab,
+platform superadmin only). The operator intersects request ∩ allowlist, publishes
+`gentian-platform-security` for compositions, and Kyverno excludes only labelled pods
+— not cluster-wide PolicyExceptions.
+
 ---
 
 ## 1. Mandatory top-level fields
@@ -607,101 +616,21 @@ HTTPRoutes is computed centrally in the operator (`cryptpadSandboxFrameAncestorO
 **pad** + **portal** + **files** on `pad-sandbox`, **files** + **portal** on `pad`.
 Do not duplicate CSP in AppProfile annotations.
 
-### 6g. Kernel file share (Nextcloud Files)
+### 6g. Nextcloud (App Store)
 
-Nextcloud Files is a **shared kernel service** at `files.<kernel_domain>` (not an
-AppProfile). The gentian-os operator does **not** manage its HTTPRoute — CSP lives in
-`gentian-os/kernel/services/nextcloud/manifests/<env>/configmap.yaml` and is
-re-applied by `./update.sh --nextcloud-office`.
+Nextcloud is an **App Store app** (`profiles/nextcloud/profile.yaml`), not a kernel
+service. Each tenant gets a dedicated instance at `cloud.<tenant_domain>` with an
+optional Collabora subchart at `collabora.<tenant_domain>`.
 
-Use the same **replace** pattern as Element (§6b): clear upstream
-`X-Frame-Options` and `Content-Security-Policy`, then set a single
-`frame-ancestors 'self' https://portal.<kernel-domain>` response header.
+OIDC uses the tenant realm (`${TENANT_ID}`) with client ID `gentian-nextcloud` and
+the `gentian-nextcloud-scope` pack from the OIDC catalog. Portal SSO follows the
+same tenant-realm + kernel IdP broker path as Element and other installed apps.
 
-#### SSO topology — kernel realm, not tenant broker
+Use the **replace** CSP pattern from §6b so `portal.<kernel_domain>` can embed the
+Files tile (`linkTarget: embedded`).
 
-Nextcloud is **not** an AppProfile and does **not** follow the tenant-realm +
-kernel-IdP-broker path used by Element, XWiki, and other installed apps.
-
-| Aspect | Tenant AppProfiles (Element, XWiki, …) | Nextcloud Files |
-|---|---|---|
-| Keycloak realm | `${TENANT_ID}` | **`kernel`** |
-| Portal → app SSO | Tenant realm + kernel IdP broker | Direct **kernel** OIDC (`opendesk-nextcloud`) |
-| Primary user-id claim | Often `opendesk_username` (LDAP `uid`) | **`opendesk_useruuid`** (LDAP `entryUUID`) |
-| User provisioning | App-specific (e.g. Synapse shadow user) | Nubus LDAP listener → NC **LDAP backend**; OIDC **`auto_provision: false`** |
-
-**Implication for debugging:** Element can work while Nextcloud fails (or vice versa).
-Fixing tenant-realm broker mappers or `${TENANT_ID}` OIDC packs does **not** by itself
-fix Files login — kernel-realm claims and NC LDAP mappings must also be correct.
-
-OIDC provider settings (management chart / `user_oidc:provider opendesk`):
-
-- `mappingUid`: `opendesk_useruuid`
-- `auto_provision`: `false` — NC refuses to create users on OIDC login; the LDAP
-  listener must provision the user first, and the OIDC claim must match the **existing**
-  NC username (which equals LDAP `entryUUID`).
-
-#### After tenant purge/redeploy — “Failed to provision the user”
-
-Symptom on `https://files.${KERNEL_DOMAIN}` after deleting and recreating a tenant
-(or individual App Users):
-
-```text
-Access forbidden
-Failed to provision the user
-```
-
-**Cause:** Purge deletes LDAP users and recreates them at the same DN with a **new**
-`entryUUID`. The Nubus listener reprovisions LDAP/NC correctly, but Nextcloud may still
-hold the **old** UUID as `owncloud_name` in `oc_ldap_user_mapping`. Keycloak (kernel
-realm) and the OIDC token carry the **new** `opendesk_useruuid`; Nextcloud looks up
-that ID, finds no user, and with `auto_provision: false` rejects login.
-
-**Three-way check** (all must match for OIDC login):
-
-| Source | Field | Example |
-|---|---|---|
-| LDAP | `entryUUID` on `uid=<user>,ou=users,ou=<tenant>,…` | `0fd28258-…` |
-| Keycloak kernel user | attribute `entryUUID` → claim `opendesk_useruuid` | same |
-| Nextcloud | `oc_ldap_user_mapping.owncloud_name` **and** `directory_uuid` | same |
-
-Compare with:
-
-```bash
-# Nextcloud user list (username = entryUUID for LDAP users)
-kubectl exec -n gentian-dev deploy/nextcloud-dev-aio -- \
-  php /var/www/html/occ user:list
-
-# LDAP mapping in Postgres
-kubectl exec -n gentian-infra-dev opendesk-postgresql-dev-0 -- \
-  psql -U nextcloud_user -d nextcloud \
-  -c "SELECT ldap_dn, directory_uuid, owncloud_name FROM oc_ldap_user_mapping WHERE ldap_dn LIKE '%<tenant>%';"
-
-# Recognized UUID?
-kubectl exec -n gentian-dev deploy/nextcloud-dev-aio -- \
-  php /var/www/html/occ ldap:check-user <entryUUID-from-ldap>
-```
-
-**Fix** (cluster ops — run when `owncloud_name` ≠ current LDAP `entryUUID`):
-
-```bash
-OLD=<stale-nc-username-uuid>
-kubectl exec -n gentian-dev deploy/nextcloud-dev-aio -- \
-  php /var/www/html/occ ldap:update-uuid --userId="${OLD}" -n
-
-kubectl exec -n gentian-dev deploy/nextcloud-dev-aio -- \
-  sh -c "echo y | php /var/www/html/occ ldap:reset-user ${OLD}"
-```
-
-`ldap:reset-user` renames the NC account to the current LDAP `entryUUID`. Plain
-`occ user:delete` often fails for LDAP-backed users (interactive prompt / backend
-restrictions); prefer `ldap:update-uuid` + `ldap:reset-user`.
-
-**Prevention:** On tenant **deletion**, gentian-os should run
-`nextcloud-group-delete-<tenant>` to remove NC users whose LDAP DN is under
-`ou=<tenant>,…` before a redeploy recreates them with new UUIDs
-(`gentian-os/internal/controller/storage_reconciler.go`). If that job did not run
-during purge, expect this drift on the next Files login.
+The licensed OpenDesk Nextcloud stack is **not** part of gentian-os or gentian-apps;
+customers who need it install it from the proprietary catalogue separately.
 
 ### 6h. App administrators (`app-admins` → in-app privileged role)
 
