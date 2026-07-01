@@ -8,6 +8,21 @@ This guide captures the accumulated learnings and best practices from the existi
 AppProfile implementations. Read it before writing a new profile — every section
 corresponds to a class of bug that was caught in git history.
 
+## Platform boundary — **no app-specific hardcoding in gentian-os**
+
+**Never** put app-specific values, profile names, or `case "myapp"` logic in gentian-os.
+There are **only two** valid options:
+
+1. **Many apps need it** — extend the **AppProfile** contract (spec, annotations, or
+   composition hooks) **and** gentian-os so the operator implements the behaviour
+   **generically** for every profile that declares it.
+2. **Unique to one app** — implement it in **gentian-apps**: the profile,
+   `composition.yaml`, assets, chart `extraValues`, bootstrap Jobs, and other
+   app-owned artefacts — **not** in gentian-os reconcilers or kernel policy.
+
+If neither path is ready yet, **leave the gap** (reconciler reports not implemented /
+fails clearly) rather than hardcoding an exception for a single catalogue entry.
+
 ---
 
 ## 1. Mandatory top-level fields
@@ -79,7 +94,8 @@ profile's **`composition.yaml`** (`app-ox`, `app-element`, …).
 | **Upstream chart / vendor** | Fix belongs in the supplier chart long-term | OX `initconfigdb -i`, Keycloak client scopes in openDesk |
 
 **Never** add per-app fields to the `AppProfile` CRD. **Never** hardcode
-profile names in gentian-os reconcilers — if you need a new operator behaviour,
+profile names or app-specific branches in gentian-os reconcilers — see
+**Platform boundary** above. If you need a new operator behaviour,
 add a **well-known annotation** (or extend an existing generic `spec` block used
 by all apps) and set it from `gentian-apps/profiles/<name>/profile.yaml`.
 
