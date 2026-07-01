@@ -7,7 +7,7 @@ App Store catalogue for Gentian OS — `AppProfile` CRs plus first-party app imp
 ```text
 profiles/              # App catalogue bundles — synced by Argo CD gentian-catalogue
   CATALOGUE.md         # layout and workflow
-  element/             # AppProfile + app-element composition + Jitsi overlay assets
+  element/             # AppProfile + app-od-element composition + Jitsi overlay assets
   openproject/
   ox-appsuite/
   xwiki/

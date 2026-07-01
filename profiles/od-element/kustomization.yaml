@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - profile.yaml
   - composition.yaml
+  - oidc-catalog.yaml
 configMapGenerator:
   - name: gentian-jitsi-oidc-overlays
     namespace: crossplane-system

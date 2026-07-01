@@ -114,6 +114,8 @@ by all apps) and set it from `gentian-apps/profiles/<name>/profile.yaml`.
 |---|---|---|
 | `gentianos.io/gateway-root-redirect` | Path string | Redirect `GET /` on the app hostname (e.g. `/appsuite/`) |
 | `gentianos.io/gateway-api-backends` | JSON array | Extra path prefixes routed to additional Services on the same host |
+| `gentianos.io/gateway-frame-ancestors` | JSON object on **`ingress.annotations`** or **`additionalIngresses[].annotations`** | Override edge `frame-ancestors` for that host. Shape: `{"mode":"replace\|append","origins":["portal","mainApp",...]}`. Tokens: `portal` → `https://portal.<kernel>`; `mainApp` → primary ingress host (`https://<ingress.subDomain>.<tenant-domain>`). Use when a **secondary host** (e.g. office editor) is embedded by the main app UI, not the portal. |
+| `gentianos.io/gateway-escaped-slashes-action` | `KeepUnchanged` on **`additionalIngresses[].annotations`** | Envoy `ClientTrafficPolicy` on the tenant (and kernel wildcard) gateway listener — required for WOPI/WebSocket paths with encoded slashes (`%3A`, `%2F`). |
 
 ```yaml
 metadata:
@@ -622,6 +624,24 @@ Nextcloud is an **App Store app** (`profiles/nextcloud/profile.yaml`), not a ker
 service. Each tenant gets a dedicated instance at `cloud.<tenant_domain>` with an
 optional Collabora subchart at `collabora.<tenant_domain>`.
 
+**Gateway policy (declared on the profile, not in gentian-os):** the Collabora
+`additionalIngresses` entry sets `gentianos.io/gateway-frame-ancestors` so the
+editor allows embedding from the main `cloud.<tenant>` host (see Gateway
+annotations table). It sets `gentianos.io/gateway-escaped-slashes-action:
+KeepUnchanged` so Envoy forwards `/cool/...` WOPI WebSocket paths without
+`path_normalization_failed`.
+
+```yaml
+additionalIngresses:
+  - subDomain: collabora
+    serviceName: nextcloud-collabora
+    servicePort: 9980
+    annotations:
+      gentianos.io/gateway-frame-ancestors: |
+        {"mode":"replace","origins":["mainApp","portal"]}
+      gentianos.io/gateway-escaped-slashes-action: KeepUnchanged
+```
+
 OIDC uses the tenant realm (`${TENANT_ID}`) with client ID `gentian-nextcloud` and
 the `gentian-nextcloud-scope` pack from the OIDC catalog. Portal SSO follows the
 same tenant-realm + kernel IdP broker path as Element and other installed apps.
@@ -773,7 +793,7 @@ needs only standard SSO or openDesk-style custom scopes and protocol mappers.
 | Path | Use when | gentian-apps | gentian-os |
 |---|---|---|---|
 | **A — composition Client MR** | Standard SSO (client id, redirects, confidential secret) | `kernelRequirements.identity.oidc` only | `app-default` (or profile composition) emits Keycloak `Client` + default scopes |
-| **B — OIDC pack** | Custom client scope, protocol mappers, LDAP group → Keycloak client role | Pack entry in `OIDCPackCatalog` (`profiles/opendesk-oidc-catalog/catalog.yaml`) | Operator `ResolvePack` provisioning Jobs |
+| **B — OIDC pack** | Custom client scope, protocol mappers, LDAP group → Keycloak client role | `profiles/<app>/oidc-catalog.yaml` | Operator `ResolvePack` provisioning Jobs |
 
 **Path A (most new apps, including Odoo):** declare `clientId`, `redirectUris`,
 and `accessType` in the profile. Do **not** add the client to `OIDCPackCatalog`.
@@ -924,9 +944,9 @@ Set `compositionRef` only when using a non-default composition:
 | Composition | When to use |
 |---|---|
 | *(omit)* | Standard apps — `app-default` is used automatically |
-| `app-element` | Element (Matrix) — bundle includes `app-element` composition |
-| `app-ox` | OX App Suite — bundle includes `app-ox` composition |
-| `app-openproject` | OpenProject — OIDC seed job in profile composition |
+| `app-od-element` | Element (Matrix) — bundle includes `app-od-element` composition |
+| `app-od-ox` | OX App Suite — bundle includes `app-od-ox` composition |
+| `app-od-openproject` | OpenProject — OIDC seed job in profile composition |
 
 ---
 

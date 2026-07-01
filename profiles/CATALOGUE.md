@@ -9,25 +9,28 @@ ArgoCD ApplicationSet **`gentian-catalogue`** (one Application per bundle).
 profiles/<name>/
   kustomization.yaml    # required — ArgoCD entrypoint
   profile.yaml          # AppProfile CR (tenant-installable apps)
-  catalog.yaml          # platform catalogue CR (e.g. OIDCPackCatalog) — no profile.yaml
+  oidc-catalog.yaml     # OIDCPackCatalog CR (optional — apps with Path B OIDC packs)
   composition.yaml      # Crossplane Composition (optional — custom MR graph)
   assets/               # optional cluster-scoped manifests (ConfigMaps, …)
   jitsi-overlay/        # optional source files (built into assets via kustomize)
 ```
 
-Tenant apps require `profile.yaml`. Platform catalogue bundles (e.g.
-`opendesk-oidc-catalog`) ship a cluster-scoped CR via `catalog.yaml` instead.
+Tenant apps require `profile.yaml`. Apps that need custom Keycloak scopes and
+protocol mappers (Path B OIDC) also ship `oidc-catalog.yaml` in the same bundle.
 
 | Profile | composition | cluster assets |
 |---------|-------------|----------------|
 | `app-store` | — (`app-default`) | — |
-| `xwiki` | — | — |
-| `openproject` | `app-openproject` | — |
-| `ox-appsuite` | `app-ox` | — |
-| `element` | `app-element` | Jitsi OIDC overlay ConfigMap |
-| `opendesk-oidc-catalog` | — | OpenDesk OIDC pack catalogue CR |
+| `nextcloud` | — (`app-default`) | portal bridge SSO assets |
+| `od-nextcloud` | — (`app-default`) | OIDC pack |
+| `od-xwiki` | — | OIDC pack |
+| `od-openproject` | `app-od-openproject` | OIDC pack |
+| `od-ox-appsuite` | `app-od-ox` | OIDC pack |
+| `od-element` | `app-od-element` | Jitsi OIDC overlay ConfigMap + OIDC pack |
 | `odoo-free-base` | — (`app-default`) | — |
-| `nextcloud` | — (`app-default`) | — |
+
+OpenDesk-flavoured profiles use the `od-` prefix. Public/community charts keep
+short names (`nextcloud`, `odoo-free-base`, …).
 
 ## Adding a simple app
 
@@ -38,11 +41,5 @@ Tenant apps require `profile.yaml`. Platform catalogue bundles (e.g.
 ## Adding a complex app (OpenDesk-style)
 
 1. Same as above, plus `composition.yaml` referenced from `spec.compositionRef`.
-2. Add any cluster prerequisites under `assets/` or `configMapGenerator` in kustomization.
-3. No gentian-os install hooks — GitOps delivers the whole bundle.
-
-## Installing for a tenant
-
-Unchanged: append the profile name to `Tenant.spec.apps` in `gentian-deployments`.
-
-Crossplane uses `app-default` or the profile's `compositionRef` when provisioning the tenant.
+2. Optional `oidc-catalog.yaml` when the app needs Path B OIDC packs.
+3. Optional `assets/` or `configMapGenerator` entries for cluster prerequisites.

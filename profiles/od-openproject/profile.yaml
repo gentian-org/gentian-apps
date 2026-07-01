@@ -58,11 +58,11 @@
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
-  name: openproject
+  name: od-openproject
   labels:
-    gentianos.io/profile-name: openproject
+    gentianos.io/profile-name: od-openproject
 spec:
-  displayName: "OpenProject"
+  displayName: "OpenProject (OpenDesk)"
   description: "Open-source project management with Gantt charts, Kanban boards, time tracking, and LDAP-synced users."
   # Catalogue identity (see gentian-os/docs/design/app-profile-versioning.md)
   family: openproject
@@ -72,7 +72,7 @@ spec:
   license: Apache-2.0
   tile:
     icon: projects
-  compositionRef: app-openproject
+  compositionRef: app-od-openproject
 
   kernelRequirements:
     identity:

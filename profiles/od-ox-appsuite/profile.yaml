@@ -11,7 +11,7 @@
 #      oci://registry.opencode.de/bmi/opendesk/components/supplier/univention/charts-mirror
 #      Syncs Nubus LDAP users into OX contexts.
 #
-# Deployment order (app-ox composition):
+# Deployment order (app-od-ox composition):
 #   1. appsuite-public-sector Helm release
 #   2. ox-appsuite-bootstrap Job (configDB + registrations)
 #   3. ox-connector-register Job + ox-connector Helm release
@@ -46,18 +46,18 @@
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
-  name: ox-appsuite
+  name: od-ox-appsuite
   labels:
-    gentianos.io/profile-name: ox-appsuite
+    gentianos.io/profile-name: od-ox-appsuite
   annotations:
     gentianos.io/gateway-root-redirect: /appsuite/
     gentianos.io/gateway-api-backends: '[{"pathPrefix":"/appsuite/api","serviceName":"appsuite-api"}]'
 spec:
-  displayName: "OX App Suite"
+  displayName: "OX App Suite (OpenDesk)"
   description: "Open-source groupware suite providing webmail, calendar, contacts, and tasks with Keycloak SSO and LDAP user sync."
   tile:
     icon: mail
-  compositionRef: app-ox
+  compositionRef: app-od-ox
 
   kernelRequirements:
     identity:

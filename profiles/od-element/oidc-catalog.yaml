@@ -1,0 +1,85 @@
+# OIDC packs for Element / Synapse and the bundled Jitsi sidecar.
+apiVersion: gentianos.io/v1alpha1
+kind: OIDCPackCatalog
+metadata:
+  name: element-oidc
+  labels:
+    gentianos.io/oidc-catalog: element
+    gentianos.io/profile-name: od-element
+spec:
+  extraManagedByAttributeGroups:
+    - LivecollaborationAdmin
+  mapperTemplates:
+    opendesk_useruuid:
+      protocolMapper: oidc-usermodel-attribute-mapper
+      config:
+        user.attribute: entryUUID
+        claim.name: opendesk_useruuid
+        jsonType.label: String
+        id.token.claim: "true"
+        access.token.claim: "true"
+        userinfo.token.claim: "true"
+    opendesk_username:
+      protocolMapper: oidc-usermodel-attribute-mapper
+      config:
+        user.attribute: uid
+        claim.name: opendesk_username
+        jsonType.label: String
+        id.token.claim: "true"
+        access.token.claim: "true"
+        userinfo.token.claim: "true"
+    email:
+      protocolMapper: oidc-usermodel-attribute-mapper
+      config:
+        user.attribute: email
+        claim.name: email
+        jsonType.label: String
+        id.token.claim: "true"
+        access.token.claim: "true"
+        userinfo.token.claim: "true"
+        introspection.token.claim: "true"
+    full_name:
+      keycloakName: "full name"
+      protocolMapper: oidc-full-name-mapper
+      config:
+        id.token.claim: "true"
+        access.token.claim: "true"
+        userinfo.token.claim: "true"
+        introspection.token.claim: "true"
+  packs:
+    opendesk-synapse:
+      scopeName: opendesk-matrix-scope
+      scopeDescription: "Scope for Matrix / Synapse OIDC clients."
+      clientRole: opendesk-matrix-access-control
+      entitlementGroup: managed-by-attribute-Livecollaboration
+      publicClient: false
+      fullScopeAllowed: false
+      defaultScopes:
+        - profile
+        - email
+        - roles
+        - web-origins
+        - acr
+      mappers:
+        - opendesk_useruuid
+        - opendesk_username
+        - full_name
+        - email
+    opendesk-jitsi:
+      scopeName: opendesk-jitsi-scope
+      scopeDescription: "Scope for Jitsi OIDC clients."
+      clientRole: opendesk-jitsi-access-control
+      entitlementGroup: managed-by-attribute-Videoconference
+      publicClient: true
+      fullScopeAllowed: true
+      defaultScopes:
+        - profile
+        - email
+        - roles
+        - web-origins
+        - acr
+      mappers:
+        - opendesk_useruuid
+        - opendesk_username
+        - full_name
+        - email

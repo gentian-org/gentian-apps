@@ -1,10 +1,10 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: app-element
+  name: app-od-element
   labels:
     gentianos.io/composition: app
-    gentianos.io/profile: element
+    gentianos.io/profile: od-element
     gentianos.io/app-variant: element
 spec:
   compositeTypeRef:
@@ -59,10 +59,11 @@ spec:
               type: Selector
               selector:
                 maxMatch: 1
+                minMatch: 0
                 matchLabels:
-                  - key: gentianos.io/oidc-catalog
-                    type: Value
-                    value: opendesk
+                  - key: gentianos.io/profile-name
+                    type: FromCompositeFieldPath
+                    valueFromFieldPath: spec.profileRef.name
             - kind: ConfigMap
               into: jitsiOidcOverlays
               apiVersion: v1
@@ -1022,7 +1023,7 @@ spec:
             {{- /* Jitsi: mount Gentian OIDC/JWT overlays over chart ConfigMaps */}}
             {{- if eq $scName "jitsi" }}
             {{- if eq (len $jitsiOverlayData) 0 }}
-              {{- fail "gentian-jitsi-oidc-overlays ConfigMap missing in crossplane-system — ensure gentian-catalogue ApplicationSet synced profiles/element" }}
+              {{- fail "gentian-jitsi-oidc-overlays ConfigMap missing in crossplane-system — ensure gentian-catalogue ApplicationSet synced profiles/od-element" }}
             {{- end }}
             {{- $jitsiOidcCM := printf "%s-oidc-overlays" $scXrName }}
             {{- $jitsiWebOverlayItems := list

@@ -34,12 +34,12 @@
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
-  name: element
+  name: od-element
   labels:
-    gentianos.io/profile-name: element
+    gentianos.io/profile-name: od-element
 spec:
   displayName: "Element (Matrix)"
-  compositionRef: app-element
+  compositionRef: app-od-element
   description: "Federated team chat and collaboration based on the Matrix protocol, with Synapse homeserver and bundled Jitsi for video conferencing."
   tile:
     icon: chat
@@ -325,7 +325,7 @@ spec:
     - name: ox_appsuite_as_token
       valuePath: "configuration.homeserver.appServiceConfigs[1].as_token"
     # Matrix User Verification Service password — seeded for the UVS bootstrap Job
-    # (app-element composition); not injected into element/synapse Helm values.
+    # (app-od-element composition); not injected into element/synapse Helm values.
     - name: matrix_uvs_password
       valuePath: "bootstrap.configuration.password"
 
@@ -420,7 +420,7 @@ spec:
         # Keep Synapse local password auth enabled (openDesk default) so the
         # opendesk-synapse-create-account UVS bootstrap Job can log in as @uvs
         # after register_new_matrix_user. Human users still go through OIDC:
-        # app-element injects sso_redirect_options.immediate on the Element web
+        # app-od-element injects sso_redirect_options.immediate on the Element web
         # config only (not into homeserver.yaml).
         "net.nordeck.element_web.module.widget_lifecycle":
           widget_permissions:
@@ -519,7 +519,7 @@ spec:
   additionalIngresses:
     # matrix.<tenant> → synapse-web (/_matrix, /_synapse, OIDC callback). Required
     # for ROUTING_MODE=gateway: the synapse-web chart ingress is disabled in
-    # app-element; the operator provisions the HTTPRoute (or nginx Ingress).
+    # app-od-element; the operator provisions the HTTPRoute (or nginx Ingress).
     - subDomain: matrix
       serviceName: synapse-web
       servicePort: 8008

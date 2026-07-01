@@ -1,10 +1,10 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: app-ox
+  name: app-od-ox
   labels:
     gentianos.io/composition: app
-    gentianos.io/profile: ox-appsuite
+    gentianos.io/profile: od-ox-appsuite
     gentianos.io/app-variant: ox-appsuite
 spec:
   compositeTypeRef:

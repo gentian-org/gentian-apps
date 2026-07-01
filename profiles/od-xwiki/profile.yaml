@@ -58,11 +58,11 @@
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
-  name: xwiki
+  name: od-xwiki
   labels:
-    gentianos.io/profile-name: xwiki
+    gentianos.io/profile-name: od-xwiki
 spec:
-  displayName: "XWiki"
+  displayName: "XWiki (OpenDesk)"
   description: "Structured wiki and knowledge management platform with OIDC authentication and LDAP user/group sync."
   tile:
     icon: wiki

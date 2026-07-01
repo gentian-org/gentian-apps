@@ -4,9 +4,8 @@
 #   Community-maintained chart (Apache-2.0); docker.io/library/nextcloud app image.
 #   Collabora Online ships as an optional subchart (collabora-online, no account required).
 #
-# Distinct from the kernel Nextcloud Files service at files.<kernel-domain> (§6g
-# app-profile-guide.md). This profile deploys a dedicated Nextcloud instance per tenant
-# for App Store installs and demo tenants.
+# Installed per tenant from the App Store at cloud.<tenant-domain>.
+# For the OpenDesk AIO stack (opendesk-nextcloud chart), use profile `od-nextcloud`.
 #
 # Secret inventory:
 #   Kernel-provided:
@@ -40,7 +39,7 @@ spec:
   kernelRequirements:
     identity:
       oidc:
-        clientId: "opendesk-nextcloud"
+        clientId: "gentian-nextcloud"
         name: "Nextcloud"
         accessType: CONFIDENTIAL
         redirectUris:
@@ -48,7 +47,7 @@ spec:
         postLogoutRedirectUris:
           - "https://cloud.${TENANT_DOMAIN}/"
           - "https://portal.${KERNEL_DOMAIN}/"
-        backchannelLogoutUrl: "https://cloud.${TENANT_DOMAIN}/apps/user_oidc/backchannel-logout/opendesk"
+        backchannelLogoutUrl: "https://cloud.${TENANT_DOMAIN}/apps/user_oidc/backchannel-logout/gentian"
     database:
       engine: postgresql
       databasePerTenant: true
@@ -136,6 +135,9 @@ spec:
         nginx.ingress.kubernetes.io/proxy-body-size: "100M"
         nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+        gentianos.io/gateway-frame-ancestors: |
+          {"mode":"replace","origins":["mainApp","portal"]}
+        gentianos.io/gateway-escaped-slashes-action: KeepUnchanged
 
   extraValues:
     fullnameOverride: "nextcloud"
@@ -196,7 +198,7 @@ spec:
           port: 587
           secure: tls
           authtype: LOGIN
-          name: "opendesk-system@${TENANT_DOMAIN}"
+          name: "gentian-system@${TENANT_DOMAIN}"
       configs:
         gentian-proxy.config.php: |-
           <?php
@@ -257,7 +259,7 @@ spec:
           COLLABORA_INTERNAL="http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980"
           COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
           # In-cluster discovery for server-side token/JWK calls; the document still advertises
-          # the external authorization_endpoint for browser redirects (same as kernel Files).
+          # the external authorization_endpoint for browser redirects.
           DISCOVERY_URI="http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
           OIDC_SECRET="$(cat /etc/gentian/oidc-client-secret)"
           echo "[gentian-nextcloud] waiting for Nextcloud to become ready..."
@@ -269,18 +271,18 @@ spec:
           $NC app:enable user_oidc || true
           $NC app:install richdocuments || true
           $NC app:enable richdocuments || true
-          $NC user_oidc:provider opendesk \
-            --clientid="opendesk-nextcloud" \
+          $NC user_oidc:provider gentian \
+            --clientid="gentian-nextcloud" \
             --clientsecret="${OIDC_SECRET}" \
             --discoveryuri="${DISCOVERY_URI}" \
-            --scope="openid profile email opendesk-nextcloud-scope" \
-            --mapping-uid="opendesk_username" \
+            --scope="openid profile email gentian-nextcloud-scope" \
+            --mapping-uid="gentian_username" \
             --mapping-display-name="name" \
             --mapping-email="email" \
             --unique-uid="1" \
             --check-bearer="0" || true
           $NC config:app:set user_oidc id4me --value="0" || true
-          # Single OIDC backend: auto-redirect /login to the opendesk provider (portal SSO).
+          # Single OIDC backend: auto-redirect /login to the gentian provider (portal SSO).
           $NC config:app:set user_oidc allow_multiple_user_backends --value="1" || true
           $NC config:system:set allow_local_remote_servers --type=boolean --value=true || true
           $NC config:app:set richdocuments wopi_url --value="${COLLABORA_PUBLIC}" || true

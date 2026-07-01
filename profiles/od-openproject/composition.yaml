@@ -1,10 +1,10 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: app-openproject
+  name: app-od-openproject
   labels:
     gentianos.io/composition: app
-    gentianos.io/profile: openproject
+    gentianos.io/profile: od-openproject
 spec:
   compositeTypeRef:
     apiVersion: gentianos.io/v1alpha1
@@ -70,10 +70,11 @@ spec:
               type: Selector
               selector:
                 maxMatch: 1
+                minMatch: 0
                 matchLabels:
-                  - key: gentianos.io/oidc-catalog
-                    type: Value
-                    value: opendesk
+                  - key: gentianos.io/profile-name
+                    type: FromCompositeFieldPath
+                    valueFromFieldPath: spec.profileRef.name
 
     # ── Step 2: Render composed resources ─────────────────────────────────────
     # Emits per-app:

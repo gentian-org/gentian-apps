@@ -1,0 +1,58 @@
+# OIDC pack for OpenDesk Nextcloud AIO (clientId: opendesk-nextcloud).
+apiVersion: gentianos.io/v1alpha1
+kind: OIDCPackCatalog
+metadata:
+  name: od-nextcloud-oidc
+  labels:
+    gentianos.io/oidc-catalog: od-nextcloud
+    gentianos.io/profile-name: od-nextcloud
+spec:
+  extraManagedByAttributeGroups:
+    - FileshareAdmin
+  mapperTemplates:
+    opendesk_useruuid:
+      protocolMapper: oidc-usermodel-attribute-mapper
+      config:
+        user.attribute: entryUUID
+        claim.name: opendesk_useruuid
+        jsonType.label: String
+        id.token.claim: "true"
+        access.token.claim: "true"
+        userinfo.token.claim: "true"
+    opendesk_username:
+      protocolMapper: oidc-usermodel-attribute-mapper
+      config:
+        user.attribute: uid
+        claim.name: opendesk_username
+        jsonType.label: String
+        id.token.claim: "true"
+        access.token.claim: "true"
+        userinfo.token.claim: "true"
+    email:
+      protocolMapper: oidc-usermodel-attribute-mapper
+      config:
+        user.attribute: email
+        claim.name: email
+        jsonType.label: String
+        id.token.claim: "true"
+        access.token.claim: "true"
+        userinfo.token.claim: "true"
+        introspection.token.claim: "true"
+  packs:
+    opendesk-nextcloud:
+      scopeName: opendesk-nextcloud-scope
+      scopeDescription: "Scope for OpenDesk Nextcloud AIO instances."
+      clientRole: opendesk-nextcloud-access-control
+      entitlementGroup: managed-by-attribute-Fileshare
+      publicClient: false
+      fullScopeAllowed: false
+      defaultScopes:
+        - profile
+        - email
+        - roles
+        - web-origins
+        - acr
+      mappers:
+        - opendesk_useruuid
+        - opendesk_username
+        - email
