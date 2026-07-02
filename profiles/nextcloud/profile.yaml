@@ -1,7 +1,8 @@
 # AppProfile — Nextcloud (per-tenant file sharing + Collabora office)
 #
 # Source chart: https://nextcloud.github.io/helm/ nextcloud v9.0.4
-#   Community-maintained chart (Apache-2.0); docker.io/library/nextcloud app image.
+# App image: ghcr.io/gentian-org/nextcloud (see images/nextcloud/BUNDLE.md)
+#   Bundled apps: richdocuments, user_oidc — no App Store egress at runtime.
 #   Collabora Online ships as an optional subchart (collabora-online, no account required).
 #
 # Installed per tenant from the App Store at cloud.<tenant-domain>.
@@ -16,7 +17,7 @@
 #   App-internal (1) → appSecrets:
 #     admin_password      → nextcloud.password
 #
-# Bootstrap: post-installation / before-starting hooks (nextcloud/docker entrypoint)
+# Bootstrap: post-installation / before-starting hooks enable bundled apps and
 # configure user_oidc, richdocuments (Collabora), and reverse-proxy settings. No custom
 # composition — app-default handles ExternalSecret, DB, cache, and Helm release.
 apiVersion: gentianos.io/v1alpha1
@@ -142,6 +143,11 @@ spec:
   extraValues:
     fullnameOverride: "nextcloud"
 
+    image:
+      registry: ghcr.io
+      repository: gentian-org/nextcloud
+      tag: "33.0.6-gentian1"
+
     # Redis ACL user is provisioned as ${TENANT_ID}-nextcloud; the chart only maps password by default.
     extraEnvVars:
       - name: REDIS_HOST_USER
@@ -208,6 +214,10 @@ spec:
             'overwrite.cli.url' => 'https://cloud.${TENANT_DOMAIN}',
             'trusted_proxies' => array('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'),
             'allow_local_remote_servers' => true,
+            'memcache_customprefix' => '${TENANT_ID}:nextcloud:',
+            'redis' => array(
+              'user' => '${TENANT_ID}-nextcloud',
+            ),
           );
       extraVolumes:
         - name: gentian-sensitive
@@ -222,18 +232,25 @@ spec:
           #!/bin/bash
           set -eu
           NC="php /var/www/html/occ"
-          COLLABORA_INTERNAL="http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980"
           COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
-          CLOUD_URL="https://cloud.${TENANT_DOMAIN}"
           if ! $NC status >/dev/null 2>&1; then
             exit 0
           fi
+          sync_bundled_apps() {
+            for app in richdocuments user_oidc; do
+              if [ ! -d "/var/www/html/custom_apps/${app}" ] && [ -d "/usr/src/nextcloud/apps/${app}" ]; then
+                cp -a "/usr/src/nextcloud/apps/${app}" "/var/www/html/custom_apps/"
+                chown -R www-data:www-data "/var/www/html/custom_apps/${app}"
+              fi
+              $NC app:enable "${app}" 2>/dev/null || true
+            done
+          }
+          sync_bundled_apps
           if $NC app:list --enabled 2>/dev/null | grep -q 'richdocuments:'; then
-            # Use the public Collabora URL for server-side WOPI discovery too. Tenant
-            # baseline NetworkPolicy allows HTTPS egress but not in-cluster :9980.
             $NC config:app:set richdocuments wopi_url --value="${COLLABORA_PUBLIC}" || true
             $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
             $NC config:app:set richdocuments doc_format --value="odf" || true
+            $NC richdocuments:activate-config || true
           fi
           curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/nextcloud-portal-sso.html \
             "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
@@ -256,10 +273,7 @@ spec:
           set -eu
           NC="php /var/www/html/occ"
           CLOUD_URL="https://cloud.${TENANT_DOMAIN}"
-          COLLABORA_INTERNAL="http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980"
           COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
-          # In-cluster discovery for server-side token/JWK calls; the document still advertises
-          # the external authorization_endpoint for browser redirects.
           DISCOVERY_URI="http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
           OIDC_SECRET="$(cat /etc/gentian/oidc-client-secret)"
           echo "[gentian-nextcloud] waiting for Nextcloud to become ready..."
@@ -267,10 +281,16 @@ spec:
             if $NC status >/dev/null 2>&1; then break; fi
             sleep 5
           done
-          $NC app:install user_oidc || true
-          $NC app:enable user_oidc || true
-          $NC app:install richdocuments || true
-          $NC app:enable richdocuments || true
+          sync_bundled_apps() {
+            for app in richdocuments user_oidc; do
+              if [ ! -d "/var/www/html/custom_apps/${app}" ] && [ -d "/usr/src/nextcloud/apps/${app}" ]; then
+                cp -a "/usr/src/nextcloud/apps/${app}" "/var/www/html/custom_apps/"
+                chown -R www-data:www-data "/var/www/html/custom_apps/${app}"
+              fi
+              $NC app:enable "${app}" 2>/dev/null || true
+            done
+          }
+          sync_bundled_apps
           $NC user_oidc:provider gentian \
             --clientid="gentian-nextcloud" \
             --clientsecret="${OIDC_SECRET}" \
@@ -282,7 +302,6 @@ spec:
             --unique-uid="1" \
             --check-bearer="0" || true
           $NC config:app:set user_oidc id4me --value="0" || true
-          # Single OIDC backend: auto-redirect /login to the gentian provider (portal SSO).
           $NC config:app:set user_oidc allow_multiple_user_backends --value="1" || true
           $NC config:system:set allow_local_remote_servers --type=boolean --value=true || true
           $NC config:app:set richdocuments wopi_url --value="${COLLABORA_PUBLIC}" || true

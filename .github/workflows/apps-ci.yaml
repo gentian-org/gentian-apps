@@ -6,12 +6,14 @@ on:
     paths:
       - "apps/**"
       - "profiles/**"
+      - "images/**"
       - ".github/workflows/apps-ci.yaml"
   pull_request:
     branches: [main, develop]
     paths:
       - "apps/**"
       - "profiles/**"
+      - "images/**"
 
 env:
   REGISTRY: ghcr.io
@@ -68,6 +70,44 @@ jobs:
           CHART_VERSION=$(grep '^version:' apps/app-store/chart/Chart.yaml | awk '{print $2}')
           helm package apps/app-store/chart -d /tmp
           helm push "/tmp/app-store-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+
+  build-nextcloud:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read nextcloud bundle versions
+        id: versions
+        run: |
+          # shellcheck disable=SC1091
+          source images/nextcloud/versions.env
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "nextcloud_version=${NEXTCLOUD_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "richdocuments_version=${RICHDOCUMENTS_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "user_oidc_version=${USER_OIDC_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Nextcloud bundle image
+        uses: docker/build-push-action@v6
+        with:
+          context: images/nextcloud
+          push: ${{ github.event_name != 'pull_request' }}
+          build-args: |
+            NEXTCLOUD_VERSION=${{ steps.versions.outputs.nextcloud_version }}
+            RICHDOCUMENTS_VERSION=${{ steps.versions.outputs.richdocuments_version }}
+            USER_OIDC_VERSION=${{ steps.versions.outputs.user_oidc_version }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ steps.versions.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ github.sha }}
 
   validate-profiles:
     runs-on: ubuntu-latest
