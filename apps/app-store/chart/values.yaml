@@ -6,7 +6,7 @@ tenantDomain: PLACEHOLDER_TENANT_DOMAIN
 api:
   image:
     repository: ghcr.io/gentian-org/app-store-api
-    tag: "0.3.1"
+    tag: "0.3.2"
   replicaCount: 1
   resources:
     requests:
@@ -22,7 +22,7 @@ api:
 web:
   image:
     repository: ghcr.io/gentian-org/app-store-web
-    tag: "0.3.1"
+    tag: "0.3.2"
   replicaCount: 1
   port: 8080
   resources:

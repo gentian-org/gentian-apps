@@ -1,4 +1,4 @@
-import { clearAccessToken, getAccessToken, redirectToLogin } from "@/auth/oidc";
+import { clearAccessToken, getAccessToken, getAuthConfig, redirectToLogin } from "@/auth/oidc";
 
 const API_PREFIX = "/api/v1";
 
@@ -35,7 +35,7 @@ async function fetchWithAuth<T>(url: string, init?: RequestInit): Promise<T> {
       ...(init?.headers || {}),
     },
   });
-  if (res.status === 401) {
+  if (res.status === 401 && !getAuthConfig().authDisabled) {
     clearAccessToken();
     await redirectToLogin();
     const retryToken = getAccessToken();

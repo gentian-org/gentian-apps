@@ -9,9 +9,26 @@ export type AuthConfig = {
   authDisabled: boolean;
 };
 
+let runtimeAuthDisabled: boolean | null = null;
+
+/** Load auth flags from the API (Vite env vars are build-time only). */
+export async function loadAuthConfig(): Promise<AuthConfig> {
+  try {
+    const res = await fetch("/api/v1/session/config");
+    if (res.ok) {
+      const data = (await res.json()) as { authDisabled?: boolean };
+      runtimeAuthDisabled = Boolean(data.authDisabled);
+    }
+  } catch {
+    // Offline or API unavailable — fall back to build-time env.
+  }
+  return getAuthConfig();
+}
+
 export function getAuthConfig(): AuthConfig {
+  const buildTimeDisabled = import.meta.env.VITE_AUTH_DISABLED === "true";
   return {
-    authDisabled: import.meta.env.VITE_AUTH_DISABLED === "true",
+    authDisabled: runtimeAuthDisabled ?? buildTimeDisabled,
   };
 }
 

@@ -1,4 +1,6 @@
 FROM node:22-alpine AS build
+ARG VITE_AUTH_DISABLED=false
+ENV VITE_AUTH_DISABLED=$VITE_AUTH_DISABLED
 WORKDIR /app
 COPY package.json ./
 RUN npm install

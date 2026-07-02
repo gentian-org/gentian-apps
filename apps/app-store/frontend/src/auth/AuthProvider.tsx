@@ -11,6 +11,7 @@ import {
   getAuthConfig,
   handleOAuthCallback,
   isAuthenticated,
+  loadAuthConfig,
   loginRedirect,
   logoutRedirect,
 } from "@/auth/oidc";
@@ -31,9 +32,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    handleOAuthCallback();
-    setAuthenticated(isAuthenticated());
-    setIsLoading(false);
+    void (async () => {
+      await loadAuthConfig();
+      handleOAuthCallback();
+      setAuthenticated(isAuthenticated());
+      setIsLoading(false);
+    })();
   }, []);
 
   const login = useCallback(() => loginRedirect(), []);

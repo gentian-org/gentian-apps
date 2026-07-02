@@ -52,6 +52,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: apps/app-store/frontend
+          build-args: |
+            VITE_AUTH_DISABLED=true
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:${{ steps.versions.outputs.image_tag }}
