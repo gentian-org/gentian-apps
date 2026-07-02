@@ -10,6 +10,7 @@ metadata:
     gentianos.io/profile-name: app-store
   annotations:
     gentianos.io/platform-app: "true"
+    gentianos.io/kernel-egress-namespaces: gentian-system
     gentianos.io/gateway-api-backends: '[{"pathPrefix":"/api","serviceName":"app-store-api","port":8000},{"pathPrefix":"/oauth","serviceName":"app-store-api","port":8000}]'
 spec:
   displayName: "App Store"

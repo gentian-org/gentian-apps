@@ -14,6 +14,9 @@ spec:
     metadata:
       labels:
         {{- include "gentian-app.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         app.kubernetes.io/name: {{ include "gentian-app.name" . }}-web
         app.kubernetes.io/component: web
     spec:
