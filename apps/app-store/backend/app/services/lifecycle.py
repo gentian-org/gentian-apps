@@ -39,7 +39,7 @@ class LifecycleClient:
 
     def install(self, profile: str, actor: str) -> dict[str, Any]:
         try:
-            with httpx.Client(timeout=60.0) as client:
+            with httpx.Client(timeout=120.0) as client:
                 res = client.post(
                     self._url(profile),
                     params={"wait": "false"},
