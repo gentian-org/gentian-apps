@@ -1,6 +1,7 @@
 # AppProfile — OpenProject (per-tenant project management)
 #
-# Source chart: https://charts.openproject.org/ openproject v10.1.0
+# Source chart: https://charts.openproject.org/ openproject v12.0.0+
+#   Chart >= 12 applies commonLabels to pod templates (required for MAC kernel-access).
 #   Community-maintained chart; docker.io/openproject/openproject app image.
 #
 # For the OpenDesk supplier mirror (opencode registry), use profile `od-openproject`
@@ -114,12 +115,11 @@ spec:
     subDomain: "projects"
     serviceName: "openproject"
     servicePort: 8080
-    ingressClassName: "nginx"
     tlsEnabled: true
     annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "512M"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+      gentianos.io/gateway-buffer-limit: "512M"
+      gentianos.io/gateway-request-timeout: "120"
+      gentianos.io/gateway-response-timeout: "120"
 
   browserProxy:
     - path: api
