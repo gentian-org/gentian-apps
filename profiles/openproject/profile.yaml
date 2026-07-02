@@ -1,0 +1,286 @@
+# AppProfile — OpenProject (per-tenant project management)
+#
+# Source chart: https://charts.openproject.org/ openproject v10.1.0
+#   Community-maintained chart; docker.io/openproject/openproject app image.
+#
+# For the OpenDesk supplier mirror (opencode registry), use profile `od-openproject`
+# in gentian-pro.
+#
+# Secret inventory:
+#   Kernel-provided:
+#     oidc_client_secret  → openproject.oidc.secret
+#     pg_*                → postgresql.auth.password / connection.*
+#     s3_secret_key       → s3.auth.secretAccessKey
+#     smtp_password       → environment.OPENPROJECT_SMTP__PASSWORD
+#   App-internal (2) → appSecrets:
+#     admin_password      → openproject.admin_user.password
+#     api_admin_password  → environment.OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_PASSWORD
+#
+# Custom composition `app-openproject` seeds the OIDC auth provider when the chart
+# seeder hook does not run on upgrades (OpenProject 16.x).
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: openproject
+  labels:
+    gentianos.io/profile-name: openproject
+spec:
+  displayName: "OpenProject"
+  description: "Open-source project management with Gantt charts, Kanban boards, and time tracking."
+  family: openproject
+  catalogueVersion: "1.0.0"
+  edition: full
+  trustTier: certified
+  license: Apache-2.0
+  tile:
+    icon: projects
+  compositionRef: app-openproject
+
+  kernelRequirements:
+    identity:
+      oidc:
+        clientId: "gentian-openproject"
+        name: "OpenProject"
+        accessType: CONFIDENTIAL
+        redirectUris:
+          - "https://projects.${TENANT_DOMAIN}/auth/keycloak/callback"
+        postLogoutRedirectUris:
+          - "https://projects.${TENANT_DOMAIN}/"
+        backchannelLogoutUrl: "https://projects.${TENANT_DOMAIN}/auth/keycloak/backchannel-logout"
+    database:
+      engine: postgresql
+      databasePerTenant: true
+    storage:
+      s3:
+        bucketPerTenant: true
+    cache:
+      engine: memcached
+    mail:
+      smtp:
+        auth: cram-md5
+        port: 587
+
+  provides:
+    - name: project-management
+      protocol: http-json
+
+  optionalIntegrations:
+    - contract: central-navigation
+      provider: portal
+      capabilities:
+        - navigation:register
+    - contract: file-store
+      provider: nextcloud
+      capabilities:
+        - webdav:read
+        - webdav:write
+
+  portalTiles:
+    - name: openproject
+      displayName:
+        de_DE: "Projekte"
+        en_US: "Projects"
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  chart:
+    repository: "https://charts.openproject.org/"
+    name: openproject
+    version: "10.1.0"
+
+  deploymentMethod: crossplane
+
+  valueMapping:
+    oidc:
+      clientSecretKey: "openproject.oidc.secret"
+    database:
+      hostKey: "postgresql.connection.host"
+      portKey: "postgresql.connection.port"
+      nameKey: "postgresql.auth.database"
+      userKey: "postgresql.auth.username"
+      passwordKey: "postgresql.auth.password"
+    s3:
+      secretKeyKey: "s3.auth.secretAccessKey"
+    smtp:
+      passwordKey: "environment.OPENPROJECT_SMTP__PASSWORD"
+
+  appSecrets:
+    - name: admin_password
+      valuePath: "openproject.admin_user.password"
+    - name: api_admin_password
+      valuePath: "environment.OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_PASSWORD"
+
+  ingress:
+    subDomain: "projects"
+    serviceName: "openproject"
+    servicePort: 8080
+    ingressClassName: "nginx"
+    tlsEnabled: true
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "512M"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+
+  browserProxy:
+    - path: api
+      target: "http://openproject.{namespace}.svc/api/v3/"
+      authMode: forward-bearer
+      stripPrefix: true
+
+  extraValues:
+    global:
+      domain: "${KERNEL_DOMAIN}"
+      hosts:
+        openproject: "projects.${TENANT_ID}"
+        keycloak: "id"
+        nubus: "portal"
+
+    fullnameOverride: "openproject"
+
+    image:
+      registry: "docker.io"
+      repository: "openproject/openproject"
+      tag: "16-slim"
+      imagePullPolicy: "IfNotPresent"
+
+    dbInit:
+      image:
+        registry: "docker.io"
+        repository: "library/postgres"
+        tag: "16-alpine"
+
+    postgresql:
+      bundled: false
+
+    memcached:
+      bundled: false
+      connection:
+        host: "memcached"
+        port: 11211
+
+    s3:
+      enabled: true
+      pathStyle: true
+      region: "us-east-1"
+      directUploads: false
+      enableSignatureV4Streaming: false
+      endpoint: "${S3_ENDPOINT}"
+      host: "${S3_ENDPOINT}"
+      bucketName: "${TENANT_ID}-openproject"
+      auth:
+        accessKeyId: "${TENANT_ID}-openproject"
+
+    persistence:
+      enabled: false
+
+    probes:
+      liveness:
+        initialDelaySeconds: 300
+        failureThreshold: 30
+      readiness:
+        initialDelaySeconds: 150
+        failureThreshold: 30
+
+    appInit:
+      resources:
+        limits:
+          cpu: "250m"
+          memory: "1Gi"
+        requests:
+          cpu: "100m"
+          memory: "768Mi"
+
+    replicaCount: 1
+    backgroundReplicaCount: 0
+
+    resources:
+      limits:
+        cpu: "750m"
+        memory: "2Gi"
+      requests:
+        cpu: "250m"
+        memory: "1Gi"
+
+    containerSecurityContext:
+      enabled: true
+      privileged: false
+      runAsUser: 1000
+      runAsGroup: 1000
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - "ALL"
+      seccompProfile:
+        type: "RuntimeDefault"
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+
+    podAnnotations:
+      secret.reloader.stakater.com/reload: openproject-sensitive-values
+
+    seederJob:
+      annotations:
+        helm.sh/hook: post-install
+        helm.sh/hook-weight: "5"
+        helm.sh/hook-delete-policy: hook-succeeded,before-hook-creation
+      resources:
+        limits:
+          cpu: "250m"
+          memory: "768Mi"
+        requests:
+          cpu: "100m"
+          memory: "512Mi"
+
+    serviceAccount:
+      create: true
+
+    openproject:
+      seed_locale: "de"
+      host: "projects.${TENANT_DOMAIN}"
+      admin_user:
+        name: "OpenProject Internal Admin"
+        mail: "openproject-admin@${TENANT_DOMAIN}"
+        password_reset: "false"
+        locked: false
+      oidc:
+        enabled: true
+        authorizationEndpoint: "/realms/${TENANT_ID}/protocol/openid-connect/auth"
+        endSessionEndpoint: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/logout"
+        host: "id.${KERNEL_DOMAIN}"
+        identifier: "gentian-openproject"
+        provider: "keycloak"
+        scope: "[openid,gentian-openproject-scope]"
+        tokenEndpoint: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/token"
+        userinfoEndpoint: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/userinfo"
+        attribute_map:
+          login: "gentian_username"
+          admin: "openproject_admin"
+      useTmpVolumes: true
+
+    ingress:
+      enabled: false
+
+    environment:
+      OPENPROJECT_LOGIN__REQUIRED: "true"
+      OPENPROJECT_OMNIAUTH__DIRECT__LOGIN__PROVIDER: "keycloak"
+      OPENPROJECT_OAUTH__ALLOW__REMAPPING__OF__EXISTING__USERS: "true"
+      OPENPROJECT_EMAIL__DELIVERY__METHOD: "smtp"
+      OPENPROJECT_OPENID__CONNECT_KEYCLOAK_ISSUER: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
+      OPENPROJECT_OPENID__CONNECT_KEYCLOAK_POST__LOGOUT__REDIRECT__URI: "https://projects.${TENANT_DOMAIN}/"
+      OPENPROJECT_OPENID__CONNECT_KEYCLOAK_JWKS__URI: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/certs"
+      OPENPROJECT_SMTP__ADDRESS: "${SMTP_HOST}"
+      OPENPROJECT_SMTP__PORT: "587"
+      OPENPROJECT_SMTP__SSL: "false"
+      OPENPROJECT_SMTP__AUTHENTICATION: "cram_md5"
+      OPENPROJECT_SMTP__ENABLE__STARTTLS__AUTO: "true"
+      OPENPROJECT_SMTP__OPENSSL__VERIFY__MODE: "none"
+      OPENPROJECT_SMTP__DOMAIN: "${TENANT_DOMAIN}"
+      OPENPROJECT_SMTP__USER__NAME: "gentian-system@${TENANT_DOMAIN}"
+      OPENPROJECT_MAIL__FROM: "noreply@${TENANT_DOMAIN}"
+      OPENPROJECT_HOME__URL: "https://portal.${KERNEL_DOMAIN}/"
+      OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_USER: "api_admin"
+      OPENPROJECT_LOG__LEVEL: "info"
+      OPENPROJECT_APP__TITLE: "Projekte"
+      OPENPROJECT_USER__DEFAULT__TIMEZONE: "Europe/Berlin"
+      OPENPROJECT_DEFAULT__COMMENT__SORT__ORDER: "desc"
+      OPENPROJECT_PLUGIN__OPENPROJECT__AVATARS: '{enable_gravatars: false, enable_local_avatars: true}'

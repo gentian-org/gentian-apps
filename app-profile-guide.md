@@ -434,10 +434,8 @@ upstream `X-Frame-Options` and `Content-Security-Policy`, then setting a single:
 Content-Security-Policy: frame-ancestors 'self' https://portal.<kernel-domain>
 ```
 
-**Exception — CryptPad** (`pad` / `pad-sandbox` kernel HTTPRoutes only): the
-operator **appends** a second CSP header so upstream `script-src` (no
-`'unsafe-eval'`) stays intact. Do not copy CryptPad's append-only pattern into
-AppProfiles.
+Do not add per-app `Content-Security-Policy` or `X-Frame-Options` annotations — the
+operator owns iframe policy for tenant app HTTPRoutes.
 
 ### 6c. AppProfile checklist (all profiles)
 
@@ -604,20 +602,6 @@ curl -sI https://id.${KERNEL_DOMAIN}/ | grep -i content-security
 # expect: frame-ancestors 'self' https://portal.<kernel> https://*.demo.<kernel> …
 ```
 
-### 6f. Kernel diagram service (CryptPad)
-
-Diagram editing from Nextcloud Files uses a **shared CryptPad kernel service**
-(like Collabora in §9b of `gentian-os/docs/architecture.md`), not a per-tenant
-AppProfile. One instance at `pad.<kernel_domain>` plus
-`pad-sandbox.<kernel_domain>` for the crypto sandbox origin serves all tenants;
-Nextcloud embeds it from `files.<kernel_domain>`.
-
-There is **no portal tile** and **no tenant HTTPRoute** — manifests live under
-`gentian-os/kernel/services/cryptpad/`. CSP `frame-ancestors` on the kernel
-HTTPRoutes is computed centrally in the operator (`cryptpadSandboxFrameAncestorOrigins`):
-**pad** + **portal** + **files** on `pad-sandbox`, **files** + **portal** on `pad`.
-Do not duplicate CSP in AppProfile annotations.
-
 ### 6g. Nextcloud (App Store)
 
 Nextcloud is an **App Store app** (`profiles/nextcloud/profile.yaml`), not a kernel
@@ -724,10 +708,9 @@ extraValues:
 
 ### 7b. Jitsi + Element (video in Matrix rooms)
 
-Jitsi is bundled as an **Element sidecar** (similar to how CryptPad is wired from
-Nextcloud in openDesk — one install, not a separate tenant app). Installing
-`element` on a tenant deploys Jitsi at `meet.<tenant>` for Element room widgets
-and portal realtime links.
+Jitsi is bundled as an **Element sidecar** (one install per tenant, not a separate
+catalogue app). Installing `element` on a tenant deploys Jitsi at `meet.<tenant>` for
+Element room widgets and portal realtime links.
 
 1. Install only `element` on the tenant (`spec.apps`). Do **not** add a separate
    `jitsi` profile — there is no standalone Jitsi AppProfile in the catalogue.
@@ -994,7 +977,7 @@ Before opening a PR, verify:
 - [ ] `reloader.stakater.com/auto: "true"` in `podAnnotations`
 - [ ] (automatic) Operator injects portal `frame-ancestors` on app HTTPRoutes — no CSP annotations in profile
 - [ ] `ingress.annotations` contains no `frame-ancestors`, `X-Frame-Options`, or `Content-Security-Policy`
-- [ ] (CryptPad / multi-host) `additionalIngresses` use flat subdomains; no per-host CSP in annotations — operator sets `pad-sandbox` policy
+- [ ] `additionalIngresses` use flat subdomains; rely on operator gateway CSP for embed hosts
 - [ ] `spec.browserProxy` declared if the shell calls this app's REST API
 - [ ] `compositionRef` omitted unless using a non-default composition
 - [ ] YAML passes `python3 -c "import yaml; yaml.safe_load(open('<file>'))"` locally
