@@ -1,7 +1,10 @@
 # Gentian app catalogue layout
 
-Each app is a **profile bundle** under `profiles/<name>/`, synced to the cluster by
-ArgoCD ApplicationSet **`gentian-catalogue`** (one Application per bundle).
+Each OSS app is a **profile bundle** under `profiles/<name>/`, synced to the cluster by
+ArgoCD ApplicationSet **`gentian-catalogue`**.
+
+OpenDesk profiles (`od-*`) live in **[gentian-pro](https://github.com/gentian-org/gentian-pro)**
+and sync via **`gentian-catalogue-pro`**.
 
 ## Layout
 
@@ -22,15 +25,12 @@ protocol mappers (Path B OIDC) also ship `oidc-catalog.yaml` in the same bundle.
 |---------|-------------|----------------|
 | `app-store` | — (`app-default`) | — |
 | `nextcloud` | — (`app-default`) | portal bridge SSO assets |
-| `od-nextcloud` | — (`app-default`) | OIDC pack |
-| `od-xwiki` | — | OIDC pack |
-| `od-openproject` | `app-od-openproject` | OIDC pack |
-| `od-ox-appsuite` | `app-od-ox` | OIDC pack |
-| `od-element` | `app-od-element` | Jitsi OIDC overlay ConfigMap + OIDC pack |
 | `odoo-free-base` | — (`app-default`) | — |
 
-OpenDesk-flavoured profiles use the `od-` prefix. Public/community charts keep
-short names (`nextcloud`, `odoo-free-base`, …).
+OpenDesk-flavoured profiles (`od-*`) are in **gentian-pro** — see
+[gentian-pro/profiles/CATALOGUE.md](https://github.com/gentian-org/gentian-pro/blob/main/profiles/CATALOGUE.md).
+
+Public/community charts keep short names (`nextcloud`, `odoo-free-base`, …).
 
 ## Adding a simple app
 

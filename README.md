@@ -5,12 +5,9 @@ App Store catalogue for Gentian OS — `AppProfile` CRs plus first-party app imp
 ## Structure
 
 ```text
-profiles/              # App catalogue bundles — synced by Argo CD gentian-catalogue
+profiles/              # OSS App catalogue bundles — synced by Argo CD gentian-catalogue
   CATALOGUE.md         # layout and workflow
-  element/             # AppProfile + app-od-element composition + Jitsi overlay assets
-  openproject/
-  ox-appsuite/
-  xwiki/
+  nextcloud/
   app-store/
 apps/                  # first-party implementations (FastAPI + React + Helm)
   _template/           # copy of gentian-app-template
@@ -51,5 +48,6 @@ See [custom-app-guide.md](custom-app-guide.md).
 |------|---------|
 | [gentian-os](https://github.com/gentian-org/gentian-os) | Orchestrator, CRDs, kernel |
 | [gentian-deployments](https://github.com/gentian-org/gentian-deployments) | Per-environment tenant state |
+| [gentian-pro](https://github.com/gentian-org/gentian-pro) | OpenDesk (pro) catalogue |
 | [gentian-app-template](https://github.com/gentian-org/gentian-app-template) | Scaffold for new apps |
 | [gentian-ui](https://github.com/gentian-org/gentian-ui) | Portal shell |

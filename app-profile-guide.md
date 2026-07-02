@@ -944,9 +944,9 @@ Set `compositionRef` only when using a non-default composition:
 | Composition | When to use |
 |---|---|
 | *(omit)* | Standard apps — `app-default` is used automatically |
-| `app-od-element` | Element (Matrix) — bundle includes `app-od-element` composition |
-| `app-od-ox` | OX App Suite — bundle includes `app-od-ox` composition |
-| `app-od-openproject` | OpenProject — OIDC seed job in profile composition |
+| `app-od-element` | Element (OpenDesk) — bundle in **gentian-pro** (`app-od-element` composition) |
+| `app-od-ox` | OX App Suite — bundle in **gentian-pro** |
+| `app-od-openproject` | OpenProject — bundle in **gentian-pro** |
 
 ---
 
