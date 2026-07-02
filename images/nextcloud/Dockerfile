@@ -29,5 +29,3 @@ LABEL org.opencontainers.image.title="Gentian Nextcloud" \
       org.gentian.nextcloud.base="${NEXTCLOUD_VERSION}" \
       org.gentian.apps.richdocuments="${RICHDOCUMENTS_VERSION}" \
       org.gentian.apps.user_oidc="${USER_OIDC_VERSION}"
-
-USER www-data

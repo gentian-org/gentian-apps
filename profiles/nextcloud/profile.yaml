@@ -119,23 +119,21 @@ spec:
     subDomain: "cloud"
     serviceName: "nextcloud"
     servicePort: 8080
-    ingressClassName: "nginx"
     tlsEnabled: true
     annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "512M"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+      gentianos.io/gateway-buffer-limit: "512M"
+      gentianos.io/gateway-request-timeout: "3600"
+      gentianos.io/gateway-response-timeout: "3600"
 
   additionalIngresses:
     - subDomain: collabora
       serviceName: nextcloud-collabora
       servicePort: 9980
-      ingressClassName: nginx
       tlsEnabled: true
       annotations:
-        nginx.ingress.kubernetes.io/proxy-body-size: "100M"
-        nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-        nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+        gentianos.io/gateway-buffer-limit: "100M"
+        gentianos.io/gateway-request-timeout: "3600"
+        gentianos.io/gateway-response-timeout: "3600"
         gentianos.io/gateway-frame-ancestors: |
           {"mode":"replace","origins":["mainApp","portal"]}
         gentianos.io/gateway-escaped-slashes-action: KeepUnchanged
@@ -146,7 +144,7 @@ spec:
     image:
       registry: ghcr.io
       repository: gentian-org/nextcloud
-      tag: "33.0.6-gentian1"
+      tag: "33.0.6-gentian2"
 
     # Redis ACL user is provisioned as ${TENANT_ID}-nextcloud; the chart only maps password by default.
     extraEnvVars:
