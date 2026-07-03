@@ -20,17 +20,23 @@
     <p>Signing in to Files…</p>
     <script>
       (async () => {
-        const ticket = new URLSearchParams(window.location.search).get("t");
+        const params = new URLSearchParams(window.location.search);
+        const ticket = params.get("t");
         if (!ticket) {
           window.location.replace("/");
           return;
         }
 
+        // Optional document-type intent from Document/Spreadsheet/Presentation tiles.
+        const open = params.get("open");
+        let target = `/gentian-portal-bridge.php?t=${encodeURIComponent(ticket)}`;
+        if (open) {
+          target += `&open=${encodeURIComponent(open)}`;
+        }
+
         // Server-side session establishment avoids iframe third-party cookie /
         // CSRF failures from posting the login form in an embedded WinBox.
-        window.location.replace(
-          `/gentian-portal-bridge.php?t=${encodeURIComponent(ticket)}`,
-        );
+        window.location.replace(target);
       })();
     </script>
   </body>
