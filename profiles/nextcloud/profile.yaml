@@ -231,6 +231,27 @@ spec:
           set -eu
           NC="php /var/www/html/occ"
           COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
+          patch_portal_bridge_htaccess() {
+            python3 - <<'PY'
+          from pathlib import Path
+          htaccess = Path("/var/www/html/.htaccess")
+          if not htaccess.is_file():
+              raise SystemExit(0)
+          text = htaccess.read_text()
+          old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
+          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
+          if "gentian-portal-bridge" not in text:
+              if old not in text:
+                  raise SystemExit(0)
+              htaccess.write_text(text.replace(old, new))
+          PY
+          }
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/nextcloud-portal-sso.html \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
+          sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/gentian-portal-bridge.php 2>/dev/null || true
+          patch_portal_bridge_htaccess
           if ! $NC status >/dev/null 2>&1; then
             exit 0
           fi
@@ -250,22 +271,7 @@ spec:
             $NC config:app:set richdocuments doc_format --value="odf" || true
             $NC richdocuments:activate-config || true
           fi
-          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/nextcloud-portal-sso.html \
-            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
-          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
-            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
-          sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/gentian-portal-bridge.php 2>/dev/null || true
-          python3 - <<'PY'
-          from pathlib import Path
-          htaccess = Path("/var/www/html/.htaccess")
-          if not htaccess.is_file():
-              raise SystemExit(0)
-          text = htaccess.read_text()
-          old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
-          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
-          if "gentian-portal-bridge" not in text:
-              htaccess.write_text(text.replace(old, new))
-          PY
+          patch_portal_bridge_htaccess
         post-installation: |
           #!/bin/bash
           set -eu
@@ -312,7 +318,8 @@ spec:
           curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
             "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
           sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/gentian-portal-bridge.php 2>/dev/null || true
-          python3 - <<'PY'
+          patch_portal_bridge_htaccess() {
+            python3 - <<'PY'
           from pathlib import Path
           htaccess = Path("/var/www/html/.htaccess")
           if not htaccess.is_file():
@@ -321,8 +328,12 @@ spec:
           old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
           new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
           if "gentian-portal-bridge" not in text:
+              if old not in text:
+                  raise SystemExit(0)
               htaccess.write_text(text.replace(old, new))
           PY
+          }
+          patch_portal_bridge_htaccess
           echo "[gentian-nextcloud] bootstrap complete for ${CLOUD_URL}"
 
     collabora:
