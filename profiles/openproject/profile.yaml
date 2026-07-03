@@ -87,7 +87,7 @@ spec:
   chart:
     repository: "https://charts.openproject.org/"
     name: openproject
-    version: "10.1.0"
+    version: "12.0.0"
 
   deploymentMethod: crossplane
 
