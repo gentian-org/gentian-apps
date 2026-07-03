@@ -22,15 +22,27 @@ FROM docker.io/library/maven:3.9-eclipse-temurin-21 AS oidcdeps
 ARG OIDC_VERSION
 WORKDIR /build
 COPY oidc-pom.xml pom.xml
-# Copy the full runtime dependency tree. XWiki platform/commons/rendering jars
-# are provided by the WAR (pruned again by the dedup step below), so exclude
-# them here to keep the copied set small; org.xwiki.contrib.oidc:* is kept.
-RUN mvn -B -Doidc.version="${OIDC_VERSION}" \
-      org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy-dependencies \
-      -DoutputDirectory=/oidc-libs \
-      -DincludeScope=runtime \
-      -DexcludeGroupIds=org.xwiki.platform,org.xwiki.commons,org.xwiki.rendering \
-    && ls -1 /oidc-libs
+# Copy the OIDC contrib jars + their non-platform deps (Nimbus, etc.). The
+# xwiki-platform/commons/rendering subtree is pruned in the pom (already in the
+# WAR) and excluded here as well. nexus.xwiki.org occasionally returns transient
+# 502s, so retry the whole resolution a few times before giving up.
+RUN set -eu; \
+    ok=0; \
+    for attempt in 1 2 3 4 5; do \
+      if mvn -B -Doidc.version="${OIDC_VERSION}" \
+           -Dmaven.wagon.http.retryHandler.count=5 \
+           -Dmaven.wagon.http.retryHandler.requestSentEnabled=true \
+           org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy-dependencies \
+           -DoutputDirectory=/oidc-libs \
+           -DincludeScope=runtime \
+           -DexcludeGroupIds=org.xwiki.platform,org.xwiki.commons,org.xwiki.rendering; then \
+        ok=1; break; \
+      fi; \
+      echo "[gentian] maven attempt ${attempt} failed (transient nexus.xwiki.org error?); retrying in 20s..."; \
+      sleep 20; \
+    done; \
+    [ "${ok}" = 1 ]; \
+    ls -1 /oidc-libs
 
 # ---------------------------------------------------------------------------
 # Stage 2 — the runtime image.

@@ -40,6 +40,28 @@
       <groupId>org.xwiki.contrib.oidc</groupId>
       <artifactId>oidc-authenticator</artifactId>
       <version>${oidc.version}</version>
+      <!--
+        Prune the entire XWiki platform/commons/rendering subtree from dependency
+        collection. Those jars (and their own deep transitives such as
+        io.sf.carte:css4j / io.sf.jclf:*, which declare open version ranges that
+        are slow/flaky to resolve) are already shipped in the WAR's WEB-INF/lib,
+        so we neither need nor want them here. This keeps the resolved graph to
+        the OIDC contrib jars + the Nimbus OAuth2 OIDC SDK tree (Maven Central).
+      -->
+      <exclusions>
+        <exclusion>
+          <groupId>org.xwiki.platform</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.xwiki.commons</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.xwiki.rendering</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
 </project>
