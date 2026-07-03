@@ -269,6 +269,10 @@ spec:
             done
           }
           sync_bundled_apps
+          # The password_policy breached-password check calls api.pwnedpasswords.com,
+          # which cluster egress blocks — every password set then waits ~5s for the
+          # timeout (felt on portal bridge login and admin ops). Disable the external check.
+          $NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true
           if $NC app:list --enabled 2>/dev/null | grep -q 'richdocuments:'; then
             $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
             $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
@@ -315,6 +319,10 @@ spec:
           $NC config:app:set user_oidc id4me --value="0" || true
           $NC config:app:set user_oidc allow_multiple_user_backends --value="1" || true
           $NC config:system:set allow_local_remote_servers --type=boolean --value=true || true
+          # Disable the password_policy breached-password check: it calls
+          # api.pwnedpasswords.com (blocked by egress) and adds ~5s to every
+          # password set — the portal bridge felt this on each Files open.
+          $NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true
           $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
           $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
           $NC config:app:set richdocuments doc_format --value="odf" || true

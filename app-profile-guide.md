@@ -733,6 +733,26 @@ URL for the admin/provisioning call, public host only for the browser redirect.
 If you add a new bridged app, mint the session server-side against
 `http://<svc>.tenant-<t>.svc.cluster.local`, not the public hostname.
 
+#### Bridge provisioning — keep the hot path cheap
+
+Opening an embedded tile runs the bridge on **every click**, so the
+provisioning step must be fast. Two rules (learned from a ~5s Files stall):
+
+1. **Do only what the login needs.** `gentian-portal-bridge.php` logs the user in
+   with `setUser()` and never checks the account password, so the bridge only has
+   to guarantee the user **exists** — it must **not** reset the password on every
+   open. `_ensure_nextcloud_user` treats OCS `100` (created) and `102` (already
+   exists) as success and skips the password `PUT`. Redundant writes in a
+   per-click path are pure latency.
+2. **Never let a blocked egress call sit in the hot path.** Nextcloud's
+   `password_policy` app runs a **HaveIBeenPwned** breached-password check that
+   calls `api.pwnedpasswords.com` on every password set. Cluster egress blocks it,
+   so each call waited for the ~5s timeout. The profile disables it
+   (`occ config:app:set password_policy enforceHaveIBeenPwned --value=false`). When
+   wrapping any chart, audit for outbound calls to the public internet (breach
+   checks, telemetry, avatar/gravatar fetches, license pings, update checks) and
+   disable them — a blocked call becomes a multi-second stall, not a clean failure.
+
 The licensed OpenDesk Nextcloud stack is **not** part of gentian-os or gentian-apps;
 customers who need it install it from the proprietary catalogue separately.
 
