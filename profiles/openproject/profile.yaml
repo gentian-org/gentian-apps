@@ -17,8 +17,10 @@
 #     admin_password      → openproject.admin_user.password
 #     api_admin_password  → environment.OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_PASSWORD
 #
-# Custom composition `app-openproject` seeds the OIDC auth provider when the chart
-# seeder hook does not run on upgrades (OpenProject 16.x).
+# Manual OpenBao (required for portal OIDC / WinBox login):
+#   gentian-os/tenants/{tenant}/apps/openproject/enterprise → token
+#   OpenProject Enterprise token for the app host (projects.{tenant-domain}).
+#   SSO is an Enterprise feature; without the token /auth/keycloak returns 404.
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
@@ -131,7 +133,7 @@ spec:
     global:
       domain: "${KERNEL_DOMAIN}"
       hosts:
-        openproject: "projects.${TENANT_ID}"
+        openproject: "projects.${TENANT_DOMAIN}"
         keycloak: "id"
         nubus: "portal"
 
@@ -277,7 +279,7 @@ spec:
       OPENPROJECT_SMTP__DOMAIN: "${TENANT_DOMAIN}"
       OPENPROJECT_SMTP__USER__NAME: "gentian-system@${TENANT_DOMAIN}"
       OPENPROJECT_MAIL__FROM: "noreply@${TENANT_DOMAIN}"
-      OPENPROJECT_HOME__URL: "https://portal.${KERNEL_DOMAIN}/"
+      OPENPROJECT_HOME__URL: "https://projects.${TENANT_DOMAIN}/"
       OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_USER: "api_admin"
       OPENPROJECT_LOG__LEVEL: "info"
       OPENPROJECT_APP__TITLE: "Projekte"

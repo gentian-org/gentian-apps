@@ -320,6 +320,12 @@ spec:
             {{- end }}
             {{- end }}
 
+            {{- /* OpenProject Enterprise token (manual OpenBao; enables OIDC SSO) */}}
+            {{- if eq $app "openproject" }}
+            {{- $entPath := printf "gentian-os/tenants/%s/apps/%s/enterprise" $tenant $app }}
+            {{- $esData = append $esData (dict "secretKey" "enterprise-token" "remoteRef" (dict "key" $entPath "property" "token")) }}
+            {{- end }}
+
             {{- /* ── Build Release set[] entries ────────────────────────────────── */}}
             {{- /* Each set entry picks a single key from the ExternalSecret-managed  */}}
             {{- /* Secret and passes it to Helm as a --set-string override. Helm      */}}
@@ -447,6 +453,11 @@ spec:
             {{- $relSet = append $relSet (dict "name" $s.valuePath
                 "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" (printf "internal-%s" $s.name)))) }}
             {{- end }}
+            {{- end }}
+
+            {{- if eq $app "openproject" }}
+            {{- $relSet = append $relSet (dict "name" "environment.OPENPROJECT_SEED__ENTERPRISE__TOKEN"
+                "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" "enterprise-token"))) }}
             {{- end }}
 
             {{- /* ── Render inline non-sensitive values ───────────────────────── */}}
@@ -727,153 +738,6 @@ spec:
             {{- end }}
 
 
-
-            
-            {{- /* ── OpenProject: seed OIDC auth provider before web pods start ── */}}
-            {{- /* OpenProject 16.x registers /auth/:provider from auth_providers DB  */}}
-            {{- /* rows. The chart seeder hook only runs on post-install (revision 1); */}}
-            {{- /* repeated Crossplane upgrades skip it, leaving /auth/keycloak → 404.  */}}
-            {{- if eq $app "openproject" }}
-            {{- $opKernelDomain := dig "KERNEL_DOMAIN" "" $ksCMData }}
-            {{- $opImg := dig "image" dict $extraVals }}
-            {{- $opImage := printf "%s/%s:%s" (dig "registry" "docker.io" $opImg) (dig "repository" "openproject/openproject" $opImg) (dig "tag" "16-slim" $opImg) }}
-            {{- $opDbRole := printf "%s_%s" $tenant $app | replace "-" "_" }}
-            ---
-            apiVersion: kubernetes.crossplane.io/v1alpha2
-            kind: Object
-            metadata:
-              annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-oidc-seed-job
-              name: {{ $xrName }}-oidc-seed-job
-            spec:
-              deletionPolicy: Delete
-              forProvider:
-                manifest:
-                  apiVersion: batch/v1
-                  kind: Job
-                  metadata:
-                    name: {{ $app }}-oidc-seed
-                    namespace: {{ $ns }}
-                    labels:
-                      app.kubernetes.io/managed-by: gentian-os
-                      gentianos.io/tenant: {{ $tenant }}
-                      gentianos.io/app: {{ $app }}
-                  spec:
-                    ttlSecondsAfterFinished: 600
-                    activeDeadlineSeconds: 1800
-                    backoffLimit: 5
-                    template:
-                      metadata:
-                        labels:
-                          app.kubernetes.io/managed-by: gentian-os
-                          gentianos.io/tenant: {{ $tenant }}
-                          gentianos.io/app: {{ $app }}
-                      spec:
-                        restartPolicy: OnFailure
-                        initContainers:
-                          - name: wait-for-schema
-                            image: {{ $opImage | quote }}
-                            command: ["/bin/bash", "-lc"]
-                            args:
-                              - |
-                                set -euo pipefail
-                                export PGPASSWORD="${OPENPROJECT_DB_PASSWORD}"
-                                max_attempts=120
-                                attempt=0
-                                until bundle exec rails runner 'exit(ActiveRecord::Base.connection.table_exists?(:auth_providers) ? 0 : 1)' 2>/dev/null; do
-                                  attempt=$((attempt + 1))
-                                  if (( attempt >= max_attempts )); then
-                                    echo "[oidc-seed] timed out waiting for OpenProject DB migrations (auth_providers)"
-                                    exit 1
-                                  fi
-                                  echo "[oidc-seed] waiting for OpenProject DB migrations (auth_providers)..."
-                                  sleep 15
-                                done
-                            env:
-                              - name: DATABASE_HOST
-                                value: {{ $cnpgHost | quote }}
-                              - name: DATABASE_PORT
-                                value: "5432"
-                              - name: OPENPROJECT_DB_USERNAME
-                                value: {{ $opDbRole | quote }}
-                              - name: OPENPROJECT_DB_DATABASE
-                                value: {{ $opDbRole | quote }}
-                              - name: OPENPROJECT_DB_PASSWORD
-                                valueFrom:
-                                  secretKeyRef:
-                                    name: {{ $secretName }}
-                                    key: db-password
-                            resources:
-                              limits:
-                                cpu: 250m
-                                memory: 1Gi
-                              requests:
-                                cpu: 100m
-                                memory: 768Mi
-                        containers:
-                          - name: oidc-seed
-                            image: {{ $opImage | quote }}
-                            command: ["/bin/bash", "-lc"]
-                            args:
-                              - |
-                                set -euo pipefail
-                                export PGPASSWORD="${OPENPROJECT_DB_PASSWORD}"
-                                bundle exec rails runner 'if ActiveRecord::Base.connection.select_value("SELECT COUNT(*) FROM auth_providers").to_i == 0; EnvData::OpenIDConnect::ProviderSeeder.new.seed!; puts "OIDC auth provider seeded"; else puts "auth_providers already present — skipping"; end'
-                            env:
-                              - name: DATABASE_HOST
-                                value: {{ $cnpgHost | quote }}
-                              - name: DATABASE_PORT
-                                value: "5432"
-                              - name: OPENPROJECT_DB_USERNAME
-                                value: {{ $opDbRole | quote }}
-                              - name: OPENPROJECT_DB_DATABASE
-                                value: {{ $opDbRole | quote }}
-                              - name: OPENPROJECT_DB_PASSWORD
-                                valueFrom:
-                                  secretKeyRef:
-                                    name: {{ $secretName }}
-                                    key: db-password
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_ISSUER
-                                value: {{ printf "https://id.%s/realms/%s" $opKernelDomain $tenant | quote }}
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_HOST
-                                value: {{ printf "id.%s" $opKernelDomain | quote }}
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_IDENTIFIER
-                                value: "gentian-openproject"
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_DISPLAY__NAME
-                                value: "Keycloak"
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_SCOPE
-                                value: "[openid,gentian-openproject-scope]"
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_AUTHORIZATION__ENDPOINT
-                                value: {{ printf "/realms/%s/protocol/openid-connect/auth" $tenant | quote }}
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_TOKEN__ENDPOINT
-                                value: {{ printf "https://id.%s/realms/%s/protocol/openid-connect/token" $opKernelDomain $tenant | quote }}
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_USERINFO__ENDPOINT
-                                value: {{ printf "https://id.%s/realms/%s/protocol/openid-connect/userinfo" $opKernelDomain $tenant | quote }}
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_JWKS__URI
-                                value: {{ printf "https://id.%s/realms/%s/protocol/openid-connect/certs" $opKernelDomain $tenant | quote }}
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_END__SESSION__ENDPOINT
-                                value: {{ printf "https://id.%s/realms/%s/protocol/openid-connect/logout" $opKernelDomain $tenant | quote }}
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_POST__LOGOUT__REDIRECT__URI
-                                value: {{ printf "https://projects.%s/" $domain | quote }}
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_ATTRIBUTE__MAP_LOGIN
-                                value: "gentian_username"
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_ATTRIBUTE__MAP_ADMIN
-                                value: "openproject_admin"
-                              - name: OPENPROJECT_OPENID__CONNECT_KEYCLOAK_SECRET
-                                valueFrom:
-                                  secretKeyRef:
-                                    name: {{ $secretName }}
-                                    key: oidc-client-secret
-                            resources:
-                              limits:
-                                cpu: 250m
-                                memory: 1Gi
-                              requests:
-                                cpu: 100m
-                                memory: 768Mi
-              providerConfigRef:
-                name: kubernetes
-            {{- end }}
 
             {{- /* Canonicalize extraVals so Helm values hashing is stable across reconciles */}}
             {{- $extraVals = $extraVals | toJson | fromJson }}
