@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Signing in to Projects…</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        background: #f5f7f6;
+        color: #1a2e28;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Signing in to Projects…</p>
+    <script>
+      (async () => {
+        const ticket = new URLSearchParams(window.location.search).get("t");
+        if (!ticket) {
+          window.location.replace("/");
+          return;
+        }
+
+        window.location.replace(
+          `/gentian-portal-bridge?t=${encodeURIComponent(ticket)}`,
+        );
+      })();
+    </script>
+  </body>
+</html>

@@ -17,16 +17,18 @@
 #     admin_password      → openproject.admin_user.password
 #     api_admin_password  → environment.OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_PASSWORD
 #
-# Portal OIDC / WinBox SSO requires an OpenProject Enterprise token for the app
-# host (projects.{tenant-domain}). Set OPENPROJECT_ENTERPRISE_TOKEN in
-# install.secrets.env — the operator publishes it via gentian-kernel-services.
-# Without it, OpenProject serves the password login page (no /auth/keycloak SSO).
+# Portal WinBox SSO uses the openproject-bridge (ticket + form login) and does not
+# require an OpenProject Enterprise token. Optional EE token still enables Keycloak
+# SSO redirect for new-tab / direct login when OPENPROJECT_ENTERPRISE_TOKEN is set
+# in install.secrets.env via gentian-kernel-services.
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
   name: openproject
   labels:
     gentianos.io/profile-name: openproject
+  annotations:
+    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/gentian-portal-bridge","serviceName":"openproject-portal-bridge","port":8080},{"pathPrefix":"/openproject-portal-sso.html","serviceName":"openproject-portal-bridge","port":8080}]'
 spec:
   displayName: "OpenProject"
   description: "Open-source project management with Gantt charts, Kanban boards, and time tracking."

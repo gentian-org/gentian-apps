@@ -4,3 +4,15 @@ resources:
   - profile.yaml
   - composition.yaml
   - oidc-catalog.yaml
+configMapGenerator:
+  - name: openproject-portal-bridge-assets
+    namespace: crossplane-system
+    files:
+      - bridge.py=assets/portal_bridge.py
+      - openproject-portal-sso.html=assets/openproject-portal-sso.html
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    gentianos.io/profile-name: openproject
+    gentianos.io/asset: openproject-portal-bridge
+    app.kubernetes.io/managed-by: gentian-os

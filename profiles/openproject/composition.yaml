@@ -75,6 +75,20 @@ spec:
                   - key: gentianos.io/profile-name
                     type: FromCompositeFieldPath
                     valueFromFieldPath: spec.profileRef.name
+            - kind: ConfigMap
+              into: portalBridgeAssets
+              apiVersion: v1
+              type: Selector
+              selector:
+                maxMatch: 1
+                minMatch: 0
+                matchLabels:
+                  - key: gentianos.io/asset
+                    type: Value
+                    value: openproject-portal-bridge
+                  - key: gentianos.io/profile-name
+                    type: Value
+                    value: openproject
 
     # ── Step 2: Render composed resources ─────────────────────────────────────
     # Emits per-app:
@@ -1150,6 +1164,162 @@ spec:
                                 value: {{ $secretMode | quote }}
               providerConfigRef:
                 name: kubernetes
+            {{- end }}
+
+            {{- /* ── Emit portal-bridge sidecar (OpenProject WinBox SSO) ───────── */}}
+            {{- if eq $app "openproject" }}
+            {{- $pbRes := dig "portalBridgeAssets" list $extraRes }}
+            {{- if gt (len $pbRes) 0 }}
+            {{- $pbCM := index $pbRes 0 }}
+            {{- $pbData := dig "data" dict $pbCM }}
+            {{- $bridgeScript := dig "bridge.py" "" $pbData }}
+            {{- $projectsHost := printf "projects.%s" $domain }}
+            {{- $portalApi := "http://gentian-portal-gentian-portal-api.platform-kernel.svc.cluster.local:8000/api/v1" }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-portal-bridge-cm
+              name: {{ $xrName }}-portal-bridge-cm
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: ConfigMap
+                  metadata:
+                    name: openproject-portal-bridge
+                    namespace: {{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: gentian-os
+                      gentianos.io/tenant: {{ $tenant }}
+                      gentianos.io/app: {{ $app }}
+                      gentianos.io/component: portal-bridge
+                  data:
+                    portal_bridge.py: |
+                      {{ $bridgeScript | nindent 22 }}
+              providerConfigRef:
+                name: kubernetes
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-portal-bridge-deploy
+              name: {{ $xrName }}-portal-bridge-deploy
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: apps/v1
+                  kind: Deployment
+                  metadata:
+                    name: openproject-portal-bridge
+                    namespace: {{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: gentian-os
+                      gentianos.io/tenant: {{ $tenant }}
+                      gentianos.io/app: {{ $app }}
+                      gentianos.io/component: portal-bridge
+                  spec:
+                    replicas: 1
+                    selector:
+                      matchLabels:
+                        app.kubernetes.io/name: openproject-portal-bridge
+                        gentianos.io/tenant: {{ $tenant }}
+                        gentianos.io/app: {{ $app }}
+                    template:
+                      metadata:
+                        labels:
+                          app.kubernetes.io/name: openproject-portal-bridge
+                          app.kubernetes.io/managed-by: gentian-os
+                          gentianos.io/tenant: {{ $tenant }}
+                          gentianos.io/app: {{ $app }}
+                          gentianos.io/component: portal-bridge
+                      spec:
+                        securityContext:
+                          runAsNonRoot: true
+                          runAsUser: 65532
+                          runAsGroup: 65532
+                          seccompProfile:
+                            type: RuntimeDefault
+                        containers:
+                          - name: bridge
+                            image: python:3.12-alpine
+                            imagePullPolicy: IfNotPresent
+                            command:
+                              - python
+                              - /app/portal_bridge.py
+                            ports:
+                              - name: http
+                                containerPort: 8080
+                            env:
+                              - name: PORT
+                                value: "8080"
+                              - name: OPENPROJECT_URL
+                                value: "http://openproject:8080"
+                              - name: OPENPROJECT_HOST
+                                value: {{ $projectsHost | quote }}
+                              - name: GENTIAN_PORTAL_BRIDGE_API
+                                value: {{ $portalApi | quote }}
+                            securityContext:
+                              allowPrivilegeEscalation: false
+                              readOnlyRootFilesystem: true
+                              capabilities:
+                                drop:
+                                  - ALL
+                            volumeMounts:
+                              - name: bridge-script
+                                mountPath: /app
+                                readOnly: true
+                            resources:
+                              requests:
+                                cpu: 10m
+                                memory: 32Mi
+                              limits:
+                                cpu: 100m
+                                memory: 128Mi
+                        volumes:
+                          - name: bridge-script
+                            configMap:
+                              name: openproject-portal-bridge
+                              items:
+                                - key: portal_bridge.py
+                                  path: portal_bridge.py
+              providerConfigRef:
+                name: kubernetes
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-portal-bridge-svc
+              name: {{ $xrName }}-portal-bridge-svc
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Service
+                  metadata:
+                    name: openproject-portal-bridge
+                    namespace: {{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: gentian-os
+                      gentianos.io/tenant: {{ $tenant }}
+                      gentianos.io/app: {{ $app }}
+                      gentianos.io/component: portal-bridge
+                  spec:
+                    selector:
+                      app.kubernetes.io/name: openproject-portal-bridge
+                      gentianos.io/tenant: {{ $tenant }}
+                      gentianos.io/app: {{ $app }}
+                    ports:
+                      - name: http
+                        port: 8080
+                        targetPort: http
+                        protocol: TCP
+              providerConfigRef:
+                name: kubernetes
+            {{- end }}
             {{- end }}
 
     # ── Step 3: Mark XR Ready when all composed resources are Ready ───────────
