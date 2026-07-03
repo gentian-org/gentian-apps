@@ -1,0 +1,39 @@
+# AppProfile — Gentian Subscriptions (ApiProfile)
+#
+# Reference ApiProfile (deploymentMethod: api): a catalogue entry backed by the
+# hosted gentian-corp commerce service. It runs NO workload pods in the tenant —
+# the operator creates no Helm release or App claim. The portal tile redirects
+# tenant admins to gentian-corp, keyed by the tenant effective domain.
+#
+# Installed by default on new tenants (opt-out). See gentian-corp/foundations.md
+# section 2.1 (ApiProfile) and 1.2 (default tenant experience).
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: gentian-subscriptions
+  labels:
+    gentianos.io/profile-name: gentian-subscriptions
+  annotations:
+    gentianos.io/platform-app: "true"
+    gentianos.io/deployment-role: base
+spec:
+  displayName: "Gentian Subscriptions"
+  description: "Manage Pro app subscriptions, billing, and entitlements for this tenant."
+  license: Apache-2.0
+  tile:
+    icon: erp
+
+  deploymentMethod: api
+
+  apiIntegration:
+    runtime: redirect
+    baseUrl: "https://corp.gentian.org"
+    tenantBinding: tenant-domain
+
+  portalTiles:
+    - name: subscriptions
+      displayName:
+        en_US: "Subscriptions"
+        de_DE: "Abonnements"
+      linkTarget: newwindow
+      allowedGroup: "Tenant Admins"
