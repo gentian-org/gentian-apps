@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Helper project used ONLY at image-build time to resolve the OpenID Connect
+  Authenticator extension and its runtime dependencies as JARs, so they can be
+  baked into WEB-INF/lib as XWiki "core extensions" (available at boot, no
+  Extension Manager / no runtime download).
+
+  All org.xwiki.contrib.oidc:* artifacts and their non-platform deps (Nimbus
+  OAuth2 OIDC SDK, etc.) are JARs — verified against nexus.xwiki.org. The XWiki
+  platform/commons/rendering jars are already shipped in the WAR's WEB-INF/lib,
+  so they are pruned by the Dockerfile dedup step (and excluded here for speed).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.gentian.build</groupId>
+  <artifactId>xwiki-oidc-libs</artifactId>
+  <version>1</version>
+  <packaging>pom</packaging>
+
+  <properties>
+    <oidc.version>2.20.2</oidc.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <repositories>
+    <repository>
+      <id>xwiki-public</id>
+      <name>XWiki Nexus (public)</name>
+      <url>https://nexus.xwiki.org/nexus/content/groups/public/</url>
+      <releases><enabled>true</enabled></releases>
+      <snapshots><enabled>false</enabled></snapshots>
+    </repository>
+  </repositories>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.xwiki.contrib.oidc</groupId>
+      <artifactId>oidc-authenticator</artifactId>
+      <version>${oidc.version}</version>
+    </dependency>
+  </dependencies>
+</project>

@@ -4,10 +4,12 @@
 #   Community-maintained chart by xwiki-contrib; Docker Official Image xwiki.
 #   Chart uses StatefulSet by default (workloadStateful: true).
 #
-# Docker image: xwiki:lts-postgres-tomcat (Docker Hub Official)
-#   LTS branch (17.x) with Tomcat + PostgreSQL JDBC driver.
-#   OIDC authenticator extension must be installed via the XWiki Extension
-#   Manager on first admin login (org.xwiki.contrib.oidc:oidc-authenticator).
+# Docker image: ghcr.io/gentian-org/xwiki (see images/xwiki/BUNDLE.md)
+#   Gentian bundle over xwiki:17.10.9-postgres-tomcat. Bakes the Standard Flavor
+#   offline repository (XIP, staged into the PVC and installed headlessly on
+#   first boot) plus the OIDC authenticator + deps as core extensions — so a
+#   fresh wiki works fully offline: no Distribution Wizard, no Extension Manager
+#   download, no pod egress. Reproducible across a full tenant/cluster teardown.
 #
 # Secret inventory:
 #   Kernel-provided:
@@ -17,9 +19,10 @@
 #   App-internal (1) → appSecrets:
 #     superadmin_password → customConfigsSecrets (xwiki.cfg xwiki.superadminpassword)
 #
-# Bootstrap: after first deploy, an admin should open wiki.<tenant-domain> and
-# install the OIDC authenticator extension. The xwiki.properties config is
-# pre-wired so OIDC SSO activates as soon as the extension is present.
+# Bootstrap: none required. On first boot the headless Distribution Job installs
+# the baked Standard Flavor from the staged offline repository, and the OIDC
+# authenticator ships as a core extension — so SSO (xwiki.cfg authclass + the
+# oidc.* properties below) is active from the first start, with no egress.
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
@@ -114,9 +117,12 @@ spec:
   extraValues:
     fullnameOverride: "xwiki"
 
+    # Gentian pre-flavored bundle (Standard Flavor XIP + OIDC authenticator baked
+    # in) — chart's xwiki.imageName is `printf "%s:%s" image.name image.tag`, so
+    # image.name carries the full ghcr path. Bump tag with images/xwiki/versions.env.
     image:
-      name: xwiki
-      tag: "lts-postgres-tomcat"
+      name: ghcr.io/gentian-org/xwiki
+      tag: "17.10.9-gentian1"
       pullPolicy: IfNotPresent
 
     mysql:
@@ -216,12 +222,13 @@ spec:
         oidc.user.nameFormater: "${oidc.user.gentian_username._clean._lowerCase}"
         oidc.user.subjectFormater: "${oidc.user.subject}"
         oidc.skipped: "false"
-        # Headless Distribution Wizard: install the XWiki Standard flavor
-        # automatically on first boot instead of showing the interactive wizard.
-        # The stock xwiki:lts-*-tomcat image ships NO flavor (empty
-        # extension/repository), so the flavor must be resolved from an extension
-        # repository. In this locked-down tenant that means either a one-time
-        # egress window (bootstrap) or a pre-flavored image (see profile header).
+        # Fully offline extension handling. The pre-flavored image (see header)
+        # bakes the Standard Flavor offline repository and stages it into the PVC
+        # on first boot; the headless Distribution Job then installs it locally
+        # instead of showing the interactive wizard. extension.repositories is set
+        # empty so XWiki never probes remote repositories (no egress, no error
+        # logs) — everything it needs is local (staged XIP + core-extension jars).
+        extension.repositories: ""
         distribution.job.interactive: "false"
         distribution.job.interactive.wiki: "false"
         distribution.defaultUI: "org.xwiki.platform:xwiki-platform-distribution-flavor-mainwiki"

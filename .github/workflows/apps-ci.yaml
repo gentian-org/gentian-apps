@@ -109,6 +109,44 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ github.sha }}
 
+  build-xwiki:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read xwiki bundle versions
+        id: versions
+        run: |
+          # shellcheck disable=SC1091
+          source images/xwiki/versions.env
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "xwiki_version=${XWIKI_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "flavor_xip_sha256=${FLAVOR_XIP_SHA256}" >> "$GITHUB_OUTPUT"
+          echo "oidc_version=${OIDC_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push XWiki bundle image
+        uses: docker/build-push-action@v6
+        with:
+          context: images/xwiki
+          push: ${{ github.event_name != 'pull_request' }}
+          build-args: |
+            XWIKI_VERSION=${{ steps.versions.outputs.xwiki_version }}
+            FLAVOR_XIP_SHA256=${{ steps.versions.outputs.flavor_xip_sha256 }}
+            OIDC_VERSION=${{ steps.versions.outputs.oidc_version }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ steps.versions.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ github.sha }}
+
   validate-profiles:
     runs-on: ubuntu-latest
     steps:
