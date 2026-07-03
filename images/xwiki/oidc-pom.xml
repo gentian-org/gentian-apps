@@ -26,10 +26,17 @@
   </properties>
 
   <repositories>
+    <!--
+      Use the direct XWiki *releases* repository, not the aggregating
+      nexus.xwiki.org/nexus/content/groups/public/ group repo: the group
+      endpoint returns intermittent/persistent 502s (a broken proxy member),
+      while the releases repo serves the org.xwiki.contrib.oidc artifacts
+      reliably. Nimbus (com.nimbusds:*) resolves from Maven Central by default.
+    -->
     <repository>
-      <id>xwiki-public</id>
-      <name>XWiki Nexus (public)</name>
-      <url>https://nexus.xwiki.org/nexus/content/groups/public/</url>
+      <id>xwiki-releases</id>
+      <name>XWiki Nexus (releases)</name>
+      <url>https://nexus.xwiki.org/nexus/content/repositories/releases/</url>
       <releases><enabled>true</enabled></releases>
       <snapshots><enabled>false</enabled></snapshots>
     </repository>
