@@ -44,7 +44,7 @@ metadata:
   labels:
     gentianos.io/profile-name: <app-id> # must match metadata.name (controller also sets family/version labels)
 spec:
-  deploymentMethod: crossplane          # ALWAYS crossplane — never tofu-controller
+  deploymentMethod: crossplane          # crossplane (default) or argocd
   family: <logical-app-id>
   catalogueVersion: "1.0.0"
   edition: full
@@ -61,7 +61,7 @@ Gentian portal / app-menu icons use a **two-path** model on `AppProfile.spec.til
 
 | Path | Spec | Notes |
 |---|---|---|
-| **Catalogue** | `tile.icon: mail` | Pick from `gentian-ui/design-system/tiles/catalogue.json` |
+| **Catalogue** | `tile.icon: mail` | Pick from `gentian-ui/legacy/design-system/tiles/catalogue.json` |
 | **Custom** | `tile.image: assets/tile.svg` → run `scripts/sync-profile-tile.py` | Inlines to `tile.logo` data URI |
 
 Per sub-app overrides: `spec.portalTiles[].tile.icon` (e.g. OX mail vs calendar).
@@ -350,11 +350,16 @@ Gentian OS avoids browser CORS issues by architecture:
 If your app's own UI calls back to its own backend (normal REST/XHR to the same
 host), no CORS configuration is needed.
 
-### 5e. Shell proxy for app APIs (`spec.browserProxy`)
+### 5e. Shell proxy for app APIs (`spec.browserProxy`) — planned, not yet implemented
+
+> **Status:** The `browserProxy` field exists on the AppProfile CRD but the
+> gentian-ui frontend and backend do **not** implement it yet. Do not rely on
+> it in profiles today — the shell will not proxy anything. This section
+> documents the intended design for when implementation lands.
 
 Declare a `browserProxy` route when the gentian shell (not the app's own UI)
-needs to call the app's API from the browser. The shell exposes
-`/api/apps/{appName}/{path}` and forwards requests to the cluster-internal
+needs to call the app's API from the browser. The shell will expose
+`/api/apps/{appName}/{path}` and forward requests to the cluster-internal
 service, injecting the user's bearer token.
 
 ```yaml
@@ -365,7 +370,7 @@ browserProxy:
     stripPrefix: true          # default — strips /api/apps/{name}/api before forwarding
 ```
 
-**When you need it:** the shell calls the app's REST API to show a widget,
+**When you'll need it:** the shell calls the app's REST API to show a widget,
 badge count, or AI context. **When you don't:** the app's own UI calls its own
 backend (same host, no CORS).
 
@@ -441,7 +446,7 @@ operator owns iframe policy for tenant app HTTPRoutes.
 
 These profiles rely on the operator and need **no** CSP annotations:
 
-- `app-store`, `element`, `openproject`, `ox-appsuite`, `xwiki`
+- `app-store`, `nextcloud`, `openproject`, `xwiki`, `odoo-free-base`
 
 Add only non-CSP `ingress.annotations` your chart needs (proxy timeouts, body size —
 bridged to Envoy `BackendTrafficPolicy`):
@@ -467,7 +472,11 @@ kubectl delete httproute -n tenant-demo httproute-demo-element
 # operator recreates on next tenant reconcile (~seconds)
 ```
 
-### 6d. Element SSO — OIDC redirect URI host
+### 6d. Element SSO — OIDC redirect URI host (gentian-pro)
+
+> **Note:** The `element` profile lives in the proprietary **gentian-pro**
+> catalogue. This section documents the pattern for reference; the profile is
+> not in this repository.
 
 Element Web is served at `chat.<tenant-domain>` but the Matrix homeserver (Synapse)
 and OIDC callback live at **`matrix.<tenant-domain>`** (synapse-web Service).
@@ -706,7 +715,11 @@ extraValues:
       nubus: "portal"                       # → portal.desk.gentian.org
 ```
 
-### 7b. Jitsi + Element (video in Matrix rooms)
+### 7b. Jitsi + Element (video in Matrix rooms) — gentian-pro
+
+> **Note:** The `element` profile and `app-od-element` composition live in the
+> proprietary **gentian-pro** catalogue. This section documents the design
+> pattern for reference.
 
 Jitsi is bundled as an **Element sidecar** (one install per tenant, not a separate
 catalogue app). Installing `element` on a tenant deploys Jitsi at `meet.<tenant>` for
@@ -927,9 +940,9 @@ Set `compositionRef` only when using a non-default composition:
 | Composition | When to use |
 |---|---|
 | *(omit)* | Standard apps — `app-default` is used automatically |
-| `app-od-element` | Element (OpenDesk) — bundle in **gentian-pro** (`app-od-element` composition) |
-| `app-od-ox` | OX App Suite — bundle in **gentian-pro** |
-| `app-od-openproject` | OpenProject — bundle in **gentian-pro** |
+| `app-openproject` | OpenProject — custom composition in `profiles/openproject/composition.yaml` |
+| `app-od-element` | Element (OpenDesk) — bundle in **gentian-pro** (proprietary catalogue) |
+| `app-od-ox` | OX App Suite — bundle in **gentian-pro** (proprietary catalogue) |
 
 ---
 
@@ -962,9 +975,9 @@ Before opening a PR, verify:
 - [ ] `global.domain` and `global.hosts` set in `extraValues`
 - [ ] If `global.hosts.keycloak` is present: `global.domain` is `${KERNEL_DOMAIN}`, tenant app hosts use `${TENANT_ID}` prefix
 - [ ] All IdP URLs use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`; redirect URIs use `${TENANT_DOMAIN}`
-- [ ] Element: OIDC redirect is `https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback` (not `chat.`)
-- [ ] Element: `additionalIngresses` includes `matrix` → `synapse-web:8008` (required) — §6d
-- [ ] Element: `matrixIdLocalpart: "opendesk_username"` (not `preferred_username`) — §6d
+- [ ] Element *(gentian-pro)*: OIDC redirect is `https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback` (not `chat.`)
+- [ ] Element *(gentian-pro)*: `additionalIngresses` includes `matrix` → `synapse-web:8008` (required) — §6d
+- [ ] Element *(gentian-pro)*: `matrixIdLocalpart: "opendesk_username"` (not `preferred_username`) — §6d
 - [ ] After tenant purge/redeploy: if Files login fails, check NC `entryUUID` drift (§6g) — not an AppProfile fix
 - [ ] App admins: `spec.provisioning.privilegedRole` when the app exposes a native admin group (§6h)
 - [ ] App admins: assign humans via `gentian:tenant:<t>:app-admins`, not per-app manual grants
@@ -978,6 +991,6 @@ Before opening a PR, verify:
 - [ ] (automatic) Operator injects portal `frame-ancestors` on app HTTPRoutes — no CSP annotations in profile
 - [ ] `ingress.annotations` contains no `frame-ancestors`, `X-Frame-Options`, or `Content-Security-Policy`
 - [ ] `additionalIngresses` use flat subdomains; rely on operator gateway CSP for embed hosts
-- [ ] `spec.browserProxy` declared if the shell calls this app's REST API
+- [ ] `spec.browserProxy` declared if the shell will call this app's REST API *(not yet implemented — §5e)*
 - [ ] `compositionRef` omitted unless using a non-default composition
 - [ ] YAML passes `python3 -c "import yaml; yaml.safe_load(open('<file>'))"` locally
