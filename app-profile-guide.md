@@ -642,6 +642,41 @@ same tenant-realm + kernel IdP broker path as Element and other installed apps.
 Use the **replace** CSP pattern from §6b so `portal.<kernel_domain>` can embed the
 Files tile (`linkTarget: embedded`).
 
+#### Collabora WOPI — critical configuration
+
+Collabora's `coolwsd` fetches file content from Nextcloud over HTTP(S). Several
+settings must align or document editing silently fails:
+
+| Setting | Value | Why |
+|---|---|---|
+| `storage.ssl.as_scheme=true` | `extra_params` | **Critical.** Without this, coolwsd always uses SSL for WOPI callbacks regardless of the URL scheme — it tries TLS to port 8080 and hangs with `Connection timed out`. |
+| `storage.ssl.enable=false` | `extra_params` | Internal WOPI callback is plain HTTP (`http://nextcloud.<ns>.svc:8080`); no TLS needed. |
+| `wopi_callback_url` | `http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080` | Must be the **internal** service URL, not the public `https://cloud.<tenant>`. Collabora uses this to call back into Nextcloud for CheckFileInfo/GetFile. |
+| `aliasgroups` | Internal + `http://cloud.<domain>:8080` + `https://cloud.<domain>` | coolwsd validates the WOPI source host against aliasgroups; all forms of the Nextcloud URL must be listed. |
+| `net.post_allow` | `10\.\d+\.\d+\.\d+`, `.*\.svc\.cluster\.local` | Required for coolwsd to accept POST requests from cluster-internal addresses. |
+| `securityContext.capabilities` | `CHOWN`, `FOWNER`, `SYS_CHROOT` | Collabora's `cool` user needs these to create jails and manage file permissions. |
+
+**Egress for HTTPS hairpin:** Collabora pods fetch Nextcloud settings/files via
+`https://cloud.<tenant_domain>` when opening documents in the browser. The
+CoreDNS hairpin resolves this to the tenant gateway in `envoy-gateway-system`.
+The profile sets `gentianos.io/kernel-egress-namespaces: envoy-gateway-system`
+so the operator grants egress to the gateway namespace.
+
+#### Portal bridge — internal service URLs only
+
+The portal API (in `platform-kernel`) provisions Nextcloud users via OCS before
+opening the Files iframe. These server-side calls **must** use the in-cluster
+service URL (`http://nextcloud.tenant-<t>.svc.cluster.local:8080`), **not** the
+public `https://cloud.<tenant>.<kernel>`. Reasons:
+
+1. CoreDNS hairpin resolves `cloud.<tenant>` to the tenant gateway IP.
+2. The gateway serves a Let's Encrypt **staging** cert on dev clusters.
+3. Python `httpx` rejects the staging cert → `CERTIFICATE_VERIFY_FAILED` → HTTP 500 → "Could not open Files."
+
+The baseline `tenant-isolation` network policy allows ingress from
+`platform-kernel`, enabling this direct service access. The same pattern
+applies to OpenProject's bridge (see `openproject_session_bridge.py`).
+
 The licensed OpenDesk Nextcloud stack is **not** part of gentian-os or gentian-apps;
 customers who need it install it from the proprietary catalogue separately.
 
