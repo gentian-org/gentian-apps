@@ -26,6 +26,8 @@ metadata:
   name: nextcloud
   labels:
     gentianos.io/profile-name: nextcloud
+  annotations:
+    gentianos.io/kernel-egress-namespaces: envoy-gateway-system
 spec:
   displayName: "Nextcloud"
   description: "Self-hosted file sync and share with Collabora Online document editing and OIDC SSO."
