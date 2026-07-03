@@ -231,6 +231,7 @@ spec:
           set -eu
           NC="php /var/www/html/occ"
           COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
+          COLLABORA_INTERNAL="http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980"
           patch_portal_bridge_htaccess() {
             python3 - <<'PY'
           from pathlib import Path
@@ -266,7 +267,7 @@ spec:
           }
           sync_bundled_apps
           if $NC app:list --enabled 2>/dev/null | grep -q 'richdocuments:'; then
-            $NC config:app:set richdocuments wopi_url --value="${COLLABORA_PUBLIC}" || true
+            $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
             $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
             $NC config:app:set richdocuments doc_format --value="odf" || true
             $NC richdocuments:activate-config || true
@@ -278,6 +279,7 @@ spec:
           NC="php /var/www/html/occ"
           CLOUD_URL="https://cloud.${TENANT_DOMAIN}"
           COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
+          COLLABORA_INTERNAL="http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980"
           DISCOVERY_URI="http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
           OIDC_SECRET="$(cat /etc/gentian/oidc-client-secret)"
           echo "[gentian-nextcloud] waiting for Nextcloud to become ready..."
@@ -308,7 +310,7 @@ spec:
           $NC config:app:set user_oidc id4me --value="0" || true
           $NC config:app:set user_oidc allow_multiple_user_backends --value="1" || true
           $NC config:system:set allow_local_remote_servers --type=boolean --value=true || true
-          $NC config:app:set richdocuments wopi_url --value="${COLLABORA_PUBLIC}" || true
+          $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
           $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
           $NC config:app:set richdocuments doc_format --value="odf" || true
           $NC richdocuments:activate-config || true
