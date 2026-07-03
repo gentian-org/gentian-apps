@@ -320,12 +320,6 @@ spec:
             {{- end }}
             {{- end }}
 
-            {{- /* OpenProject Enterprise token (manual OpenBao; enables OIDC SSO) */}}
-            {{- if eq $app "openproject" }}
-            {{- $entPath := printf "gentian-os/tenants/%s/apps/%s/enterprise" $tenant $app }}
-            {{- $esData = append $esData (dict "secretKey" "enterprise-token" "remoteRef" (dict "key" $entPath "property" "token")) }}
-            {{- end }}
-
             {{- /* ── Build Release set[] entries ────────────────────────────────── */}}
             {{- /* Each set entry picks a single key from the ExternalSecret-managed  */}}
             {{- /* Secret and passes it to Helm as a --set-string override. Helm      */}}
@@ -453,11 +447,6 @@ spec:
             {{- $relSet = append $relSet (dict "name" $s.valuePath
                 "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" (printf "internal-%s" $s.name)))) }}
             {{- end }}
-            {{- end }}
-
-            {{- if eq $app "openproject" }}
-            {{- $relSet = append $relSet (dict "name" "environment.OPENPROJECT_SEED__ENTERPRISE__TOKEN"
-                "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" "enterprise-token"))) }}
             {{- end }}
 
             {{- /* ── Render inline non-sensitive values ───────────────────────── */}}
@@ -737,7 +726,17 @@ spec:
                 name: kubernetes
             {{- end }}
 
-
+            {{- /* OpenProject Enterprise: enable Keycloak SSO only when cluster token set */}}
+            {{- if eq $app "openproject" }}
+            {{- $enterpriseToken := dig "OPENPROJECT_ENTERPRISE_TOKEN" "" $ksCMData }}
+            {{- if $enterpriseToken }}
+            {{- $existingEnvironment := default dict (dig "environment" dict $extraVals) }}
+            {{- $extraVals = mergeOverwrite $extraVals (dict "environment" (mergeOverwrite $existingEnvironment (dict
+                "OPENPROJECT_SEED__ENTERPRISE__TOKEN" $enterpriseToken
+                "OPENPROJECT_OMNIAUTH__DIRECT__LOGIN__PROVIDER" "keycloak"
+            ))) }}
+            {{- end }}
+            {{- end }}
 
             {{- /* Canonicalize extraVals so Helm values hashing is stable across reconciles */}}
             {{- $extraVals = $extraVals | toJson | fromJson }}

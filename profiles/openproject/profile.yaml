@@ -17,10 +17,10 @@
 #     admin_password      → openproject.admin_user.password
 #     api_admin_password  → environment.OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_PASSWORD
 #
-# Manual OpenBao (required for portal OIDC / WinBox login):
-#   gentian-os/tenants/{tenant}/apps/openproject/enterprise → token
-#   OpenProject Enterprise token for the app host (projects.{tenant-domain}).
-#   SSO is an Enterprise feature; without the token /auth/keycloak returns 404.
+# Portal OIDC / WinBox SSO requires an OpenProject Enterprise token for the app
+# host (projects.{tenant-domain}). Set OPENPROJECT_ENTERPRISE_TOKEN in
+# install.secrets.env — the operator publishes it via gentian-kernel-services.
+# Without it, OpenProject serves the password login page (no /auth/keycloak SSO).
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
@@ -264,7 +264,6 @@ spec:
 
     environment:
       OPENPROJECT_LOGIN__REQUIRED: "true"
-      OPENPROJECT_OMNIAUTH__DIRECT__LOGIN__PROVIDER: "keycloak"
       OPENPROJECT_OAUTH__ALLOW__REMAPPING__OF__EXISTING__USERS: "true"
       OPENPROJECT_EMAIL__DELIVERY__METHOD: "smtp"
       OPENPROJECT_OPENID__CONNECT_KEYCLOAK_ISSUER: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
