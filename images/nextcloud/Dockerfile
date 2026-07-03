@@ -22,7 +22,8 @@ RUN set -eux; \
     rm -f /tmp/*.tar.gz; \
     chown -R www-data:www-data \
       /usr/src/nextcloud/apps/richdocuments \
-      /usr/src/nextcloud/apps/user_oidc
+      /usr/src/nextcloud/apps/user_oidc; \
+    printf '%s\n' 'redis.session.locking_enabled = 0' > /usr/local/etc/php/conf.d/zz-gentian-redis-session.ini
 
 LABEL org.opencontainers.image.title="Gentian Nextcloud" \
       org.opencontainers.image.description="Nextcloud with richdocuments and user_oidc bundled for Gentian tenants" \
