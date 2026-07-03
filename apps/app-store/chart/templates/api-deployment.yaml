@@ -48,6 +48,18 @@ spec:
               value: {{ .Values.gentian.appsRepo | quote }}
             - name: GENTIAN_APPS_BRANCH
               value: {{ .Values.gentian.appsBranch | quote }}
+            - name: TENANT_DOMAIN
+              value: {{ .Values.tenantDomain | quote }}
+            - name: GENTIAN_COMMERCE_ENABLED
+              value: {{ .Values.gentian.commerceEnabled | quote }}
+            {{- if .Values.gentian.corpApiUrl }}
+            - name: GENTIAN_CORP_API_URL
+              value: {{ .Values.gentian.corpApiUrl | quote }}
+            {{- end }}
+            {{- if .Values.gentian.corpCheckoutUrl }}
+            - name: GENTIAN_CORP_CHECKOUT_URL
+              value: {{ .Values.gentian.corpCheckoutUrl | quote }}
+            {{- end }}
             - name: GENTIAN_DEPLOYMENTS_REPO
               value: {{ .Values.gentian.deploymentsRepo | quote }}
             - name: GENTIAN_DEPLOYMENTS_PATH

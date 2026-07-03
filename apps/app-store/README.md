@@ -7,7 +7,25 @@ Gateway API HTTPRoute (no in-pod nginx), security modules (`tenant`, `authz`, lo
 
 ## API
 
-- `GET /api/v1/catalogue/` — available apps (`AppCatalogue` + `AppProfile` metadata)
+- `GET /api/v1/catalogue/` — available apps (`AppCatalogue` + `AppProfile` metadata; `tier`, `catalogueAction`, `checkoutUrl` for Pro apps)
+
+## Commercial (Pro) apps
+
+Apps with `AppProfile.spec.license: proprietary` (typically from **gentian-pro**) appear in the
+same catalogue grid as community apps. Pro cards use warmer styling and a **Buy** button;
+community cards are visually subdued with **Free** and **Install**.
+
+| Env | Purpose |
+|-----|---------|
+| `GENTIAN_COMMERCE_ENABLED` | Enable checkout URLs and gentian-corp catalogue merge |
+| `GENTIAN_CORP_API_URL` | Entitlement lookup (`action: install` vs `buy`) |
+| `GENTIAN_CORP_CHECKOUT_URL` | Buy button redirect base |
+| `TENANT_DOMAIN` | Tenant effective domain for checkout query params |
+
+Set these on the app-store API deployment (Helm `gentian.commerceEnabled`, `gentian.corpApiUrl`,
+`gentian.corpCheckoutUrl`, and chart `tenantDomain`). Pro install via API returns `402` until
+gentian-corp reports entitlement.
+
 - `GET /api/v1/tenant/apps/installed`
 - `POST /api/v1/tenant/apps/{profile}/install`
 - `DELETE /api/v1/tenant/apps/{profile}`

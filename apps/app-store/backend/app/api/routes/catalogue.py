@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 
 from app.core.auth import get_current_user
 from app.core.config import get_settings
@@ -9,17 +9,30 @@ from app.services.tile_resolver import resolve_tile_logo
 router = APIRouter(prefix="/catalogue", tags=["catalogue"])
 
 
+def _bearer_token(authorization: str | None) -> str | None:
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip() or None
+    return None
+
+
 @router.get("/")
 def get_catalogue(
     user: dict = Depends(get_current_user),
     include_platform: bool = False,
+    authorization: str | None = Header(default=None),
 ) -> dict:
     _ = user
     settings = get_settings()
     k8s = K8sClient()
-    data = build_catalogue(k8s, include_platform=include_platform)
+    data = build_catalogue(
+        k8s,
+        include_platform=include_platform,
+        settings=settings,
+        bearer_token=_bearer_token(authorization),
+    )
     data["catalogueRepo"] = settings.gentian_apps_repo
     data["catalogueBranch"] = settings.gentian_apps_branch
+    data["tenantDomain"] = settings.tenant_domain
     return data
 
 

@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.core.auth import get_current_user
 from app.core.config import get_settings
 from app.services.k8s_client import K8sClient
+from app.services.catalogue_tiers import is_proprietary
+from app.services.corp_client import fetch_entitled_profiles
 from app.services.lifecycle import LifecycleError, get_lifecycle_client
 from app.services.tenant_app_status import claim_status_from_result, list_from_k8s
 
@@ -15,6 +17,36 @@ router = APIRouter(prefix="/tenant/apps", tags=["tenant-apps"])
 
 def _actor(user: dict) -> str:
     return str(user.get("preferred_username") or user.get("sub") or "unknown")
+
+
+def _profile_entitled(profile_name: str, settings, entitled: set[str]) -> bool:
+    if profile_name in entitled:
+        return True
+    try:
+        k8s = K8sClient()
+        profile = k8s.get_app_profile(profile_name)
+        family = (profile.get("spec") or {}).get("family") or profile_name
+        return family in entitled
+    except Exception:
+        return False
+
+
+def _assert_may_install(profile: str, settings) -> None:
+    k8s = K8sClient()
+    try:
+        profile_obj = k8s.get_app_profile(profile)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown profile: {profile}") from exc
+    entry = {"name": profile, "license": (profile_obj.get("spec") or {}).get("license")}
+    if not is_proprietary(entry, profile_obj):
+        return
+    entitled = fetch_entitled_profiles(settings)
+    if _profile_entitled(profile, settings, entitled):
+        return
+    raise HTTPException(
+        status_code=402,
+        detail="This app requires a commercial subscription. Use Buy in the catalogue first.",
+    )
 
 
 def _list_installed_entries() -> tuple[list[dict[str, Any]], str | None]:
@@ -61,6 +93,7 @@ def list_installed(user: dict = Depends(get_current_user)) -> dict:
 @router.post("/{profile}/install")
 def install_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
     settings = get_settings()
+    _assert_may_install(profile, settings)
     try:
         result = get_lifecycle_client().install(
             profile,

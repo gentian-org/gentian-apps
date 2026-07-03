@@ -58,6 +58,10 @@ spec:
       appsRepo: "https://github.com/gentian-org/gentian-apps"
       appsBranch: main
       lifecycleUrl: "http://gentian-os-lifecycle.gentian-system.svc.cluster.local:8082"
+      # Phase A commerce (optional; enable when gentian-corp is deployed)
+      commerceEnabled: false
+      corpApiUrl: ""
+      corpCheckoutUrl: ""
     ingress:
       enabled: false
     auth:

@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     )
     gentian_apps_branch: str = Field(default="main", alias="GENTIAN_APPS_BRANCH")
 
+    tenant_domain: str | None = Field(default=None, alias="TENANT_DOMAIN")
+
+    gentian_commerce_enabled: bool = Field(default=False, alias="GENTIAN_COMMERCE_ENABLED")
+    gentian_corp_api_url: str | None = Field(default=None, alias="GENTIAN_CORP_API_URL")
+    gentian_corp_checkout_url: str | None = Field(
+        default=None, alias="GENTIAN_CORP_CHECKOUT_URL"
+    )
+
     install_mode: str = Field(default="gitops", alias="INSTALL_MODE")
 
     lifecycle_url: str | None = Field(
@@ -60,6 +68,17 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.lower() in {"production", "prod", "staging"}
+
+    @property
+    def gentian_corp_checkout_base_url(self) -> str | None:
+        if self.gentian_corp_checkout_url:
+            return self.gentian_corp_checkout_url.rstrip("/")
+        if self.gentian_corp_api_url:
+            base = self.gentian_corp_api_url.rstrip("/")
+            if base.endswith("/api/v1"):
+                return base[: -len("/api/v1")]
+            return base
+        return None
 
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/api/client";
 
+type CatalogueTier = "community" | "pro";
+type CatalogueAction = "install" | "buy";
+
 type CatalogueApp = {
   name: string;
   displayName: string;
@@ -9,6 +12,12 @@ type CatalogueApp = {
   chartVersion: string;
   kernelRequirements: string[];
   installedCount: number;
+  tier?: CatalogueTier;
+  license?: string;
+  catalogueAction?: CatalogueAction;
+  checkoutUrl?: string | null;
+  licenceNotice?: string | null;
+  requiresEntitlement?: boolean;
 };
 
 type AppCondition = {
@@ -31,6 +40,10 @@ type CatalogueResponse = {
   apps: CatalogueApp[];
   catalogueRepo: string;
   catalogueBranch: string;
+  commerceEnabled?: boolean;
+  communityCount?: number;
+  proCount?: number;
+  tenantDomain?: string;
   lastUpdated?: string;
 };
 
@@ -56,6 +69,10 @@ type Notice = {
 };
 
 const STATUS_POLL_MS = 4000;
+
+function isProApp(app: CatalogueApp): boolean {
+  return app.tier === "pro" || app.requiresEntitlement === true;
+}
 
 function displayNameFor(profile: string, catalogue: CatalogueResponse | null): string {
   return catalogue?.apps.find((app) => app.name === profile)?.displayName || profile;
@@ -109,6 +126,129 @@ function AppListCard({
         </button>
       </div>
     </li>
+  );
+}
+
+function CatalogueCard({
+  app,
+  installedApp,
+  busy,
+  onDetails,
+  onInstall,
+  onBuy,
+}: {
+  app: CatalogueApp;
+  installedApp: InstalledApp | undefined;
+  busy: string | null;
+  onDetails: () => void;
+  onInstall: () => void;
+  onBuy: () => void;
+}) {
+  const pro = isProApp(app);
+  const ready = isAppReady(installedApp);
+  const installing = Boolean(installedApp) && !ready;
+  const showBuy = pro && app.catalogueAction === "buy" && !installedApp;
+
+  const cardClass = pro
+    ? "border-amber-200/90 bg-gradient-to-br from-amber-50 via-white to-violet-50 shadow-md shadow-amber-100/60 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-100/80"
+    : "border-slate-200/80 bg-slate-50/50 shadow-sm hover:border-slate-300 hover:bg-slate-50/80";
+
+  const avatarClass = pro
+    ? "bg-gradient-to-br from-amber-200 to-violet-200 text-amber-900"
+    : "bg-slate-200/80 text-slate-600";
+
+  const logoClass = pro ? "h-10 w-10 rounded-lg object-contain" : "h-10 w-10 rounded-lg object-contain opacity-90 saturate-[0.88]";
+
+  return (
+    <article className={`flex flex-col rounded-xl border p-5 transition ${cardClass}`}>
+      <div className="flex items-start gap-3">
+        {app.logo ? (
+          <img src={app.logo} alt="" className={logoClass} />
+        ) : (
+          <div
+            className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold ${avatarClass}`}
+          >
+            {app.displayName.slice(0, 1)}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className={`truncate font-semibold ${pro ? "text-slate-900" : "text-slate-700"}`}>
+              {app.displayName}
+            </h3>
+            {pro ? (
+              <span className="rounded-full bg-gradient-to-r from-amber-500 to-violet-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
+                Pro
+              </span>
+            ) : (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                Free
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500">v{app.chartVersion}</p>
+        </div>
+      </div>
+
+      <p className={`mt-3 line-clamp-3 flex-1 text-sm ${pro ? "text-slate-600" : "text-slate-500"}`}>
+        {app.description || "No description."}
+      </p>
+
+      {pro && app.licenceNotice && showBuy && (
+        <p className="mt-2 text-xs text-amber-800/90">{app.licenceNotice}</p>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-1">
+        {app.kernelRequirements.map((req) => (
+          <span
+            key={req}
+            className={`rounded-full px-2 py-0.5 text-xs ${
+              pro ? "bg-amber-100/80 text-amber-900" : "bg-slate-100/90 text-slate-600"
+            }`}
+          >
+            {req}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onDetails}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-white/80"
+        >
+          Details
+        </button>
+        {ready ? (
+          <span className="text-sm font-medium text-emerald-700">Ready</span>
+        ) : installing ? (
+          <span
+            className="rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800"
+            title={installedApp?.message}
+          >
+            Installing
+          </span>
+        ) : showBuy ? (
+          <button
+            type="button"
+            disabled={busy === app.name}
+            onClick={onBuy}
+            className="rounded-lg bg-gradient-to-r from-amber-500 via-orange-500 to-violet-600 px-4 py-1.5 text-sm font-semibold text-white shadow-md shadow-amber-300/40 transition hover:brightness-110 disabled:opacity-50"
+          >
+            {busy === app.name ? "Opening…" : "Buy"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={busy === app.name}
+            onClick={onInstall}
+            className="rounded-lg bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-50"
+          >
+            {busy === app.name ? "Installing…" : "Install"}
+          </button>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -167,6 +307,8 @@ export function StorePage() {
   const readyApps = installed.filter((app) => isAppReady(app));
   const installingApps = installed.filter((app) => !isAppReady(app));
   const hasInstalling = installingApps.length > 0;
+
+  const catalogueApps = catalogue?.apps ?? [];
 
   useEffect(() => {
     if (!hasInstalling) {
@@ -233,6 +375,20 @@ export function StorePage() {
     }
   }
 
+  function buy(app: CatalogueApp) {
+    setBusy(app.name);
+    setNotice(null);
+    if (app.checkoutUrl) {
+      window.location.href = app.checkoutUrl;
+      return;
+    }
+    setNotice({
+      kind: "info",
+      text: `${app.displayName} requires a subscription. Checkout at gentian-corp will be available once commerce is configured (GENTIAN_COMMERCE_ENABLED).`,
+    });
+    setBusy(null);
+  }
+
   async function uninstall(profile: string, purge = false) {
     setBusy(profile);
     setNotice(null);
@@ -280,6 +436,24 @@ export function StorePage() {
         ? "border-emerald-200 bg-emerald-50 text-emerald-800"
         : "border-sky-200 bg-sky-50 text-sky-800";
 
+  function renderCatalogueGrid(apps: CatalogueApp[]) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {apps.map((app) => (
+          <CatalogueCard
+            key={app.name}
+            app={app}
+            installedApp={installedByProfile.get(app.name)}
+            busy={busy}
+            onDetails={() => setSelected(app)}
+            onInstall={() => install(app.name)}
+            onBuy={() => buy(app)}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <main className="mx-auto min-h-screen max-w-6xl p-6 md:p-10">
       <header className="mb-8">
@@ -288,19 +462,30 @@ export function StorePage() {
         </p>
         <h1 className="mt-2 text-3xl font-bold text-slate-900">App Store</h1>
         <p className="mt-2 max-w-2xl text-slate-600">
-          Browse available applications and install them for your tenant with one click.
+          Browse community and Pro apps in one catalogue. Free apps install immediately; Pro apps
+          require a subscription.
         </p>
         {catalogue && (
-          <p className="mt-3 text-xs text-slate-500">
-            Catalogue: {catalogue.catalogueRepo} @ {catalogue.catalogueBranch}
-          </p>
+          <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
+            <span>
+              Catalogue: {catalogue.catalogueRepo} @ {catalogue.catalogueBranch}
+            </span>
+            {typeof catalogue.communityCount === "number" && (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-800">
+                {catalogue.communityCount} free
+              </span>
+            )}
+            {typeof catalogue.proCount === "number" && catalogue.proCount > 0 && (
+              <span className="rounded-full bg-gradient-to-r from-amber-100 to-violet-100 px-2 py-0.5 font-medium text-amber-900">
+                {catalogue.proCount} pro
+              </span>
+            )}
+          </div>
         )}
       </header>
 
       {notice && (
-        <div className={`mb-6 rounded-lg border px-4 py-3 ${noticeStyles}`}>
-          {notice.text}
-        </div>
+        <div className={`mb-6 rounded-lg border px-4 py-3 ${noticeStyles}`}>{notice.text}</div>
       )}
 
       {installingApps.length > 0 && (
@@ -346,76 +531,19 @@ export function StorePage() {
       </section>
 
       <section>
-        <h2 className="mb-4 text-lg font-semibold">Catalogue</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(catalogue?.apps || []).map((app) => {
-            const installedApp = installedByProfile.get(app.name);
-            const ready = isAppReady(installedApp);
-            const installing = Boolean(installedApp) && !ready;
-
-            return (
-              <article
-                key={app.name}
-                className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-200"
-              >
-                <div className="flex items-start gap-3">
-                  {app.logo ? (
-                    <img src={app.logo} alt="" className="h-10 w-10 rounded-lg object-contain" />
-                  ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-sm font-bold text-indigo-700">
-                      {app.displayName.slice(0, 1)}
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate font-semibold">{app.displayName}</h3>
-                    <p className="text-xs text-slate-500">v{app.chartVersion}</p>
-                  </div>
-                </div>
-                <p className="mt-3 line-clamp-3 flex-1 text-sm text-slate-600">
-                  {app.description || "No description."}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {app.kernelRequirements.map((req) => (
-                    <span
-                      key={req}
-                      className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700"
-                    >
-                      {req}
-                    </span>
-                  ))}
-                </div>
-                <div className="mt-4 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelected(app)}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
-                  >
-                    Details
-                  </button>
-                  {ready ? (
-                    <span className="text-sm font-medium text-emerald-700">Ready</span>
-                  ) : installing ? (
-                    <span
-                      className="rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800"
-                      title={installedApp?.message}
-                    >
-                      Installing
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={busy === app.name}
-                      onClick={() => install(app.name)}
-                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                    >
-                      {busy === app.name ? "Installing…" : "Install"}
-                    </button>
-                  )}
-                </div>
-              </article>
-            );
-          })}
+        <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 className="text-lg font-semibold">Catalogue</h2>
+          {catalogueApps.length > 0 && (
+            <span className="text-sm text-slate-500">
+              Community apps install for free; Pro apps show Buy until entitled.
+            </span>
+          )}
         </div>
+        {catalogueApps.length === 0 ? (
+          <p className="text-slate-500">No apps in the catalogue yet.</p>
+        ) : (
+          renderCatalogueGrid(catalogueApps)
+        )}
       </section>
 
       {purgeTarget && (
@@ -452,11 +580,27 @@ export function StorePage() {
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[80vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-xl font-semibold">{selected.displayName}</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-xl font-semibold">{selected.displayName}</h3>
+              {isProApp(selected) ? (
+                <span className="rounded-full bg-gradient-to-r from-amber-500 to-violet-600 px-2 py-0.5 text-xs font-bold text-white">
+                  Pro
+                </span>
+              ) : (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                  Free
+                </span>
+              )}
+            </div>
             <p className="mt-2 text-sm text-slate-600">{selected.description}</p>
             <p className="mt-4 text-sm">
               <span className="font-medium">Profile:</span> {selected.name}
             </p>
+            {selected.license && (
+              <p className="text-sm">
+                <span className="font-medium">License:</span> {selected.license}
+              </p>
+            )}
             <p className="text-sm">
               <span className="font-medium">Chart version:</span> {selected.chartVersion}
             </p>
@@ -464,6 +608,11 @@ export function StorePage() {
               <span className="font-medium">Cluster installs:</span> {selected.installedCount}{" "}
               tenants
             </p>
+            {isProApp(selected) && selected.licenceNotice && (
+              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {selected.licenceNotice}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => setSelected(null)}

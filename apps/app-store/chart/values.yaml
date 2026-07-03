@@ -74,6 +74,9 @@ gentian:
   appsRepo: https://github.com/gentian-org/gentian-apps
   appsBranch: main
   lifecycleUrl: http://gentian-os-lifecycle.gentian-system.svc.cluster.local:8082
+  commerceEnabled: false
+  corpApiUrl: ""
+  corpCheckoutUrl: ""
 
 gitOps:
   enabled: false
