@@ -126,8 +126,16 @@ spec:
     postgresql:
       enabled: false
 
+    # Read DB_PASSWORD from the ESO-synced secret (key db-password, created from
+    # valueMapping.database.passwordKey). With customKeyRef the chart does not try
+    # to mount its own release-named secret, which it fails to create under
+    # fullnameOverride (Error: secret "<release>-release" not found).
     externalDB:
       type: "postgresql"
+      customKeyRef:
+        enabled: true
+        name: "xwiki-sensitive-values"
+        key: "db-password"
 
     solr:
       enabled: false
