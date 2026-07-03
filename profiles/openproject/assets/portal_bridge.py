@@ -210,10 +210,12 @@ def _establish_openproject_session(username: str, password: str) -> tuple[list[s
         raise ValueError("login failed")
 
     session_cookies = _collect_set_cookies(login_headers_out)
+    location = login_headers_out.get("Location") or ""
+    if "two_factor" in location:
+        raise ValueError("login requires two-factor authentication")
     if not session_cookies:
-        raise ValueError("login failed")
+        raise ValueError("login failed without session cookie")
 
-    location = login_headers_out.get("Location")
     return session_cookies, _normalize_redirect(location)
 
 
@@ -270,7 +272,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 session["username"],
                 session["password"],
             )
-        except ValueError:
+        except ValueError as exc:
+            sys.stderr.write("bridge auth failed: %s\n" % exc)
             self.send_error(HTTPStatus.UNAUTHORIZED, "Invalid or expired bridge ticket")
             return
         except urllib.error.URLError:

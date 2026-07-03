@@ -282,6 +282,9 @@ spec:
       OPENPROJECT_MAIL__FROM: "noreply@${TENANT_DOMAIN}"
       OPENPROJECT_HOME__URL: "https://projects.${TENANT_DOMAIN}/"
       OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_USER: "api_admin"
+      # Portal bridge establishes sessions via password login; 2FA blocks cookie issuance.
+      OPENPROJECT_2FA_DISABLED: "true"
+      OPENPROJECT_2FA_ACTIVE__STRATEGIES: "[]"
       OPENPROJECT_LOG__LEVEL: "info"
       OPENPROJECT_APP__TITLE: "Projekte"
       OPENPROJECT_USER__DEFAULT__TIMEZONE: "Europe/Berlin"
