@@ -446,7 +446,7 @@ operator owns iframe policy for tenant app HTTPRoutes.
 
 These profiles rely on the operator and need **no** CSP annotations:
 
-- `app-store`, `nextcloud`, `openproject`, `xwiki`, `odoo-free-base`
+- `app-store`, `nextcloud`, `openproject`, `xwiki`
 
 Add only non-CSP `ingress.annotations` your chart needs (proxy timeouts, body size —
 bridged to Envoy `BackendTrafficPolicy`):
