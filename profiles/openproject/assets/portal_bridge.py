@@ -224,8 +224,17 @@ def _embedding_csp() -> str:
 class BridgeHandler(BaseHTTPRequestHandler):
     server_version = "OpenProjectPortalBridge/1.0"
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self._csp_sent = False
+        super().__init__(*args, **kwargs)
+
     def log_message(self, fmt: str, *args) -> None:
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
+
+    def send_header(self, keyword: str, value: str) -> None:
+        if keyword.lower() == "content-security-policy":
+            self._csp_sent = True
+        super().send_header(keyword, value)
 
     def do_HEAD(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
@@ -275,10 +284,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def end_headers(self) -> None:
-        if not any(
-            header.lower().startswith(b"content-security-policy:")
-            for header in self._headers_buffer
-        ):
+        if not self._csp_sent:
             self.send_header("Content-Security-Policy", _embedding_csp())
         super().end_headers()
 
