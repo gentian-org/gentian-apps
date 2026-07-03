@@ -233,7 +233,7 @@ function CatalogueCard({
             type="button"
             disabled={busy === app.name}
             onClick={onBuy}
-            className="rounded-lg bg-gradient-to-r from-amber-500 via-orange-500 to-violet-600 px-4 py-1.5 text-sm font-semibold text-white shadow-md shadow-amber-300/40 transition hover:brightness-110 disabled:opacity-50"
+            className="rounded-lg bg-violet-600 px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:opacity-50"
           >
             {busy === app.name ? "Opening…" : "Buy"}
           </button>
