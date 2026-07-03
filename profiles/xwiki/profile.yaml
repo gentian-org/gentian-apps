@@ -229,8 +229,17 @@ spec:
             name: xwiki-sensitive-values
             key: internal-superadmin_password
 
+    # This chart exposes no pod-label value (no podLabels/commonLabels support),
+    # so the app-default composition's podLabels injection is silently ignored.
+    # Publish the gentian identifiers as pod ANNOTATIONS instead; the platform
+    # Kyverno policy `gentian-promote-app-labels` copies them onto the pod LABELS
+    # that the tenant kernel-access / app-internal NetworkPolicies select on
+    # (gentianos.io/app). Without this the pod gets no egress to platform-kernel
+    # (Postgres, Keycloak).
     podAnnotations:
       secret.reloader.stakater.com/reload: xwiki-sensitive-values
+      gentianos.io/app: xwiki
+      gentianos.io/tenant: "${TENANT_ID}"
 
     # XWiki Tomcat image is not hardened for non-root/read-only rootfs; leave the
     # chart security contexts at their defaults (disabled) — matches nextcloud/odoo.
