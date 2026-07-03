@@ -216,6 +216,16 @@ spec:
         oidc.user.nameFormater: "${oidc.user.gentian_username._clean._lowerCase}"
         oidc.user.subjectFormater: "${oidc.user.subject}"
         oidc.skipped: "false"
+        # Headless Distribution Wizard: install the XWiki Standard flavor
+        # automatically on first boot instead of showing the interactive wizard.
+        # The stock xwiki:lts-*-tomcat image ships NO flavor (empty
+        # extension/repository), so the flavor must be resolved from an extension
+        # repository. In this locked-down tenant that means either a one-time
+        # egress window (bootstrap) or a pre-flavored image (see profile header).
+        distribution.job.interactive: "false"
+        distribution.job.interactive.wiki: "false"
+        distribution.defaultUI: "org.xwiki.platform:xwiki-platform-distribution-flavor-mainwiki"
+        distribution.defaultWikiUI: "org.xwiki.platform:xwiki-platform-distribution-flavor-wiki"
 
     customConfigsSecrets:
       xwiki.properties:
