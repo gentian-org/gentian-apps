@@ -1,0 +1,233 @@
+# AppProfile — XWiki (per-tenant enterprise wiki)
+#
+# Source chart: https://xwiki-contrib.github.io/xwiki-helm/ xwiki v1.6.8
+#   Community-maintained chart by xwiki-contrib; Docker Official Image xwiki.
+#   Chart uses StatefulSet by default (workloadStateful: true).
+#
+# Docker image: xwiki:lts-postgres-tomcat (Docker Hub Official)
+#   LTS branch (17.x) with Tomcat + PostgreSQL JDBC driver.
+#   OIDC authenticator extension must be installed via the XWiki Extension
+#   Manager on first admin login (org.xwiki.contrib.oidc:oidc-authenticator).
+#
+# Secret inventory:
+#   Kernel-provided:
+#     oidc_client_secret  → customConfigsSecrets (xwiki.properties oidc.secret)
+#     pg_*                → externalDB.{host,database,user,password}
+#     smtp_password       → (future: mail.smtp.password via xwiki.properties)
+#   App-internal (1) → appSecrets:
+#     superadmin_password → customConfigsSecrets (xwiki.cfg xwiki.superadminpassword)
+#
+# Bootstrap: after first deploy, an admin should open wiki.<tenant-domain> and
+# install the OIDC authenticator extension. The xwiki.properties config is
+# pre-wired so OIDC SSO activates as soon as the extension is present.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: xwiki
+  labels:
+    gentianos.io/profile-name: xwiki
+spec:
+  displayName: "XWiki"
+  description: "Open-source enterprise wiki with structured data, WYSIWYG editing, and extensible application platform."
+  family: xwiki
+  catalogueVersion: "1.0.0"
+  edition: full
+  trustTier: certified
+  license: LGPL-2.1
+  tile:
+    icon: wiki
+
+  kernelRequirements:
+    identity:
+      oidc:
+        clientId: "gentian-xwiki"
+        name: "XWiki"
+        accessType: CONFIDENTIAL
+        # XWiki OIDC authenticator callback endpoint (image serves at ROOT context,
+        # so no /xwiki prefix — chart probes /rest, not /xwiki/rest).
+        redirectUris:
+          - "https://wiki.${TENANT_DOMAIN}/oidc/authenticator/callback"
+        postLogoutRedirectUris:
+          - "https://wiki.${TENANT_DOMAIN}/"
+          - "https://portal.${KERNEL_DOMAIN}/"
+        backchannelLogoutUrl: "https://wiki.${TENANT_DOMAIN}/oidc/authenticator/backchannel_logout"
+    database:
+      engine: postgresql
+      databasePerTenant: true
+    mail:
+      smtp:
+        auth: plain
+        port: 587
+
+  provides:
+    - name: wiki
+      protocol: http-html
+
+  optionalIntegrations:
+    - contract: central-navigation
+      provider: portal
+      capabilities:
+        - navigation:register
+
+  portalTiles:
+    - name: xwiki
+      displayName:
+        de_DE: "Wiki"
+        en_US: "Wiki"
+      # XWiki runs fine inside the portal WinBox iframe; operator injects the
+      # portal frame-ancestors CSP on the app HTTPRoute (guide §6a/§8a).
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  chart:
+    repository: "https://xwiki-contrib.github.io/xwiki-helm"
+    name: xwiki
+    version: "1.6.8"
+
+  deploymentMethod: crossplane
+
+  valueMapping:
+    oidc:
+      clientSecretKey: "oidcClientSecret"
+    database:
+      hostKey: "externalDB.host"
+      nameKey: "externalDB.database"
+      userKey: "externalDB.user"
+      passwordKey: "externalDB.password"
+    smtp:
+      passwordKey: "smtpPassword"
+
+  appSecrets:
+    - name: superadmin_password
+      valuePath: "superadminPassword"
+
+  ingress:
+    subDomain: "wiki"
+    serviceName: "xwiki"
+    servicePort: 80
+    tlsEnabled: true
+    annotations:
+      gentianos.io/gateway-buffer-limit: "128M"
+      gentianos.io/gateway-request-timeout: "120"
+      gentianos.io/gateway-response-timeout: "120"
+
+  extraValues:
+    fullnameOverride: "xwiki"
+
+    image:
+      name: xwiki
+      tag: "lts-postgres-tomcat"
+      pullPolicy: IfNotPresent
+
+    mysql:
+      enabled: false
+    mariadb:
+      enabled: false
+    postgresql:
+      enabled: false
+
+    externalDB:
+      type: "postgresql"
+
+    solr:
+      enabled: false
+
+    ingress:
+      enabled: false
+
+    persistence:
+      enabled: true
+      size: "2Gi"
+
+    workloadStateful: true
+
+    service:
+      type: ClusterIP
+      externalPort: 80
+      internalPort: 8080
+      sessionAffinity: ClientIP
+
+    javaOpts:
+      - "-Xmx1024m"
+      - "-Xms512m"
+
+    resources:
+      limits:
+        cpu: "1"
+        memory: "2Gi"
+      requests:
+        cpu: "250m"
+        memory: "1Gi"
+
+    probes:
+      startup:
+        enabled: true
+        initialDelaySeconds: 120
+        timeoutSeconds: 60
+        periodSeconds: 30
+        failureThreshold: 10
+        successThreshold: 1
+      liveness:
+        enabled: true
+        httpGet:
+          enabled: true
+          path: /rest
+        initialDelaySeconds: 30
+        timeoutSeconds: 5
+        periodSeconds: 30
+        failureThreshold: 10
+        successThreshold: 1
+      readiness:
+        enabled: true
+        httpGet:
+          enabled: true
+          path: /rest/wikis/xwiki/spaces
+        initialDelaySeconds: 30
+        timeoutSeconds: 5
+        periodSeconds: 30
+        failureThreshold: 10
+        successThreshold: 1
+
+    # OIDC authenticator config (org.xwiki.contrib.oidc:oidc-authenticator).
+    # Explicit Keycloak endpoints (not just discovery) so token exchange works on
+    # ACME staging where the JVM trusts the injected staging CA truststore.
+    # Property names/format per the extension docs: comma-separated scopes, the
+    # authclass in xwiki.cfg, and secret via customConfigsSecrets (never inline).
+    customConfigs:
+      xwiki.cfg:
+        xwiki.authentication.authclass: "org.xwiki.contrib.oidc.auth.OIDCAuthServiceImpl"
+      xwiki.properties:
+        oidc.provider: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
+        oidc.endpoint.authorization: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/auth"
+        oidc.endpoint.token: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/token"
+        oidc.endpoint.userinfo: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/userinfo"
+        oidc.endpoint.logout: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/logout"
+        oidc.endpoint.token.auth_method: "client_secret_basic"
+        oidc.clientid: "gentian-xwiki"
+        oidc.scope: "openid,profile,email,gentian-xwiki-scope"
+        oidc.user.nameFormater: "${oidc.user.gentian_username._clean._lowerCase}"
+        oidc.user.subjectFormater: "${oidc.user.subject}"
+        oidc.skipped: "false"
+
+    customConfigsSecrets:
+      xwiki.properties:
+        oidc.secret:
+          secret:
+            name: xwiki-sensitive-values
+            key: oidc-client-secret
+      xwiki.cfg:
+        xwiki.superadminpassword:
+          secret:
+            name: xwiki-sensitive-values
+            key: internal-superadmin_password
+
+    podAnnotations:
+      secret.reloader.stakater.com/reload: xwiki-sensitive-values
+
+    # XWiki Tomcat image is not hardened for non-root/read-only rootfs; leave the
+    # chart security contexts at their defaults (disabled) — matches nextcloud/odoo.
+    securityContext:
+      enabled: false
+
+    containerSecurityContext:
+      enabled: false
