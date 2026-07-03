@@ -20,6 +20,10 @@ PORTAL_API = os.environ.get(
 ).rstrip("/")
 OPENPROJECT_URL = os.environ.get("OPENPROJECT_URL", "http://openproject:8080").rstrip("/")
 OPENPROJECT_HOST = os.environ.get("OPENPROJECT_HOST", "").strip()
+PORTAL_FRAME_ANCESTOR = os.environ.get(
+    "PORTAL_FRAME_ANCESTOR",
+    "https://portal.desk.gentian.org",
+).strip()
 LISTEN_PORT = int(os.environ.get("PORT", "8080"))
 
 _SSO_HTML = """<!DOCTYPE html>
@@ -59,25 +63,42 @@ _SSO_HTML = """<!DOCTYPE html>
 """
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _openproject_headers() -> dict[str, str]:
+    host_header = OPENPROJECT_HOST or urllib.parse.urlparse(OPENPROJECT_URL).netloc
+    headers: dict[str, str] = {"X-Forwarded-Proto": "https"}
+    if host_header:
+        headers["Host"] = host_header
+    return headers
+
+
+def _openproject_opener() -> urllib.request.OpenerDirector:
+    return urllib.request.build_opener(_NoRedirect())
+
+
 def _request(
     method: str,
     url: str,
     *,
     data: bytes | None = None,
     headers: dict[str, str] | None = None,
-) -> tuple[int, dict[str, str], bytes]:
+    opener: urllib.request.OpenerDirector | None = None,
+) -> tuple[int, Any, bytes]:
     req = urllib.request.Request(url, data=data, method=method)
     for key, value in (headers or {}).items():
         req.add_header(key, value)
+    client = opener or urllib.request.build_opener()
     try:
-        with urllib.request.urlopen(req, timeout=20) as response:
+        with client.open(req, timeout=20) as response:
             body = response.read()
-            response_headers = {k: v for k, v in response.headers.items()}
-            return response.status, response_headers, body
+            return response.status, response.headers, body
     except urllib.error.HTTPError as exc:
         body = exc.read()
-        response_headers = {k: v for k, v in exc.headers.items()}
-        return exc.code, response_headers, body
+        return exc.code, exc.headers, body
 
 
 def _redeem_ticket(ticket: str) -> dict[str, str]:
@@ -127,11 +148,32 @@ def _collect_set_cookies(headers: Any) -> list[str]:
     return [value] if value else []
 
 
-def _establish_openproject_session(username: str, password: str) -> tuple[list[str], str | None]:
-    host_header = OPENPROJECT_HOST or urllib.parse.urlparse(OPENPROJECT_URL).netloc
-    base_headers = {"Host": host_header} if host_header else {}
+def _normalize_redirect(location: str | None) -> str:
+    if not location:
+        return "/"
+    parsed = urllib.parse.urlparse(location)
+    if parsed.scheme and parsed.netloc:
+        host = OPENPROJECT_HOST or urllib.parse.urlparse(OPENPROJECT_URL).netloc
+        if parsed.netloc == host:
+            path = parsed.path or "/"
+            if parsed.query:
+                path = f"{path}?{parsed.query}"
+            return path
+    if location.startswith("/"):
+        return location
+    return "/"
 
-    status, headers, body = _request("GET", f"{OPENPROJECT_URL}/login", headers=base_headers)
+
+def _establish_openproject_session(username: str, password: str) -> tuple[list[str], str]:
+    opener = _openproject_opener()
+    base_headers = _openproject_headers()
+
+    status, headers, body = _request(
+        "GET",
+        f"{OPENPROJECT_URL}/login",
+        headers=base_headers,
+        opener=opener,
+    )
     if status >= 400:
         raise ValueError("login page failed")
 
@@ -162,14 +204,21 @@ def _establish_openproject_session(username: str, password: str) -> tuple[list[s
         f"{OPENPROJECT_URL}/login",
         data=form,
         headers=login_headers,
+        opener=opener,
     )
     if status not in {HTTPStatus.FOUND, HTTPStatus.SEE_OTHER, HTTPStatus.MOVED_PERMANENTLY}:
         raise ValueError("login failed")
 
     session_cookies = _collect_set_cookies(login_headers_out)
+    if not session_cookies:
+        raise ValueError("login failed")
 
     location = login_headers_out.get("Location")
-    return session_cookies, location
+    return session_cookies, _normalize_redirect(location)
+
+
+def _embedding_csp() -> str:
+    return f"frame-ancestors 'self' {PORTAL_FRAME_ANCESTOR}"
 
 
 class BridgeHandler(BaseHTTPRequestHandler):
@@ -177,6 +226,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def log_message(self, fmt: str, *args) -> None:
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
+
+    def do_HEAD(self) -> None:
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/openproject-portal-sso.html":
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            return
+        if parsed.path == "/gentian-portal-bridge":
+            self.send_response(HTTPStatus.BAD_REQUEST)
+            self.end_headers()
+            return
+        self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
@@ -206,12 +268,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.BAD_GATEWAY, "Could not reach upstream service")
             return
 
-        redirect_to = location or "/"
         self.send_response(HTTPStatus.FOUND)
         for cookie in cookies:
             self.send_header("Set-Cookie", cookie)
-        self.send_header("Location", redirect_to)
+        self.send_header("Location", location)
         self.end_headers()
+
+    def end_headers(self) -> None:
+        if not any(
+            header.lower().startswith("content-security-policy:")
+            for header in self._headers_buffer
+        ):
+            self.send_header("Content-Security-Policy", _embedding_csp())
+        super().end_headers()
 
     def _send_html(self, html: str) -> None:
         encoded = html.encode("utf-8")

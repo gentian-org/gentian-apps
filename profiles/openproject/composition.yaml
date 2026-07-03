@@ -1175,6 +1175,7 @@ spec:
             {{- $bridgeScript := dig "bridge.py" "" $pbData }}
             {{- $projectsHost := printf "projects.%s" $domain }}
             {{- $portalApi := "http://gentian-portal-gentian-portal-api.platform-kernel.svc.cluster.local:8000/api/v1" }}
+            {{- $portalFrameAncestor := printf "https://portal.%s" (dig "KERNEL_DOMAIN" "desk.gentian.org" $ksCMData) }}
             ---
             apiVersion: kubernetes.crossplane.io/v1alpha2
             kind: Object
@@ -1261,6 +1262,8 @@ spec:
                                 value: {{ $projectsHost | quote }}
                               - name: GENTIAN_PORTAL_BRIDGE_API
                                 value: {{ $portalApi | quote }}
+                              - name: PORTAL_FRAME_ANCESTOR
+                                value: {{ $portalFrameAncestor | quote }}
                             securityContext:
                               allowPrivilegeEscalation: false
                               readOnlyRootFilesystem: true
