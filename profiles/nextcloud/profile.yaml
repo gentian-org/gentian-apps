@@ -85,6 +85,36 @@ spec:
       # Embedded portal tile — gentian-ui opens /nextcloud-portal-sso.html with a bridge ticket.
       linkTarget: embedded
       allowedGroup: "App Users"
+    # Collabora document-type tiles. linkSuffix ?open=<type> is carried through the
+    # bridge (sso.html → gentian-portal-bridge.php), which opens the user's most
+    # recently edited file of that type in Collabora, seeding a blank one on first use.
+    - name: document
+      displayName:
+        de_DE: "Dokument"
+        en_US: "Document"
+      linkTarget: embedded
+      linkSuffix: "?open=document"
+      allowedGroup: "App Users"
+      tile:
+        icon: documents
+    - name: spreadsheet
+      displayName:
+        de_DE: "Tabelle"
+        en_US: "Spreadsheet"
+      linkTarget: embedded
+      linkSuffix: "?open=spreadsheet"
+      allowedGroup: "App Users"
+      tile:
+        icon: spreadsheet
+    - name: presentation
+      displayName:
+        de_DE: "Präsentation"
+        en_US: "Presentation"
+      linkTarget: embedded
+      linkSuffix: "?open=presentation"
+      allowedGroup: "App Users"
+      tile:
+        icon: presentation
 
   provisioning:
     privilegedRole:
