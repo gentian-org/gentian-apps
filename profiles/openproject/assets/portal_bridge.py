@@ -276,7 +276,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def end_headers(self) -> None:
         if not any(
-            header.lower().startswith("content-security-policy:")
+            header.lower().startswith(b"content-security-policy:")
             for header in self._headers_buffer
         ):
             self.send_header("Content-Security-Policy", _embedding_csp())
