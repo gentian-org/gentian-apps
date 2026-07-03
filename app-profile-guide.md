@@ -184,6 +184,52 @@ for OIDC. Set `global.domain: "${KERNEL_DOMAIN}"` and prefix tenant app host
 labels with `${TENANT_ID}` (e.g. `jitsi: "meet.${TENANT_ID}"` →
 `meet.demo.desk.gentian.org`). See `gentian-apps` commit `b1203d0`.
 
+### Browser-facing vs server-to-server URLs (public vs internal)
+
+`${TENANT_DOMAIN}` and `${KERNEL_DOMAIN}` are **public** hostnames for the
+**browser**. Any call made **server-side, from inside the cluster** — one
+workload reaching another — should target **internal** Kubernetes service DNS
+(`<service>.<namespace>.svc.cluster.local`), not the public hostname. This rule
+applies to **every** profile, not any one app.
+
+| Caller → callee | URL to use |
+|---|---|
+| Browser → app UI | Public `https://<sub>.${TENANT_DOMAIN}` |
+| App backend → its kernel deps (DB, S3, LDAP, SMTP) | Internal — already service DNS via `${LDAP_HOST}`, `${S3_ENDPOINT}`, … |
+| Companion/sidecar → main app (e.g. an editor's file callback) | Internal `http://<svc>.${TENANT_NAMESPACE}.svc.cluster.local:<port>` |
+| Kernel component → tenant app (portal API, provisioners) | Internal `http://<svc>.tenant-<t>.svc.cluster.local:<port>` |
+| App backend → central IdP token/userinfo exchange | Internal Keycloak (`KEYCLOAK_INTERNAL_URL`), not `https://id.${KERNEL_DOMAIN}` |
+
+**Why not use the public hostname everywhere?** Inside the cluster, CoreDNS
+**hairpins** `*.${KERNEL_DOMAIN}` and `*.${TENANT_DOMAIN}` to the edge gateway.
+That path has two traps for server-side HTTP clients:
+
+1. **Staging TLS certs.** On dev/staging the gateway serves a **Let's Encrypt
+   staging** cert. Strict clients (Python `httpx`, Go, JVM, Node, Twisted) reject
+   it with `CERTIFICATE_VERIFY_FAILED` / `unable to get local issuer certificate`.
+   Symptom: HTTP 500 from the caller, "could not connect", or a hung TLS handshake.
+2. **Extra latency and failure surface.** The request leaves the pod, traverses
+   the gateway, and comes back — slower, and dependent on gateway/DNS health for a
+   call that never needed to leave the cluster.
+
+**Two ways to satisfy a server-side call:**
+
+- **Preferred — internal service URL.** Point the callback/integration at
+  `.svc.cluster.local`; plain HTTP is fine in-cluster. This is what the Nextcloud
+  WOPI callback (§6g), the portal bridge (§6g), and Element's `KEYCLOAK_INTERNAL_URL`
+  (§6d) all do.
+- **When the public host is unavoidable** (the app hard-codes it, or browser and
+  server must agree on one issuer string) — **trust the staging CA** in that
+  runtime: mount `gentian-staging-ca-tls` and set the language's trust env
+  (`NODE_EXTRA_CA_CERTS`, JVM truststore, `SSL_CERT_FILE`), or set the app's
+  documented "insecure SSL for testing" flag. See the ACME staging note below and §8a.
+
+**Cross-namespace reachability:** a kernel component calling a tenant app relies
+on the tenant baseline `tenant-isolation` NetworkPolicy allowing ingress from
+`platform-kernel` (operator default). A companion service that must reach the edge
+gateway for a browser-side flow (e.g. an editor fetching `https://<sub>.${TENANT_DOMAIN}`)
+declares `gentianos.io/kernel-egress-namespaces: envoy-gateway-system` on the profile.
+
 ### Central IdP — required pattern (all profiles)
 
 Gentian uses a **central Keycloak** on the kernel domain. Realms are **per tenant**
@@ -223,7 +269,10 @@ The operator seeds OIDC issuer/client credentials in OpenBao as
 - Hardcoded realm names (`opendesk`, `souvap`) instead of `${TENANT_ID}`.
 - Redirect URIs on `${KERNEL_DOMAIN}` or portal host instead of `${TENANT_DOMAIN}`.
 
-**ACME staging (dev):** when `tenantDNS01ClusterIssuer` contains `staging`,
+**ACME staging (dev):** this is the "public host unavoidable" branch of the
+server-to-server rule above — Synapse must present the same OIDC issuer string to
+the browser and validate it server-side, so it cannot swap in an internal URL and
+must instead trust the staging CA. When `tenantDNS01ClusterIssuer` contains `staging`,
 compositions mount `gentian-staging-ca-tls` and (for Synapse) set
 `use_insecure_ssl_client_just_for_testing_do_not_use` plus explicit OIDC
 endpoints with `discover: false` and `user_profile_method: userinfo_endpoint` in
@@ -501,10 +550,11 @@ client `opendesk-synapse` picks up the new redirect URI.
 
 On **ACME staging** clusters, the same message after the matrix host routes
 correctly usually means Synapse failed the **token/userinfo exchange** (Twisted
-HTTPS to `id.<kernel>` on the hairpin path). The `app-element` composition
-points server-side OIDC endpoints at in-cluster Keycloak (`KEYCLOAK_INTERNAL_URL`
-in `gentian-kernel-services`); confirm the Element XApp reconciled after the
-operator upgrade.
+HTTPS to `id.<kernel>` on the hairpin path) — the server-to-server trap from §2.
+The `app-element` composition applies the "internal service URL" remedy: it points
+server-side OIDC endpoints at in-cluster Keycloak (`KEYCLOAK_INTERNAL_URL` in
+`gentian-kernel-services`); confirm the Element XApp reconciled after the operator
+upgrade.
 
 **Matrix localpart:** use `matrixIdLocalpart: "opendesk_username"` (LDAP `uid`) and
 request scope `opendesk-matrix-scope`. Do not use `preferred_username` — kernel-broker
@@ -644,8 +694,13 @@ Files tile (`linkTarget: embedded`).
 
 #### Collabora WOPI — critical configuration
 
-Collabora's `coolwsd` fetches file content from Nextcloud over HTTP(S). Several
-settings must align or document editing silently fails:
+Collabora is a **server-side companion** — the general case is any app that ships
+a back-end helper (document editor, media transcoder, search indexer, thumbnailer)
+that calls back into the main app or another cluster service. Per the public-vs-internal
+rule (§2), those callbacks use **internal service DNS**; the browser-side editor URL
+stays public. The `coolwsd`-specific settings below must align or document editing
+silently fails — but the *shape* of the problem (internal callback URL + SSL scheme +
+egress + host allowlist) recurs for any such companion:
 
 | Setting | Value | Why |
 |---|---|---|
@@ -662,20 +717,21 @@ CoreDNS hairpin resolves this to the tenant gateway in `envoy-gateway-system`.
 The profile sets `gentianos.io/kernel-egress-namespaces: envoy-gateway-system`
 so the operator grants egress to the gateway namespace.
 
-#### Portal bridge — internal service URLs only
+#### Portal bridge — a kernel → tenant server-side call
 
-The portal API (in `platform-kernel`) provisions Nextcloud users via OCS before
-opening the Files iframe. These server-side calls **must** use the in-cluster
-service URL (`http://nextcloud.tenant-<t>.svc.cluster.local:8080`), **not** the
-public `https://cloud.<tenant>.<kernel>`. Reasons:
+The portal API (in `platform-kernel`) provisions the app user via OCS before
+opening the Files iframe. This is a textbook **kernel → tenant** call from §2, so
+it uses the internal service URL (`http://nextcloud.tenant-<t>.svc.cluster.local:8080`),
+never the public `https://cloud.<tenant>`. Using the public host here regressed
+with `CERTIFICATE_VERIFY_FAILED` → HTTP 500 ("Could not open Files") the moment
+CoreDNS hairpin + staging certs were in play. The baseline `tenant-isolation`
+NetworkPolicy allows ingress from `platform-kernel` to make this reachable.
 
-1. CoreDNS hairpin resolves `cloud.<tenant>` to the tenant gateway IP.
-2. The gateway serves a Let's Encrypt **staging** cert on dev clusters.
-3. Python `httpx` rejects the staging cert → `CERTIFICATE_VERIFY_FAILED` → HTTP 500 → "Could not open Files."
-
-The baseline `tenant-isolation` network policy allows ingress from
-`platform-kernel`, enabling this direct service access. The same pattern
-applies to OpenProject's bridge (see `openproject_session_bridge.py`).
+**Generalizes to any app with a portal session bridge:** OpenProject's bridge
+(`openproject_session_bridge.py`) follows the identical pattern — internal service
+URL for the admin/provisioning call, public host only for the browser redirect.
+If you add a new bridged app, mint the session server-side against
+`http://<svc>.tenant-<t>.svc.cluster.local`, not the public hostname.
 
 The licensed OpenDesk Nextcloud stack is **not** part of gentian-os or gentian-apps;
 customers who need it install it from the proprietary catalogue separately.
@@ -1010,6 +1066,8 @@ Before opening a PR, verify:
 - [ ] `global.domain` and `global.hosts` set in `extraValues`
 - [ ] If `global.hosts.keycloak` is present: `global.domain` is `${KERNEL_DOMAIN}`, tenant app hosts use `${TENANT_ID}` prefix
 - [ ] All IdP URLs use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`; redirect URIs use `${TENANT_DOMAIN}`
+- [ ] Server-side/in-cluster calls (companion callbacks, provisioning, token exchange) use internal `.svc.cluster.local` URLs, not public hostnames — §2. If a public host is unavoidable, staging CA is trusted.
+- [ ] Companion service that must reach the edge gateway sets `gentianos.io/kernel-egress-namespaces` — §2, §6g
 - [ ] Element *(gentian-pro)*: OIDC redirect is `https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback` (not `chat.`)
 - [ ] Element *(gentian-pro)*: `additionalIngresses` includes `matrix` → `synapse-web:8008` (required) — §6d
 - [ ] Element *(gentian-pro)*: `matrixIdLocalpart: "opendesk_username"` (not `preferred_username`) — §6d
