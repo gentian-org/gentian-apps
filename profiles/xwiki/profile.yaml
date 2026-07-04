@@ -271,10 +271,26 @@ spec:
       gentianos.io/app: xwiki
       gentianos.io/tenant: "${TENANT_ID}"
 
-    # XWiki Tomcat image is not hardened for non-root/read-only rootfs; leave the
-    # chart security contexts at their defaults (disabled) — matches nextcloud/odoo.
+    # Enable and configure securityContexts to satisfy Kyverno security policies.
     securityContext:
-      enabled: false
+      enabled: true
+      fsGroup: 101
+      seccompProfile:
+        type: "RuntimeDefault"
 
     containerSecurityContext:
-      enabled: false
+      enabled: true
+      runAsUser: 100
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: "RuntimeDefault"
+
+    # Configure the secrets init container (xwiki-secrets) to also be Kyverno compliant.
+    volumePermissions:
+      containerSecurityContext:
+        enabled: true
+        runAsUser: 0
+        allowPrivilegeEscalation: false
+        seccompProfile:
+          type: "RuntimeDefault"
