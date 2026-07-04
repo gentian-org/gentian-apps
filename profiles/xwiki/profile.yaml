@@ -280,8 +280,8 @@ spec:
 
     containerSecurityContext:
       enabled: true
-      runAsUser: 100
-      runAsNonRoot: true
+      runAsUser: 0
+      runAsNonRoot: null
       allowPrivilegeEscalation: false
       seccompProfile:
         type: "RuntimeDefault"
