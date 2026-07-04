@@ -29,6 +29,8 @@ metadata:
   name: xwiki
   labels:
     gentianos.io/profile-name: xwiki
+  annotations:
+    gentianos.io/kernel-egress-namespaces: envoy-gateway-system
 spec:
   displayName: "XWiki"
   description: "Open-source enterprise wiki with structured data, WYSIWYG editing, and extensible application platform."
@@ -80,6 +82,10 @@ spec:
       # XWiki runs fine inside the portal WinBox iframe; operator injects the
       # portal frame-ancestors CSP on the app HTTPRoute (guide §6a/§8a).
       linkTarget: embedded
+      # The portal derives authMode: oidc automatically from kernelRequirements.identity.oidc
+      # and bootstraps a Keycloak browser-session cookie in a hidden iframe before
+      # opening this app — needed because portal password login uses the direct-access
+      # grant (no browser redirect), so no Keycloak SSO cookie exists until we create one.
       allowedGroup: "App Users"
 
   chart:
@@ -176,10 +182,12 @@ spec:
     probes:
       startup:
         enabled: true
-        initialDelaySeconds: 120
+        # XWiki typically boots in 60-90s; starting checks at 60s and polling
+        # every 15s cuts the observable wait by ~60-90s vs the old 120s dead zone.
+        initialDelaySeconds: 60
         timeoutSeconds: 60
-        periodSeconds: 30
-        failureThreshold: 10
+        periodSeconds: 15
+        failureThreshold: 20
         successThreshold: 1
       liveness:
         enabled: true
@@ -211,17 +219,22 @@ spec:
       xwiki.cfg:
         xwiki.authentication.authclass: "org.xwiki.contrib.oidc.auth.OIDCAuthServiceImpl"
       xwiki.properties:
-        oidc.provider: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
-        oidc.endpoint.authorization: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/auth"
-        oidc.endpoint.token: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/token"
-        oidc.endpoint.userinfo: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/userinfo"
-        oidc.endpoint.logout: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/logout"
+        oidc.provider: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}"
+        oidc.endpoint.authorization: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}/protocol/openid-connect/auth"
+        oidc.endpoint.token: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}/protocol/openid-connect/token"
+        oidc.endpoint.userinfo: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}/protocol/openid-connect/userinfo"
+        oidc.endpoint.logout: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}/protocol/openid-connect/logout"
         oidc.endpoint.token.auth_method: "client_secret_basic"
         oidc.clientid: "gentian-xwiki"
         oidc.scope: "openid,profile,email,gentian-xwiki-scope"
         oidc.user.nameFormater: "${oidc.user.gentian_username._clean._lowerCase}"
         oidc.user.subjectFormater: "${oidc.user.subject}"
-        oidc.skipped: "false"
+        # oidc.skipped=true: XWiki immediately redirects unauthenticated requests
+        # to Keycloak instead of showing an anonymous view with a "Log In" button.
+        # The portal's hidden-iframe bootstrap (authMode: oidc above) has already
+        # established the Keycloak SSO cookie, so Keycloak completes the flow
+        # without showing its own login form.
+        oidc.skipped: "true"
         # Fully offline extension handling. The pre-flavored image (see header)
         # bakes the Standard Flavor offline repository and stages it into the PVC
         # on first boot; the headless Distribution Job then installs it locally
