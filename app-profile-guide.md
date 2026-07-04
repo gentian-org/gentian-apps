@@ -34,6 +34,57 @@ platform superadmin only). The operator intersects request ∩ allowlist, publis
 
 ---
 
+## ❌ Absolute prohibition — no cluster hotfixes, ever
+
+> **Gentian OS must run identically on any cluster, at any time, from a clean
+> install. Any change that lives only on a specific cluster violates this
+> invariant and is strictly forbidden.**
+
+### What is a cluster hotfix?
+
+A cluster hotfix is any change applied directly to a live cluster that is **not
+tracked in a git repository** and **not deployed by the normal CI/CD pipeline**.
+Common forms include, but are not limited to:
+
+| Forbidden action | Why it is harmful |
+|---|---|
+| `kubectl create configmap` / `kubectl apply` of a resource that overrides files mounted into a pod | Shadows the Docker image silently; invisible to git, CI, and code review; does not survive cluster reprovisioning |
+| `kubectl patch deployment` to inject an env var, change an image tag, or add a volume | Bypasses the Helm release; ArgoCD will drift-detect or silently accept it |
+| `kubectl exec` + writing files into a running container | Survives only until the pod restarts; leaves no trace |
+| Editing a Secret or ConfigMap in the cluster to change application behaviour | Not reviewed, not auditable, not reproducible |
+| Pinning a pod to a node, taint, or toleration outside of the chart | Breaks portability |
+
+### The correct path — always
+
+```
+1. Reproduce the bug or missing behaviour in the local dev environment.
+2. Fix it in the source code (gentian-ui, gentian-apps, gentian-os — whichever owns it).
+3. Write or update a test.
+4. Commit with a descriptive message, push, open a PR / push to develop.
+5. CI builds the image and the CD pipeline deploys it.
+6. Verify on the target cluster via the normal deployment.
+```
+
+If you cannot reproduce the issue locally and feel pressure to "just fix it in the
+cluster", **stop**. Raise the issue in the team, extend the local dev environment
+so the class of bug is reproducible, then fix it properly.
+
+### If a cluster hotfix already exists
+
+1. Identify the override (e.g. a ConfigMap volume-mounted into a pod).
+2. Implement the real fix in source and push it.
+3. Wait for CI to build and deploy the new image.
+4. **Delete the hotfix resource** (`kubectl delete configmap …`) so the
+   deployment reverts to the clean state.
+5. Confirm via `kubectl get` that no trace of the override remains.
+6. Document what happened in the commit message or a post-mortem.
+
+Leaving a hotfix in place "until we have time" is not acceptable — it will
+outlast the original incident and cause confusion for every engineer who works on
+the system after you.
+
+---
+
 ## 1. Mandatory top-level fields
 
 ```yaml
