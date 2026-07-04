@@ -27,7 +27,7 @@ spec:
 
   apiIntegration:
     runtime: redirect
-    baseUrl: "https://corp.gentian.org"
+    baseUrl: "https://corp.desk.gentian.org"
     tenantBinding: tenant-domain
 
   portalTiles:
