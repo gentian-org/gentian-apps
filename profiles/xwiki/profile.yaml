@@ -215,6 +215,10 @@ spec:
     # ACME staging where the JVM trusts the injected staging CA truststore.
     # Property names/format per the extension docs: comma-separated scopes, the
     # authclass in xwiki.cfg, and secret via customConfigsSecrets (never inline).
+    properties:
+      "property:xwiki:XWiki.XWikiPreferences^XWiki.XWikiPreferences.authenticate_view": 1
+      "property:xwiki:XWiki.XWikiPreferences^XWiki.XWikiPreferences.authenticate_edit": 1
+
     customConfigs:
       xwiki.cfg:
         xwiki.authentication.authclass: "org.xwiki.contrib.oidc.auth.OIDCAuthServiceImpl"
