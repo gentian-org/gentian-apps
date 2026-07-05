@@ -229,12 +229,12 @@ spec:
         oidc.scope: "openid,profile,email,gentian-xwiki-scope"
         oidc.user.nameFormater: "${oidc.user.gentian_username._clean._lowerCase}"
         oidc.user.subjectFormater: "${oidc.user.subject}"
-        # oidc.skipped=true: XWiki immediately redirects unauthenticated requests
-        # to Keycloak instead of showing an anonymous view with a "Log In" button.
+        # oidc.skipped=false: The OIDC authenticator is active. XWiki immediately redirects
+        # unauthenticated requests to Keycloak instead of showing an anonymous view with a "Log In" button.
         # The portal's hidden-iframe bootstrap (authMode: oidc above) has already
         # established the Keycloak SSO cookie, so Keycloak completes the flow
         # without showing its own login form.
-        oidc.skipped: "true"
+        oidc.skipped: "false"
         # Fully offline extension handling. The pre-flavored image (see header)
         # bakes the Standard Flavor offline repository and stages it into the PVC
         # on first boot; the headless Distribution Job then installs it locally
