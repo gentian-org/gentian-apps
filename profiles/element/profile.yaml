@@ -93,6 +93,8 @@ spec:
     macWaivers:
       - policy: gentian-require-non-root
         scope: sidecar-jitsi
+      - policy: gentian-restrict-capabilities
+        scope: sidecar-jitsi
 
   sidecars:
     - name: jitsi
