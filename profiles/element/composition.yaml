@@ -143,6 +143,12 @@ spec:
             {{- end }}
             {{- end }}
 
+            {{- $domain := $xr.spec.domain }}
+            {{- $ksRes  := dig "kernelServices" list $extraRes }}
+            {{- $ksCM   := default dict (index $ksRes 0) }}
+            {{- $ksCMData := dig "data" dict $ksCM }}
+            {{- $kernelDomain := dig "KERNEL_DOMAIN" "" $ksCMData }}
+
             {{- /* ── Build ExternalSecret data[] entries ── */}}
             {{- $esData := list }}
 
@@ -258,8 +264,6 @@ spec:
             {{- end }}
 
             {{- /* ── Set up Helm Release / Deployment values mapping ── */}}
-            {{- $kernelDomain := $spec.kernelDomain }}
-            {{- $tenantDomain := $spec.tenantDomain }}
             {{- $extraVals    := default dict $spec.parameters.extraValues }}
             {{- $imagePull    := list (dict "name" "registry-credentials") }}
 
@@ -376,8 +380,8 @@ spec:
                       {
                         "default_server_config": {
                           "m.homeserver": {
-                            "base_url": "https://matrix.{{ $tenantDomain }}",
-                            "server_name": "{{ $tenantDomain }}"
+                            "base_url": "https://matrix.{{ $domain }}",
+                            "server_name": "{{ $domain }}"
                           }
                         },
                         "brand": "Element",
@@ -457,6 +461,8 @@ spec:
                                 mountPath: /var/run
                               - name: tmp
                                 mountPath: /tmp
+                              - name: confd
+                                mountPath: /etc/nginx/conf.d
                         volumes:
                           - name: config
                             configMap:
@@ -466,6 +472,8 @@ spec:
                           - name: run
                             emptyDir: {}
                           - name: tmp
+                            emptyDir: {}
+                          - name: confd
                             emptyDir: {}
               providerConfigRef:
                 name: kubernetes
@@ -503,16 +511,6 @@ spec:
                 name: kubernetes
 
             {{- /* ── Release 2: Synapse (matrix-synapse) ─────────────────────── */}}
-            {{- $ksResStaging := dig "kernelServices" list $extraRes }}
-            {{- $ksCMStaging  := default dict (index $ksResStaging 0) }}
-            {{- $ksCMDataStaging := dig "data" dict $ksCMStaging }}
-            {{- $keycloakInternal := dig "KEYCLOAK_INTERNAL_URL" "" $ksCMDataStaging }}
-            {{- $publicIdBase := printf "https://id.%s/auth/realms/%s" $kernelDomain $tenant }}
-            {{- $serverIdBase := $publicIdBase }}
-            {{- if $keycloakInternal }}
-            {{- $serverIdBase = printf "%s/realms/%s" $keycloakInternal $tenant }}
-            {{- end }}
-
             {{- $synapseVals := dict
                 "fullnameOverride" "synapse-web"
                 "image" (dict
@@ -520,11 +518,11 @@ spec:
                   "tag" "v1.115.0"
                   "pullPolicy" "IfNotPresent"
                 )
-                "serverName" $tenantDomain
-                "publicServerName" (printf "matrix.%s" $tenantDomain)
+                "serverName" $domain
+                "publicServerName" (printf "matrix.%s" $domain)
                 "wellknown" (dict "enabled" false)
                 "postgresql" (dict "enabled" false)
-                "redis" (dict "enabled" false)
+                "redis" (dict "enabled" true)
                 "externalPostgresql" (dict
                   "existingSecret" $secretName
                   "existingSecretPasswordKey" "db-password"
@@ -533,10 +531,10 @@ spec:
                   "email" (dict
                     "enable_notifs" true
                     "require_transport_security" true
-                    "notif_from" (printf "matrix@%s" $tenantDomain)
+                    "notif_from" (printf "matrix@%s" $domain)
                     "smtp_host" (printf "smtp.%s" $kernelDomain)
                     "smtp_port" 587
-                    "smtp_user" (printf "matrix@%s" $tenantDomain)
+                    "smtp_user" (printf "matrix@%s" $domain)
                   )
                 )
                 "extraSecrets" (dict
