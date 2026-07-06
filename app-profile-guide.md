@@ -991,7 +991,30 @@ realm name. Never hardcode `souvap`, `opendesk`, or any literal realm name.
 must use `https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}` (or path-only auth
 URLs resolved against `openproject.oidc.host: "id.${KERNEL_DOMAIN}"`). See §2.
 
-### 8a. openDesk supplier charts on Gentian — integration boundary
+### 8a. Portal Integration: Direct OIDC vs Session-Bridge Flow
+
+When integrating an application into the Gentian Portal, choose the correct authentication path based on how the application handles OIDC logins inside an iframe/embedded view (`linkTarget: embedded`):
+
+| Integration Path | Description | Typical Apps |
+|---|---|---|
+| **Direct OIDC Flow** | The app's frontend initiates standard browser-side OIDC login. The portal warms up OIDC cookies in the background via hidden iframe. | XWiki, Odoo Community |
+| **Session-Bridge Flow** | The portal API exchanges a single-use login ticket backend-to-backend, and passes this ticket to log the user in inside the iframe. | Nextcloud, Element, OpenProject |
+
+#### 1. Direct OIDC Flow (with Silent SSO Warmup)
+For standard web applications that support clean OIDC redirections and can run within an iframe:
+- **How it works**: The app is launched directly at its public URL (e.g., `https://wiki.demo.desk.gentian.org/`). It redirects the browser inside the iframe to Keycloak. Keycloak detects existing session cookies and logs the user in silently.
+- **Requirements**:
+  - The Portal frontend must automatically bootstrap the OIDC session cookies (`KEYCLOAK_IDENTITY`/`KEYCLOAK_SESSION` on path `/auth`) upon desktop mount by calling `/auth/idp-session` and loading the impersonation URL in a hidden iframe.
+  - The Keycloak browser flow (e.g. `browser-kernel-idp`) must set **both** the `Cookie` execution and the `Identity Provider Redirector` execution to **`ALTERNATIVE`**. Never set the redirector to `REQUIRED` as it forces redirecting to the parent realm and prompts for login.
+
+#### 2. Session-Bridge Flow (with Backend Bridge Tickets)
+For complex suite applications that block nested OIDC redirects inside cross-origin iframes or have custom API session handlers:
+- **How it works**: When the user clicks the tile, the Portal frontend calls the Portal API to get a single-use bridge ticket (e.g. via Nextcloud OCS or OpenProject API). This ticket is passed in the launch URL parameters (e.g. `?ticket=<token>`). A custom bridge script/plugin on the app side consumes the ticket, calls the Portal API to verify it, sets the app session cookie, and redirects the user to the app page.
+- **Requirements**:
+  - The verification call from the app to the Portal API must run cluster-internally over service DNS (`http://gentian-portal-api.platform-kernel.svc.cluster.local:8000`), not the public portal URL, to avoid ingress hairpins and self-signed certificate issues.
+  - The bridge login path must be highly optimized and not execute blocking egress calls (e.g., checking password breach databases) during ticket verification.
+
+### 8b. openDesk supplier charts on Gentian — integration boundary
 
 Many AppProfiles wrap **openDesk Helm charts** (XWiki, Element, OX, OpenProject, …).
 Gentian still runs the **Nubus/UCS stack** for LDAP, UDM, portal tiles, and
@@ -1043,7 +1066,7 @@ LDAP placeholders only — do not reuse openDesk-only mechanisms (`keycloak-brid
 `opendesk-*` scope names, MBA attribute names) unless you intentionally integrate
 with the openDesk directory model.
 
-### 8b. OIDC Silent Single Sign-On (SSO) & Multi-Tenant Custom Attributes
+### 8c. OIDC Silent Single Sign-On (SSO) & Multi-Tenant Custom Attributes
 
 When integrating OIDC applications in a multi-tenant environment (where users log in to a main portal on the `${KERNEL_DOMAIN}` but run app instances in sub-domains on the `${TENANT_DOMAIN}`), the following requirements are critical for smooth SSO:
 
@@ -1060,7 +1083,7 @@ When integrating OIDC applications in a multi-tenant environment (where users lo
      * Any custom attributes that need to be synchronized from LDAP, mapped from a broker, or set via the Admin API (e.g., `uid`, `gentian.inviteEmail`) **must be registered** in the Keycloak User Profile schema configuration for the realm (via the `ShellEnsureInviteEmailUserProfile` helper or Admin REST API `/users/profile`).
      * Ensure that the OIDC protocol mapper matches the case and name of the registered attribute precisely.
 
-### 8c. SSO smoke-test after publishing a profile
+### 8d. SSO smoke-test after publishing a profile
 
 1. Log in at **`https://portal.${KERNEL_DOMAIN}`** (kernel realm).
 2. Click the app tile (normal click, not Ctrl) — should open in **WinBox** if
