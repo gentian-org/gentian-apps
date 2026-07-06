@@ -149,9 +149,6 @@ spec:
             {{- $ksCMData := dig "data" dict $ksCM }}
             {{- $kernelDomain := dig "KERNEL_DOMAIN" "" $ksCMData }}
             {{- $keycloakInternal := dig "KEYCLOAK_INTERNAL_URL" "" $ksCMData }}
-            {{- if $keycloakInternal }}
-            {{- $keycloakInternal = replace "http://" "https://" $keycloakInternal | replace ":8080" ":8443" }}
-            {{- end }}
 
             {{- /* ── Build ExternalSecret data[] entries ── */}}
             {{- $esData := list }}
@@ -551,6 +548,8 @@ spec:
                   )
                   "extraEnv" (list
                     (dict "name" "OIDC_CLIENT_SECRET" "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "key" "oidc-client-secret")))
+                    (dict "name" "AUTHLIB_INSECURE_TRANSPORT" "value" "1")
+                    (dict "name" "OAUTHLIB_INSECURE_TRANSPORT" "value" "1")
                   )
                   "extraCommands" (list
                     (printf "(python -c \"import socket, time; any(socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex(('127.0.0.1', 8008)) == 0 or time.sleep(1) for _ in range(300))\" && register_new_matrix_user -c /synapse/config/homeserver.yaml -c /synapse/config/conf.d/secrets.yaml -u gentian-portal-bridge -p \"portal-bridge-not-used-for-login\" -a || true) &")
