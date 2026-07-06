@@ -527,20 +527,33 @@ spec:
                   "existingSecret" $secretName
                   "existingSecretPasswordKey" "db-password"
                 )
-                "securityContext" (dict
-                  "allowPrivilegeEscalation" false
-                  "capabilities" (dict "drop" (list "ALL"))
-                  "privileged" false
-                  "readOnlyRootFilesystem" true
-                  "runAsNonRoot" true
-                  "runAsUser" 666
-                  "seccompProfile" (dict "type" "RuntimeDefault")
-                )
-                "podSecurityContext" (dict
-                  "fsGroup" 666
-                  "runAsGroup" 666
-                  "runAsUser" 666
-                  "seccompProfile" (dict "type" "RuntimeDefault")
+                "synapse" (dict
+                  "podSecurityContext" (dict
+                    "fsGroup" 666
+                    "runAsGroup" 666
+                    "runAsUser" 666
+                    "seccompProfile" (dict "type" "RuntimeDefault")
+                  )
+                  "securityContext" (dict
+                    "allowPrivilegeEscalation" false
+                    "capabilities" (dict "drop" (list "ALL"))
+                    "privileged" false
+                    "readOnlyRootFilesystem" true
+                    "runAsNonRoot" true
+                    "runAsUser" 666
+                    "seccompProfile" (dict "type" "RuntimeDefault")
+                  )
+                  "extraEnv" (list
+                    (dict "name" "OIDC_CLIENT_SECRET" "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "key" "oidc-client-secret")))
+                  )
+                  "extraCommands" (list
+                    (printf "register_new_matrix_user -c /synapse/config/homeserver.yaml -c /synapse/config/conf.d/ -u gentian-portal-bridge -p \"portal-bridge-not-used-for-login\" -a || true")
+                    (printf "sed -i \"s/@@OIDC_CLIENT_SECRET@@/${OIDC_CLIENT_SECRET}/g\" /synapse/config/conf.d/secrets.yaml")
+                  )
+                  "resources" (dict
+                    "limits" (dict "cpu" "1" "memory" "2Gi")
+                    "requests" (dict "cpu" "250m" "memory" "512Mi")
+                  )
                 )
                 "signingkey" (dict
                   "job" (dict
@@ -588,19 +601,6 @@ spec:
                       )
                     )
                   ))
-                )
-                "synapse" (dict
-                  "extraEnv" (list
-                    (dict "name" "OIDC_CLIENT_SECRET" "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "key" "oidc-client-secret")))
-                  )
-                  "extraCommands" (list
-                    (printf "register_new_matrix_user -c /synapse/config/homeserver.yaml -c /synapse/config/conf.d/ -u gentian-portal-bridge -p \"portal-bridge-not-used-for-login\" -a || true")
-                    (printf "sed -i \"s/@@OIDC_CLIENT_SECRET@@/${OIDC_CLIENT_SECRET}/g\" /synapse/config/conf.d/secrets.yaml")
-                  )
-                  "resources" (dict
-                    "limits" (dict "cpu" "1" "memory" "2Gi")
-                    "requests" (dict "cpu" "250m" "memory" "512Mi")
-                  )
                 )
             }}
             ---
