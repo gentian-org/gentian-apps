@@ -527,6 +527,10 @@ spec:
                   "existingSecretPasswordKey" "db-password"
                 )
                 "synapse" (dict
+                  "labels" (dict
+                    "gentianos.io/app" $app
+                    "gentianos.io/tenant" $tenant
+                  )
                   "podSecurityContext" (dict
                     "fsGroup" 666
                     "runAsGroup" 666
