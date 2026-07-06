@@ -548,7 +548,7 @@ spec:
                     (dict "name" "OIDC_CLIENT_SECRET" "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "key" "oidc-client-secret")))
                   )
                   "extraCommands" (list
-                    (printf "while ! nc -z localhost 8008; do sleep 1; done && register_new_matrix_user -c /synapse/config/homeserver.yaml -c /synapse/config/conf.d/secrets.yaml -u gentian-portal-bridge -p \"portal-bridge-not-used-for-login\" -a || true")
+                    (printf "python -c \"import socket, time\nwhile True:\n    try:\n        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n        s.connect(('127.0.0.1', 8008))\n        s.close()\n        break\n    except:\n        time.sleep(1)\" && register_new_matrix_user -c /synapse/config/homeserver.yaml -c /synapse/config/conf.d/secrets.yaml -u gentian-portal-bridge -p \"portal-bridge-not-used-for-login\" -a || true")
                   )
                   "resources" (dict
                     "limits" (dict "cpu" "1" "memory" "2Gi")
