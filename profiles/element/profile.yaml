@@ -496,7 +496,6 @@ spec:
     subDomain: "chat"
     serviceName: "element"
     servicePort: 8080
-    ingressClassName: "nginx"
     tlsEnabled: true
     # TLS: operator uses per-tenant DNS-01 wildcard (clusterIssuer field unused)
     # Portal iframe CSP (frame-ancestors) is injected by the gentian-os operator —
@@ -513,7 +512,6 @@ spec:
     - subDomain: matrix
       serviceName: synapse-web
       servicePort: 8008
-      ingressClassName: nginx
       tlsEnabled: true
       annotations:
         nginx.ingress.kubernetes.io/proxy-body-size: "100M"
@@ -522,7 +520,6 @@ spec:
     - subDomain: meet
       serviceName: jitsi-web
       servicePort: 80
-      ingressClassName: nginx
       tlsEnabled: true
 
   # BrowserProxy routes expose the Matrix Client-Server API to the shell via a CORS-safe
