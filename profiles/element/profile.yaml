@@ -4,6 +4,8 @@ metadata:
   name: element
   labels:
     gentianos.io/profile-name: element
+  annotations:
+    gentianos.io/kernel-egress-namespaces: envoy-gateway-system
 spec:
   displayName: "Element"
   compositionRef: app-element
