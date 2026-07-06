@@ -527,6 +527,41 @@ spec:
                   "existingSecret" $secretName
                   "existingSecretPasswordKey" "db-password"
                 )
+                "securityContext" (dict
+                  "allowPrivilegeEscalation" false
+                  "capabilities" (dict "drop" (list "ALL"))
+                  "privileged" false
+                  "readOnlyRootFilesystem" true
+                  "runAsNonRoot" true
+                  "runAsUser" 666
+                  "seccompProfile" (dict "type" "RuntimeDefault")
+                )
+                "podSecurityContext" (dict
+                  "fsGroup" 666
+                  "runAsGroup" 666
+                  "runAsUser" 666
+                  "seccompProfile" (dict "type" "RuntimeDefault")
+                )
+                "signingkey" (dict
+                  "job" (dict
+                    "enabled" true
+                    "podSecurityContext" (dict
+                      "allowPrivilegeEscalation" false
+                      "capabilities" (dict "drop" (list "ALL"))
+                      "privileged" false
+                      "readOnlyRootFilesystem" false
+                      "runAsNonRoot" true
+                      "runAsUser" 666
+                      "seccompProfile" (dict "type" "RuntimeDefault")
+                    )
+                    "securityContext" (dict
+                      "fsGroup" 666
+                      "runAsGroup" 666
+                      "runAsUser" 666
+                      "seccompProfile" (dict "type" "RuntimeDefault")
+                    )
+                  )
+                )
                 "extraConfig" (dict
                   "email" (dict
                     "enable_notifs" true
