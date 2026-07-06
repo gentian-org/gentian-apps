@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - profile.yaml
+  - composition.yaml
+  - oidc-catalog.yaml
+configMapGenerator:
+  - name: gentian-jitsi-oidc-overlays
+    namespace: crossplane-system
+    files:
+      - body.html=jitsi-overlay/body.html
+      - context.ts=jitsi-overlay/context.ts
+      - oidc-adapter.html=jitsi-overlay/oidc-adapter.html
+      - oidc-redirect.html=jitsi-overlay/oidc-redirect.html
+      - plugin.head.html=jitsi-overlay/plugin.head.html
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    gentianos.io/config-type: jitsi-oidc-overlays
+    app.kubernetes.io/managed-by: gentian-os
