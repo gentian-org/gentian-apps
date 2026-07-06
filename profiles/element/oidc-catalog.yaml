@@ -1,4 +1,4 @@
-# OIDC packs for Element / Synapse and the bundled Jitsi sidecar.
+# OIDC packs for Element / Synapse.
 apiVersion: gentianos.io/v1alpha1
 kind: OIDCPackCatalog
 metadata:
@@ -7,27 +7,7 @@ metadata:
     gentianos.io/oidc-catalog: element
     gentianos.io/profile-name: element
 spec:
-  extraManagedByAttributeGroups:
-    - LivecollaborationAdmin
   mapperTemplates:
-    opendesk_useruuid:
-      protocolMapper: oidc-usermodel-attribute-mapper
-      config:
-        user.attribute: entryUUID
-        claim.name: opendesk_useruuid
-        jsonType.label: String
-        id.token.claim: "true"
-        access.token.claim: "true"
-        userinfo.token.claim: "true"
-    opendesk_username:
-      protocolMapper: oidc-usermodel-attribute-mapper
-      config:
-        user.attribute: uid
-        claim.name: opendesk_username
-        jsonType.label: String
-        id.token.claim: "true"
-        access.token.claim: "true"
-        userinfo.token.claim: "true"
     email:
       protocolMapper: oidc-usermodel-attribute-mapper
       config:
@@ -48,9 +28,9 @@ spec:
         introspection.token.claim: "true"
   packs:
     gentian-synapse:
-      scopeName: opendesk-matrix-scope
+      scopeName: matrix-scope
       scopeDescription: "Scope for Matrix / Synapse OIDC clients."
-      clientRole: opendesk-matrix-access-control
+      clientRole: matrix-access-control
       entitlementGroup: managed-by-attribute-Livecollaboration
       publicClient: false
       fullScopeAllowed: false
@@ -61,25 +41,5 @@ spec:
         - web-origins
         - acr
       mappers:
-        - opendesk_useruuid
-        - opendesk_username
-        - full_name
-        - email
-    gentian-jitsi:
-      scopeName: opendesk-jitsi-scope
-      scopeDescription: "Scope for Jitsi OIDC clients."
-      clientRole: opendesk-jitsi-access-control
-      entitlementGroup: managed-by-attribute-Videoconference
-      publicClient: true
-      fullScopeAllowed: true
-      defaultScopes:
-        - profile
-        - email
-        - roles
-        - web-origins
-        - acr
-      mappers:
-        - opendesk_useruuid
-        - opendesk_username
         - full_name
         - email
