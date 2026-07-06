@@ -148,6 +148,7 @@ spec:
             {{- $ksCM   := default dict (index $ksRes 0) }}
             {{- $ksCMData := dig "data" dict $ksCM }}
             {{- $kernelDomain := dig "KERNEL_DOMAIN" "" $ksCMData }}
+            {{- $keycloakInternal := dig "KEYCLOAK_INTERNAL_URL" "" $ksCMData }}
 
             {{- /* ── Build ExternalSecret data[] entries ── */}}
             {{- $esData := list }}
@@ -547,8 +548,7 @@ spec:
                     (dict "name" "OIDC_CLIENT_SECRET" "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "key" "oidc-client-secret")))
                   )
                   "extraCommands" (list
-                    (printf "register_new_matrix_user -c /synapse/config/homeserver.yaml -c /synapse/config/conf.d/ -u gentian-portal-bridge -p \"portal-bridge-not-used-for-login\" -a || true")
-                    (printf "sed -i \"s/@@OIDC_CLIENT_SECRET@@/${OIDC_CLIENT_SECRET}/g\" /synapse/config/conf.d/secrets.yaml")
+                    (printf "while ! nc -z localhost 8008; do sleep 1; done && register_new_matrix_user -c /synapse/config/homeserver.yaml -c /synapse/config/conf.d/secrets.yaml -u gentian-portal-bridge -p \"portal-bridge-not-used-for-login\" -a || true")
                   )
                   "resources" (dict
                     "limits" (dict "cpu" "1" "memory" "2Gi")
@@ -589,11 +589,15 @@ spec:
                   "oidc_providers" (list (dict
                     "idp_id" "keycloak"
                     "idp_name" "Keycloak"
-                    "discover" true
+                    "discover" false
                     "issuer" (printf "https://id.%s/realms/%s" $kernelDomain $tenant)
                     "client_id" "gentian-synapse"
                     "client_secret" "@@OIDC_CLIENT_SECRET@@"
                     "scopes" (list "openid" "profile" "email")
+                    "authorization_endpoint" (printf "https://id.%s/auth/realms/%s/protocol/openid-connect/auth" $kernelDomain $tenant)
+                    "token_endpoint" (printf "%s/realms/%s/protocol/openid-connect/token" $keycloakInternal $tenant)
+                    "userinfo_endpoint" (printf "%s/realms/%s/protocol/openid-connect/userinfo" $keycloakInternal $tenant)
+                    "jwks_uri" (printf "%s/realms/%s/protocol/openid-connect/certs" $keycloakInternal $tenant)
                     "user_mapping_provider" (dict
                       "config" (dict
                         "subject_claim" "sub"
