@@ -1,0 +1,35 @@
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: odoo-cb-calendar
+  labels:
+    gentianos.io/profile-name: odoo-cb-calendar
+  annotations:
+    gentianos.io/platform-app: "false"
+    gentianos.io/deployment-role: module
+    gentianos.io/requires-profile: odoo-cb-base
+spec:
+  displayName: "Odoo Calendar"
+  description: "Shared calendar module for Odoo."
+  family: odoo
+  catalogueVersion: "1.0.0"
+  edition: calendar
+  trustTier: platform
+  license: LGPL-3.0
+  tile:
+    icon: erp
+
+  portalTiles:
+    - name: odoo-calendar
+      displayName:
+        en_US: "Odoo Calendar"
+        de_DE: "Odoo Kalender"
+      linkSuffix: "/web?gentian_embed=1#action=calendar.action_calendar_event"
+      linkTarget: embedded
+      allowedGroup: "Tenant Admins"
+
+  compositionRef: app-odoo
+  deploymentMethod: crossplane
+  extraValues:
+    odoo:
+      module: calendar

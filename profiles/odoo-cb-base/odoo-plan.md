@@ -901,11 +901,11 @@ from the base bundle (cluster-scoped Composition name `app-odoo`).
 
 ### Phase 2 — Module profiles
 
-- [ ] CRD / annotation for `deployment-role: module`
+- [x] CRD / annotation for `deployment-role: module`
 - [ ] Operator auto-install base
-- [ ] Module install Job in composition + `gentian_os` post-install hook
-- [ ] First modules: `odoo-crm`, `odoo-contacts`, `odoo-calendar` (low deps)
-- [ ] **`gentian_os` embed actions** for first module tiles (`gentian_embed=1`)
+- [x] Module install Job in composition + `gentian_os` post-install hook
+- [x] First modules: `odoo-cb-crm`, `odoo-cb-contacts`, `odoo-cb-calendar` (low deps)
+- [x] **`gentian_os` embed actions** for first module tiles (`gentian_embed=1`)
 - [ ] App Store listing + `gtnctl apps install` E2E
 
 ### Phase 2b — Three-tier RBAC
