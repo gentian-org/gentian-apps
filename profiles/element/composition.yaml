@@ -423,7 +423,11 @@ spec:
                 "gentianos.io/tenant" $tenant
                 "app.kubernetes.io/managed-by" "gentian-os"
             }}
-            {{- $elementExtraVals = mergeOverwrite $elementExtraVals (dict "podLabels" $appPodLabels) }}
+            {{- $appPodAnnotations := dict
+                "gentianos.io/app" $app
+                "gentianos.io/tenant" $tenant
+            }}
+            {{- $elementExtraVals = mergeOverwrite $elementExtraVals (dict "podLabels" $appPodLabels "podAnnotations" $appPodAnnotations) }}
 
             {{- /* ── Emit Keycloak Client CR ─────────────────────────────────────────── */}}
             {{- /* When kernelRequirements.identity.oidc is set, the composition   */}}
@@ -663,6 +667,7 @@ spec:
                 "fullnameOverride" "opendesk-synapse"
                 "imagePullSecrets" $imagePull
                 "podLabels"        $appPodLabels
+                "podAnnotations"   $appPodAnnotations
                 "replicaCount"     1
                 "federation" (dict "ingress" (dict "enabled" false))
                 "resources" (dict
@@ -711,6 +716,8 @@ spec:
                   "secretName" "opendesk-matrix-user-verification-service-account"
                 )
                 "fullnameOverride" "opendesk-matrix-user-verification-service-bootstrap"
+                "podLabels"        $appPodLabels
+                "podAnnotations"   $appPodAnnotations
                 "global" (dict "imagePullSecrets" $imagePull)
                 "image" (dict
                   "registry" "registry-1.docker.io"
@@ -757,6 +764,8 @@ spec:
                 "global" $globalVals
                 "imagePullSecrets" $imagePull
                 "fullnameOverride" "opendesk-matrix-user-verification-service"
+                "podLabels"        $appPodLabels
+                "podAnnotations"   $appPodAnnotations
                 "replicaCount" 1
                 "extraEnvVars" (list
                   (dict "name" "UVS_ACCESS_TOKEN" "valueFrom" (dict "secretKeyRef" (dict "name" "opendesk-matrix-user-verification-service-account" "key" "access_token")))
@@ -815,6 +824,7 @@ spec:
                 "fullnameOverride" "synapse-web"
                 "imagePullSecrets" $imagePull
                 "podLabels"        $appPodLabels
+                "podAnnotations"   $appPodAnnotations
                 "replicaCount"     1
                 "ingress"          $synapseWebIngress
                 "resources" (dict
@@ -1018,6 +1028,18 @@ spec:
             {{- if gt (len $scPodLabels) 0 }}
             {{- $scExtraVals = mergeOverwrite $scExtraVals (dict "podLabels" $scPodLabels) }}
             {{- end }}
+            {{- $scAppLabels := dict "gentianos.io/app" $app "gentianos.io/tenant" $tenant "app.kubernetes.io/managed-by" "gentian-os" }}
+            {{- $scAppLabels = mergeOverwrite $scAppLabels $scPodLabels }}
+            {{- $scAppAnnos := dict "gentianos.io/app" $app "gentianos.io/tenant" $tenant }}
+            {{- $scJitsi := default dict (dig "jitsi" dict $scExtraVals) }}
+            {{- range $comp := list "web" "prosody" "jicofo" "jigasi" "jvb" }}
+              {{- $compVals := default dict (dig $comp dict $scJitsi) }}
+              {{- $compLabels := mergeOverwrite (default dict (dig "podLabels" dict $compVals)) $scAppLabels }}
+              {{- $compAnnos := mergeOverwrite (default dict (dig "podAnnotations" dict $compVals)) $scAppAnnos }}
+              {{- $compVals = mergeOverwrite $compVals (dict "podLabels" $compLabels "podAnnotations" $compAnnos) }}
+              {{- $scJitsi = mergeOverwrite $scJitsi (dict $comp $compVals) }}
+            {{- end }}
+            {{- $scExtraVals = mergeOverwrite $scExtraVals (dict "jitsi" $scJitsi) }}
             {{- end }}
 
             {{- /* Jitsi: mount Gentian OIDC/JWT overlays over chart ConfigMaps */}}
