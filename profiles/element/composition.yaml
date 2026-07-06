@@ -149,6 +149,9 @@ spec:
             {{- $ksCMData := dig "data" dict $ksCM }}
             {{- $kernelDomain := dig "KERNEL_DOMAIN" "" $ksCMData }}
             {{- $keycloakInternal := dig "KEYCLOAK_INTERNAL_URL" "" $ksCMData }}
+            {{- if $keycloakInternal }}
+            {{- $keycloakInternal = replace "http://" "https://" $keycloakInternal | replace ":8080" ":8443" }}
+            {{- end }}
 
             {{- /* ── Build ExternalSecret data[] entries ── */}}
             {{- $esData := list }}
@@ -596,6 +599,7 @@ spec:
                     "client_id" "gentian-synapse"
                     "client_secret" "@@OIDC_CLIENT_SECRET@@"
                     "scopes" (list "openid" "profile" "email")
+                    "use_insecure_ssl_client_just_for_testing_do_not_use" true
                     "authorization_endpoint" (printf "https://id.%s/auth/realms/%s/protocol/openid-connect/auth" $kernelDomain $tenant)
                     "token_endpoint" (printf "%s/realms/%s/protocol/openid-connect/token" $keycloakInternal $tenant)
                     "userinfo_endpoint" (printf "%s/realms/%s/protocol/openid-connect/userinfo" $keycloakInternal $tenant)
