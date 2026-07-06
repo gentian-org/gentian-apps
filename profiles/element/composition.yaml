@@ -128,6 +128,9 @@ spec:
             {{- $ccRes      := dig "clusterConfig" list $extraRes }}
             {{- $ccCM       := default dict (index $ccRes 0) }}
             {{- $ccData     := dig "data" dict $ccCM }}
+            {{- $jitsiOidcOverlaysRes := dig "jitsiOidcOverlays" list $extraRes }}
+            {{- $jitsiOverlayCM := default dict (index $jitsiOidcOverlaysRes 0) }}
+            {{- $jitsiOverlayData := dig "data" dict $jitsiOverlayCM }}
             {{- $secretMode    := dig "secretMode"     "derived" $ccData }}
             {{- $cnpgHost      := dig "cnpg.host"      "" $ccData }}
             {{- $nodeIP        := dig "node.ip"        "" $ccData }}
@@ -429,6 +432,24 @@ spec:
             }}
             {{- $elementExtraVals = mergeOverwrite $elementExtraVals (dict "podLabels" $appPodLabels "podAnnotations" $appPodAnnotations) }}
 
+            {{- $elementOverlayCM := printf "%s-sso-overlay" $xrName }}
+            {{- $elementOverlayVol := dict
+                "name" "element-sso-overlay"
+                "configMap" (dict
+                  "name" $elementOverlayCM
+                  "items" (list (dict "key" "gentian-portal-sso.html" "path" "gentian-portal-sso.html"))
+                )
+            }}
+            {{- $elementOverlayMount := dict
+                "name" "element-sso-overlay"
+                "subPath" "gentian-portal-sso.html"
+                "mountPath" "/app/gentian-portal-sso.html"
+            }}
+            {{- $elementExtraVals = mergeOverwrite $elementExtraVals (dict
+                "extraVolumes" (list $elementOverlayVol)
+                "extraVolumeMounts" (list $elementOverlayMount)
+            ) }}
+
             {{- /* ── Emit Keycloak Client CR ─────────────────────────────────────────── */}}
             {{- /* When kernelRequirements.identity.oidc is set, the composition   */}}
             {{- /* registers the app as an OIDC client in the tenant's own realm.  */}}
@@ -542,6 +563,30 @@ spec:
               providerConfigRef:
                 name: kubernetes
             {{- end }}
+
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-sso-overlay-cm
+              name: {{ $xrName }}-sso-overlay-cm
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: ConfigMap
+                  metadata:
+                    name: {{ $elementOverlayCM }}
+                    namespace: {{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: gentian-os
+                      gentianos.io/app: {{ $app }}
+                      gentianos.io/tenant: {{ $tenant }}
+                  binaryData:
+                    gentian-portal-sso.html: {{ index $jitsiOverlayData "gentian-portal-sso.html" | default "" | b64enc | quote }}
+              providerConfigRef:
+                name: kubernetes
 
             {{- /* ── Release 1: opendesk-element (frontend) ─────────────────── */}}
             {{- /* Identical to app-default — extraVals contain all frontend     */}}

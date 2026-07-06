@@ -13,6 +13,7 @@ configMapGenerator:
       - oidc-adapter.html=jitsi-overlay/oidc-adapter.html
       - oidc-redirect.html=jitsi-overlay/oidc-redirect.html
       - plugin.head.html=jitsi-overlay/plugin.head.html
+      - gentian-portal-sso.html=assets/gentian-portal-sso.html
 generatorOptions:
   disableNameSuffixHash: true
   labels:

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Signing in to Chat…</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        background: #f5f7f6;
+        color: #1a2e28;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Signing in to Chat…</p>
+    <script>
+      async function clearElementStorage() {
+        localStorage.clear();
+        sessionStorage.clear();
+        if (!("indexedDB" in window) || !indexedDB.databases) {
+          return;
+        }
+        const databases = await indexedDB.databases();
+        await Promise.all(
+          databases.map(
+            (db) =>
+              new Promise((resolve) => {
+                const request = indexedDB.deleteDatabase(db.name);
+                request.onsuccess = () => resolve();
+                request.onerror = () => resolve();
+                request.onblocked = () => resolve();
+              }),
+          ),
+        );
+      }
+
+      function persistSession(session) {
+        localStorage.setItem("mx_hs_url", session.homeServerUrl);
+        localStorage.setItem("mx_user_id", session.userId);
+        localStorage.setItem("mx_is_guest", "false");
+        localStorage.setItem("mx_has_access_token", "true");
+        localStorage.setItem("mx_access_token", session.accessToken);
+        localStorage.removeItem("mx_has_pickle_key");
+        localStorage.removeItem("mx_has_refresh_token");
+        localStorage.removeItem("mx_refresh_token");
+        if (session.deviceId) {
+          localStorage.setItem("mx_device_id", session.deviceId);
+        } else {
+          localStorage.removeItem("mx_device_id");
+        }
+      }
+
+      (async () => {
+        const ticket = new URLSearchParams(window.location.search).get("t");
+        if (!ticket) {
+          window.location.replace("/");
+          return;
+        }
+
+        const portalHost = (() => {
+          const parts = window.location.hostname.split(".");
+          if (parts[0] === "chat" && parts.length > 2) {
+            return ["portal", ...parts.slice(2)].join(".");
+          }
+          return `portal.${parts.slice(-2).join(".")}`;
+        })();
+        const portalApi = `${window.location.protocol}//${portalHost}/api/v1`;
+
+        let session;
+        try {
+          const response = await fetch(
+            `${portalApi}/session/matrix-bridge/redeem/${encodeURIComponent(ticket)}`,
+          );
+          if (!response.ok) {
+            throw new Error("redeem failed");
+          }
+          session = await response.json();
+        } catch (_error) {
+          window.location.replace("/");
+          return;
+        }
+
+        await clearElementStorage();
+        persistSession(session);
+        window.location.replace("/");
+      })();
+    </script>
+  </body>
+</html>
