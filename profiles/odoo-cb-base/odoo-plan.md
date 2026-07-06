@@ -910,10 +910,10 @@ from the base bundle (cluster-scoped Composition name `app-odoo`).
 
 ### Phase 2b — Three-tier RBAC
 
-- [ ] `gentianOdooModules` attribute + Admin Console group editor extension
-- [ ] `gentianOdooGroupRoles` JSON on Keycloak group + Admin Console **Odoo roles** tab
-- [ ] Portal reconciler: `gentianOdooModules` → per-tile `allowedGroups`
-- [ ] **`gentian_os` RBAC bridge**: Keycloak Group ↔ `res.groups` + JSON role mapping (§5.4b)
+- [x] `gentianOdooModules` attribute + Admin Console group editor extension
+- [x] `gentianOdooGroupRoles` JSON on Keycloak group + Admin Console **Odoo roles** tab
+- [x] Portal reconciler: `gentianOdooModules` → per-tile `allowedGroups`
+- [x] **`gentian_os` RBAC bridge**: Keycloak Group ↔ `res.groups` + JSON role mapping (§5.4b)
 - [ ] **`gentian_manifest.yaml`** loader on community module install
 - [ ] E2E: community addon with manifest only (no `gentian_os` change); two Keycloak groups, same module, different delete rights
 
