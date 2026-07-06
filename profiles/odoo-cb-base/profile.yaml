@@ -1,18 +1,18 @@
-# AppProfile — Odoo Community base runtime (odoo-free-base)
+# AppProfile — Odoo Community base runtime (odoo-cb-base)
 #
 # Deploys one Odoo OCB instance per tenant. Module profiles (odoo-crm, …) install
 # Odoo CE modules via app-odoo Jobs in a later phase. OIDC uses app-default Client MR.
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
-  name: odoo-free-base
+  name: odoo-cb-base
   labels:
-    gentianos.io/profile-name: odoo-free-base
+    gentianos.io/profile-name: odoo-cb-base
   annotations:
     gentianos.io/platform-app: "true"
     gentianos.io/deployment-role: base
 spec:
-  displayName: "Odoo Platform"
+  displayName: "Odoo Community Backport"
   description: "Odoo Community ERP runtime — required base for Odoo module apps."
   family: odoo
   catalogueVersion: "1.0.0"
@@ -21,11 +21,12 @@ spec:
   license: LGPL-3.0
   tile:
     icon: erp
+  compositionRef: app-odoo
 
   kernelRequirements:
     identity:
       oidc:
-        clientId: odoo
+        clientId: odoo-cb
         name: Odoo
         accessType: CONFIDENTIAL
         redirectUris:

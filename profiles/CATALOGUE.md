@@ -26,13 +26,13 @@ protocol mappers (Path B OIDC) also ship `oidc-catalog.yaml` in the same bundle.
 | `app-store` | — (`app-default`) | — |
 | `nextcloud` | — (`app-default`) | portal bridge SSO assets |
 | `openproject` | `app-openproject` | portal bridge assets |
-| `odoo-free-base` | — (`app-default`) | — |
+| `odoo-cb-base` | — (`app-default`) | — |
 | `xwiki` | — (`app-default`) | — |
 
 OpenDesk-flavoured profiles (`od-*`) are in **gentian-pro** — see
 [gentian-pro/profiles/CATALOGUE.md](https://github.com/gentian-org/gentian-pro/blob/main/profiles/CATALOGUE.md).
 
-Public/community charts keep short names (`nextcloud`, `openproject`, `odoo-free-base`, …).
+Public/community charts keep short names (`nextcloud`, `openproject`, `odoo-cb-base`, …).
 
 ## Adding a simple app
 

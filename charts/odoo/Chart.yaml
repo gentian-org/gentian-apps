@@ -3,4 +3,4 @@ name: odoo
 description: Odoo Community (OCB) for Gentian OS tenants
 type: application
 version: 0.1.0
-appVersion: "18.0"
+appVersion: "19.0"

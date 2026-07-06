@@ -10,7 +10,7 @@ This document outlines how to add **Odoo Community** as a Gentian **base app**
 with individually installable Odoo modules as catalogue entries, Gentian IdM,
 admin-only configuration surfaces, and contract-based integrations (e.g. files).
 
-**Chosen approach:** **A + hybrid RBAC (model 3)** — OX-style `odoo-free-base`
+**Chosen approach:** **A + hybrid RBAC (model 3)** — OX-style `odoo-cb-base`
 + thin module profiles, with a three-tier permission model:
 
 1. **Admin Console** — tenant admins define groups/roles (in Keycloak) and assign which Gentian/Odoo apps
@@ -58,7 +58,7 @@ flowchart LR
     end
 
     subgraph tenant ["Per-tenant scope (gentian-apps)"]
-        BASE["odoo-free-base"]
+        BASE["odoo-cb-base"]
         MOD["odoo-crm, odoo-sales, …"]
         BASE --> MOD
         MOD -->|SSO / OIDC| IDM["Gentian IdM"]
@@ -88,7 +88,7 @@ under one `ox-appsuite` install, or Element + Jitsi sidecar).
 
 ```
 gentian-apps/profiles/
-├── odoo-free-base/          # platform tier — deploys Odoo runtime (this folder)
+├── odoo-cb-base/          # platform tier — deploys Odoo runtime (this folder)
 │   ├── odoo-plan.md
 │   ├── profile.yaml         # base AppProfile (admin-only)
 │   ├── composition.yaml     # app-odoo
@@ -105,17 +105,17 @@ gentian-apps/profiles/
 
 | Profile kind | Example | Helm release | Portal tiles | App Store |
 |---|---|---|---|---|
-| **Base** | `odoo-free-base` | **Yes** — one Odoo Deployment per tenant | Admin only (`Tenant Admins`) | Hidden or “Odoo Platform (required)” |
+| **Base** | `odoo-cb-base` | **Yes** — one Odoo Deployment per tenant | Admin only (`Tenant Admins`) | Hidden or “Odoo Platform (required)” |
 | **Module** | `odoo-crm`, `odoo-sale` | **No** — module install Job only | User tile(s) with deep link | Visible, installable |
 
 **Analogy:** `ox-appsuite` = one backend + many `portalTiles`; here
-`odoo-free-base` = one Odoo instance + many module profiles add Odoo modules
+`odoo-cb-base` = one Odoo instance + many module profiles add Odoo modules
 and tiles.
 
 ### 3.2 Base auto-install
 
 When a tenant admin installs any `odoo-*` module profile, the **operator**
-should **implicitly ensure** `odoo-free-base` is present in `Tenant.spec.apps`
+should **implicitly ensure** `odoo-cb-base` is present in `Tenant.spec.apps`
 (or materialise its `App` claim without store listing):
 
 - Matches Element → Jitsi bundling (sidecar auto-deployed).
@@ -149,7 +149,7 @@ profile-scoped composition (`app-odoo`).
 metadata:
   annotations:
     gentianos.io/deployment-role: module
-    gentianos.io/requires-profile: odoo-free-base
+    gentianos.io/requires-profile: odoo-cb-base
 spec:
   family: odoo
   edition: crm
@@ -228,7 +228,7 @@ mappers, and group → client-role mappings** (e.g. `opendesk_username`,
 - SSO needs standard claims (`email`, `sub`) or direct token claims mapped inside Odoo.
 
 ```yaml
-# odoo-free-base/profile.yaml (OIDC — catalogue only)
+# odoo-cb-base/profile.yaml (OIDC — catalogue only)
 kernelRequirements:
   identity:
     oidc:
@@ -412,7 +412,7 @@ Both groups see the **same app** (tier 2); **different actions** inside it (tier
 | Admin Console group extension | `gentian-os` | `gentianOdooModules` editor on Keycloak group objects |
 | Portal `allowedGroups` reconciler | `gentian-os` operator | Map `gentianOdooModules` → per-tile group IDs |
 | MBA / module install hook | `app-odoo` composition | Register module id in catalogue metadata for checkboxes |
-| OIDC on base profile | `odoo-free-base/profile.yaml` | SSO configuration |
+| OIDC on base profile | `odoo-cb-base/profile.yaml` | SSO configuration |
 
 #### Module profile portal tile default
 
@@ -467,7 +467,7 @@ app stack on a minimal install — use **internal submodules** instead (§5.2).
 ```
 odoo-modules/
 └── gentian_os/
-    ├── __manifest__.py              # core — always installed with odoo-free-base
+    ├── __manifest__.py              # core — always installed with odoo-cb-base
     ├── models/
     │   ├── res_groups.py            # Keycloak Group ↔ res.groups (tier 3 RBAC)
     │   ├── res_users.py             # User claims mapping → groups_id
@@ -489,7 +489,7 @@ odoo-modules/
 
 | Module | `depends` | Loaded when |
 |---|---|---|
-| **`gentian_os`** | `base`, `web`, `auth_oauth` | Always — `odoo-free-base` enables it in chart `extraValues` |
+| **`gentian_os`** | `base`, `web`, `auth_oauth` | Always — `odoo-cb-base` enables it in chart `extraValues` |
 | **`gentian_os_account`** | `gentian_os`, `account` | `odoo-accounting` module profile installed |
 | **`gentian_os_contacts`** | `gentian_os`, `contacts` | `odoo-contacts` profile installed |
 | **`gentian_os_crm`** | `gentian_os`, `crm` | `odoo-crm` profile installed |
@@ -696,7 +696,7 @@ embed actions and integration clients match installed profiles.
 ```mermaid
 flowchart TB
     subgraph tenant_ns ["tenant-{name}"]
-        APP["App claim: odoo-free-base"]
+        APP["App claim: odoo-cb-base"]
         MOD1["App claim: odoo-crm"]
         MOD2["App claim: odoo-sales"]
         REL["helm Release: odoo"]
@@ -736,7 +736,7 @@ Module profiles must **not** request a second database or ingress.
 Single hostname for the tenant Odoo instance:
 
 ```yaml
-# odoo-free-base/profile.yaml
+# odoo-cb-base/profile.yaml
 ingress:
   subDomain: erp
   serviceName: odoo
@@ -798,13 +798,13 @@ against the running service (or a one-shot install container), then invoke
 
 | Profile | `trustTier` | Store listing | `license` |
 |---|---|---|---|
-| `odoo-free-base` | `platform` | Hidden (`catalogueVisible: false` — new field or annotation) | LGPL-3.0 |
+| `odoo-cb-base` | `platform` | Hidden (`catalogueVisible: false` — new field or annotation) | LGPL-3.0 |
 | `odoo-crm`, … | `certified` | Visible | LGPL-3.0 |
 
 **Install flow:**
 
 1. Tenant admin installs `odoo-crm` from App Store / `gtnctl apps install`.
-2. Operator adds `odoo-free-base` if missing.
+2. Operator adds `odoo-cb-base` if missing.
 3. Crossplane deploys Odoo; Job installs `crm` module.
 4. Reconciler creates CRM portal tile; `allowedGroups` driven by
    `gentianOdooModules` (§4.3).
@@ -825,7 +825,7 @@ Declare on **base** (consumer) and optionally on modules (provider). **Execution
 is always in **`gentian_os`** (§5.5) — AppProfiles declare intent only.
 
 ```yaml
-# odoo-free-base/profile.yaml
+# odoo-cb-base/profile.yaml
 optionalIntegrations:
   - contract: file-store
     provider: nextcloud
@@ -860,7 +860,7 @@ The operator writes OpenBao paths; ESO syncs a Secret mounted into the Odoo pod;
 ## 9. Profile bundle layout (this folder)
 
 ```
-profiles/odoo-free-base/
+profiles/odoo-cb-base/
 ├── odoo-plan.md           # this document
 ├── kustomization.yaml
 ├── profile.yaml             # base AppProfile
@@ -887,17 +887,17 @@ from the base bundle (cluster-scoped Composition name `app-odoo`).
 
 ### Phase 0 — Design sign-off
 
-- [ ] Confirm `deployment-role` / auto-base semantics with platform team
-- [ ] Pick Odoo version (18 OCB from `server/` vs latest LTS)
-- [ ] Confirm Community-only scope for `odoo-free-*` naming
+- [x] Confirm `deployment-role` / auto-base semantics with platform team
+- [x] Pick Odoo version (18 OCB from `server/` vs latest LTS)
+- [x] Confirm Community-only scope for `odoo-free-*` naming
 
 ### Phase 1 — Base runtime + `gentian_os` core
 
-- [ ] Gentian Helm chart `odoo` (Postgres via kernel, secrets via ESO)
-- [ ] `app-odoo` composition + render goldens
-- [ ] `odoo-free-base/profile.yaml` with OIDC + admin portal tile
-- [ ] **`gentian_os` core**: OIDC auth & Keycloak claims mapper, binding secret reader, config from ConfigMap
-- [ ] Manual smoke: SSO, admin settings, single `base,web` + `gentian_os`
+- [x] Gentian Helm chart `odoo` (Postgres via kernel, secrets via ESO)
+- [x] `app-odoo` composition + render goldens
+- [x] `odoo-cb-base/profile.yaml` with OIDC + admin portal tile
+- [x] **`gentian_os` core**: OIDC auth & Keycloak claims mapper, binding secret reader, config from ConfigMap
+- [x] Manual smoke: SSO, admin settings, single `base,web` + `gentian_os`
 
 ### Phase 2 — Module profiles
 

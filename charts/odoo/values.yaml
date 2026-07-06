@@ -23,13 +23,6 @@ oidc:
   clientId: ""
   clientSecret: ""
 
-ldap:
-  host: ""
-  port: "389"
-  baseDn: ""
-  bindDn: ""
-  bindPassword: ""
-
 gentian:
   configPath: /etc/gentian/config.json
   bindingsPath: /etc/gentian/bindings.json
