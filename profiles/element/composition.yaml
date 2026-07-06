@@ -239,28 +239,26 @@ spec:
               providerConfigRef:
                 name: kubernetes
             ---
-            apiVersion: kubernetes.crossplane.io/v1alpha2
-            kind: Object
+            apiVersion: kv.vault.upbound.io/v1alpha1
+            kind: SecretV2
             metadata:
               annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $safeName }}-seed-seeder
-              name: {{ $seedName }}-seeder
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $safeName }}-kv
+              name: {{ $seedName }}-kv
             spec:
+              deletionPolicy: Orphan
+              managementPolicies:
+                - Observe
+                - Create
               forProvider:
-                manifest:
-                  apiVersion: gentianos.io/v1alpha1
-                  kind: OpenBaoSeeder
-                  metadata:
-                    name: {{ $seedName }}
-                    namespace: crossplane-system
-                  spec:
-                    path: {{ $kvPath }}
-                    secretRef:
-                      name: {{ $seedName }}
-                      namespace: crossplane-system
-                      key: data.json
+                mount: secret
+                name: {{ $kvPath }}
+                dataJsonSecretRef:
+                  name: {{ $seedName }}
+                  namespace: crossplane-system
+                  key: data.json
               providerConfigRef:
-                name: kubernetes
+                name: openbao
             {{- end }}
             {{- end }}
 
@@ -548,7 +546,7 @@ spec:
                     (dict "name" "OIDC_CLIENT_SECRET" "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "key" "oidc-client-secret")))
                   )
                   "extraCommands" (list
-                    (printf "python -c \"import socket, time; any(socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex(('127.0.0.1', 8008)) == 0 or time.sleep(1) for _ in range(300))\" && register_new_matrix_user -c /synapse/config/homeserver.yaml -c /synapse/config/conf.d/secrets.yaml -u gentian-portal-bridge -p \"portal-bridge-not-used-for-login\" -a || true")
+                    (printf "(python -c \"import socket, time; any(socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex(('127.0.0.1', 8008)) == 0 or time.sleep(1) for _ in range(300))\" && register_new_matrix_user -c /synapse/config/homeserver.yaml -c /synapse/config/conf.d/secrets.yaml -u gentian-portal-bridge -p \"portal-bridge-not-used-for-login\" -a || true) &")
                   )
                   "resources" (dict
                     "limits" (dict "cpu" "1" "memory" "2Gi")
