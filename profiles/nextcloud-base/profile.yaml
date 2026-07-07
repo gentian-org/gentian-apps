@@ -119,20 +119,7 @@ spec:
   extraValues:
     fullnameOverride: "nextcloud"
 
-    podSecurityContext:
-      runAsNonRoot: true
-      runAsUser: 33
-      runAsGroup: 33
-      seccompProfile:
-        type: RuntimeDefault
 
-    securityContext:
-      allowPrivilegeEscalation: false
-      runAsNonRoot: true
-      runAsUser: 33
-      runAsGroup: 33
-      seccompProfile:
-        type: RuntimeDefault
 
     image:
       registry: ghcr.io
@@ -177,6 +164,19 @@ spec:
     cronjob:
       enabled: true
       type: sidecar
+      sidecar:
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 33
+          runAsGroup: 33
+          seccompProfile:
+            type: RuntimeDefault
+
+    podAnnotations:
+      secret.reloader.stakater.com/reload: nextcloud-base-sensitive-values
+
+    nextcloud:
       securityContext:
         allowPrivilegeEscalation: false
         runAsNonRoot: true
@@ -184,11 +184,12 @@ spec:
         runAsGroup: 33
         seccompProfile:
           type: RuntimeDefault
-
-    podAnnotations:
-      secret.reloader.stakater.com/reload: nextcloud-base-sensitive-values
-
-    nextcloud:
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 33
+        runAsGroup: 33
+        seccompProfile:
+          type: RuntimeDefault
       host: "cloud.${TENANT_DOMAIN}"
       username: admin
       password: ""
