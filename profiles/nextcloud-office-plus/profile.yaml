@@ -168,19 +168,6 @@ spec:
 
   deploymentMethod: crossplane
 
-  security:
-    macWaivers:
-      - policy: gentian-disallow-privilege-escalation
-        scope: nextcloud
-      - policy: gentian-require-seccomp
-        scope: nextcloud
-      - policy: gentian-disallow-privilege-escalation
-        scope: collabora
-      - policy: gentian-require-seccomp
-        scope: collabora
-      - policy: gentian-restrict-capabilities
-        scope: collabora
-
   valueMapping:
     oidc:
       clientSecretKey: "nextcloud.oidcBootstrap.clientSecret"
@@ -226,9 +213,20 @@ spec:
   extraValues:
     fullnameOverride: "nextcloud"
 
-    podLabels:
-      mac-waiver.gentianos.io/gentian-disallow-privilege-escalation: "approved"
-      mac-waiver.gentianos.io/gentian-require-seccomp: "approved"
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 33
+      runAsGroup: 33
+      seccompProfile:
+        type: RuntimeDefault
+
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 33
+      runAsGroup: 33
+      seccompProfile:
+        type: RuntimeDefault
 
     image:
       registry: ghcr.io
@@ -273,6 +271,13 @@ spec:
     cronjob:
       enabled: true
       type: sidecar
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        runAsUser: 33
+        runAsGroup: 33
+        seccompProfile:
+          type: RuntimeDefault
 
     podAnnotations:
       secret.reloader.stakater.com/reload: nextcloud-office-plus-sensitive-values
@@ -445,19 +450,16 @@ spec:
       podLabels:
         gentianos.io/app: nextcloud
         gentianos.io/tenant: ${TENANT_ID}
-        mac-waiver.gentianos.io/gentian-disallow-privilege-escalation: "approved"
-        mac-waiver.gentianos.io/gentian-require-seccomp: "approved"
-        mac-waiver.gentianos.io/gentian-restrict-capabilities: "approved"
       securityContext:
-        allowPrivilegeEscalation: true
+        allowPrivilegeEscalation: false
         runAsNonRoot: true
         runAsUser: 1001
         runAsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
         capabilities:
-          add:
-            - CHOWN
-            - FOWNER
-            - SYS_CHROOT
+          drop:
+            - ALL
       collabora:
         aliasgroups:
           - host: "http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080"

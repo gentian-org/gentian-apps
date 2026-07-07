@@ -87,13 +87,6 @@ spec:
 
   deploymentMethod: crossplane
 
-  security:
-    macWaivers:
-      - policy: gentian-disallow-privilege-escalation
-        scope: nextcloud
-      - policy: gentian-require-seccomp
-        scope: nextcloud
-
   valueMapping:
     oidc:
       clientSecretKey: "nextcloud.oidcBootstrap.clientSecret"
@@ -126,9 +119,20 @@ spec:
   extraValues:
     fullnameOverride: "nextcloud"
 
-    podLabels:
-      mac-waiver.gentianos.io/gentian-disallow-privilege-escalation: "approved"
-      mac-waiver.gentianos.io/gentian-require-seccomp: "approved"
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 33
+      runAsGroup: 33
+      seccompProfile:
+        type: RuntimeDefault
+
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 33
+      runAsGroup: 33
+      seccompProfile:
+        type: RuntimeDefault
 
     image:
       registry: ghcr.io
@@ -173,6 +177,13 @@ spec:
     cronjob:
       enabled: true
       type: sidecar
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        runAsUser: 33
+        runAsGroup: 33
+        seccompProfile:
+          type: RuntimeDefault
 
     podAnnotations:
       secret.reloader.stakater.com/reload: nextcloud-base-sensitive-values
