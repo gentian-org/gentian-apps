@@ -31,7 +31,7 @@ spec:
   description: "Self-hosted file sync and share with OIDC SSO."
   family: nextcloud
   catalogueVersion: "1.0.0"
-  edition: base
+  edition: minimal
   trustTier: certified
   license: AGPL-3.0-only
   tile:
@@ -79,11 +79,6 @@ spec:
       # Embedded portal tile — gentian-ui opens /nextcloud-portal-sso.html with a bridge ticket.
       linkTarget: embedded
       allowedGroup: "App Users"
-
-  provisioning:
-    privilegedRole:
-      kind: group
-      name: admin
 
   chart:
     repository: "https://nextcloud.github.io/helm/"

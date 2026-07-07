@@ -32,7 +32,7 @@ spec:
   description: "Self-hosted file sync, document editing, forms, PIM, Deck, Collectives wiki, and Talk video/chat with OIDC SSO."
   family: nextcloud
   catalogueVersion: "1.0.0"
-  edition: suite
+  edition: full
   trustTier: certified
   license: AGPL-3.0-only
   tile:
@@ -187,10 +187,6 @@ spec:
       tile:
         icon: chat
 
-  provisioning:
-    privilegedRole:
-      kind: group
-      name: admin
 
   chart:
     repository: "https://nextcloud.github.io/helm/"

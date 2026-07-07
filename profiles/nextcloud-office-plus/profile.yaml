@@ -32,7 +32,7 @@ spec:
   description: "Self-hosted file sync, document editing, forms, and PIM (Mail, Calendar, Contacts, Tasks) with OIDC SSO."
   family: nextcloud
   catalogueVersion: "1.0.0"
-  edition: office-plus
+  edition: performant
   trustTier: certified
   license: AGPL-3.0-only
   tile:
@@ -160,10 +160,6 @@ spec:
       tile:
         icon: tasks
 
-  provisioning:
-    privilegedRole:
-      kind: group
-      name: admin
 
   chart:
     repository: "https://nextcloud.github.io/helm/"

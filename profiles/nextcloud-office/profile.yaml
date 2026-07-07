@@ -32,7 +32,7 @@ spec:
   description: "Self-hosted file sync, forms, and Collabora Online document editing with OIDC SSO."
   family: nextcloud
   catalogueVersion: "1.0.0"
-  edition: office
+  edition: standard
   trustTier: certified
   license: AGPL-3.0-only
   tile:
@@ -124,10 +124,6 @@ spec:
       tile:
         icon: documents
 
-  provisioning:
-    privilegedRole:
-      kind: group
-      name: admin
 
   chart:
     repository: "https://nextcloud.github.io/helm/"

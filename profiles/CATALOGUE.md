@@ -24,7 +24,10 @@ protocol mappers (Path B OIDC) also ship `oidc-catalog.yaml` in the same bundle.
 | Profile | composition | cluster assets |
 |---------|-------------|----------------|
 | `app-store` | — (`app-default`) | — |
-| `nextcloud` | — (`app-default`) | portal bridge SSO assets |
+| `nextcloud-base` | — (`app-default`) | portal bridge SSO assets |
+| `nextcloud-office` | — (`app-default`) | portal bridge SSO assets |
+| `nextcloud-office-plus` | — (`app-default`) | portal bridge SSO assets |
+| `nextcloud-suite` | — (`app-default`) | portal bridge SSO assets |
 | `openproject` | `app-openproject` | portal bridge assets |
 | `odoo-cb-base` | — (`app-default`) | — |
 | `xwiki` | — (`app-default`) | — |
