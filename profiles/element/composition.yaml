@@ -779,6 +779,9 @@ spec:
                       spec:
                         serviceAccountName: app-init
                         restartPolicy: OnFailure
+                        securityContext:
+                          seccompProfile:
+                            type: RuntimeDefault
                         volumes:
                           - name: scripts
                             configMap:
@@ -786,6 +789,13 @@ spec:
                         containers:
                           - name: database-init
                             image: {{ $appInitImage | quote }}
+                            securityContext:
+                              allowPrivilegeEscalation: false
+                              capabilities:
+                                drop:
+                                  - ALL
+                              seccompProfile:
+                                type: RuntimeDefault
                             command:
                               - /bin/sh
                               - /scripts/init.sh
