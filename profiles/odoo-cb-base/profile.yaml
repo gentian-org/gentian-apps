@@ -63,7 +63,7 @@ spec:
   chart:
     repository: https://raw.githubusercontent.com/gentian-org/gentian-apps/main/charts/packages
     name: odoo
-    version: "0.1.0"
+    version: "0.1.1"
 
   deploymentMethod: crossplane
 
