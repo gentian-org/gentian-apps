@@ -681,17 +681,17 @@ spec:
                               - name: DB_HOST
                                 valueFrom:
                                   secretKeyRef:
-                                    name: odoo-cb-sensitive-values
+                                    name: odoo-cb-base-sensitive-values
                                     key: db-host
                               - name: DB_PORT
                                 valueFrom:
                                   secretKeyRef:
-                                    name: odoo-cb-sensitive-values
+                                    name: odoo-cb-base-sensitive-values
                                     key: db-port
                               - name: DB_USER
                                 valueFrom:
                                   secretKeyRef:
-                                    name: odoo-cb-sensitive-values
+                                    name: odoo-cb-base-sensitive-values
                                     key: db-user
                         containers:
                           - name: odoo-install
@@ -720,27 +720,27 @@ spec:
                               - name: DB_HOST
                                 valueFrom:
                                   secretKeyRef:
-                                    name: odoo-cb-sensitive-values
+                                    name: odoo-cb-base-sensitive-values
                                     key: db-host
                               - name: DB_PORT
                                 valueFrom:
                                   secretKeyRef:
-                                    name: odoo-cb-sensitive-values
+                                    name: odoo-cb-base-sensitive-values
                                     key: db-port
                               - name: DB_USER
                                 valueFrom:
                                   secretKeyRef:
-                                    name: odoo-cb-sensitive-values
+                                    name: odoo-cb-base-sensitive-values
                                     key: db-user
                               - name: DB_PASSWORD
                                 valueFrom:
                                   secretKeyRef:
-                                    name: odoo-cb-sensitive-values
+                                    name: odoo-cb-base-sensitive-values
                                     key: db-password
                               - name: DB_NAME
                                 valueFrom:
                                   secretKeyRef:
-                                    name: odoo-cb-sensitive-values
+                                    name: odoo-cb-base-sensitive-values
                                     key: db-name
                             volumeMounts:
                               - name: odoo-config

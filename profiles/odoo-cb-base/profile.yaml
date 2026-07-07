@@ -88,6 +88,8 @@ spec:
   extraValues:
     fullnameOverride: odoo
     tenantId: "${TENANT_ID}"
+    existingSecret:
+      name: odoo-cb-base-sensitive-values
     ingress:
       enabled: false
     gentian:
