@@ -1,14 +1,14 @@
-# OIDC pack for the public Nextcloud App Store profile (clientId: gentian-nextcloud).
+# OIDC pack for the public Nextcloud Office+ profile.
 apiVersion: gentianos.io/v1alpha1
 kind: OIDCPackCatalog
 metadata:
-  name: nextcloud-oidc
+  name: nextcloud-officeplus-oidc
   labels:
-    gentianos.io/oidc-catalog: nextcloud
-    gentianos.io/profile-name: nextcloud
+    gentianos.io/oidc-catalog: nextcloud-officeplus
+    gentianos.io/profile-name: nextcloud-office-plus
 spec:
   extraManagedByAttributeGroups:
-    - FileshareAdmin
+    - FileshareOfficePlusAdmin
   mapperTemplates:
     gentian_useruuid:
       protocolMapper: oidc-usermodel-attribute-mapper
@@ -39,11 +39,11 @@ spec:
         userinfo.token.claim: "true"
         introspection.token.claim: "true"
   packs:
-    gentian-nextcloud:
-      scopeName: gentian-nextcloud-scope
-      scopeDescription: "Scope for Gentian Nextcloud app instances."
-      clientRole: gentian-nextcloud-access-control
-      entitlementGroup: managed-by-attribute-Fileshare
+    gentian-nextcloud-officeplus:
+      scopeName: gentian-nextcloud-officeplus-scope
+      scopeDescription: "Scope for Gentian Nextcloud Office+ app instances."
+      clientRole: gentian-nextcloud-officeplus-access-control
+      entitlementGroup: managed-by-attribute-FileshareOfficePlus
       publicClient: false
       fullScopeAllowed: false
       defaultScopes:

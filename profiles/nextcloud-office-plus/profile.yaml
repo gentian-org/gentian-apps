@@ -1,12 +1,11 @@
-# AppProfile — Nextcloud (per-tenant file sharing + Collabora office)
+# AppProfile — Nextcloud Office+ (per-tenant files + doc editing + forms + mail + calendar + contacts + tasks)
 #
 # Source chart: https://nextcloud.github.io/helm/ nextcloud v9.0.4
 # App image: ghcr.io/gentian-org/nextcloud (see images/nextcloud/BUNDLE.md)
-#   Bundled apps: richdocuments, user_oidc — no App Store egress at runtime.
+#   Bundled apps: richdocuments, user_oidc, forms, mail, calendar, contacts, tasks — no App Store egress at runtime.
 #   Collabora Online ships as an optional subchart (collabora-online, no account required).
 #
 # Installed per tenant from the App Store at cloud.<tenant-domain>.
-# For the OpenDesk AIO stack (opendesk-nextcloud chart), use profile `od-nextcloud`.
 #
 # Secret inventory:
 #   Kernel-provided:
@@ -23,17 +22,17 @@
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
-  name: nextcloud
+  name: nextcloud-office-plus
   labels:
-    gentianos.io/profile-name: nextcloud
+    gentianos.io/profile-name: nextcloud-office-plus
   annotations:
     gentianos.io/kernel-egress-namespaces: envoy-gateway-system
 spec:
-  displayName: "Nextcloud"
-  description: "Self-hosted file sync and share with Collabora Online document editing and OIDC SSO."
+  displayName: "Nextcloud Office+"
+  description: "Self-hosted file sync, document editing, forms, and PIM (Mail, Calendar, Contacts, Tasks) with OIDC SSO."
   family: nextcloud
   catalogueVersion: "1.0.0"
-  edition: full
+  edition: office-plus
   trustTier: certified
   license: AGPL-3.0-only
   tile:
@@ -42,8 +41,8 @@ spec:
   kernelRequirements:
     identity:
       oidc:
-        clientId: "gentian-nextcloud"
-        name: "Nextcloud"
+        clientId: "gentian-nextcloud-officeplus"
+        name: "Nextcloud Office+"
         accessType: CONFIDENTIAL
         redirectUris:
           - "https://cloud.${TENANT_DOMAIN}/*"
@@ -78,7 +77,7 @@ spec:
         - wopi:edit
 
   portalTiles:
-    - name: nextcloud
+    - name: nextcloud-office-plus
       displayName:
         de_DE: "Dateien"
         en_US: "Files"
@@ -115,6 +114,51 @@ spec:
       allowedGroup: "App Users"
       tile:
         icon: presentation
+    - name: forms
+      displayName:
+        de_DE: "Formulare"
+        en_US: "Forms"
+      linkTarget: embedded
+      linkSuffix: "?app=forms"
+      allowedGroup: "App Users"
+      tile:
+        icon: documents
+    - name: mail
+      displayName:
+        de_DE: "E-Mail"
+        en_US: "Mail"
+      linkTarget: embedded
+      linkSuffix: "?app=mail"
+      allowedGroup: "App Users"
+      tile:
+        icon: mail
+    - name: calendar
+      displayName:
+        de_DE: "Kalender"
+        en_US: "Calendar"
+      linkTarget: embedded
+      linkSuffix: "?app=calendar"
+      allowedGroup: "App Users"
+      tile:
+        icon: calendar
+    - name: contacts
+      displayName:
+        de_DE: "Kontakte"
+        en_US: "Contacts"
+      linkTarget: embedded
+      linkSuffix: "?app=contacts"
+      allowedGroup: "App Users"
+      tile:
+        icon: contacts
+    - name: tasks
+      displayName:
+        de_DE: "Aufgaben"
+        en_US: "Tasks"
+      linkTarget: embedded
+      linkSuffix: "?app=tasks"
+      allowedGroup: "App Users"
+      tile:
+        icon: tasks
 
   provisioning:
     privilegedRole:
@@ -176,7 +220,7 @@ spec:
     image:
       registry: ghcr.io
       repository: gentian-org/nextcloud
-      tag: "33.0.6-gentian3"
+      tag: "33.0.6-officeplus-gentian4"
 
     # Redis ACL user is provisioned as ${TENANT_ID}-nextcloud; the chart only maps password by default.
     extraEnvVars:
@@ -276,7 +320,7 @@ spec:
           new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
           if "gentian-portal-bridge" not in text:
               if old not in text:
-                  raise SystemExit(0)
+                   raise SystemExit(0)
               htaccess.write_text(text.replace(old, new))
           PY
           }
@@ -290,7 +334,7 @@ spec:
             exit 0
           fi
           sync_bundled_apps() {
-            for app in richdocuments user_oidc; do
+            for app in richdocuments user_oidc forms mail calendar contacts tasks; do
               if [ ! -d "/var/www/html/custom_apps/${app}" ] && [ -d "/usr/src/nextcloud/apps/${app}" ]; then
                 cp -a "/usr/src/nextcloud/apps/${app}" "/var/www/html/custom_apps/"
                 chown -R www-data:www-data "/var/www/html/custom_apps/${app}"
@@ -299,9 +343,9 @@ spec:
             done
           }
           sync_bundled_apps
-          # The password_policy breached-password check calls api.pwnedpasswords.com,
-          # which cluster egress blocks — every password set then waits ~5s for the
-          # timeout (felt on portal bridge login and admin ops). Disable the external check.
+          # Disable the password_policy breached-password check: it calls
+          # api.pwnedpasswords.com (blocked by egress) and adds ~5s to every
+          # password set — the portal bridge felt this on each Files open.
           $NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true
           if $NC app:list --enabled 2>/dev/null | grep -q 'richdocuments:'; then
             $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
@@ -327,7 +371,7 @@ spec:
             sleep 5
           done
           sync_bundled_apps() {
-            for app in richdocuments user_oidc; do
+            for app in richdocuments user_oidc forms mail calendar contacts tasks; do
               if [ ! -d "/var/www/html/custom_apps/${app}" ] && [ -d "/usr/src/nextcloud/apps/${app}" ]; then
                 cp -a "/usr/src/nextcloud/apps/${app}" "/var/www/html/custom_apps/"
                 chown -R www-data:www-data "/var/www/html/custom_apps/${app}"
@@ -337,10 +381,10 @@ spec:
           }
           sync_bundled_apps
           $NC user_oidc:provider gentian \
-            --clientid="gentian-nextcloud" \
+            --clientid="gentian-nextcloud-officeplus" \
             --clientsecret="${OIDC_SECRET}" \
             --discoveryuri="${DISCOVERY_URI}" \
-            --scope="openid profile email gentian-nextcloud-scope" \
+            --scope="openid profile email gentian-nextcloud-officeplus-scope" \
             --mapping-uid="gentian_username" \
             --mapping-display-name="name" \
             --mapping-email="email" \
@@ -375,7 +419,7 @@ spec:
           new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
           if "gentian-portal-bridge" not in text:
               if old not in text:
-                  raise SystemExit(0)
+                   raise SystemExit(0)
               htaccess.write_text(text.replace(old, new))
           PY
           }

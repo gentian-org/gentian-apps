@@ -1,0 +1,495 @@
+# AppProfile — Nextcloud Suite (per-tenant files + doc editing + forms + mail + calendar + contacts + tasks + deck + collectives + spreed)
+#
+# Source chart: https://nextcloud.github.io/helm/ nextcloud v9.0.4
+# App image: ghcr.io/gentian-org/nextcloud (see images/nextcloud/BUNDLE.md)
+#   Bundled apps: richdocuments, user_oidc, forms, mail, calendar, contacts, tasks, deck, collectives, spreed — no App Store egress at runtime.
+#   Collabora Online ships as an optional subchart (collabora-online, no account required).
+#
+# Installed per tenant from the App Store at cloud.<tenant-domain>.
+#
+# Secret inventory:
+#   Kernel-provided:
+#     oidc_client_secret  → nextcloud.oidcBootstrap.clientSecret (hook + bootstrap)
+#     pg_*                → externalDatabase.{host,database,user,password}
+#     redis_*             → externalRedis.{host,port,password}
+#     smtp_password       → nextcloud.mail.smtp.password
+#   App-internal (1) → appSecrets:
+#     admin_password      → nextcloud.password
+#
+# Bootstrap: post-installation / before-starting hooks enable bundled apps and
+# configure user_oidc, richdocuments (Collabora), and reverse-proxy settings. No custom
+# composition — app-default handles ExternalSecret, DB, cache, and Helm release.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: nextcloud-suite
+  labels:
+    gentianos.io/profile-name: nextcloud-suite
+  annotations:
+    gentianos.io/kernel-egress-namespaces: envoy-gateway-system
+spec:
+  displayName: "Nextcloud Suite"
+  description: "Self-hosted file sync, document editing, forms, PIM, Deck, Collectives wiki, and Talk video/chat with OIDC SSO."
+  family: nextcloud
+  catalogueVersion: "1.0.0"
+  edition: suite
+  trustTier: certified
+  license: AGPL-3.0-only
+  tile:
+    icon: files
+
+  kernelRequirements:
+    identity:
+      oidc:
+        clientId: "gentian-nextcloud-suite"
+        name: "Nextcloud Suite"
+        accessType: CONFIDENTIAL
+        redirectUris:
+          - "https://cloud.${TENANT_DOMAIN}/*"
+        postLogoutRedirectUris:
+          - "https://cloud.${TENANT_DOMAIN}/"
+          - "https://portal.${KERNEL_DOMAIN}/"
+        backchannelLogoutUrl: "https://cloud.${TENANT_DOMAIN}/apps/user_oidc/backchannel-logout/gentian"
+    database:
+      engine: postgresql
+      databasePerTenant: true
+    cache:
+      engine: redis
+    mail:
+      smtp:
+        auth: plain
+        port: 587
+
+  provides:
+    - name: file-store
+      protocol: webdav
+    - name: filepicker
+      protocol: ocs
+
+  optionalIntegrations:
+    - contract: central-navigation
+      provider: portal
+      capabilities:
+        - navigation:register
+    - contract: office-editor
+      provider: collabora
+      capabilities:
+        - wopi:edit
+
+  portalTiles:
+    - name: nextcloud-suite
+      displayName:
+        de_DE: "Dateien"
+        en_US: "Files"
+      # Embedded portal tile — gentian-ui opens /nextcloud-portal-sso.html with a bridge ticket.
+      linkTarget: embedded
+      allowedGroup: "App Users"
+    # Collabora document-type tiles. linkSuffix ?open=<type> is carried through the
+    # bridge (sso.html → gentian-portal-bridge.php), which opens the user's most
+    # recently edited file of that type in Collabora, seeding a blank one on first use.
+    - name: document
+      displayName:
+        de_DE: "Dokument"
+        en_US: "Document"
+      linkTarget: embedded
+      linkSuffix: "?open=document"
+      allowedGroup: "App Users"
+      tile:
+        icon: documents
+    - name: spreadsheet
+      displayName:
+        de_DE: "Tabelle"
+        en_US: "Spreadsheet"
+      linkTarget: embedded
+      linkSuffix: "?open=spreadsheet"
+      allowedGroup: "App Users"
+      tile:
+        icon: spreadsheet
+    - name: presentation
+      displayName:
+        de_DE: "Präsentation"
+        en_US: "Presentation"
+      linkTarget: embedded
+      linkSuffix: "?open=presentation"
+      allowedGroup: "App Users"
+      tile:
+        icon: presentation
+    - name: forms
+      displayName:
+        de_DE: "Formulare"
+        en_US: "Forms"
+      linkTarget: embedded
+      linkSuffix: "?app=forms"
+      allowedGroup: "App Users"
+      tile:
+        icon: documents
+    - name: mail
+      displayName:
+        de_DE: "E-Mail"
+        en_US: "Mail"
+      linkTarget: embedded
+      linkSuffix: "?app=mail"
+      allowedGroup: "App Users"
+      tile:
+        icon: mail
+    - name: calendar
+      displayName:
+        de_DE: "Kalender"
+        en_US: "Calendar"
+      linkTarget: embedded
+      linkSuffix: "?app=calendar"
+      allowedGroup: "App Users"
+      tile:
+        icon: calendar
+    - name: contacts
+      displayName:
+        de_DE: "Kontakte"
+        en_US: "Contacts"
+      linkTarget: embedded
+      linkSuffix: "?app=contacts"
+      allowedGroup: "App Users"
+      tile:
+        icon: contacts
+    - name: tasks
+      displayName:
+        de_DE: "Aufgaben"
+        en_US: "Tasks"
+      linkTarget: embedded
+      linkSuffix: "?app=tasks"
+      allowedGroup: "App Users"
+      tile:
+        icon: tasks
+    - name: deck
+      displayName:
+        de_DE: "Projekte"
+        en_US: "Projects"
+      linkTarget: embedded
+      linkSuffix: "?app=deck"
+      allowedGroup: "App Users"
+      tile:
+        icon: projects
+    - name: collectives
+      displayName:
+        de_DE: "Wiki"
+        en_US: "Wiki"
+      linkTarget: embedded
+      linkSuffix: "?app=collectives"
+      allowedGroup: "App Users"
+      tile:
+        icon: wiki
+    - name: talk
+      displayName:
+        de_DE: "Talk"
+        en_US: "Talk"
+      linkTarget: embedded
+      linkSuffix: "?app=spreed"
+      allowedGroup: "App Users"
+      tile:
+        icon: chat
+
+  provisioning:
+    privilegedRole:
+      kind: group
+      name: admin
+
+  chart:
+    repository: "https://nextcloud.github.io/helm/"
+    name: nextcloud
+    version: "9.0.4"
+
+  deploymentMethod: crossplane
+
+  valueMapping:
+    oidc:
+      clientSecretKey: "nextcloud.oidcBootstrap.clientSecret"
+    database:
+      hostKey: "externalDatabase.host"
+      nameKey: "externalDatabase.database"
+      userKey: "externalDatabase.user"
+      passwordKey: "externalDatabase.password"
+    cache:
+      hostKey: "externalRedis.host"
+      portKey: "externalRedis.port"
+      passwordKey: "externalRedis.password"
+    smtp:
+      passwordKey: "nextcloud.mail.smtp.password"
+
+  appSecrets:
+    - name: admin_password
+      valuePath: "nextcloud.password"
+
+  ingress:
+    subDomain: "cloud"
+    serviceName: "nextcloud"
+    servicePort: 8080
+    tlsEnabled: true
+    annotations:
+      gentianos.io/gateway-buffer-limit: "512M"
+      gentianos.io/gateway-request-timeout: "3600"
+      gentianos.io/gateway-response-timeout: "3600"
+
+  additionalIngresses:
+    - subDomain: collabora
+      serviceName: nextcloud-collabora
+      servicePort: 9980
+      tlsEnabled: true
+      annotations:
+        gentianos.io/gateway-buffer-limit: "100M"
+        gentianos.io/gateway-request-timeout: "3600"
+        gentianos.io/gateway-response-timeout: "3600"
+        gentianos.io/gateway-frame-ancestors: |
+          {"mode":"replace","origins":["mainApp","portal"]}
+        gentianos.io/gateway-escaped-slashes-action: KeepUnchanged
+
+  extraValues:
+    fullnameOverride: "nextcloud"
+
+    image:
+      registry: ghcr.io
+      repository: gentian-org/nextcloud
+      tag: "33.0.6-suite-gentian4"
+
+    # Redis ACL user is provisioned as ${TENANT_ID}-nextcloud; the chart only maps password by default.
+    extraEnvVars:
+      - name: REDIS_HOST_USER
+        value: "${TENANT_ID}-nextcloud"
+
+    internalDatabase:
+      enabled: false
+
+    externalDatabase:
+      enabled: true
+      type: postgresql
+
+    mariadb:
+      enabled: false
+
+    postgresql:
+      enabled: false
+
+    externalRedis:
+      enabled: true
+
+    redis:
+      enabled: false
+
+    phpClientHttpsFix:
+      enabled: true
+      protocol: https
+
+    ingress:
+      enabled: false
+
+    persistence:
+      enabled: true
+      size: 10Gi
+
+    cronjob:
+      enabled: true
+      type: sidecar
+
+    podAnnotations:
+      secret.reloader.stakater.com/reload: nextcloud-sensitive-values
+
+    nextcloud:
+      host: "cloud.${TENANT_DOMAIN}"
+      username: admin
+      password: ""
+      update: 0
+      mail:
+        enabled: true
+        fromAddress: noreply
+        domain: "${TENANT_DOMAIN}"
+        smtp:
+          host: "${SMTP_HOST}"
+          port: 587
+          secure: tls
+          authtype: LOGIN
+          name: "gentian-system@${TENANT_DOMAIN}"
+      configs:
+        gentian-proxy.config.php: |-
+          <?php
+          $CONFIG = array(
+            'overwritehost' => 'cloud.${TENANT_DOMAIN}',
+            'overwriteprotocol' => 'https',
+            'overwrite.cli.url' => 'https://cloud.${TENANT_DOMAIN}',
+            'trusted_proxies' => array('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'),
+            'allow_local_remote_servers' => true,
+            'memcache_customprefix' => '${TENANT_ID}:nextcloud:',
+            'redis' => array(
+              'user' => '${TENANT_ID}-nextcloud',
+            ),
+          );
+      extraVolumes:
+        - name: gentian-sensitive
+          secret:
+            secretName: nextcloud-sensitive-values
+      extraVolumeMounts:
+        - name: gentian-sensitive
+          mountPath: /etc/gentian
+          readOnly: true
+      hooks:
+        before-starting: |
+          #!/bin/bash
+          set -eu
+          NC="php /var/www/html/occ"
+          COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
+          COLLABORA_INTERNAL="http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980"
+          NEXTCLOUD_CALLBACK="http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080"
+          patch_portal_bridge_htaccess() {
+            python3 - <<'PY'
+          from pathlib import Path
+          htaccess = Path("/var/www/html/.htaccess")
+          if not htaccess.is_file():
+              raise SystemExit(0)
+          text = htaccess.read_text()
+          old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
+          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
+          if "gentian-portal-bridge" not in text:
+              if old not in text:
+                   raise SystemExit(0)
+              htaccess.write_text(text.replace(old, new))
+          PY
+          }
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/nextcloud-portal-sso.html \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
+          sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/gentian-portal-bridge.php 2>/dev/null || true
+          patch_portal_bridge_htaccess
+          if ! $NC status >/dev/null 2>&1; then
+            exit 0
+          fi
+          sync_bundled_apps() {
+            for app in richdocuments user_oidc forms mail calendar contacts tasks deck collectives spreed; do
+              if [ ! -d "/var/www/html/custom_apps/${app}" ] && [ -d "/usr/src/nextcloud/apps/${app}" ]; then
+                cp -a "/usr/src/nextcloud/apps/${app}" "/var/www/html/custom_apps/"
+                chown -R www-data:www-data "/var/www/html/custom_apps/${app}"
+              fi
+              $NC app:enable "${app}" 2>/dev/null || true
+            done
+          }
+          sync_bundled_apps
+          # Disable the password_policy breached-password check: it calls
+          # api.pwnedpasswords.com (blocked by egress) and adds ~5s to every
+          # password set — the portal bridge felt this on each Files open.
+          $NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true
+          if $NC app:list --enabled 2>/dev/null | grep -q 'richdocuments:'; then
+            $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
+            $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
+            $NC config:app:set richdocuments doc_format --value="odf" || true
+            $NC config:app:set richdocuments wopi_callback_url --value="${NEXTCLOUD_CALLBACK}" || true
+            $NC richdocuments:activate-config --callback-url="${NEXTCLOUD_CALLBACK}" || true
+          fi
+          patch_portal_bridge_htaccess
+        post-installation: |
+          #!/bin/bash
+          set -eu
+          NC="php /var/www/html/occ"
+          CLOUD_URL="https://cloud.${TENANT_DOMAIN}"
+          COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
+          COLLABORA_INTERNAL="http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980"
+          NEXTCLOUD_CALLBACK="http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080"
+          DISCOVERY_URI="http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
+          OIDC_SECRET="$(cat /etc/gentian/oidc-client-secret)"
+          echo "[gentian-nextcloud] waiting for Nextcloud to become ready..."
+          for i in $(seq 1 90); do
+            if $NC status >/dev/null 2>&1; then break; fi
+            sleep 5
+          done
+          sync_bundled_apps() {
+            for app in richdocuments user_oidc forms mail calendar contacts tasks deck collectives spreed; do
+              if [ ! -d "/var/www/html/custom_apps/${app}" ] && [ -d "/usr/src/nextcloud/apps/${app}" ]; then
+                cp -a "/usr/src/nextcloud/apps/${app}" "/var/www/html/custom_apps/"
+                chown -R www-data:www-data "/var/www/html/custom_apps/${app}"
+              fi
+              $NC app:enable "${app}" 2>/dev/null || true
+            done
+          }
+          sync_bundled_apps
+          $NC user_oidc:provider gentian \
+            --clientid="gentian-nextcloud-suite" \
+            --clientsecret="${OIDC_SECRET}" \
+            --discoveryuri="${DISCOVERY_URI}" \
+            --scope="openid profile email gentian-nextcloud-suite-scope" \
+            --mapping-uid="gentian_username" \
+            --mapping-display-name="name" \
+            --mapping-email="email" \
+            --unique-uid="1" \
+            --check-bearer="0" || true
+          $NC config:app:set user_oidc id4me --value="0" || true
+          $NC config:app:set user_oidc allow_multiple_user_backends --value="1" || true
+          $NC config:system:set allow_local_remote_servers --type=boolean --value=true || true
+          # Disable the password_policy breached-password check: it calls
+          # api.pwnedpasswords.com (blocked by egress) and adds ~5s to every
+          # password set — the portal bridge felt this on each Files open.
+          $NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true
+          $NC config:app:set richdocuments wopi_url --value="${COLLABORA_INTERNAL}" || true
+          $NC config:app:set richdocuments public_wopi_url --value="${COLLABORA_PUBLIC}" || true
+          $NC config:app:set richdocuments doc_format --value="odf" || true
+          $NC config:app:set richdocuments wopi_callback_url --value="${NEXTCLOUD_CALLBACK}" || true
+          $NC richdocuments:activate-config --callback-url="${NEXTCLOUD_CALLBACK}" || true
+          $NC background:cron || true
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/nextcloud-portal-sso.html \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
+          sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/gentian-portal-bridge.php 2>/dev/null || true
+          patch_portal_bridge_htaccess() {
+            python3 - <<'PY'
+          from pathlib import Path
+          htaccess = Path("/var/www/html/.htaccess")
+          if not htaccess.is_file():
+              raise SystemExit(0)
+          text = htaccess.read_text()
+          old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
+          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
+          if "gentian-portal-bridge" not in text:
+              if old not in text:
+                   raise SystemExit(0)
+              htaccess.write_text(text.replace(old, new))
+          PY
+          }
+          patch_portal_bridge_htaccess
+          echo "[gentian-nextcloud] bootstrap complete for ${CLOUD_URL}"
+
+    collabora:
+      enabled: true
+      fullnameOverride: nextcloud-collabora
+      podLabels:
+        gentianos.io/app: nextcloud
+        gentianos.io/tenant: ${TENANT_ID}
+      securityContext:
+        allowPrivilegeEscalation: true
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        capabilities:
+          add:
+            - CHOWN
+            - FOWNER
+            - SYS_CHROOT
+      collabora:
+        aliasgroups:
+          - host: "http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080"
+          - host: "http://cloud.${TENANT_DOMAIN}:8080"
+          - host: "https://cloud.${TENANT_DOMAIN}"
+        extra_params: "--o:ssl.enable=false --o:ssl.termination=true --o:net.proto=ipv4 --o:storage.ssl.as_scheme=true --o:storage.ssl.enable=false --o:mount_jail_tree=false --o:net.post_allow.host[0]=10\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3} --o:net.post_allow.host[1]=.*\\.svc\\.cluster\\.local"
+        server_name: "collabora.${TENANT_DOMAIN}"
+      ingress:
+        enabled: false
+      resources:
+        limits:
+          cpu: "2"
+          memory: "2Gi"
+        requests:
+          cpu: "250m"
+          memory: "1Gi"
+
+    resources:
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+      requests:
+        cpu: "250m"
+        memory: "512Mi"

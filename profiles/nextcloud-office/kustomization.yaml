@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - profile.yaml
+  - oidc-catalog.yaml
+configMapGenerator:
+  - name: nextcloud-office-portal-bridge-sso
+    namespace: crossplane-system
+    files:
+      - nextcloud-portal-sso.html=assets/nextcloud-portal-sso.html
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    gentianos.io/profile-name: nextcloud-office
+    gentianos.io/asset: portal-bridge-sso
+    app.kubernetes.io/managed-by: gentian-os

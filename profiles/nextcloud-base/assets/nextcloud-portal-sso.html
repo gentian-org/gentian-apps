@@ -29,9 +29,13 @@
 
         // Optional document-type intent from Document/Spreadsheet/Presentation tiles.
         const open = params.get("open");
+        const app = params.get("app");
         let target = `/gentian-portal-bridge.php?t=${encodeURIComponent(ticket)}`;
         if (open) {
           target += `&open=${encodeURIComponent(open)}`;
+        }
+        if (app) {
+          target += `&app=${encodeURIComponent(app)}`;
         }
 
         // Server-side session establishment avoids iframe third-party cookie /

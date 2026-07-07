@@ -4,13 +4,13 @@ resources:
   - profile.yaml
   - oidc-catalog.yaml
 configMapGenerator:
-  - name: nextcloud-portal-bridge-sso
+  - name: nextcloud-office-plus-portal-bridge-sso
     namespace: crossplane-system
     files:
       - nextcloud-portal-sso.html=assets/nextcloud-portal-sso.html
 generatorOptions:
   disableNameSuffixHash: true
   labels:
-    gentianos.io/profile-name: nextcloud
+    gentianos.io/profile-name: nextcloud-office-plus
     gentianos.io/asset: portal-bridge-sso
     app.kubernetes.io/managed-by: gentian-os

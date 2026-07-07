@@ -1,0 +1,58 @@
+# OIDC pack for the public Nextcloud Office profile.
+apiVersion: gentianos.io/v1alpha1
+kind: OIDCPackCatalog
+metadata:
+  name: nextcloud-office-oidc
+  labels:
+    gentianos.io/oidc-catalog: nextcloud-office
+    gentianos.io/profile-name: nextcloud-office
+spec:
+  extraManagedByAttributeGroups:
+    - FileshareOfficeAdmin
+  mapperTemplates:
+    gentian_useruuid:
+      protocolMapper: oidc-usermodel-attribute-mapper
+      config:
+        user.attribute: entryUUID
+        claim.name: gentian_useruuid
+        jsonType.label: String
+        id.token.claim: "true"
+        access.token.claim: "true"
+        userinfo.token.claim: "true"
+    gentian_username:
+      protocolMapper: oidc-usermodel-attribute-mapper
+      config:
+        user.attribute: uid
+        claim.name: gentian_username
+        jsonType.label: String
+        id.token.claim: "true"
+        access.token.claim: "true"
+        userinfo.token.claim: "true"
+    email:
+      protocolMapper: oidc-usermodel-attribute-mapper
+      config:
+        user.attribute: email
+        claim.name: email
+        jsonType.label: String
+        id.token.claim: "true"
+        access.token.claim: "true"
+        userinfo.token.claim: "true"
+        introspection.token.claim: "true"
+  packs:
+    gentian-nextcloud-office:
+      scopeName: gentian-nextcloud-office-scope
+      scopeDescription: "Scope for Gentian Nextcloud Office app instances."
+      clientRole: gentian-nextcloud-office-access-control
+      entitlementGroup: managed-by-attribute-FileshareOffice
+      publicClient: false
+      fullScopeAllowed: false
+      defaultScopes:
+        - profile
+        - email
+        - roles
+        - web-origins
+        - acr
+      mappers:
+        - gentian_useruuid
+        - gentian_username
+        - email

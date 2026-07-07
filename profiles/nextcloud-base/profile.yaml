@@ -1,0 +1,324 @@
+# AppProfile — Nextcloud Base (per-tenant file sharing only)
+#
+# Source chart: https://nextcloud.github.io/helm/ nextcloud v9.0.4
+# App image: ghcr.io/gentian-org/nextcloud (see images/nextcloud/BUNDLE.md)
+#   Bundled apps: user_oidc — no App Store egress at runtime.
+#
+# Installed per tenant from the App Store at cloud.<tenant-domain>.
+#
+# Secret inventory:
+#   Kernel-provided:
+#     oidc_client_secret  → nextcloud.oidcBootstrap.clientSecret (hook + bootstrap)
+#     pg_*                → externalDatabase.{host,database,user,password}
+#     redis_*             → externalRedis.{host,port,password}
+#     smtp_password       → nextcloud.mail.smtp.password
+#   App-internal (1) → appSecrets:
+#     admin_password      → nextcloud.password
+#
+# Bootstrap: post-installation / before-starting hooks enable bundled apps and
+# configure user_oidc and reverse-proxy settings. No custom composition —
+# app-default handles ExternalSecret, DB, cache, and Helm release.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: nextcloud-base
+  labels:
+    gentianos.io/profile-name: nextcloud-base
+  annotations:
+    gentianos.io/kernel-egress-namespaces: envoy-gateway-system
+spec:
+  displayName: "Nextcloud Base"
+  description: "Self-hosted file sync and share with OIDC SSO."
+  family: nextcloud
+  catalogueVersion: "1.0.0"
+  edition: base
+  trustTier: certified
+  license: AGPL-3.0-only
+  tile:
+    icon: files
+
+  kernelRequirements:
+    identity:
+      oidc:
+        clientId: "gentian-nextcloud-base"
+        name: "Nextcloud Base"
+        accessType: CONFIDENTIAL
+        redirectUris:
+          - "https://cloud.${TENANT_DOMAIN}/*"
+        postLogoutRedirectUris:
+          - "https://cloud.${TENANT_DOMAIN}/"
+          - "https://portal.${KERNEL_DOMAIN}/"
+        backchannelLogoutUrl: "https://cloud.${TENANT_DOMAIN}/apps/user_oidc/backchannel-logout/gentian"
+    database:
+      engine: postgresql
+      databasePerTenant: true
+    cache:
+      engine: redis
+    mail:
+      smtp:
+        auth: plain
+        port: 587
+
+  provides:
+    - name: file-store
+      protocol: webdav
+    - name: filepicker
+      protocol: ocs
+
+  optionalIntegrations:
+    - contract: central-navigation
+      provider: portal
+      capabilities:
+        - navigation:register
+
+  portalTiles:
+    - name: nextcloud-base
+      displayName:
+        de_DE: "Dateien"
+        en_US: "Files"
+      # Embedded portal tile — gentian-ui opens /nextcloud-portal-sso.html with a bridge ticket.
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  provisioning:
+    privilegedRole:
+      kind: group
+      name: admin
+
+  chart:
+    repository: "https://nextcloud.github.io/helm/"
+    name: nextcloud
+    version: "9.0.4"
+
+  deploymentMethod: crossplane
+
+  valueMapping:
+    oidc:
+      clientSecretKey: "nextcloud.oidcBootstrap.clientSecret"
+    database:
+      hostKey: "externalDatabase.host"
+      nameKey: "externalDatabase.database"
+      userKey: "externalDatabase.user"
+      passwordKey: "externalDatabase.password"
+    cache:
+      hostKey: "externalRedis.host"
+      portKey: "externalRedis.port"
+      passwordKey: "externalRedis.password"
+    smtp:
+      passwordKey: "nextcloud.mail.smtp.password"
+
+  appSecrets:
+    - name: admin_password
+      valuePath: "nextcloud.password"
+
+  ingress:
+    subDomain: "cloud"
+    serviceName: "nextcloud"
+    servicePort: 8080
+    tlsEnabled: true
+    annotations:
+      gentianos.io/gateway-buffer-limit: "512M"
+      gentianos.io/gateway-request-timeout: "3600"
+      gentianos.io/gateway-response-timeout: "3600"
+
+  extraValues:
+    fullnameOverride: "nextcloud"
+
+    image:
+      registry: ghcr.io
+      repository: gentian-org/nextcloud
+      tag: "33.0.6-base-gentian4"
+
+    # Redis ACL user is provisioned as ${TENANT_ID}-nextcloud; the chart only maps password by default.
+    extraEnvVars:
+      - name: REDIS_HOST_USER
+        value: "${TENANT_ID}-nextcloud"
+
+    internalDatabase:
+      enabled: false
+
+    externalDatabase:
+      enabled: true
+      type: postgresql
+
+    mariadb:
+      enabled: false
+
+    postgresql:
+      enabled: false
+
+    externalRedis:
+      enabled: true
+
+    redis:
+      enabled: false
+
+    phpClientHttpsFix:
+      enabled: true
+      protocol: https
+
+    ingress:
+      enabled: false
+
+    persistence:
+      enabled: true
+      size: 10Gi
+
+    cronjob:
+      enabled: true
+      type: sidecar
+
+    podAnnotations:
+      secret.reloader.stakater.com/reload: nextcloud-sensitive-values
+
+    nextcloud:
+      host: "cloud.${TENANT_DOMAIN}"
+      username: admin
+      password: ""
+      update: 0
+      mail:
+        enabled: true
+        fromAddress: noreply
+        domain: "${TENANT_DOMAIN}"
+        smtp:
+          host: "${SMTP_HOST}"
+          port: 587
+          secure: tls
+          authtype: LOGIN
+          name: "gentian-system@${TENANT_DOMAIN}"
+      configs:
+        gentian-proxy.config.php: |-
+          <?php
+          $CONFIG = array(
+            'overwritehost' => 'cloud.${TENANT_DOMAIN}',
+            'overwriteprotocol' => 'https',
+            'overwrite.cli.url' => 'https://cloud.${TENANT_DOMAIN}',
+            'trusted_proxies' => array('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'),
+            'allow_local_remote_servers' => true,
+            'memcache_customprefix' => '${TENANT_ID}:nextcloud:',
+            'redis' => array(
+              'user' => '${TENANT_ID}-nextcloud',
+            ),
+          );
+      extraVolumes:
+        - name: gentian-sensitive
+          secret:
+            secretName: nextcloud-sensitive-values
+      extraVolumeMounts:
+        - name: gentian-sensitive
+          mountPath: /etc/gentian
+          readOnly: true
+      hooks:
+        before-starting: |
+          #!/bin/bash
+          set -eu
+          NC="php /var/www/html/occ"
+          patch_portal_bridge_htaccess() {
+            python3 - <<'PY'
+          from pathlib import Path
+          htaccess = Path("/var/www/html/.htaccess")
+          if not htaccess.is_file():
+              raise SystemExit(0)
+          text = htaccess.read_text()
+          old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
+          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
+          if "gentian-portal-bridge" not in text:
+              if old not in text:
+                   raise SystemExit(0)
+              htaccess.write_text(text.replace(old, new))
+          PY
+          }
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/nextcloud-portal-sso.html \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
+          sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/gentian-portal-bridge.php 2>/dev/null || true
+          patch_portal_bridge_htaccess
+          if ! $NC status >/dev/null 2>&1; then
+            exit 0
+          fi
+          sync_bundled_apps() {
+            for app in user_oidc; do
+              if [ ! -d "/var/www/html/custom_apps/${app}" ] && [ -d "/usr/src/nextcloud/apps/${app}" ]; then
+                cp -a "/usr/src/nextcloud/apps/${app}" "/var/www/html/custom_apps/"
+                chown -R www-data:www-data "/var/www/html/custom_apps/${app}"
+              fi
+              $NC app:enable "${app}" 2>/dev/null || true
+            done
+          }
+          sync_bundled_apps
+          # Disable the password_policy breached-password check: it calls
+          # api.pwnedpasswords.com (blocked by egress) and adds ~5s to every
+          # password set — the portal bridge felt this on each Files open.
+          $NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true
+          patch_portal_bridge_htaccess
+        post-installation: |
+          #!/bin/bash
+          set -eu
+          NC="php /var/www/html/occ"
+          CLOUD_URL="https://cloud.${TENANT_DOMAIN}"
+          DISCOVERY_URI="http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
+          OIDC_SECRET="$(cat /etc/gentian/oidc-client-secret)"
+          echo "[gentian-nextcloud] waiting for Nextcloud to become ready..."
+          for i in $(seq 1 90); do
+            if $NC status >/dev/null 2>&1; then break; fi
+            sleep 5
+          done
+          sync_bundled_apps() {
+            for app in user_oidc; do
+              if [ ! -d "/var/www/html/custom_apps/${app}" ] && [ -d "/usr/src/nextcloud/apps/${app}" ]; then
+                cp -a "/usr/src/nextcloud/apps/${app}" "/var/www/html/custom_apps/"
+                chown -R www-data:www-data "/var/www/html/custom_apps/${app}"
+              fi
+              $NC app:enable "${app}" 2>/dev/null || true
+            done
+          }
+          sync_bundled_apps
+          $NC user_oidc:provider gentian \
+            --clientid="gentian-nextcloud-base" \
+            --clientsecret="${OIDC_SECRET}" \
+            --discoveryuri="${DISCOVERY_URI}" \
+            --scope="openid profile email gentian-nextcloud-base-scope" \
+            --mapping-uid="gentian_username" \
+            --mapping-display-name="name" \
+            --mapping-email="email" \
+            --unique-uid="1" \
+            --check-bearer="0" || true
+          $NC config:app:set user_oidc id4me --value="0" || true
+          $NC config:app:set user_oidc allow_multiple_user_backends --value="1" || true
+          $NC config:system:set allow_local_remote_servers --type=boolean --value=true || true
+          # Disable the password_policy breached-password check: it calls
+          # api.pwnedpasswords.com (blocked by egress) and adds ~5s to every
+          # password set — the portal bridge felt this on each Files open.
+          $NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true
+          $NC background:cron || true
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/nextcloud-portal-sso.html \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
+          sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/gentian-portal-bridge.php 2>/dev/null || true
+          patch_portal_bridge_htaccess() {
+            python3 - <<'PY'
+          from pathlib import Path
+          htaccess = Path("/var/www/html/.htaccess")
+          if not htaccess.is_file():
+              raise SystemExit(0)
+          text = htaccess.read_text()
+          old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
+          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
+          if "gentian-portal-bridge" not in text:
+              if old not in text:
+                   raise SystemExit(0)
+              htaccess.write_text(text.replace(old, new))
+          PY
+          }
+          patch_portal_bridge_htaccess
+          echo "[gentian-nextcloud] bootstrap complete for ${CLOUD_URL}"
+
+    resources:
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+      requests:
+        cpu: "250m"
+        memory: "512Mi"
