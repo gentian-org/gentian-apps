@@ -302,7 +302,7 @@ spec:
       type: sidecar
 
     podAnnotations:
-      secret.reloader.stakater.com/reload: nextcloud-sensitive-values
+      secret.reloader.stakater.com/reload: nextcloud-suite-sensitive-values
 
     nextcloud:
       host: "cloud.${TENANT_DOMAIN}"
@@ -336,7 +336,7 @@ spec:
       extraVolumes:
         - name: gentian-sensitive
           secret:
-            secretName: nextcloud-sensitive-values
+            secretName: nextcloud-suite-sensitive-values
       extraVolumeMounts:
         - name: gentian-sensitive
           mountPath: /etc/gentian
