@@ -13,7 +13,7 @@ spec:
   description: "Contact management module for Odoo."
   family: odoo
   catalogueVersion: "1.0.0"
-  edition: contacts
+  edition: standard
   trustTier: platform
   license: LGPL-3.0
   tile:

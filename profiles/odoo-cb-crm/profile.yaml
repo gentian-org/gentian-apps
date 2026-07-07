@@ -13,7 +13,7 @@ spec:
   description: "Customer Relationship Management module for Odoo."
   family: odoo
   catalogueVersion: "1.0.0"
-  edition: crm
+  edition: standard
   trustTier: platform
   license: LGPL-3.0
   tile:
