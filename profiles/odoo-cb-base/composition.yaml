@@ -653,6 +653,9 @@ spec:
                           gentianos.io/component: odoo-install
                       spec:
                         restartPolicy: OnFailure
+                        securityContext:
+                          seccompProfile:
+                            type: RuntimeDefault
                         initContainers:
                           - name: wait-for-base
                             image: postgres:16-alpine
@@ -660,6 +663,8 @@ spec:
                               allowPrivilegeEscalation: false
                               capabilities:
                                 drop: ["ALL"]
+                              seccompProfile:
+                                type: RuntimeDefault
                             command:
                               - sh
                               - -c
@@ -690,6 +695,12 @@ spec:
                                     key: db-user
                         containers:
                           - name: odoo-install
+                            securityContext:
+                              allowPrivilegeEscalation: false
+                              capabilities:
+                                drop: ["ALL"]
+                              seccompProfile:
+                                type: RuntimeDefault
                             image: "ghcr.io/gentian-org/ocb:latest"
                             command:
                               - /bin/sh
