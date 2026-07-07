@@ -282,6 +282,8 @@ spec:
             {{- $relSet = append $relSet (dict "name" $vm.oidc.clientSecretKey
                 "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" "oidc-client-secret"))) }}
             {{- end }}
+            {{- $relSet = append $relSet (dict "name" "extraSecrets.oidc_providers[0].client_secret"
+                "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" "oidc-client-secret"))) }}
             {{- end }}
 
             {{- if $vm.database }}
