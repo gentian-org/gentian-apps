@@ -671,6 +671,18 @@ Common causes:
    false) even though portal login works. **Workaround:** Ctrl/Cmd+click the Element tile
    to open Chat in a top-level tab (gentian-ui `linkTarget: embedded` override).
 
+5. **OIDC Client Secret mapping missing** — Synapse configuration files cannot resolve raw env
+   vars directly. Sensitive values (like `client_secret`) must be dynamically mapped from
+   the Kubernetes secret store via the Helm Release `set[]` override configuration in the
+   composition (e.g. mapping `extraSecrets.oidc_providers[0].client_secret` to
+   `oidc-client-secret`). If it remains as the static placeholder string `'@@OIDC_CLIENT_SECRET@@'`,
+   Keycloak rejects the token exchange request with `invalid_client_credentials`.
+
+6. **OIDC Issuer format missing /auth** — Keycloak in the Gentian OS homelab installation
+   runs with a root path `/auth`. The configured `issuer` URL (e.g. under `extraSecrets.oidc_providers`)
+   must match the exact realm issuer (i.e. `https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}`).
+   Omitting the `/auth` path prefix results in OIDC verification failing with `invalid_claim: Invalid claim "iss"`.
+
 **Wrong user after switching portal accounts:** portal login uses the **kernel** realm;
 Element/Synapse OIDC uses the **tenant** realm (`demo`, …). A previous user's tenant-realm
 SSO cookie or cached Matrix session in the browser can reopen Chat as the wrong person.
