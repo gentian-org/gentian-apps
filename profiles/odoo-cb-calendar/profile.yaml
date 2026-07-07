@@ -30,6 +30,10 @@ spec:
 
   compositionRef: app-odoo
   deploymentMethod: crossplane
+  chart:
+    repository: oci://ghcr.io/gentian-org/charts
+    name: odoo
+    version: "0.1.0"
   extraValues:
     odoo:
       module: calendar
