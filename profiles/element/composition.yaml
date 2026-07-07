@@ -596,7 +596,7 @@ spec:
                     "idp_id" "keycloak"
                     "idp_name" "Keycloak"
                     "discover" false
-                    "issuer" (printf "https://id.%s/realms/%s" $kernelDomain $tenant)
+                    "issuer" (printf "https://id.%s/auth/realms/%s" $kernelDomain $tenant)
                     "client_id" "gentian-synapse"
                     "client_secret" "@@OIDC_CLIENT_SECRET@@"
                     "scopes" (list "openid" "profile" "email")
