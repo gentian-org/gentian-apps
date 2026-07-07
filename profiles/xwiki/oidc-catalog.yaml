@@ -2,7 +2,7 @@
 apiVersion: gentianos.io/v1alpha1
 kind: OIDCPackCatalog
 metadata:
-  name: xwiki-oidc
+  name: gentian-xwiki-oidc
   labels:
     gentianos.io/oidc-catalog: xwiki
     gentianos.io/profile-name: xwiki

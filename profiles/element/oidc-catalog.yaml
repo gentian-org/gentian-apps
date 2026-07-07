@@ -2,7 +2,7 @@
 apiVersion: gentianos.io/v1alpha1
 kind: OIDCPackCatalog
 metadata:
-  name: element-oidc
+  name: gentian-element-oidc
   labels:
     gentianos.io/oidc-catalog: element
     gentianos.io/profile-name: element

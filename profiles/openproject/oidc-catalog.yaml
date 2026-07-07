@@ -2,7 +2,7 @@
 apiVersion: gentianos.io/v1alpha1
 kind: OIDCPackCatalog
 metadata:
-  name: openproject-oidc
+  name: gentian-openproject-oidc
   labels:
     gentianos.io/oidc-catalog: openproject
     gentianos.io/profile-name: openproject
