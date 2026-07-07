@@ -871,19 +871,19 @@ spec:
                       MC=mc
                       command -v "${MC}" >/dev/null 2>&1 || MC=mcli
                       JWT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-                      BAO_TOKEN=$(curl -sf "${BAO_ADDR}/v1/auth/kubernetes/login" \
+                      BAO_TOKEN=$(curl -k -sf "${BAO_ADDR}/v1/auth/kubernetes/login" \
                         -H 'Content-Type: application/json' \
                         -d "{\"role\":\"app-init\",\"jwt\":\"${JWT}\"}" \
                         | jq -r '.auth.client_token')
                       ACCESS_KEY="${TENANT}-${APP}"
                       BUCKET="${TENANT}-${APP}"
-                      MINIO=$(curl -sf \
+                      MINIO=$(curl -k -sf \
                         -H "X-Vault-Token: ${BAO_TOKEN}" \
                         "${BAO_ADDR}/v1/secret/data/gentian-os/kernel/storage/minio")
                       ROOT_USER=$(echo "${MINIO}" | jq -r '.data.data.root_user')
                       ROOT_PASS=$(echo "${MINIO}" | jq -r '.data.data.root_password')
                       ${MC} alias set minio "${MINIO_ENDPOINT}" "${ROOT_USER}" "${ROOT_PASS}" >/dev/null
-                      EXISTING=$(curl -sf \
+                      EXISTING=$(curl -k -sf \
                         -H "X-Vault-Token: ${BAO_TOKEN}" \
                         "${BAO_ADDR}/v1/secret/data/gentian-os/tenants/${TENANT}/apps/${APP}/s3" \
                         2>/dev/null || echo '{}')
@@ -907,7 +907,7 @@ spec:
                         if [ "${SECRET_MODE}" = "random" ]; then
                           SECRET_KEY=$(openssl rand -hex 32)
                         else
-                          MASTER=$(curl -sf \
+                          MASTER=$(curl -k -sf \
                             -H "X-Vault-Token: ${BAO_TOKEN}" \
                             "${BAO_ADDR}/v1/secret/data/gentian-os/kernel/internal/master-password" \
                             | jq -r '.data.data.value')
@@ -926,7 +926,7 @@ spec:
                       ${MC} admin policy create minio "${ACCESS_KEY}-policy" /tmp/policy.json
                       ${MC} admin policy attach minio "${ACCESS_KEY}-policy" --user "${ACCESS_KEY}"
                       echo "[s3-init] bucket policy attached"
-                      curl -sf \
+                      curl -k -sf \
                         -H "X-Vault-Token: ${BAO_TOKEN}" \
                         -H 'Content-Type: application/json' \
                         -X POST \
@@ -986,7 +986,7 @@ spec:
                               - name: APP
                                 value: {{ $app }}
                               - name: BAO_ADDR
-                                value: "http://openbao.openbao.svc.cluster.local:8200"
+                                value: "https://openbao.openbao.svc.cluster.local:8200"
                               - name: MINIO_ENDPOINT
                                 value: {{ $minioEndpoint | quote }}
                               - name: SECRET_MODE
@@ -1037,15 +1037,15 @@ spec:
                       #!/bin/sh
                       set -eu
                       JWT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-                      BAO_TOKEN=$(curl -sf "${BAO_ADDR}/v1/auth/kubernetes/login" \
+                      BAO_TOKEN=$(curl -k -sf "${BAO_ADDR}/v1/auth/kubernetes/login" \
                         -H 'Content-Type: application/json' \
                         -d "{\"role\":\"app-init\",\"jwt\":\"${JWT}\"}" \
                         | jq -r '.auth.client_token')
-                      EXISTING=$(curl -sf \
+                      EXISTING=$(curl -k -sf \
                         -H "X-Vault-Token: ${BAO_TOKEN}" \
                         "${BAO_ADDR}/v1/secret/data/gentian-os/tenants/${TENANT}/apps/${APP}/database" \
                         2>/dev/null || echo '{}')
-                      CNPG=$(curl -sf \
+                      CNPG=$(curl -k -sf \
                         -H "X-Vault-Token: ${BAO_TOKEN}" \
                         "${BAO_ADDR}/v1/secret/data/gentian-os/kernel/database/cnpg")
                       SU_USER=$(echo "${CNPG}" | jq -r '.data.data.superuser_username')
@@ -1066,7 +1066,7 @@ spec:
                       elif [ "${SECRET_MODE}" = "random" ]; then
                         PASSWORD=$(openssl rand -hex 32)
                       else
-                        MASTER=$(curl -sf \
+                        MASTER=$(curl -k -sf \
                           -H "X-Vault-Token: ${BAO_TOKEN}" \
                           "${BAO_ADDR}/v1/secret/data/gentian-os/kernel/internal/master-password" \
                           | jq -r '.data.data.value')
@@ -1096,7 +1096,7 @@ spec:
                         -c "ALTER ROLE \"${ROLE}\" SET search_path TO \"${DBNAME}\", public;"
                       echo "[db-init] role ${ROLE}, database ${DBNAME}, and schema ${DBNAME} ensured"
                       if [ "${SKIP_BAO_WRITE}" != "true" ]; then
-                        curl -sf \
+                        curl -k -sf \
                           -H "X-Vault-Token: ${BAO_TOKEN}" \
                           -H 'Content-Type: application/json' \
                           -X POST \
@@ -1157,7 +1157,7 @@ spec:
                               - name: APP
                                 value: {{ $app }}
                               - name: BAO_ADDR
-                                value: "http://openbao.openbao.svc.cluster.local:8200"
+                                value: "https://openbao.openbao.svc.cluster.local:8200"
                               - name: CNPG_HOST
                                 value: {{ $cnpgHost | quote }}
                               - name: SECRET_MODE

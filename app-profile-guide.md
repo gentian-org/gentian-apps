@@ -1211,3 +1211,22 @@ Before opening a PR, verify:
 - [ ] `spec.browserProxy` declared if the shell will call this app's REST API *(not yet implemented — §5e)*
 - [ ] `compositionRef` omitted unless using a non-default composition
 - [ ] YAML passes `python3 -c "import yaml; yaml.safe_load(open('<file>'))"` locally
+- [ ] Bootstrap/init jobs in `composition.yaml` targeting OpenBao/Vault use `https://...` and `curl -k` (or mount CA cert) to prevent infinite hangs due to TLS requirement (§13)
+
+---
+
+## 13. OpenBao (Vault) Integration in Compositions (Bootstrap Jobs)
+
+When defining bootstrap or initialization Jobs in a composition (`composition.yaml`) that need to communicate directly with the OpenBao/Vault API:
+
+1. **Use HTTPS**: The OpenBao endpoint is TLS-secured. Always set `BAO_ADDR` to `https://openbao.openbao.svc.cluster.local:8200` (not `http://...`).
+2. **Handle TLS/Self-Signed Certificate**: Since OpenBao uses a self-signed or internal CA certificate, `curl` commands in your bootstrap scripts must bypass validation using `-k` or `--insecure` (e.g., `curl -k -sf`), or explicitly mount the CA certificate.
+3. **Avoid Infinite Hangs**: Always ensure curl or other HTTP client calls fail fast by implementing appropriate timeouts (e.g., `--max-time 10` or `--connect-timeout 5`) so that failure modes are readable in pod logs rather than hanging indefinitely.
+
+Example ConfigMap script pattern:
+```bash
+BAO_TOKEN=$(curl -k -sf --max-time 10 "${BAO_ADDR}/v1/auth/kubernetes/login" \
+  -H 'Content-Type: application/json' \
+  -d "{\"role\":\"app-init\",\"jwt\":\"${JWT}\"}" \
+  | jq -r '.auth.client_token')
+```
