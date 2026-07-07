@@ -21,7 +21,13 @@ RUN set -eux; \
     tar -xzf /tmp/user_oidc.tar.gz -C /usr/src/nextcloud/apps/; \
     rm -f /tmp/*.tar.gz; \
     chown -R www-data:www-data /usr/src/nextcloud/apps/user_oidc; \
-    printf '%s\n' 'redis.session.locking_enabled = 0' > /usr/local/etc/php/conf.d/zz-gentian-redis-session.ini
+    printf '%s\n' 'redis.session.locking_enabled = 0' > /usr/local/etc/php/conf.d/zz-gentian-redis-session.ini; \
+    sed -i 's/Listen 80/Listen 8080/' /etc/apache2/ports.conf; \
+    sed -i 's/<VirtualHost \*:80>/<VirtualHost \*:8080>/' /etc/apache2/sites-available/000-default.conf; \
+    chown -R www-data:www-data /usr/local/etc/php/conf.d; \
+    chown -R www-data:www-data /var/run/apache2 /var/log/apache2 /var/lock/apache2 /var/lib/apache2 /etc/apache2
+
+USER www-data
 
 LABEL org.opencontainers.image.title="Gentian Nextcloud Base" \
       org.opencontainers.image.description="Nextcloud with user_oidc bundled for Gentian tenants" \
@@ -49,6 +55,8 @@ RUN set -eux; \
     chown -R www-data:www-data \
       /usr/src/nextcloud/apps/richdocuments \
       /usr/src/nextcloud/apps/forms
+
+USER www-data
 
 LABEL org.opencontainers.image.title="Gentian Nextcloud Office" \
       org.opencontainers.image.description="Nextcloud Office bundle with user_oidc, richdocuments and forms" \
@@ -87,6 +95,8 @@ RUN set -eux; \
       /usr/src/nextcloud/apps/contacts \
       /usr/src/nextcloud/apps/tasks
 
+USER www-data
+
 LABEL org.opencontainers.image.title="Gentian Nextcloud Office+" \
       org.opencontainers.image.description="Nextcloud Office+ bundle with mail, calendar, contacts and tasks" \
       org.gentian.apps.mail="${MAIL_VERSION}" \
@@ -110,7 +120,7 @@ RUN set -eux; \
       "https://github.com/nextcloud-releases/deck/releases/download/v${DECK_VERSION}/deck-v${DECK_VERSION}.tar.gz"; \
     tar -xzf /tmp/deck.tar.gz -C /usr/src/nextcloud/apps/; \
     curl -fsSL -o /tmp/collectives.tar.gz \
-      "https://github.com/nextcloud-releases/collectives/releases/download/v${COLLECTIVES_VERSION}/collectives-v${COLLECTIVES_VERSION}.tar.gz"; \
+      "https://github.com/nextcloud/collectives/releases/download/v${COLLECTIVES_VERSION}/collectives-${COLLECTIVES_VERSION}.tar.gz"; \
     tar -xzf /tmp/collectives.tar.gz -C /usr/src/nextcloud/apps/; \
     curl -fsSL -o /tmp/spreed.tar.gz \
       "https://github.com/nextcloud-releases/spreed/releases/download/v${SPREED_VERSION}/spreed-v${SPREED_VERSION}.tar.gz"; \
@@ -120,6 +130,8 @@ RUN set -eux; \
       /usr/src/nextcloud/apps/deck \
       /usr/src/nextcloud/apps/collectives \
       /usr/src/nextcloud/apps/spreed
+
+USER www-data
 
 LABEL org.opencontainers.image.title="Gentian Nextcloud Suite" \
       org.opencontainers.image.description="Nextcloud Suite bundle with deck, collectives and spreed (Talk)" \

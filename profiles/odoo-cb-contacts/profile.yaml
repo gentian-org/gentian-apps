@@ -8,6 +8,7 @@ metadata:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: module
     gentianos.io/requires-profile: odoo-cb-base
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["contacts"]}'
 spec:
   displayName: "Odoo Contacts"
   description: "Contact management module for Odoo."

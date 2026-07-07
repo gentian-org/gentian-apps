@@ -8,6 +8,7 @@ metadata:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: module
     gentianos.io/requires-profile: odoo-cb-base
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["calendar"]}'
 spec:
   displayName: "Odoo Calendar"
   description: "Shared calendar module for Odoo."

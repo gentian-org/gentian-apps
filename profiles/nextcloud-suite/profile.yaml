@@ -298,6 +298,7 @@ spec:
       secret.reloader.stakater.com/reload: nextcloud-suite-sensitive-values
 
     nextcloud:
+      containerPort: 8080
       securityContext:
         allowPrivilegeEscalation: false
         runAsNonRoot: true
