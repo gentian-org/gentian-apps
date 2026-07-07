@@ -640,7 +640,7 @@ spec:
                     labels:
                       app.kubernetes.io/managed-by: gentian-os
                       gentianos.io/tenant: {{ $tenant }}
-                      gentianos.io/app: {{ $app }}
+                      gentianos.io/app: odoo-cb-base
                   spec:
                     ttlSecondsAfterFinished: 600
                     backoffLimit: 10
@@ -649,7 +649,7 @@ spec:
                         labels:
                           app.kubernetes.io/managed-by: gentian-os
                           gentianos.io/tenant: {{ $tenant }}
-                          gentianos.io/app: {{ $app }}
+                          gentianos.io/app: odoo-cb-base
                           gentianos.io/component: odoo-install
                       spec:
                         restartPolicy: OnFailure
