@@ -31,7 +31,7 @@ spec:
   compositionRef: app-odoo
   deploymentMethod: crossplane
   chart:
-    repository: https://raw.githubusercontent.com/gentian-org/gentian-apps/main/charts/packages
+    repository: http://192.168.0.100:8089
     name: odoo
     version: "0.1.1"
   extraValues:
