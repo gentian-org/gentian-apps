@@ -33,7 +33,7 @@ spec:
   chart:
     repository: http://192.168.0.100:8089
     name: odoo
-    version: "0.1.1"
+    version: "0.1.2"
   extraValues:
     odoo:
       module: calendar
