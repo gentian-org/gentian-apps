@@ -78,12 +78,20 @@ spec:
             - |
               python3 /opt/odoo/src/odoo/odoo-bin \
                 -d "${DB_NAME}" \
+                --db_host="${DB_HOST}" \
+                --db_port="${DB_PORT}" \
+                --db_user="${DB_USER}" \
+                --db_password="${DB_PASSWORD}" \
                 --config=/etc/odoo/odoo.conf \
                 -i {{ .Values.gentian.initModules }} \
                 --without-demo=all \
                 --stop-after-init || true
               exec python3 /opt/odoo/src/odoo/odoo-bin \
                 -d "${DB_NAME}" \
+                --db_host="${DB_HOST}" \
+                --db_port="${DB_PORT}" \
+                --db_user="${DB_USER}" \
+                --db_password="${DB_PASSWORD}" \
                 --config=/etc/odoo/odoo.conf
           ports:
             - name: http
