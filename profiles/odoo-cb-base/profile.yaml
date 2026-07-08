@@ -11,6 +11,7 @@ metadata:
   annotations:
     gentianos.io/platform-app: "true"
     gentianos.io/deployment-role: base
+    gentianos.io/portal-auth-mode: oidc
 spec:
   displayName: "Odoo Community Backport"
   description: "Odoo Community ERP runtime — required base for Odoo module apps."
@@ -56,6 +57,8 @@ spec:
       displayName:
         en_US: "Odoo Settings"
         de_DE: "Odoo Einstellungen"
+      tile:
+        icon: settings
       linkSuffix: "/web?gentian_embed=1"
       linkTarget: embedded
       allowedGroup: "Tenant Admins"
@@ -63,7 +66,7 @@ spec:
   chart:
     repository: http://192.168.0.100:8089
     name: odoo
-    version: "0.1.7"
+    version: "0.1.8"
 
   deploymentMethod: crossplane
 

@@ -9,6 +9,7 @@ metadata:
     gentianos.io/deployment-role: module
     gentianos.io/requires-profile: odoo-cb-base
     gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["crm"]}'
+    gentianos.io/portal-auth-mode: oidc
 spec:
   displayName: "Odoo CRM"
   description: "Customer Relationship Management module for Odoo."
@@ -18,7 +19,7 @@ spec:
   trustTier: platform
   license: LGPL-3.0
   tile:
-    icon: erp
+    icon: crm
 
   portalTiles:
     - name: odoo-crm

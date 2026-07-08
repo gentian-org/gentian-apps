@@ -152,6 +152,21 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret.name }}
                   key: db-name
+            - name: OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: oidc-client-id
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: oidc-client-secret
+            - name: OIDC_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: oidc-issuer
             - name: GENTIAN_TENANT_ID
               value: {{ .Values.tenantId | quote }}
             - name: GENTIAN_CONFIG_PATH

@@ -3,7 +3,17 @@ entries:
   odoo:
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-08T17:55:05.269115729+02:00"
+    created: "2026-07-08T18:09:23.576255719+02:00"
+    description: Odoo Community (OCB) for Gentian OS tenants
+    digest: 87733a9025829f1cf8022cd6f457b64fa2e16bda4cd2fdd11cf5ffeeb35ce632
+    name: odoo
+    type: application
+    urls:
+    - http://192.168.0.100:8089/odoo-0.1.8.tgz
+    version: 0.1.8
+  - apiVersion: v2
+    appVersion: "19.0"
+    created: "2026-07-08T18:09:23.575944529+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: 42eb22d03b9921e7f310d7a05a3ff9f24db550e650a6614bf43f3631287c888e
     name: odoo
@@ -13,7 +23,7 @@ entries:
     version: 0.1.7
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-08T17:55:05.268964885+02:00"
+    created: "2026-07-08T18:09:23.575645634+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: ed4581b9b2058820dcc0a41d2bc95db9d617313b1b6ba347cc5916370916b787
     name: odoo
@@ -23,7 +33,7 @@ entries:
     version: 0.1.6
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-08T17:55:05.268818485+02:00"
+    created: "2026-07-08T18:09:23.575344978+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: 144953e3c1f0728f37b9567033fa3127df43c2a30da753b3ccf035febfe4f8c5
     name: odoo
@@ -33,7 +43,7 @@ entries:
     version: 0.1.5
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-08T17:55:05.268678177+02:00"
+    created: "2026-07-08T18:09:23.575003417+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: 1be1c7c0f4bbbbd282ee2b511f75157039522fb5265933b098d9b0a1608a6dab
     name: odoo
@@ -43,7 +53,7 @@ entries:
     version: 0.1.4
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-08T17:55:05.268538053+02:00"
+    created: "2026-07-08T18:09:23.57453925+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: 15cb7fcd5f5fa7993343607b311e0feeaadd3bf5fb32208ae747c453935af9fb
     name: odoo
@@ -53,7 +63,7 @@ entries:
     version: 0.1.3
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-08T17:55:05.268377882+02:00"
+    created: "2026-07-08T18:09:23.574196603+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: 5c9c6d9f99de072410e5533dce9cb1f2c369dc55ce31319c6b3da79056e385a1
     name: odoo
@@ -63,7 +73,7 @@ entries:
     version: 0.1.2
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-08T17:55:05.268237183+02:00"
+    created: "2026-07-08T18:09:23.574023448+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: c69d239c28e928ea852fbe311eaa2fd1c567ca5a00ed0c42dc88c7ef9713c575
     name: odoo
@@ -73,7 +83,7 @@ entries:
     version: 0.1.1
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-08T17:55:05.26809584+02:00"
+    created: "2026-07-08T18:09:23.573854175+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: b239e8d3dec61ea35de2415c7526a753c29cbb711dec66c0cfda0e290217be4b
     name: odoo
@@ -81,4 +91,4 @@ entries:
     urls:
     - http://192.168.0.100:8089/odoo-0.1.0.tgz
     version: 0.1.0
-generated: "2026-07-08T17:55:05.267878578+02:00"
+generated: "2026-07-08T18:09:23.573601874+02:00"
