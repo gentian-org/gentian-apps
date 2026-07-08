@@ -11,6 +11,7 @@ data:
     workers = 0
     max_cron_threads = 1
     without_demo = all
+    proxy_mode = True
   config.json: |
     {
       "tenantId": {{ .Values.tenantId | quote }},
