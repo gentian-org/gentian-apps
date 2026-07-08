@@ -28,6 +28,12 @@ gentian:
   bindingsPath: /etc/gentian/bindings.json
   modulesPath: /opt/odoo/custom-addons
   initModules: "base,web,gentian_os"
+  git:
+    enabled: true
+    repo: "https://github.com/gentian-org/odoo-modules.git"
+    branch: "main"
+    syncInterval: 60
+    secretName: ""
 
 persistence:
   enabled: true

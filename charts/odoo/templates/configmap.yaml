@@ -5,7 +5,7 @@ metadata:
 data:
   odoo.conf: |
     [options]
-    addons_path = /opt/odoo/src/odoo/addons,{{ .Values.gentian.modulesPath }}
+    addons_path = /opt/odoo/src/odoo/addons,{{ .Values.gentian.modulesPath }}{{ if .Values.gentian.git.enabled }}/current{{ end }}
     data_dir = /opt/odoo/data
     xmlrpc_port = {{ .Values.service.port }}
     workers = 0
