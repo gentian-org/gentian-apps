@@ -6,6 +6,7 @@ metadata:
     gentianos.io/profile-name: element
   annotations:
     gentianos.io/kernel-egress-namespaces: envoy-gateway-system
+    gentianos.io/portal-auth-mode: matrix-bridge
 spec:
   displayName: "Element"
   compositionRef: app-element
