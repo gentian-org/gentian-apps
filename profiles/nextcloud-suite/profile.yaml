@@ -248,7 +248,7 @@ spec:
       tag: "33.0.6-suite-gentian4"
 
     # Redis ACL user is provisioned as ${TENANT_ID}-${APP_ID}; the chart only maps password by default.
-    extraEnvVars:
+    extraEnv:
       - name: REDIS_HOST_USER
         value: "${TENANT_ID}-${APP_ID}"
 
