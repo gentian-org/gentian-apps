@@ -26,6 +26,7 @@ metadata:
     gentianos.io/profile-name: nextcloud-base
   annotations:
     gentianos.io/kernel-egress-namespaces: envoy-gateway-system
+    gentianos.io/portal-auth-mode: nextcloud-bridge
 spec:
   displayName: "Nextcloud Base"
   description: "Self-hosted file sync and share with OIDC SSO."

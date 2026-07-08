@@ -29,6 +29,7 @@ metadata:
     gentianos.io/profile-name: openproject
   annotations:
     gentianos.io/gateway-api-backends: '[{"pathPrefix":"/gentian-portal-bridge","serviceName":"openproject-portal-bridge","port":8080},{"pathPrefix":"/openproject-portal-sso.html","serviceName":"openproject-portal-bridge","port":8080}]'
+    gentianos.io/portal-auth-mode: openproject-bridge
 spec:
   displayName: "OpenProject"
   description: "Open-source project management with Gantt charts, Kanban boards, and time tracking."

@@ -27,6 +27,7 @@ metadata:
     gentianos.io/profile-name: nextcloud-office
   annotations:
     gentianos.io/kernel-egress-namespaces: envoy-gateway-system
+    gentianos.io/portal-auth-mode: nextcloud-bridge
 spec:
   displayName: "Nextcloud Office"
   description: "Self-hosted file sync, forms, and Collabora Online document editing with OIDC SSO."

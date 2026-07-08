@@ -27,6 +27,7 @@ metadata:
     gentianos.io/profile-name: nextcloud-office-plus
   annotations:
     gentianos.io/kernel-egress-namespaces: envoy-gateway-system
+    gentianos.io/portal-auth-mode: nextcloud-bridge
 spec:
   displayName: "Nextcloud Office+"
   description: "Self-hosted file sync, document editing, forms, and PIM (Mail, Calendar, Contacts, Tasks) with OIDC SSO."

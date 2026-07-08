@@ -27,6 +27,7 @@ metadata:
     gentianos.io/profile-name: nextcloud-suite
   annotations:
     gentianos.io/kernel-egress-namespaces: envoy-gateway-system
+    gentianos.io/portal-auth-mode: nextcloud-bridge
 spec:
   displayName: "Nextcloud Suite"
   description: "Self-hosted file sync, document editing, forms, PIM, Deck, Collectives wiki, and Talk video/chat with OIDC SSO."
