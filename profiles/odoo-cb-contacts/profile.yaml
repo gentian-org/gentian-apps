@@ -27,7 +27,7 @@ spec:
         de_DE: "Odoo Kontakte"
       linkSuffix: "/web?gentian_embed=1#action=contacts.action_contacts"
       linkTarget: embedded
-      allowedGroup: "Tenant Admins"
+      allowedGroup: "App Users"
 
   compositionRef: app-odoo
   deploymentMethod: crossplane

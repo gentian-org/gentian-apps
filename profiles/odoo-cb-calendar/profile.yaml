@@ -27,7 +27,7 @@ spec:
         de_DE: "Odoo Kalender"
       linkSuffix: "/web?gentian_embed=1#action=calendar.action_calendar_event"
       linkTarget: embedded
-      allowedGroup: "Tenant Admins"
+      allowedGroup: "App Users"
 
   compositionRef: app-odoo
   deploymentMethod: crossplane

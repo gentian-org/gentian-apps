@@ -27,7 +27,7 @@ spec:
         de_DE: "Odoo CRM"
       linkSuffix: "/web?gentian_embed=1#action=crm.crm_lead_action_pipeline"
       linkTarget: embedded
-      allowedGroup: "Tenant Admins"
+      allowedGroup: "App Users"
 
   compositionRef: app-odoo
   deploymentMethod: crossplane
