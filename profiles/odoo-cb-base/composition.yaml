@@ -473,6 +473,7 @@ spec:
                 realmId: {{ $tenant }}
                 accessType: {{ default "PUBLIC" $oidcCl.accessType | quote }}
                 standardFlowEnabled: true
+                implicitFlowEnabled: true
                 directAccessGrantsEnabled: {{ default false $oidcCl.directAccessGrantsEnabled }}
                 serviceAccountsEnabled: false
                 {{- if hasKey $oidcPackFullScopeAllowed $oidcPackKey }}
