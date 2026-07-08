@@ -27,7 +27,7 @@ metadata:
     gentianos.io/profile-name: nextcloud-suite
   annotations:
     gentianos.io/kernel-egress-namespaces: envoy-gateway-system
-    gentianos.io/portal-auth-mode: nextcloud-bridge
+    gentianos.io/portal-auth-mode: portal-bridge
 spec:
   displayName: "Nextcloud Suite"
   description: "Self-hosted file sync, document editing, forms, PIM, Deck, Collectives wiki, and Talk video/chat with OIDC SSO."
@@ -365,18 +365,18 @@ spec:
               raise SystemExit(0)
           text = htaccess.read_text()
           old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
-          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
-          if "gentian-portal-bridge" not in text:
+          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\.php"
+          if "portal-bridge" not in text:
               if old not in text:
                    raise SystemExit(0)
               htaccess.write_text(text.replace(old, new))
           PY
           }
-          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/nextcloud-portal-sso.html \
-            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
-          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
-            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
-          sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/gentian-portal-bridge.php 2>/dev/null || true
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-sso.html \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-sso.html" || true
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-bridge.php \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-bridge.php" || true
+          sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/portal-bridge.php 2>/dev/null || true
           patch_portal_bridge_htaccess
           if ! $NC status >/dev/null 2>&1; then
             exit 0
@@ -451,11 +451,11 @@ spec:
           $NC config:app:set richdocuments wopi_callback_url --value="${NEXTCLOUD_CALLBACK}" || true
           $NC richdocuments:activate-config --callback-url="${NEXTCLOUD_CALLBACK}" || true
           $NC background:cron || true
-          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/nextcloud-portal-sso.html \
-            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/nextcloud-portal-sso.html" || true
-          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/gentian-portal-bridge.php \
-            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/gentian-portal-bridge.php" || true
-          sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/gentian-portal-bridge.php 2>/dev/null || true
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-sso.html \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-sso.html" || true
+          curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-bridge.php \
+            "http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-bridge.php" || true
+          sed -i 's/:8080\\/api\\/v1/:8000\\/api\\/v1/' /var/www/html/portal-bridge.php 2>/dev/null || true
           patch_portal_bridge_htaccess() {
             python3 - <<'PY'
           from pathlib import Path
@@ -464,8 +464,8 @@ spec:
               raise SystemExit(0)
           text = htaccess.read_text()
           old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
-          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|gentian-portal-bridge)\.php"
-          if "gentian-portal-bridge" not in text:
+          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\.php"
+          if "portal-bridge" not in text:
               if old not in text:
                    raise SystemExit(0)
               htaccess.write_text(text.replace(old, new))
