@@ -267,6 +267,16 @@ spec:
       configs:
         gentian-proxy.config.php: |-
           <?php
+          // Dynamically override session.save_path to support Redis ACL usernames
+          $redis_host = getenv('REDIS_HOST') ?: 'redis-dev-master.gentian-infra-dev.svc.cluster.local';
+          $redis_port = getenv('REDIS_HOST_PORT') ?: 6379;
+          $redis_pass = getenv('REDIS_HOST_PASSWORD') ?: '';
+          $redis_user = '${TENANT_ID}-${APP_ID}';
+          if ($redis_host && $redis_pass) {
+              $save_path = "tcp://$redis_host:$redis_port?auth[user]=$redis_user&auth[pass]=$redis_pass";
+              ini_set('session.save_path', $save_path);
+          }
+
           $CONFIG = array(
             'overwritehost' => 'cloud.${TENANT_DOMAIN}',
             'overwriteprotocol' => 'https',
