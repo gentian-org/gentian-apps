@@ -240,12 +240,14 @@ spec:
           if not htaccess.is_file():
               raise SystemExit(0)
           text = htaccess.read_text()
-          old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
-          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\.php"
-          if "portal-bridge" not in text:
-              if old not in text:
-                   raise SystemExit(0)
-              htaccess.write_text(text.replace(old, new))
+          if "gentian-portal-bridge" in text:
+              text = text.replace("gentian-portal-bridge", "portal-bridge")
+              htaccess.write_text(text)
+          elif "portal-bridge" not in text:
+              old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
+              new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\.php"
+              if old in text:
+                  htaccess.write_text(text.replace(old, new))
           PY
           }
           curl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-sso.html \
@@ -324,12 +326,14 @@ spec:
           if not htaccess.is_file():
               raise SystemExit(0)
           text = htaccess.read_text()
-          old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
-          new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\.php"
-          if "portal-bridge" not in text:
-              if old not in text:
-                   raise SystemExit(0)
-              htaccess.write_text(text.replace(old, new))
+          if "gentian-portal-bridge" in text:
+              text = text.replace("gentian-portal-bridge", "portal-bridge")
+              htaccess.write_text(text)
+          elif "portal-bridge" not in text:
+              old = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php"
+              new = r"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\.php"
+              if old in text:
+                  htaccess.write_text(text.replace(old, new))
           PY
           }
           patch_portal_bridge_htaccess
