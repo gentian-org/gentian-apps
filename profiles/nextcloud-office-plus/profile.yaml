@@ -169,6 +169,13 @@ spec:
 
   deploymentMethod: crossplane
 
+  security:
+    macWaivers:
+      - policy: gentian-disallow-privilege-escalation
+        scope: collabora
+      - policy: gentian-restrict-capabilities
+        scope: collabora
+
   valueMapping:
     oidc:
       clientSecretKey: "nextcloud.oidcBootstrap.clientSecret"
@@ -467,14 +474,20 @@ spec:
       podLabels:
         gentianos.io/app: nextcloud
         gentianos.io/tenant: ${TENANT_ID}
+        mac-waiver.gentianos.io/gentian-disallow-privilege-escalation: "approved"
+        mac-waiver.gentianos.io/gentian-restrict-capabilities: "approved"
       securityContext:
-        allowPrivilegeEscalation: false
+        allowPrivilegeEscalation: true
         runAsNonRoot: true
         runAsUser: 1001
         runAsGroup: 1001
         seccompProfile:
           type: RuntimeDefault
         capabilities:
+          add:
+            - CHOWN
+            - FOWNER
+            - SYS_CHROOT
           drop:
             - ALL
       collabora:
