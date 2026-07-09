@@ -59,7 +59,7 @@ spec:
         de_DE: "Odoo Einstellungen"
       tile:
         icon: settings
-      linkSuffix: "/web?gentian_embed=1"
+      linkSuffix: "/web?gentian_embed=1&action=base_setup.action_general_configuration"
       linkTarget: embedded
       allowedGroup: "Tenant Admins"
 
