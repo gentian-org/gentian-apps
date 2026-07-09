@@ -472,7 +472,7 @@ spec:
       enabled: true
       fullnameOverride: nextcloud-collabora
       podLabels:
-        gentianos.io/app: nextcloud
+        gentianos.io/app: nextcloud-office-plus
         gentianos.io/tenant: ${TENANT_ID}
         mac-waiver.gentianos.io/gentian-disallow-privilege-escalation: "approved"
         mac-waiver.gentianos.io/gentian-restrict-capabilities: "approved"
