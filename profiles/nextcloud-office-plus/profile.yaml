@@ -375,7 +375,8 @@ spec:
           fi
           sync_bundled_apps() {
             for app in richdocuments user_oidc forms mail calendar contacts tasks; do
-              if [ ! -d "/var/www/html/custom_apps/${app}" ] && [ -d "/usr/src/nextcloud/apps/${app}" ]; then
+              if [ -d "/usr/src/nextcloud/apps/${app}" ]; then
+                rm -rf "/var/www/html/custom_apps/${app}"
                 cp -a "/usr/src/nextcloud/apps/${app}" "/var/www/html/custom_apps/"
                 chown -R www-data:www-data "/var/www/html/custom_apps/${app}"
               fi
@@ -412,7 +413,8 @@ spec:
           done
           sync_bundled_apps() {
             for app in richdocuments user_oidc forms mail calendar contacts tasks; do
-              if [ ! -d "/var/www/html/custom_apps/${app}" ] && [ -d "/usr/src/nextcloud/apps/${app}" ]; then
+              if [ -d "/usr/src/nextcloud/apps/${app}" ]; then
+                rm -rf "/var/www/html/custom_apps/${app}"
                 cp -a "/usr/src/nextcloud/apps/${app}" "/var/www/html/custom_apps/"
                 chown -R www-data:www-data "/var/www/html/custom_apps/${app}"
               fi
