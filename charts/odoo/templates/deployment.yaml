@@ -62,8 +62,15 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret.name }}
                   key: db-password
-        {{- if .Values.gentian.git.enabled }}
-        - name: git-sync-init
+        {{- $gitSources := list -}}
+        {{- if .Values.gentian.gitSources -}}
+          {{- $gitSources = .Values.gentian.gitSources -}}
+        {{- end -}}
+        {{- if and .Values.gentian.git.enabled (eq (len $gitSources) 0) -}}
+          {{- $gitSources = list (dict "name" "default" "repo" .Values.gentian.git.repo "branch" .Values.gentian.git.branch "syncInterval" (int .Values.gentian.git.syncInterval) "secretName" .Values.gentian.git.secretName) -}}
+        {{- end -}}
+        {{- range $gitSources }}
+        - name: git-sync-init-{{ .name }}
           image: registry.k8s.io/git-sync/git-sync:v4.2.3
           securityContext:
             runAsUser: 999
@@ -74,20 +81,20 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           args:
-            - --repo={{ .Values.gentian.git.repo }}
-            - --branch={{ .Values.gentian.git.branch }}
-            - --root={{ .Values.gentian.modulesPath }}
-            - --dest=current
+            - --repo={{ .repo }}
+            - --branch={{ .branch }}
+            - --root={{ $.Values.gentian.modulesPath }}
+            - --dest={{ .name }}/current
             - --submodules=off
             - --one-time
-            {{- if .Values.gentian.git.secretName }}
+            {{- if .secretName }}
             - --ssh-key-file=/etc/git-secret/ssh
             {{- end }}
           volumeMounts:
             - name: extra-addons
-              mountPath: {{ .Values.gentian.modulesPath }}
-            {{- if .Values.gentian.git.secretName }}
-            - name: git-secret
+              mountPath: {{ $.Values.gentian.modulesPath }}
+            {{- if .secretName }}
+            - name: git-secret-{{ .name }}
               mountPath: /etc/git-secret
               readOnly: true
             {{- end }}
@@ -198,8 +205,8 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-        {{- if .Values.gentian.git.enabled }}
-        - name: git-sync
+        {{- range $gitSources }}
+        - name: git-sync-{{ .name }}
           image: registry.k8s.io/git-sync/git-sync:v4.2.3
           securityContext:
             runAsUser: 999
@@ -210,20 +217,20 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           args:
-            - --repo={{ .Values.gentian.git.repo }}
-            - --branch={{ .Values.gentian.git.branch }}
-            - --root={{ .Values.gentian.modulesPath }}
-            - --dest=current
+            - --repo={{ .repo }}
+            - --branch={{ .branch }}
+            - --root={{ $.Values.gentian.modulesPath }}
+            - --dest={{ .name }}/current
             - --submodules=off
-            - --wait={{ .Values.gentian.git.syncInterval }}
-            {{- if .Values.gentian.git.secretName }}
+            - --wait={{ .syncInterval }}
+            {{- if .secretName }}
             - --ssh-key-file=/etc/git-secret/ssh
             {{- end }}
           volumeMounts:
             - name: extra-addons
-              mountPath: {{ .Values.gentian.modulesPath }}
-            {{- if .Values.gentian.git.secretName }}
-            - name: git-secret
+              mountPath: {{ $.Values.gentian.modulesPath }}
+            {{- if .secretName }}
+            - name: git-secret-{{ .name }}
               mountPath: /etc/git-secret
               readOnly: true
             {{- end }}
@@ -249,9 +256,11 @@ spec:
                 path: config.json
         - name: tmp
           emptyDir: {}
-        {{- if and .Values.gentian.git.enabled .Values.gentian.git.secretName }}
-        - name: git-secret
+        {{- range $gitSources }}
+        {{- if .secretName }}
+        - name: git-secret-{{ .name }}
           secret:
-            secretName: {{ .Values.gentian.git.secretName }}
+            secretName: {{ .secretName }}
             defaultMode: 288
+        {{- end }}
         {{- end }}

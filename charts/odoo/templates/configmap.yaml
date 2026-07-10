@@ -5,7 +5,18 @@ metadata:
 data:
   odoo.conf: |
     [options]
-    addons_path = /opt/odoo/src/odoo/addons,{{ .Values.gentian.modulesPath }}{{ if .Values.gentian.git.enabled }}/current{{ end }}
+    {{- $gitSources := list -}}
+    {{- if .Values.gentian.gitSources -}}
+      {{- $gitSources = .Values.gentian.gitSources -}}
+    {{- end -}}
+    {{- if and .Values.gentian.git.enabled (eq (len $gitSources) 0) -}}
+      {{- $gitSources = list (dict "name" "default" "repo" .Values.gentian.git.repo "branch" .Values.gentian.git.branch "syncInterval" (int .Values.gentian.git.syncInterval) "secretName" .Values.gentian.git.secretName) -}}
+    {{- end -}}
+    {{- $addonsPaths := list "/opt/odoo/src/odoo/addons" -}}
+    {{- range $gitSources -}}
+      {{- $addonsPaths = append $addonsPaths (printf "%s/%s/current" $.Values.gentian.modulesPath .name) -}}
+    {{- end -}}
+    addons_path = {{ join "," $addonsPaths }}
     data_dir = /opt/odoo/data
     xmlrpc_port = {{ .Values.service.port }}
     workers = 0

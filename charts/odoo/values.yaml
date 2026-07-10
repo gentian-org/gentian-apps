@@ -34,6 +34,7 @@ gentian:
     branch: "main"
     syncInterval: 60
     secretName: ""
+  gitSources: []
 
 persistence:
   enabled: true
