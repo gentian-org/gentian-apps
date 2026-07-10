@@ -96,7 +96,7 @@ spec:
     ingress:
       enabled: false
     gentian:
-      initModules: "base,web,gentian_os"
+      initModules: "base,web,gentian_os,account"
       modulesPath: /opt/odoo/custom-addons
       git:
         enabled: true
