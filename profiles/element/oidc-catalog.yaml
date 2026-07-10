@@ -9,7 +9,7 @@ metadata:
 spec:
   mapperTemplates:
     email:
-      protocolMapper: oidc-usermodel-attribute-mapper
+      protocolMapper: oidc-usermodel-property-mapper
       config:
         user.attribute: email
         claim.name: email

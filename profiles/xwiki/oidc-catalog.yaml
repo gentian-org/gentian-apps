@@ -27,7 +27,7 @@ spec:
         access.token.claim: "true"
         userinfo.token.claim: "true"
     email:
-      protocolMapper: oidc-usermodel-attribute-mapper
+      protocolMapper: oidc-usermodel-property-mapper
       config:
         user.attribute: email
         claim.name: email
@@ -37,7 +37,7 @@ spec:
         userinfo.token.claim: "true"
         introspection.token.claim: "true"
     given_name:
-      protocolMapper: oidc-usermodel-attribute-mapper
+      protocolMapper: oidc-usermodel-property-mapper
       config:
         user.attribute: firstName
         claim.name: given_name
@@ -47,7 +47,7 @@ spec:
         userinfo.token.claim: "true"
         introspection.token.claim: "true"
     family_name:
-      protocolMapper: oidc-usermodel-attribute-mapper
+      protocolMapper: oidc-usermodel-property-mapper
       config:
         user.attribute: lastName
         claim.name: family_name
