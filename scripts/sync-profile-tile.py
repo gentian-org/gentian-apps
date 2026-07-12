@@ -25,22 +25,38 @@ def sync_profile(profile_dir: Path) -> int:
 
     doc = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
     spec = doc.setdefault("spec", {})
-    tile = spec.setdefault("tile", {})
+
+    updated = False
+
+    # Sync main tile if set with image
+    tile = spec.get("tile", {})
     image_rel = tile.get("image")
-    if not image_rel:
-        print(f"{profile_dir}: spec.tile.image not set", file=sys.stderr)
-        return 1
+    if image_rel:
+        image_path = profile_dir / image_rel
+        if image_path.is_file():
+            tile["logo"] = encode_svg(image_path)
+            tile.pop("icon", None)
+            print(f"Updated main tile.logo from {image_rel}")
+            updated = True
 
-    image_path = profile_dir / image_rel
-    if not image_path.is_file():
-        print(f"missing {image_path}", file=sys.stderr)
-        return 1
+    # Sync sub-app portalTiles if set with image
+    for portal_tile in spec.get("portalTiles") or []:
+        tile_cfg = portal_tile.get("tile") or {}
+        image_rel = tile_cfg.get("image")
+        if image_rel:
+            image_path = profile_dir / image_rel
+            if image_path.is_file():
+                tile_cfg["logo"] = encode_svg(image_path)
+                tile_cfg.pop("icon", None)
+                print(f"Updated portalTile {portal_tile['name']} tile.logo from {image_rel}")
+                updated = True
 
-    tile["logo"] = encode_svg(image_path)
-    tile.pop("icon", None)
-    profile_path.write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
-    print(f"Updated {profile_path} tile.logo from {image_rel}")
-    return 0
+    if updated:
+        profile_path.write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
+        return 0
+    else:
+        print(f"No changes in {profile_path}", file=sys.stderr)
+        return 1
 
 
 def main() -> int:

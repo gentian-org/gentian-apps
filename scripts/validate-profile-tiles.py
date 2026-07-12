@@ -37,9 +37,8 @@ def validate_profile(path: Path, catalogue_ids: set[str]) -> list[str]:
         icon = tile.get("icon")
         logo = tile.get("logo")
         image = tile.get("image")
-        set_count = sum(1 for v in (icon, logo, image) if v)
-        if set_count > 1:
-            errors.append(f"{rel} {label}: set only one of tile.icon, tile.logo, or tile.image")
+        if icon and (logo or image):
+            errors.append(f"{rel} {label}: set either tile.icon or tile.image/tile.logo, not both")
             return
         if icon and icon not in catalogue_ids:
             errors.append(f"{rel} {label}: unknown tile.icon {icon!r}")

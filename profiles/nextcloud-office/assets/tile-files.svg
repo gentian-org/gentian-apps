@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52" role="img">
+  <rect width="52" height="52" rx="10" fill="#ECE8DF"/>
+  <rect width="52" height="52" rx="10" fill="none" stroke="rgba(20, 21, 46, 0.08)" stroke-width="1"/>
+  <svg x="14" y="14" width="24" height="24" viewBox="0 0 16 16" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2">
+    <path d="M4 20c-.55 0-1.021-.196-1.412-.587A1.927 1.927 0 0 1 2 18V6c0-.55.196-1.021.588-1.413A1.926 1.926 0 0 1 4 4h6l2 2h8c.55 0 1.021.196 1.413.587.391.392.587.863.587 1.413v10a1.93 1.93 0 0 1-.587 1.413A1.93 1.93 0 0 1 20 20H4Z" fill="#262696" fill-rule="nonzero" transform="matrix(.7 0 0 .7 -.4 -.4)"/>
+  </svg>
+</svg>

@@ -1230,3 +1230,52 @@ BAO_TOKEN=$(curl -k -sf --max-time 10 "${BAO_ADDR}/v1/auth/kubernetes/login" \
   -d "{\"role\":\"app-init\",\"jwt\":\"${JWT}\"}" \
   | jq -r '.auth.client_token')
 ```
+
+---
+
+## 14. SaaS Integrations (ApiProfile)
+
+For applications and services that are hosted externally (such as centralized billing, CRM, or external vendor SaaS), Gentian OS supports **ApiProfiles** (`deploymentMethod: api`).
+
+An ApiProfile deploys NO workload pods or Helm releases inside the tenant namespace, but contributes portal shell tiles and ingress routing configurations.
+
+### 14a. Structuring the Profile
+
+Below is a complete template for an ApiProfile:
+
+```yaml
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: external-service
+spec:
+  displayName: "External Service"
+  description: "External SaaS integration sample."
+  license: proprietary
+  
+  deploymentMethod: api
+
+  apiIntegration:
+    runtime: portal-proxy                # redirect | portal-proxy
+    baseUrl: "https://saas.example.com"  # external target URL
+    tenantBinding: tenant-domain         # tenant-domain | none
+
+  portalTiles:
+    - name: dashboard
+      displayName:
+        en_US: "Dashboard"
+      linkTarget: embedded               # embedded | newwindow
+      allowedGroup: "Tenant Admins"
+```
+
+### 14b. Runtime Modes
+
+1. **Redirect Mode (`runtime: redirect`):**
+   * The portal shell tile directs the user's browser to the external `baseUrl` via a top-level redirect or opens a new tab.
+   * If `tenantBinding` is `tenant-domain`, the operator appends `?tenantDomain=<tenant>.<kernel_domain>` to the redirect URL to identify the client workspace.
+
+2. **Portal Proxy Mode (`runtime: portal-proxy`):**
+   * The operator configures Gateway API HTTPRoutes for the app's subdomain to forward all incoming traffic to the central **portal BFF API** (`gentian-portal-gentian-portal-api` Service in the tenant namespace on port `8000`).
+   * The portal BFF acts as a reverse proxy, receiving requests same-origin from the browser and forwarding them server-side to the external `baseUrl` (injecting `tenantDomain` query arguments if requested).
+   * This allows the external SaaS UI to be embedded inside the portal UI in an iframe (`linkTarget: embedded`) safely, avoiding CORS headers and keeping credentials server-side.
+

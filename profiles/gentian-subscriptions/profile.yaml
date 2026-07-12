@@ -26,7 +26,7 @@ spec:
   deploymentMethod: api
 
   apiIntegration:
-    runtime: redirect
+    runtime: portal-proxy
     baseUrl: "https://corp.desk.gentian.org"
     tenantBinding: tenant-domain
 
@@ -35,5 +35,5 @@ spec:
       displayName:
         en_US: "Subscriptions"
         de_DE: "Abonnements"
-      linkTarget: newwindow
+      linkTarget: embedded
       allowedGroup: "Tenant Admins"
