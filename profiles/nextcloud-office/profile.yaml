@@ -248,40 +248,7 @@ spec:
         mountPath: /etc/gentian
         readOnly: true
       hooks:
-        before-starting: "#!/bin/bash\nset -eu\nNC=\"php /var/www/html/occ\"\nCOLLABORA_PUBLIC=\"\
-          https://collabora.${TENANT_DOMAIN}\"\nCOLLABORA_INTERNAL=\"http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980\"\
-          \nNEXTCLOUD_CALLBACK=\"http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080\"\
-          \npatch_portal_bridge_htaccess() {\n  python3 - <<'PY'\nfrom pathlib import\
-          \ Path\nhtaccess = Path(\"/var/www/html/.htaccess\")\nif not htaccess.is_file():\n\
-          \    raise SystemExit(0)\ntext = htaccess.read_text()\nif \"gentian-portal-bridge\"\
-          \ in text:\n    text = text.replace(\"gentian-portal-bridge\", \"portal-bridge\"\
-          )\n    htaccess.write_text(text)\nelif \"portal-bridge\" not in text:\n\
-          \    old = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\\\
-          .php\"\n    new = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\\\
-          .php\"\n    if old in text:\n        htaccess.write_text(text.replace(old,\
-          \ new))\nPY\n}\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-sso.html\
-          \ \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-sso.html\"\
-          \ || true\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-bridge.php\
-          \ \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-bridge.php\"\
-          \ || true\nsed -i 's/:8080\\\\/api\\\\/v1/:8000\\\\/api\\\\/v1/' /var/www/html/portal-bridge.php\
-          \ 2>/dev/null || true\npatch_portal_bridge_htaccess\nif ! $NC status >/dev/null\
-          \ 2>&1; then\n  exit 0\nfi\nsync_bundled_apps() {\n  for app in richdocuments\
-          \ user_oidc forms; do\n    if [ -d \"/usr/src/nextcloud/apps/${app}\" ];\
-          \ then\n      rm -rf \"/var/www/html/custom_apps/${app}\"\n      cp -a \"\
-          /usr/src/nextcloud/apps/${app}\" \"/var/www/html/custom_apps/\"\n      chown\
-          \ -R www-data:www-data \"/var/www/html/custom_apps/${app}\"\n    fi\n  \
-          \  $NC app:enable \"${app}\" 2>/dev/null || true\n  done\n}\nsync_bundled_apps\n\
-          # Disable the password_policy breached-password check: it calls\n# api.pwnedpasswords.com\
-          \ (blocked by egress) and adds ~5s to every\n# password set \u2014 the portal\
-          \ bridge felt this on each Files open.\n$NC config:app:set password_policy\
-          \ enforceHaveIBeenPwned --value=false || true\nif $NC app:list --enabled\
-          \ 2>/dev/null | grep -q 'richdocuments:'; then\n  $NC config:app:set richdocuments\
-          \ wopi_url --value=\"${COLLABORA_INTERNAL}\" || true\n  $NC config:app:set\
-          \ richdocuments public_wopi_url --value=\"${COLLABORA_PUBLIC}\" || true\n\
-          \  $NC config:app:set richdocuments doc_format --value=\"odf\" || true\n\
-          \  $NC config:app:set richdocuments wopi_callback_url --value=\"${NEXTCLOUD_CALLBACK}\"\
-          \ || true\n  $NC richdocuments:activate-config --callback-url=\"${NEXTCLOUD_CALLBACK}\"\
-          \ || true\nfi\npatch_portal_bridge_htaccess\n"
+        before-starting: "#!/bin/bash\nset -eu\nNC=\"php /var/www/html/occ\"\nCOLLABORA_PUBLIC=\"https://collabora.${TENANT_DOMAIN}\"\nCOLLABORA_INTERNAL=\"http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980\"\nNEXTCLOUD_CALLBACK=\"http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080\"\npatch_portal_bridge_htaccess() {\n  python3 - <<'PY'\nfrom pathlib import Path\nhtaccess = Path(\"/var/www/html/.htaccess\")\nif not htaccess.is_file():\n    raise SystemExit(0)\ntext = htaccess.read_text()\nif \"gentian-portal-bridge\" in text:\n    text = text.replace(\"gentian-portal-bridge\", \"portal-bridge\")\n    htaccess.write_text(text)\nelif \"portal-bridge\" not in text:\n    old = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\\.php\"\n    new = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\\.php\"\n    if old in text:\n        htaccess.write_text(text.replace(old, new))\nPY\n}\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-sso.html \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-sso.html\" || true\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-bridge.php \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-bridge.php\" || true\nsed -i 's/:8080\\\\/api\\\\/v1/:8000\\\\/api\\\\/v1/' /var/www/html/portal-bridge.php 2>/dev/null || true\npatch_portal_bridge_htaccess\nif ! $NC status >/dev/null 2>&1; then\n  exit 0\nfi\nsync_bundled_apps() {\n  for app in richdocuments user_oidc forms; do\n    if [ -d \"/usr/src/nextcloud/apps/${app}\" ]; then\n      rm -rf \"/var/www/html/custom_apps/${app}\"\n      cp -a \"/usr/src/nextcloud/apps/${app}\" \"/var/www/html/custom_apps/\"\n      chown -R www-data:www-data \"/var/www/html/custom_apps/${app}\"\n    fi\n    $NC app:enable \"${app}\" 2>/dev/null || true\n  done\n}\nsync_bundled_apps\n# Disable the password_policy breached-password check: it calls\n# api.pwnedpasswords.com (blocked by egress) and adds ~5s to every\n# password set \u2014 the portal bridge felt this on each Files open.\n$NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true\nif $NC app:list --enabled 2>/dev/null | grep -q 'richdocuments:'; then\n  $NC config:app:set richdocuments wopi_url --value=\"${COLLABORA_INTERNAL}\" || true\n  $NC config:app:set richdocuments public_wopi_url --value=\"${COLLABORA_PUBLIC}\" || true\n  $NC config:app:set richdocuments doc_format --value=\"odf\" || true\n  $NC config:app:set richdocuments wopi_callback_url --value=\"${NEXTCLOUD_CALLBACK}\" || true\n  $NC richdocuments:activate-config --callback-url=\"${NEXTCLOUD_CALLBACK}\" || true\nfi\npatch_portal_bridge_htaccess\npatch_nextcloud_layouts() {\n  python3 - <<'PY'\nfrom pathlib import Path\nfor name in [\"layout.user.php\", \"layout.public.php\"]:\n    path = Path(f\"/var/www/html/core/templates/{name}\")\n    if not path.is_file():\n        continue\n    text = path.read_text()\n    if \"window.self !== window.top\" in text:\n        continue\n    patch = '''\t\t<script nonce=\"<?php p($_['cspNonce']); ?>\">\n\t\t\tif (window.self !== window.top) {\n\t\t\t\tconst style = document.createElement('style');\n\t\t\t\tstyle.innerHTML = '#header { display: none !important; } #content { padding-top: 0 !important; }';\n\t\t\t\tdocument.head.appendChild(style);\n\t\t\t}\n\t\t</script>\n\t</body>'''\n    if \"</body>\" in text:\n        path.write_text(text.replace(\"</body>\", patch))\nPY\n}\npatch_nextcloud_layouts\n"
         post-installation: "#!/bin/bash\nset -eu\nNC=\"php /var/www/html/occ\"\nCLOUD_URL=\"\
           https://cloud.${TENANT_DOMAIN}\"\nCOLLABORA_PUBLIC=\"https://collabora.${TENANT_DOMAIN}\"\
           \nCOLLABORA_INTERNAL=\"http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980\"\
