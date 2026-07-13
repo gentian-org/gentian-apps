@@ -1,0 +1,41 @@
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: odoo-cb-purchase
+  labels:
+    gentianos.io/profile-name: odoo-cb-purchase
+  annotations:
+    gentianos.io/platform-app: "false"
+    gentianos.io/deployment-role: module
+    gentianos.io/requires-profile: odoo-cb-base
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["purchase"],"gentianOdooGroupRoles":["purchase.group_purchase_user"]}'
+    gentianos.io/portal-auth-mode: oidc
+spec:
+  displayName: "Odoo Purchase"
+  description: "Purchase and vendor management module for Odoo."
+  family: odoo
+  catalogueVersion: "1.0.0"
+  edition: standard
+  trustTier: platform
+  license: LGPL-3.0
+  tile:
+    icon: spreadsheet
+
+  portalTiles:
+    - name: odoo-purchase
+      displayName:
+        en_US: "Odoo Purchase"
+        de_DE: "Odoo Einkauf"
+      linkSuffix: "/web?gentian_embed=1&action=purchase.purchase_form_action"
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  compositionRef: app-odoo
+  deploymentMethod: crossplane
+  chart:
+    repository: http://192.168.0.100:8089
+    name: odoo
+    version: "0.1.3"
+  extraValues:
+    odoo:
+      module: purchase

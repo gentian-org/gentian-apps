@@ -1,0 +1,41 @@
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: odoo-cb-inventory
+  labels:
+    gentianos.io/profile-name: odoo-cb-inventory
+  annotations:
+    gentianos.io/platform-app: "false"
+    gentianos.io/deployment-role: module
+    gentianos.io/requires-profile: odoo-cb-base
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["inventory"],"gentianOdooGroupRoles":["stock.group_stock_user"]}'
+    gentianos.io/portal-auth-mode: oidc
+spec:
+  displayName: "Odoo Inventory"
+  description: "Inventory and warehouse management module for Odoo."
+  family: odoo
+  catalogueVersion: "1.0.0"
+  edition: standard
+  trustTier: platform
+  license: LGPL-3.0
+  tile:
+    icon: database
+
+  portalTiles:
+    - name: odoo-inventory
+      displayName:
+        en_US: "Odoo Inventory"
+        de_DE: "Odoo Inventar"
+      linkSuffix: "/web?gentian_embed=1&action=stock.stock_picking_type_action"
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  compositionRef: app-odoo
+  deploymentMethod: crossplane
+  chart:
+    repository: http://192.168.0.100:8089
+    name: odoo
+    version: "0.1.3"
+  extraValues:
+    odoo:
+      module: stock
