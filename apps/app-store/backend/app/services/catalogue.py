@@ -54,6 +54,7 @@ def build_catalogue(
             "annotations": meta.get("annotations", {}),
             "license": entry.get("license") or spec.get("license") or "",
             "family": entry.get("family") or spec.get("family") or name,
+            "resources": spec.get("extraValues", {}).get("resources") if spec.get("extraValues") else None,
         }
         enriched = enrich_catalogue_entry(
             base,

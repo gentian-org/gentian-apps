@@ -49,4 +49,5 @@ def get_catalogue_entry(profile_name: str, user: dict = Depends(get_current_user
         "logo": resolve_tile_logo(spec),
         "chartVersion": spec.get("chart", {}).get("version"),
         "kernelRequirements": spec.get("kernelRequirements"),
+        "resources": spec.get("extraValues", {}).get("resources") if spec.get("extraValues") else None,
     }

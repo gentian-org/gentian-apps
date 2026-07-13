@@ -168,16 +168,16 @@ spec:
       sessionAffinity: ClientIP
 
     javaOpts:
-      - "-Xmx1024m"
-      - "-Xms512m"
+      - "-Xmx2048m"
+      - "-Xms1024m"
 
     resources:
       limits:
         cpu: "1"
-        memory: "2Gi"
+        memory: "3Gi"
       requests:
         cpu: "250m"
-        memory: "1Gi"
+        memory: "1.5Gi"
 
     probes:
       startup:

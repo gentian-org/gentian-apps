@@ -17,7 +17,16 @@ type CatalogueApp = {
   catalogueAction?: CatalogueAction;
   checkoutUrl?: string | null;
   licenceNotice?: string | null;
-  requiresEntitlement?: boolean;
+  resources?: {
+    requests?: {
+      cpu?: string;
+      memory?: string;
+    };
+    limits?: {
+      cpu?: string;
+      memory?: string;
+    };
+  };
 };
 
 type AppCondition = {
@@ -608,6 +617,21 @@ export function StorePage() {
               <span className="font-medium">Cluster installs:</span> {selected.installedCount}{" "}
               tenants
             </p>
+            {selected.resources && (selected.resources.requests || selected.resources.limits) && (
+              <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm border border-slate-100">
+                <p className="font-semibold text-slate-700 mb-1">Resource Profile</p>
+                {selected.resources.requests && (
+                  <p className="text-slate-600">
+                    <span className="font-medium">Requests:</span> CPU {selected.resources.requests.cpu || "—"}, Memory {selected.resources.requests.memory || "—"}
+                  </p>
+                )}
+                {selected.resources.limits && (
+                  <p className="text-slate-600">
+                    <span className="font-medium">Limits:</span> CPU {selected.resources.limits.cpu || "—"}, Memory {selected.resources.limits.memory || "—"}
+                  </p>
+                )}
+              </div>
+            )}
             {isProApp(selected) && selected.licenceNotice && (
               <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 {selected.licenceNotice}

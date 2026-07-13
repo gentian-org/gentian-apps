@@ -21,9 +21,9 @@ def test_proprietary_app_buy_without_entitlement() -> None:
     entry = {"name": "element", "license": "proprietary"}
     profile = {"spec": {"family": "element", "license": "proprietary"}}
     settings = Settings(
-        gentian_commerce_enabled=True,
-        gentian_corp_checkout_url="https://corp.gentian.org",
-        tenant_domain="demo.desk.gentian.org",
+        GENTIAN_COMMERCE_ENABLED=True,
+        GENTIAN_CORP_CHECKOUT_URL="https://corp.gentian.org",
+        TENANT_DOMAIN="demo.desk.gentian.org",
     )
     result = enrich_catalogue_entry(entry, profile, settings=settings, entitled_profiles=set())
     assert result["tier"] == "pro"
@@ -41,3 +41,25 @@ def test_proprietary_app_install_when_entitled() -> None:
     )
     assert result["catalogueAction"] == ACTION_INSTALL
     assert result.get("checkoutUrl") is None
+
+
+def test_catalogue_entry_includes_resources() -> None:
+    entry = {
+        "name": "xwiki",
+        "license": "LGPL-2.1",
+        "resources": {
+            "limits": {"cpu": "1", "memory": "3Gi"},
+            "requests": {"cpu": "250m", "memory": "1.5Gi"}
+        }
+    }
+    profile = {
+        "spec": {
+            "displayName": "XWiki"
+        }
+    }
+    settings = Settings()
+    result = enrich_catalogue_entry(entry, profile, settings=settings)
+    assert result["resources"] == {
+        "limits": {"cpu": "1", "memory": "3Gi"},
+        "requests": {"cpu": "250m", "memory": "1.5Gi"}
+    }
