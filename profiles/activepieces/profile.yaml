@@ -68,6 +68,13 @@ spec:
     fullnameOverride: "activepieces"
     ingress:
       enabled: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 1
+        memory: 512Mi
 
     podLabels:
       mac-waiver.gentianos.io/gentian-restrict-capabilities: "approved"
