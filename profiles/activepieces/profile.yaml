@@ -69,6 +69,22 @@ spec:
     ingress:
       enabled: false
 
+    extraVolumes:
+      - name: nginx-log
+        emptyDir: {}
+      - name: nginx-lib
+        emptyDir: {}
+      - name: nginx-run
+        emptyDir: {}
+
+    extraVolumeMounts:
+      - mountPath: /var/log/nginx
+        name: nginx-log
+      - mountPath: /var/lib/nginx
+        name: nginx-lib
+      - mountPath: /run
+        name: nginx-run
+
     postgresql:
       enabled: false
     redis:
