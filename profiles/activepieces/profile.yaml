@@ -83,6 +83,9 @@ spec:
         executionMode: SANDBOXED
       telemetry: false
       templateSourceURL: ""
+      data:
+        pvc:
+          storageClass: ""
 
     securityContext:
       runAsNonRoot: true
