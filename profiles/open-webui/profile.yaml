@@ -8,7 +8,7 @@ metadata:
     # OpenWebUI needs network access to the platform-kernel namespace where LiteLLM resides
     gentianos.io/kernel-egress-namespaces: platform-kernel
 spec:
-  displayName: "Open WebUI"
+  displayName: "AI Chat"
   description: "User-friendly chat interface for LLMs, configured to route through the central LiteLLM proxy."
   family: open-webui
   catalogueVersion: "1.0.0"
@@ -21,6 +21,14 @@ spec:
   provides:
     - name: webui
       protocol: http-html
+
+  portalTiles:
+    - name: open-webui
+      displayName:
+        de_DE: "AI Chat"
+        en_US: "AI Chat"
+      linkTarget: embedded
+      allowedGroup: "App Users"
 
   chart:
     repository: "https://helm.openwebui.com"
