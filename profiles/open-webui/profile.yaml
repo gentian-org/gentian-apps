@@ -33,7 +33,7 @@ spec:
   chart:
     repository: "https://helm.openwebui.com"
     name: open-webui
-    version: "3.0.0"
+    version: "15.2.0"
 
   deploymentMethod: crossplane
 
