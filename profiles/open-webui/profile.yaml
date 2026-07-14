@@ -1,0 +1,49 @@
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: open-webui
+  labels:
+    gentianos.io/profile-name: open-webui
+  annotations:
+    # OpenWebUI needs network access to the platform-kernel namespace where LiteLLM resides
+    gentianos.io/kernel-egress-namespaces: platform-kernel
+spec:
+  displayName: "Open WebUI"
+  description: "User-friendly chat interface for LLMs, configured to route through the central LiteLLM proxy."
+  family: open-webui
+  catalogueVersion: "1.0.0"
+  edition: full
+  trustTier: certified
+  license: MIT
+  tile:
+    icon: chat
+
+  provides:
+    - name: webui
+      protocol: http-html
+
+  chart:
+    repository: "https://helm.openwebui.com"
+    name: open-webui
+    version: "3.0.0"
+
+  deploymentMethod: crossplane
+
+  ingress:
+    subDomain: "chat"
+    serviceName: "open-webui"
+    servicePort: 8080
+    tlsEnabled: true
+
+  extraValues:
+    fullnameOverride: "open-webui"
+    ingress:
+      enabled: false
+
+    persistence:
+      enabled: true
+      size: "2Gi"
+
+    extraEnvFrom:
+      - secretRef:
+          name: llm-credentials-open-webui
