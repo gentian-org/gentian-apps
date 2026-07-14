@@ -56,6 +56,14 @@ spec:
       enabled: true
       size: "2Gi"
 
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "512Mi"
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+
     extraEnvFrom:
       - secretRef:
           name: llm-credentials-open-webui
