@@ -41,7 +41,7 @@ spec:
   ingress:
     subDomain: "ai-chat"
     serviceName: "open-webui"
-    servicePort: 8080
+    servicePort: 80
     tlsEnabled: true
   extraValues:
     fullnameOverride: "open-webui"
