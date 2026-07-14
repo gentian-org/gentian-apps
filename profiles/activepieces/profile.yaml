@@ -69,6 +69,9 @@ spec:
     ingress:
       enabled: false
 
+    podLabels:
+      mac-waiver.gentianos.io/gentian-restrict-capabilities: "approved"
+
     extraVolumes:
       - name: nginx-log
         emptyDir: {}
