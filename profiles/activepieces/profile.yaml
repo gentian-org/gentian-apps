@@ -36,7 +36,7 @@ spec:
       allowedGroup: "App Users"
 
   chart:
-    repository: "oci://ghcr.io/adnoctem/helm"
+    repository: "http://192.168.0.100:8089"
     name: activepieces
     version: "0.3.0"
 
