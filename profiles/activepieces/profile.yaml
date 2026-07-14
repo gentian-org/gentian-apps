@@ -78,6 +78,7 @@ spec:
 
     podLabels:
       mac-waiver.gentianos.io/gentian-restrict-capabilities: "approved"
+      mac-waiver.gentianos.io/gentian-require-non-root: "approved"
 
     extraVolumes:
       - name: nginx-log
