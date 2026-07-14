@@ -1,0 +1,91 @@
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: activepieces
+  labels:
+    gentianos.io/profile-name: activepieces
+spec:
+  displayName: "Automation"
+  description: "Open-source workflow automation with 200+ integrations, webhook triggers, and visual flow builder."
+  family: activepieces
+  catalogueVersion: "1.0.0"
+  edition: full
+  trustTier: certified
+  license: MIT
+  tile:
+    icon: analytics
+  deploymentMethod: crossplane
+
+  kernelRequirements:
+    identity:
+      saml:
+        entityId: "gentian-activepieces"
+        acsUrl: "https://auto.${TENANT_DOMAIN}/api/v1/authn/saml/callback"
+    database:
+      engine: postgresql
+      databasePerTenant: true
+    cache:
+      engine: redis
+
+  portalTiles:
+    - name: activepieces
+      displayName:
+        de_DE: "Automatisierung"
+        en_US: "Automation"
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  chart:
+    repository: "oci://ghcr.io/activepieces/helm"
+    name: activepieces
+    version: "0.86.0"
+
+  valueMapping:
+    database:
+      hostKey: "env.AP_POSTGRES_HOST"
+      portKey: "env.AP_POSTGRES_PORT"
+      nameKey: "env.AP_POSTGRES_DATABASE"
+      userKey: "env.AP_POSTGRES_USERNAME"
+      passwordKey: "env.AP_POSTGRES_PASSWORD"
+
+  appSecrets:
+    - name: encryption_key
+      valuePath: "env.AP_ENCRYPTION_KEY"
+    - name: jwt_secret
+      valuePath: "env.AP_JWT_SECRET"
+
+  ingress:
+    subDomain: "auto"
+    serviceName: "activepieces"
+    servicePort: 80
+    tlsEnabled: true
+
+  extraValues:
+    fullnameOverride: "activepieces"
+    ingress:
+      enabled: false
+
+    postgresql:
+      enabled: false
+    redis:
+      enabled: false
+
+    env:
+      AP_FRONTEND_URL: "https://auto.${TENANT_DOMAIN}"
+      AP_WEBHOOK_URL: "https://auto.${TENANT_DOMAIN}"
+      AP_EXECUTION_MODE: "SANDBOXED"
+      AP_REDIS_HOST: "${REDIS_HOST}"
+      AP_REDIS_PORT: "6379"
+      AP_TELEMETRY_ENABLED: "false"
+      AP_TEMPLATES_SOURCE_URL: ""
+
+    podAnnotations:
+      reloader.stakater.com/auto: "true"
+
+    containerSecurityContext:
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      seccompProfile:
+        type: RuntimeDefault
