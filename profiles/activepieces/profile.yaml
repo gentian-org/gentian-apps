@@ -84,9 +84,6 @@ spec:
       telemetry: false
       templateSourceURL: ""
 
-    podAnnotations:
-      reloader.stakater.com/auto: "true"
-
     securityContext:
       runAsNonRoot: true
       allowPrivilegeEscalation: false
