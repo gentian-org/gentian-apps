@@ -36,23 +36,27 @@ spec:
       allowedGroup: "App Users"
 
   chart:
-    repository: "oci://ghcr.io/activepieces/helm"
+    repository: "oci://ghcr.io/adnoctem/helm"
     name: activepieces
-    version: "0.86.0"
+    version: "0.3.0"
 
   valueMapping:
     database:
-      hostKey: "env.AP_POSTGRES_HOST"
-      portKey: "env.AP_POSTGRES_PORT"
-      nameKey: "env.AP_POSTGRES_DATABASE"
-      userKey: "env.AP_POSTGRES_USERNAME"
-      passwordKey: "env.AP_POSTGRES_PASSWORD"
+      hostKey: "activepieces.postgresql.host"
+      portKey: "activepieces.postgresql.port"
+      nameKey: "activepieces.postgresql.database"
+      userKey: "activepieces.postgresql.username"
+      passwordKey: "activepieces.postgresql.password"
+    cache:
+      hostKey: "activepieces.redis.host"
+      portKey: "activepieces.redis.port"
+      passwordKey: "activepieces.redis.password"
 
   appSecrets:
     - name: encryption_key
-      valuePath: "env.AP_ENCRYPTION_KEY"
+      valuePath: "activepieces.encryption.connection"
     - name: jwt_secret
-      valuePath: "env.AP_JWT_SECRET"
+      valuePath: "activepieces.encryption.jwt"
 
   ingress:
     subDomain: "auto"
@@ -70,19 +74,20 @@ spec:
     redis:
       enabled: false
 
-    env:
-      AP_FRONTEND_URL: "https://auto.${TENANT_DOMAIN}"
-      AP_WEBHOOK_URL: "https://auto.${TENANT_DOMAIN}"
-      AP_EXECUTION_MODE: "SANDBOXED"
-      AP_REDIS_HOST: "${REDIS_HOST}"
-      AP_REDIS_PORT: "6379"
-      AP_TELEMETRY_ENABLED: "false"
-      AP_TEMPLATES_SOURCE_URL: ""
+    activepieces:
+      domain: "auto.${TENANT_DOMAIN}"
+      database: postgres
+      queue:
+        mode: redis
+      sandbox:
+        executionMode: SANDBOXED
+      telemetry: false
+      templateSourceURL: ""
 
     podAnnotations:
       reloader.stakater.com/auto: "true"
 
-    containerSecurityContext:
+    securityContext:
       runAsNonRoot: true
       allowPrivilegeEscalation: false
       capabilities:
