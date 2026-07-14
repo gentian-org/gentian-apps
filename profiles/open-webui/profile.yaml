@@ -56,11 +56,15 @@ spec:
       - secretRef:
           name: llm-credentials-open-webui
 
-    # Disable local Ollama and pipelines sub-deployments
+    # Disable local Ollama, pipelines, and redis sub-deployments
     ollama:
       enabled: false
     pipelines:
       enabled: false
+    websocket:
+      manager: ""
+      redis:
+        enabled: false
 
     # Kyverno baseline security policies compliance
     podSecurityContext:
