@@ -60,6 +60,9 @@ spec:
       - secretRef:
           name: llm-credentials-open-webui
 
+    copyAppData:
+      command: ["sh", "-c", "cp -R -n /app/backend/data/. /tmp/app-data/ || true"]
+
     # Disable local Ollama, pipelines, and redis sub-deployments
     ollama:
       enabled: false
