@@ -8,7 +8,7 @@ metadata:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: module
     gentianos.io/requires-profile: odoo-cb-base
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["mrp"],"gentianOdooGroupRoles":["mrp.group_mrp_user"]}'
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["mrp"],"gentianOdooGroupRoles":["mrp.group_mrp_user","stock.group_stock_user"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
   displayName: "Odoo Manufacturing"
