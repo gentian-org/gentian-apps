@@ -61,7 +61,7 @@ spec:
   ingress:
     subDomain: "auto"
     serviceName: "activepieces"
-    servicePort: 80
+    servicePort: 8080
     tlsEnabled: true
 
   extraValues:
