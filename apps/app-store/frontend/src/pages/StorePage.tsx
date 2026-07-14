@@ -17,6 +17,7 @@ type CatalogueApp = {
   catalogueAction?: CatalogueAction;
   checkoutUrl?: string | null;
   licenceNotice?: string | null;
+  requiresEntitlement?: boolean;
   resources?: {
     requests?: {
       cpu?: string;
