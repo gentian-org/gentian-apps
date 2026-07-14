@@ -38,7 +38,7 @@ spec:
   chart:
     repository: "http://192.168.0.100:8089"
     name: activepieces
-    version: "0.3.2"
+    version: "0.3.3"
 
   valueMapping:
     database:
@@ -98,6 +98,8 @@ spec:
       database: postgres
       queue:
         mode: redis
+      redis:
+        username: "${TENANT_ID}-activepieces"
       sandbox:
         executionMode: SANDBOXED
       telemetry: false

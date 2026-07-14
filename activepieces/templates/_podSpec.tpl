@@ -79,10 +79,7 @@ template:
           {{- if and (eq .Values.activepieces.queue.mode "redis") (or .Values.activepieces.redis.password .Values.activepieces.redis.existingSecret) }}
           {{- if .Values.activepieces.redis.username }}
           - name: AP_REDIS_USER
-            valueFrom:
-              secretKeyRef:
-                name: {{ default (include "activepieces.secrets.redis" .) .Values.activepieces.redis.existingSecret }}
-                key: username
+            value: {{ .Values.activepieces.redis.username | quote }}
           {{- end }}
           - name: AP_REDIS_PASSWORD
             valueFrom:
