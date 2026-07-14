@@ -256,21 +256,10 @@ function CatalogueCard({
           Details
         </button>
         {ready ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-emerald-600 flex items-center gap-1.5 mr-1">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
-              Ready
-            </span>
-            <button
-              type="button"
-              disabled={busy === app.name}
-              onClick={() => onInstall(true)}
-              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
-              title="Add all existing tenant users to this application's access group."
-            >
-              {busy === app.name ? "Provisioning…" : "Provision"}
-            </button>
-          </div>
+          <span className="text-sm font-medium text-emerald-600 flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
+            Ready
+          </span>
         ) : installing ? (
           <span
             className="rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800 flex items-center gap-1.5"
