@@ -45,6 +45,11 @@ spec:
     tlsEnabled: true
   extraValues:
     fullnameOverride: "open-webui"
+    extraEnvVars:
+      - name: OFFLINE_MODE
+        value: "true"
+      - name: HF_HUB_OFFLINE
+        value: "1"
     ingress:
       enabled: false
 
