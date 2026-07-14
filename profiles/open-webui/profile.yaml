@@ -39,7 +39,7 @@ spec:
   deploymentMethod: crossplane
 
   ingress:
-    subDomain: "chat"
+    subDomain: "ai-chat"
     serviceName: "open-webui"
     servicePort: 8080
     tlsEnabled: true
