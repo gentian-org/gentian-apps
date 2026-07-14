@@ -108,10 +108,10 @@ template:
           - name: {{ include "activepieces.pv" . }}
             mountPath: {{ .Values.activepieces.data.rootPath }}
         {{- if .Values.volumeMounts }}
-          {{- toYaml .Values.volumeMounts | nindent 12 }}
+          {{- toYaml .Values.volumeMounts | nindent 10 }}
         {{- end }}
         {{- if .Values.extraVolumeMounts }}
-          {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
+          {{- toYaml .Values.extraVolumeMounts | nindent 10 }}
         {{- end }}
         {{- if .Values.resources }}
         resources:
@@ -162,10 +162,10 @@ template:
         persistentVolumeClaim:
           claimName: {{ default (include "activepieces.pvc" .) .Values.activepieces.data.pvc.existingClaim }}
     {{- if .Values.volumes }}
-      {{- toYaml .Values.volumes | nindent 8 }}
+      {{- toYaml .Values.volumes | nindent 6 }}
     {{- end }}
     {{- if .Values.extraVolumes }}
-      {{- toYaml .Values.extraVolumes | nindent 8 }}
+      {{- toYaml .Values.extraVolumes | nindent 6 }}
     {{- end }}
     {{- if .Values.priorityClassName }}
     priorityClassName: {{ .Values.priorityClassName }}
