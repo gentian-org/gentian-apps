@@ -636,7 +636,7 @@ spec:
                   apiVersion: batch/v1
                   kind: Job
                   metadata:
-                    name: odoo-install-{{ $module }}
+                    name: odoo-install-{{ replace "_" "-" $module }}
                     namespace: {{ $ns }}
                     labels:
                       app.kubernetes.io/managed-by: gentian-os
