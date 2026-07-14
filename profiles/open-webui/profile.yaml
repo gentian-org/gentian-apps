@@ -55,3 +55,22 @@ spec:
     extraEnvFrom:
       - secretRef:
           name: llm-credentials-open-webui
+
+    # Disable local Ollama and pipelines sub-deployments
+    ollama:
+      enabled: false
+    pipelines:
+      enabled: false
+
+    # Kyverno baseline security policies compliance
+    podSecurityContext:
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      seccompProfile:
+        type: RuntimeDefault
