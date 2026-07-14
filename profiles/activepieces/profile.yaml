@@ -85,7 +85,7 @@ spec:
       templateSourceURL: ""
       data:
         pvc:
-          storageClass: ""
+          storageClass: "nfs-csi"
 
     podSecurityContext:
       fsGroup: 1000
