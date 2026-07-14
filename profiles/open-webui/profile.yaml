@@ -49,6 +49,9 @@ spec:
     ingress:
       enabled: false
 
+    image:
+      tag: "0.10.2-slim"
+
     persistence:
       enabled: true
       size: "2Gi"
