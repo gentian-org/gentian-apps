@@ -91,13 +91,14 @@ def list_installed(user: dict = Depends(get_current_user)) -> dict:
 
 
 @router.post("/{profile}/install")
-def install_app(profile: str, user: dict = Depends(get_current_user)) -> dict:
+def install_app(profile: str, provision: bool = False, user: dict = Depends(get_current_user)) -> dict:
     settings = get_settings()
     _assert_may_install(profile, settings)
     try:
         result = get_lifecycle_client().install(
             profile,
             _actor(user),
+            provision=provision,
         )
     except LifecycleError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

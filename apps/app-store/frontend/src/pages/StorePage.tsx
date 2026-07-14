@@ -151,23 +151,51 @@ function CatalogueCard({
   installedApp: InstalledApp | undefined;
   busy: string | null;
   onDetails: () => void;
-  onInstall: () => void;
+  onInstall: (provision: boolean) => void;
   onBuy: () => void;
 }) {
   const pro = isProApp(app);
+  const installed = Boolean(installedApp);
   const ready = isAppReady(installedApp);
-  const installing = Boolean(installedApp) && !ready;
-  const showBuy = pro && app.catalogueAction === "buy" && !installedApp;
+  const installing = installed && !ready;
+  const showBuy = pro && app.catalogueAction === "buy" && !installed;
 
-  const cardClass = pro
-    ? "border-amber-200/90 bg-gradient-to-br from-amber-50 via-white to-violet-50 shadow-md shadow-amber-100/60 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-100/80"
-    : "border-slate-200/80 bg-slate-50/50 shadow-sm hover:border-slate-300 hover:bg-slate-50/80";
+  let cardClass = "";
+  let avatarClass = "";
+  let logoClass = "";
+  let badgeClass = "";
+  let titleClass = "";
+  let requirementClass = "";
+  let descriptionClass = "";
 
-  const avatarClass = pro
-    ? "bg-gradient-to-br from-amber-200 to-violet-200 text-amber-900"
-    : "bg-slate-200/80 text-slate-600";
-
-  const logoClass = pro ? "h-10 w-10 rounded-lg object-contain" : "h-10 w-10 rounded-lg object-contain opacity-90 saturate-[0.88]";
+  if (installed) {
+    // Installed or installing app: Grey theme
+    cardClass = "border-slate-200 bg-slate-50/80 shadow-none text-slate-500 hover:border-slate-300 hover:bg-slate-100/60";
+    avatarClass = "bg-slate-200/80 text-slate-500";
+    logoClass = "h-10 w-10 rounded-lg object-contain opacity-50 grayscale";
+    titleClass = "truncate font-semibold text-slate-600";
+    badgeClass = "rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500";
+    requirementClass = "bg-slate-200/60 text-slate-500";
+    descriptionClass = "mt-3 line-clamp-3 flex-1 text-sm text-slate-400";
+  } else if (pro) {
+    // Premium/Commercial app: Orange-Purple theme
+    cardClass = "border-amber-200/90 bg-gradient-to-br from-amber-50 via-white to-violet-50 shadow-md shadow-amber-100/60 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-100/80";
+    avatarClass = "bg-gradient-to-br from-amber-200 to-violet-200 text-amber-900";
+    logoClass = "h-10 w-10 rounded-lg object-contain";
+    titleClass = "truncate font-semibold text-slate-900";
+    badgeClass = "rounded-full bg-gradient-to-r from-amber-500 to-violet-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm";
+    requirementClass = "bg-amber-100/80 text-amber-900";
+    descriptionClass = "mt-3 line-clamp-3 flex-1 text-sm text-slate-600";
+  } else {
+    // Free app: Appealing Blue theme
+    cardClass = "border-blue-200/80 bg-gradient-to-br from-blue-50/50 via-white to-sky-50/30 shadow-md shadow-blue-100/40 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-100/60";
+    avatarClass = "bg-gradient-to-br from-blue-200 to-sky-200 text-blue-900";
+    logoClass = "h-10 w-10 rounded-lg object-contain opacity-95 saturate-[1.05]";
+    titleClass = "truncate font-semibold text-slate-800";
+    badgeClass = "rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 shadow-sm";
+    requirementClass = "bg-blue-100/80 text-blue-800";
+    descriptionClass = "mt-3 line-clamp-3 flex-1 text-sm text-slate-500";
+  }
 
   return (
     <article className={`flex flex-col rounded-xl border p-5 transition ${cardClass}`}>
@@ -183,38 +211,30 @@ function CatalogueCard({
         )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className={`truncate font-semibold ${pro ? "text-slate-900" : "text-slate-700"}`}>
+            <h3 className={titleClass}>
               {app.displayName}
             </h3>
-            {pro ? (
-              <span className="rounded-full bg-gradient-to-r from-amber-500 to-violet-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
-                Pro
-              </span>
-            ) : (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                Free
-              </span>
-            )}
+            <span className={badgeClass}>
+              {installed ? "Installed" : pro ? "Pro" : "Free"}
+            </span>
           </div>
-          <p className="text-xs text-slate-500">v{app.chartVersion}</p>
+          <p className={`text-xs ${installed ? "text-slate-400" : "text-slate-500"}`}>v{app.chartVersion}</p>
         </div>
       </div>
 
-      <p className={`mt-3 line-clamp-3 flex-1 text-sm ${pro ? "text-slate-600" : "text-slate-500"}`}>
+      <p className={descriptionClass}>
         {app.description || "No description."}
       </p>
 
       {pro && app.licenceNotice && showBuy && (
-        <p className="mt-2 text-xs text-amber-800/90">{app.licenceNotice}</p>
+        <p className={`mt-2 text-xs ${installed ? "text-slate-400" : "text-amber-800/90"}`}>{app.licenceNotice}</p>
       )}
 
       <div className="mt-3 flex flex-wrap gap-1">
         {app.kernelRequirements.map((req) => (
           <span
             key={req}
-            className={`rounded-full px-2 py-0.5 text-xs ${
-              pro ? "bg-amber-100/80 text-amber-900" : "bg-slate-100/90 text-slate-600"
-            }`}
+            className={`rounded-full px-2 py-0.5 text-xs ${requirementClass}`}
           >
             {req}
           </span>
@@ -225,17 +245,38 @@ function CatalogueCard({
         <button
           type="button"
           onClick={onDetails}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-white/80"
+          className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+            installed 
+              ? "border-slate-300 text-slate-500 hover:bg-slate-200/50" 
+              : pro 
+                ? "border-amber-300/80 text-amber-900/80 hover:bg-amber-100/50" 
+                : "border-blue-300/80 text-blue-900/80 hover:bg-blue-100/50"
+          }`}
         >
           Details
         </button>
         {ready ? (
-          <span className="text-sm font-medium text-emerald-700">Ready</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-emerald-600 flex items-center gap-1.5 mr-1">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
+              Ready
+            </span>
+            <button
+              type="button"
+              disabled={busy === app.name}
+              onClick={() => onInstall(true)}
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+              title="Add all existing tenant users to this application's access group."
+            >
+              {busy === app.name ? "Provisioning…" : "Provision"}
+            </button>
+          </div>
         ) : installing ? (
           <span
-            className="rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800"
+            className="rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800 flex items-center gap-1.5"
             title={installedApp?.message}
           >
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse inline-block"></span>
             Installing
           </span>
         ) : showBuy ? (
@@ -248,14 +289,28 @@ function CatalogueCard({
             {busy === app.name ? "Opening…" : "Buy"}
           </button>
         ) : (
-          <button
-            type="button"
-            disabled={busy === app.name}
-            onClick={onInstall}
-            className="rounded-lg bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-50"
-          >
-            {busy === app.name ? "Installing…" : "Install"}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={busy === app.name}
+              onClick={() => onInstall(false)}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition disabled:opacity-50 ${
+                pro ? "bg-violet-600 hover:bg-violet-700" : "bg-blue-600 hover:bg-blue-700"
+              }`}
+              title="Installs the application without adding any users to its access group."
+            >
+              {busy === app.name ? "Installing…" : "Install"}
+            </button>
+            <button
+              type="button"
+              disabled={busy === app.name}
+              onClick={() => onInstall(true)}
+              className="rounded-lg bg-slate-700 hover:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition disabled:opacity-50"
+              title="Installs the application and automatically adds all existing tenant users to its access group."
+            >
+              {busy === app.name ? "Provisioning…" : "Provision"}
+            </button>
+          </div>
         )}
       </div>
     </article>
@@ -340,11 +395,11 @@ export function StorePage() {
     };
   }, [hasInstalling, refresh]);
 
-  async function install(profile: string) {
+  async function install(profile: string, provision: boolean = false) {
     setBusy(profile);
     setNotice(null);
     try {
-      const result = await apiFetch<InstallResponse>(`/tenant/apps/${profile}/install`, {
+      const result = await apiFetch<InstallResponse>(`/tenant/apps/${profile}/install?provision=${provision}`, {
         method: "POST",
       });
       const label = displayNameFor(profile, catalogue);
@@ -456,7 +511,7 @@ export function StorePage() {
             installedApp={installedByProfile.get(app.name)}
             busy={busy}
             onDetails={() => setSelected(app)}
-            onInstall={() => install(app.name)}
+            onInstall={(provision) => install(app.name, provision)}
             onBuy={() => buy(app)}
           />
         ))}

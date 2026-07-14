@@ -37,12 +37,12 @@ class LifecycleClient:
         data = res.json()
         return data.get("apps", [])
 
-    def install(self, profile: str, actor: str) -> dict[str, Any]:
+    def install(self, profile: str, actor: str, provision: bool = False) -> dict[str, Any]:
         try:
             with httpx.Client(timeout=120.0) as client:
                 res = client.post(
                     self._url(profile),
-                    params={"wait": "false"},
+                    params={"wait": "false", "provision": "true" if provision else "false"},
                     headers=self._headers(actor),
                 )
         except httpx.TimeoutException as exc:
