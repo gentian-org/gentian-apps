@@ -91,6 +91,13 @@ spec:
   extraValues:
     fullnameOverride: odoo
     tenantId: "${TENANT_ID}"
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: 2
+        memory: 4Gi
     existingSecret:
       name: odoo-cb-base-sensitive-values
     ingress:

@@ -72,6 +72,13 @@ spec:
   extraValues:
     serverName: "${TENANT_DOMAIN}"
     publicServerName: "matrix.${TENANT_DOMAIN}"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 1
+        memory: 512Mi
     wellknown:
       enabled: false
     postgresql:

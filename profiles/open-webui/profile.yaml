@@ -48,6 +48,13 @@ spec:
     fullnameOverride: "open-webui"
     ingress:
       enabled: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
 
     image:
       tag: "0.10.2-slim"
