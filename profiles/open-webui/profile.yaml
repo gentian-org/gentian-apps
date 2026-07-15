@@ -73,7 +73,7 @@ spec:
             name: open-webui-sensitive-values
             key: oidc-client-secret
       - name: OPENID_PROVIDER_URL
-        value: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
+        value: "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
       - name: OAUTH_PROVIDER_NAME
         value: "Gentian SSO"
       - name: OAUTH_SCOPES
