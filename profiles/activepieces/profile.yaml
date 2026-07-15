@@ -77,6 +77,9 @@ spec:
         value: "http://localhost:3000/v1/flow-templates"
     ingress:
       enabled: false
+      tls:
+        - hosts:
+            - "auto.${TENANT_DOMAIN}"
     resources:
       requests:
         cpu: 100m
