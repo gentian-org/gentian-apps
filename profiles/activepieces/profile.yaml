@@ -36,7 +36,7 @@ spec:
       allowedGroup: "App Users"
 
   chart:
-    repository: "http://192.168.0.100:8089"
+    repository: oci://ghcr.io/gentian-org/charts
     name: activepieces
     version: "0.3.11"
 

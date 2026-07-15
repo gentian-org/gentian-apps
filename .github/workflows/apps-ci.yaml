@@ -7,6 +7,8 @@ on:
       - "apps/**"
       - "profiles/**"
       - "images/**"
+      - "charts/odoo/**"
+      - "activepieces/**"
       - ".github/workflows/apps-ci.yaml"
   pull_request:
     branches: [main, develop]
@@ -14,6 +16,8 @@ on:
       - "apps/**"
       - "profiles/**"
       - "images/**"
+      - "charts/odoo/**"
+      - "activepieces/**"
 
 env:
   REGISTRY: ghcr.io
@@ -194,3 +198,53 @@ jobs:
           done
       - name: Validate profile tile specs
         run: python3 scripts/validate-profile-tiles.py
+
+  build-odoo-chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Package and push chart
+        if: github.event_name != 'pull_request'
+        run: |
+          CHART_VERSION=$(grep '^version:' charts/odoo/Chart.yaml | awk '{print $2}')
+          helm package charts/odoo -d /tmp
+          helm push "/tmp/odoo-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+
+  build-activepieces-chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Package and push chart
+        if: github.event_name != 'pull_request'
+        run: |
+          CHART_VERSION=$(grep '^version:' activepieces/Chart.yaml | awk '{print $2}')
+          helm package activepieces -d /tmp
+          helm push "/tmp/activepieces-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts

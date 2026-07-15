@@ -64,9 +64,9 @@ spec:
       allowedGroup: "Tenant Admins"
 
   chart:
-    repository: http://192.168.0.100:8089
+    repository: oci://ghcr.io/gentian-org/charts
     name: odoo
-    version: "0.1.8"
+    version: "0.1.9"
 
   deploymentMethod: crossplane
 

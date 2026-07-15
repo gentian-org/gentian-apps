@@ -223,6 +223,7 @@ spec:
             - --dest={{ .name }}/current
             - --submodules=off
             - --wait={{ .syncInterval }}
+            - --stale-worktree-timeout=24h
             {{- if .secretName }}
             - --ssh-key-file=/etc/git-secret/ssh
             {{- end }}
