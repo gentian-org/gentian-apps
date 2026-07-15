@@ -19,7 +19,7 @@ spec:
   kernelRequirements:
     identity:
       saml:
-        entityId: "gentian-activepieces"
+        entityId: "Activepieces"
         acsUrl: "https://auto.${TENANT_DOMAIN}/api/v1/authn/saml/callback"
     database:
       engine: postgresql
