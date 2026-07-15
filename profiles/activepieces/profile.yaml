@@ -38,7 +38,7 @@ spec:
   chart:
     repository: "http://192.168.0.100:8089"
     name: activepieces
-    version: "0.3.3"
+    version: "0.3.4"
 
   valueMapping:
     database:
@@ -128,3 +128,10 @@ spec:
         add: ["NET_BIND_SERVICE", "CHOWN", "SETUID", "SETGID", "DAC_OVERRIDE"]
       seccompProfile:
         type: RuntimeDefault
+
+    hostAliases:
+      - ip: "127.0.0.1"
+        hostnames:
+          - "raw.githubusercontent.com"
+          - "activepieces.com"
+          - "cloud.activepieces.com"

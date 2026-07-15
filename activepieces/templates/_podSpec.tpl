@@ -187,4 +187,8 @@ template:
     initContainers:
       {{- toYaml .Values.initContainers | nindent 8 }}
     {{- end }}
+    {{- if .Values.hostAliases }}
+    hostAliases:
+      {{- toYaml .Values.hostAliases | nindent 6 }}
+    {{- end }}
 {{- end }}
