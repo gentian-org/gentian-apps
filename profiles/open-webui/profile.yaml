@@ -19,6 +19,15 @@ spec:
   tile:
     icon: chat
 
+  kernelRequirements:
+    identity:
+      oidc:
+        clientId: "gentian-open-webui"
+        name: "AI Chat"
+        accessType: CONFIDENTIAL
+        redirectUris:
+          - "https://ai-chat.${TENANT_DOMAIN}/oauth/oidc/callback"
+
   provides:
     - name: webui
       protocol: http-html
@@ -38,6 +47,10 @@ spec:
 
   deploymentMethod: crossplane
 
+  valueMapping:
+    oidc:
+      clientSecretKey: "dummyOidcSecret"
+
   ingress:
     subDomain: "ai-chat"
     serviceName: "open-webui"
@@ -50,6 +63,27 @@ spec:
         value: "true"
       - name: HF_HUB_OFFLINE
         value: "1"
+      - name: ENABLE_OAUTH_SIGNUP
+        value: "true"
+      - name: OAUTH_CLIENT_ID
+        value: "gentian-open-webui"
+      - name: OAUTH_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: open-webui-sensitive-values
+            key: oidc-client-secret
+      - name: OPENID_PROVIDER_URL
+        value: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
+      - name: OAUTH_PROVIDER_NAME
+        value: "Gentian SSO"
+      - name: OAUTH_SCOPES
+        value: "openid email profile"
+      - name: WEBUI_URL
+        value: "https://ai-chat.${TENANT_DOMAIN}"
+      - name: REDIRECT_URI
+        value: "https://ai-chat.${TENANT_DOMAIN}/oauth/oidc/callback"
+      - name: ENABLE_LOGIN_FORM
+        value: "false"
     ingress:
       enabled: false
 
