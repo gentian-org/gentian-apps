@@ -27,7 +27,66 @@ entries:
       org.opencontainers.image.vendor: Ad Noctem Collective
     apiVersion: v2
     appVersion: 0.28.0
-    created: "2026-07-15T09:31:14.955558788+02:00"
+    created: "2026-07-15T09:35:33.421162694+02:00"
+    dependencies:
+    - condition: postgresql.enabled
+      name: postgresql
+      repository: oci://registry-1.docker.io/bitnamicharts
+      version: ~15.5
+    - condition: redis.enabled
+      name: redis
+      repository: oci://registry-1.docker.io/bitnamicharts
+      version: ~19.5
+    description: Activepieces is an open source all-in-one automation tool with 100+
+      integrations
+    digest: b81834e784a35cd4efe14aa51ab8b2312cec5a9ea8311b29460b216b3cf66974
+    home: https://www.activepieces.com/
+    icon: https://github.com/adnoctem/artwork/blob/425046029eaed451f5ced22ddc650059dff11878/projects/activepieces/icon/color/activepieces-icon-color.png
+    keywords:
+    - automation
+    - workflow
+    - activepieces
+    - zapier
+    - n8n
+    kubeVersion: '>=1.26.0-0'
+    maintainers:
+    - email: info@adnoctem.co
+      name: adnoctem
+    - email: info@mvprowess.com
+      name: MVProwess
+    name: activepieces
+    sources:
+    - https://github.com/adnoctem/helm
+    urls:
+    - http://192.168.0.100:8089/activepieces-0.3.8.tgz
+    version: 0.3.8
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
+        - kind: changed
+          description: repository owner changed from fmjstudios to adnoctem
+      artifacthub.io/images: |
+        - name: activepieces
+          image: docker.io/activepieces/activepieces:0.28.0
+      artifacthub.io/license: MIT
+      artifacthub.io/links: |
+        - name: Source
+          url: https://github.com/adnoctem/helm
+        - name: Support
+          url: https://github.com/adnoctem/helm/issues
+        - name: Activepieces Homepage
+          url: https://www.activepieces.com/
+        - name: Activepieces Documentation
+          url: https://www.activepieces.com/docs/getting-started/introduction
+      artifacthub.io/prerelease: "false"
+      artifacthub.io/signKey: |
+        fingerprint: 97DB36A8BD5E342076ED46D63E317D513290CC4B
+        url: https://keys.openpgp.org/vks/v1/by-fingerprint/97DB36A8BD5E342076ED46D63E317D513290CC4B
+      org.opencontainers.image.licenses: MIT
+      org.opencontainers.image.vendor: Ad Noctem Collective
+    apiVersion: v2
+    appVersion: 0.28.0
+    created: "2026-07-15T09:35:33.409803516+02:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -86,7 +145,7 @@ entries:
       org.opencontainers.image.vendor: Ad Noctem Collective
     apiVersion: v2
     appVersion: 0.28.0
-    created: "2026-07-15T09:31:14.944956918+02:00"
+    created: "2026-07-15T09:35:33.399416505+02:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -145,7 +204,7 @@ entries:
       org.opencontainers.image.vendor: Ad Noctem Collective
     apiVersion: v2
     appVersion: 0.28.0
-    created: "2026-07-15T09:31:14.937205008+02:00"
+    created: "2026-07-15T09:35:33.391787757+02:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -204,7 +263,7 @@ entries:
       org.opencontainers.image.vendor: Ad Noctem Collective
     apiVersion: v2
     appVersion: 0.28.0
-    created: "2026-07-15T09:31:14.930768784+02:00"
+    created: "2026-07-15T09:35:33.373808481+02:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -263,7 +322,7 @@ entries:
       org.opencontainers.image.vendor: Ad Noctem Collective
     apiVersion: v2
     appVersion: 0.28.0
-    created: "2026-07-15T09:31:14.924581815+02:00"
+    created: "2026-07-15T09:35:33.364843401+02:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -322,7 +381,7 @@ entries:
       org.opencontainers.image.vendor: Ad Noctem Collective
     apiVersion: v2
     appVersion: 0.28.0
-    created: "2026-07-15T09:31:14.917663585+02:00"
+    created: "2026-07-15T09:35:33.358119676+02:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -381,7 +440,7 @@ entries:
       org.opencontainers.image.vendor: Ad Noctem Collective
     apiVersion: v2
     appVersion: 0.28.0
-    created: "2026-07-15T09:31:14.909939634+02:00"
+    created: "2026-07-15T09:35:33.350554166+02:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -440,7 +499,7 @@ entries:
       org.opencontainers.image.vendor: Ad Noctem Collective
     apiVersion: v2
     appVersion: 0.28.0
-    created: "2026-07-15T09:31:14.901558062+02:00"
+    created: "2026-07-15T09:35:33.34198753+02:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -476,7 +535,7 @@ entries:
   odoo:
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-15T09:31:14.957128367+02:00"
+    created: "2026-07-15T09:35:33.423803267+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: 87733a9025829f1cf8022cd6f457b64fa2e16bda4cd2fdd11cf5ffeeb35ce632
     name: odoo
@@ -486,7 +545,7 @@ entries:
     version: 0.1.8
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-15T09:31:14.956992515+02:00"
+    created: "2026-07-15T09:35:33.423651619+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: 42eb22d03b9921e7f310d7a05a3ff9f24db550e650a6614bf43f3631287c888e
     name: odoo
@@ -496,7 +555,7 @@ entries:
     version: 0.1.7
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-15T09:31:14.956865733+02:00"
+    created: "2026-07-15T09:35:33.423468011+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: ed4581b9b2058820dcc0a41d2bc95db9d617313b1b6ba347cc5916370916b787
     name: odoo
@@ -506,7 +565,7 @@ entries:
     version: 0.1.6
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-15T09:31:14.956736177+02:00"
+    created: "2026-07-15T09:35:33.423164852+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: 144953e3c1f0728f37b9567033fa3127df43c2a30da753b3ccf035febfe4f8c5
     name: odoo
@@ -516,7 +575,7 @@ entries:
     version: 0.1.5
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-15T09:31:14.956606358+02:00"
+    created: "2026-07-15T09:35:33.42288337+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: 1be1c7c0f4bbbbd282ee2b511f75157039522fb5265933b098d9b0a1608a6dab
     name: odoo
@@ -526,7 +585,7 @@ entries:
     version: 0.1.4
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-15T09:31:14.956473396+02:00"
+    created: "2026-07-15T09:35:33.422630964+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: 15cb7fcd5f5fa7993343607b311e0feeaadd3bf5fb32208ae747c453935af9fb
     name: odoo
@@ -536,7 +595,7 @@ entries:
     version: 0.1.3
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-15T09:31:14.956320171+02:00"
+    created: "2026-07-15T09:35:33.422374215+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: 5c9c6d9f99de072410e5533dce9cb1f2c369dc55ce31319c6b3da79056e385a1
     name: odoo
@@ -546,7 +605,7 @@ entries:
     version: 0.1.2
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-15T09:31:14.956003127+02:00"
+    created: "2026-07-15T09:35:33.42213261+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: c69d239c28e928ea852fbe311eaa2fd1c567ca5a00ed0c42dc88c7ef9713c575
     name: odoo
@@ -556,7 +615,7 @@ entries:
     version: 0.1.1
   - apiVersion: v2
     appVersion: "19.0"
-    created: "2026-07-15T09:31:14.955801776+02:00"
+    created: "2026-07-15T09:35:33.421424182+02:00"
     description: Odoo Community (OCB) for Gentian OS tenants
     digest: b239e8d3dec61ea35de2415c7526a753c29cbb711dec66c0cfda0e290217be4b
     name: odoo
@@ -564,4 +623,4 @@ entries:
     urls:
     - http://192.168.0.100:8089/odoo-0.1.0.tgz
     version: 0.1.0
-generated: "2026-07-15T09:31:14.894871473+02:00"
+generated: "2026-07-15T09:35:33.332586793+02:00"

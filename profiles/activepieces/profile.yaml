@@ -38,7 +38,7 @@ spec:
   chart:
     repository: "http://192.168.0.100:8089"
     name: activepieces
-    version: "0.3.7"
+    version: "0.3.8"
 
   valueMapping:
     database:

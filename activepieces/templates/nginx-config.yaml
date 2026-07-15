@@ -28,6 +28,12 @@ data:
             ~*^bg bg;
         }
 
+        # Set cookie if token query parameter is present
+        map $arg_token $auth_cookie {
+            default "";
+            ~.+ "ap_logged_in=true; Path=/; Max-Age=31536000; Secure; SameSite=Lax";
+        }
+
         server_tokens off;
 
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
@@ -85,9 +91,7 @@ data:
 
             location /redirect {
                 root /usr/share/nginx/html/en;
-                if ($arg_token) {
-                    add_header Set-Cookie "ap_logged_in=true; Path=/; Max-Age=31536000; Secure; SameSite=Lax" always;
-                }
+                add_header Set-Cookie $auth_cookie always;
                 try_files $uri $uri/ /index.html?$args;
             }
 
