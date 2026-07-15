@@ -79,17 +79,17 @@ data:
                 alias /usr/share/nginx/html/en/assets/img/custom;
             }
 
-            # SAML Auto-forward redirects
+            # SAML Auto-forward redirects (explicitly HTTPS to prevent HTTP downgrade)
             location = / {
                 root /usr/share/nginx/html/en;
                 if ($cookie_ap_logged_in != "true") {
-                    return 302 /api/v1/authn/saml/login;
+                    return 302 https://$host/api/v1/authn/saml/login;
                 }
                 try_files $uri $uri/ /index.html?$args;
             }
 
             location = /sign-in {
-                return 302 /api/v1/authn/saml/login;
+                return 302 https://$host/api/v1/authn/saml/login;
             }
 
             location /redirect {
