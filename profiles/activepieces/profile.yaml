@@ -38,7 +38,7 @@ spec:
   chart:
     repository: "http://192.168.0.100:8089"
     name: activepieces
-    version: "0.3.6"
+    version: "0.3.7"
 
   valueMapping:
     database:
@@ -96,6 +96,9 @@ spec:
         emptyDir: {}
       - name: nginx-run
         emptyDir: {}
+      - name: nginx-config
+        configMap:
+          name: activepieces-nginx-config
 
     extraVolumeMounts:
       - mountPath: /var/log/nginx
@@ -104,6 +107,9 @@ spec:
         name: nginx-lib
       - mountPath: /run
         name: nginx-run
+      - name: nginx-config
+        mountPath: /etc/nginx/nginx.conf
+        subPath: nginx.conf
 
     postgresql:
       enabled: false
@@ -144,12 +150,3 @@ spec:
           - "raw.githubusercontent.com"
           - "activepieces.com"
           - "cloud.activepieces.com"
-
-    extraVolumes:
-      - name: nginx-config
-        configMap:
-          name: activepieces-nginx-config
-    extraVolumeMounts:
-      - name: nginx-config
-        mountPath: /etc/nginx/nginx.conf
-        subPath: nginx.conf
