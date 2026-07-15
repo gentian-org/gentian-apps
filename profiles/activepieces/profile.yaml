@@ -20,7 +20,7 @@ spec:
     identity:
       saml:
         entityId: "Activepieces"
-        acsUrl: "https://auto.${TENANT_DOMAIN}/api/v1/authn/saml/callback"
+        acsUrl: "https://auto.${TENANT_DOMAIN}/api/v1/authn/saml/acs"
     database:
       engine: postgresql
       databasePerTenant: true
@@ -38,7 +38,7 @@ spec:
   chart:
     repository: "http://192.168.0.100:8089"
     name: activepieces
-    version: "0.3.10"
+    version: "0.3.11"
 
   valueMapping:
     database:
