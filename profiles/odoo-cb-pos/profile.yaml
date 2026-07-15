@@ -8,7 +8,7 @@ metadata:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: module
     gentianos.io/requires-profile: odoo-cb-base
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["pos"],"gentianOdooGroupRoles":["point_of_sale.group_pos_user","stock.group_stock_user","account.group_account_invoice"]}'
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["pos"],"gentianOdooGroupRoles":["point_of_sale.group_pos_user","point_of_sale.group_pos_manager","stock.group_stock_user","account.group_account_invoice"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
   displayName: "Odoo Point of Sale"
