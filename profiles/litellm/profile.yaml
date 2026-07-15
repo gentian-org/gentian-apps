@@ -1,0 +1,30 @@
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: litellm
+  labels:
+    gentianos.io/profile-name: litellm
+  annotations:
+    gentianos.io/platform-app: "true"
+    gentianos.io/deployment-role: base
+spec:
+  displayName: "LLM Admin Panel"
+  description: "Manage LLM configurations, models, virtual keys, and track token usage."
+  license: MIT
+  tile:
+    icon: settings
+
+  deploymentMethod: api
+
+  apiIntegration:
+    runtime: portal-proxy
+    baseUrl: "http://litellm-proxy.platform-kernel.svc.cluster.local:4000"
+    tenantBinding: none
+
+  portalTiles:
+    - name: litellm
+      displayName:
+        en_US: "LLM Admin Panel"
+        de_DE: "LLM Admin Panel"
+      linkTarget: embedded
+      allowedGroup: "Tenant Admins"
