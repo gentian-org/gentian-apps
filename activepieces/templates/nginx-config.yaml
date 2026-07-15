@@ -45,6 +45,9 @@ data:
             root /usr/share/nginx/html;
             index index.html;
 
+            # Set auth cookie at server level so it is inherited and works with internal redirects
+            add_header Set-Cookie $auth_cookie always;
+
             error_page 404 /404.html;
             location = /404.html {
                 root /usr/share/nginx/html;
@@ -91,7 +94,6 @@ data:
 
             location /redirect {
                 root /usr/share/nginx/html/en;
-                add_header Set-Cookie $auth_cookie always;
                 try_files $uri $uri/ /index.html?$args;
             }
 
