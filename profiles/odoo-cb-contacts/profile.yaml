@@ -35,7 +35,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: odoo
-    version: "0.1.9"
+    version: "0.1.10"
   extraValues:
     odoo:
       module: contacts

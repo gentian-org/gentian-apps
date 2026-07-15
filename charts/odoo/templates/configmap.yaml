@@ -2,20 +2,20 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "odoo.fullname" . }}-config
+{{- $gitSources := list -}}
+{{- if .Values.gentian.gitSources -}}
+  {{- $gitSources = .Values.gentian.gitSources -}}
+{{- end -}}
+{{- if and .Values.gentian.git.enabled (eq (len $gitSources) 0) -}}
+  {{- $gitSources = list (dict "name" "default" "repo" .Values.gentian.git.repo "branch" .Values.gentian.git.branch "syncInterval" (int .Values.gentian.git.syncInterval) "secretName" .Values.gentian.git.secretName) -}}
+{{- end -}}
+{{- $addonsPaths := list "/opt/odoo/src/odoo/addons" -}}
+{{- range $gitSources -}}
+  {{- $addonsPaths = append $addonsPaths (printf "%s/%s/current" $.Values.gentian.modulesPath .name) -}}
+{{- end -}}
 data:
   odoo.conf: |
     [options]
-    {{- $gitSources := list -}}
-    {{- if .Values.gentian.gitSources -}}
-      {{- $gitSources = .Values.gentian.gitSources -}}
-    {{- end -}}
-    {{- if and .Values.gentian.git.enabled (eq (len $gitSources) 0) -}}
-      {{- $gitSources = list (dict "name" "default" "repo" .Values.gentian.git.repo "branch" .Values.gentian.git.branch "syncInterval" (int .Values.gentian.git.syncInterval) "secretName" .Values.gentian.git.secretName) -}}
-    {{- end -}}
-    {{- $addonsPaths := list "/opt/odoo/src/odoo/addons" -}}
-    {{- range $gitSources -}}
-      {{- $addonsPaths = append $addonsPaths (printf "%s/%s/current" $.Values.gentian.modulesPath .name) -}}
-    {{- end -}}
     addons_path = {{ join "," $addonsPaths }}
     data_dir = /opt/odoo/data
     xmlrpc_port = {{ .Values.service.port }}
