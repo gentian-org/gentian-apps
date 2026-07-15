@@ -84,6 +84,8 @@ spec:
         value: "https://ai-chat.${TENANT_DOMAIN}/oauth/oidc/callback"
       - name: ENABLE_LOGIN_FORM
         value: "false"
+      - name: OAUTH_AUTO_REDIRECT
+        value: "true"
     ingress:
       enabled: false
 
