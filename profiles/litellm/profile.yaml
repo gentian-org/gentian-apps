@@ -16,6 +16,10 @@ spec:
 
   deploymentMethod: api
 
+  ingress:
+    subDomain: llm-admin
+    tlsEnabled: true
+
   apiIntegration:
     runtime: portal-proxy
     baseUrl: "http://litellm-proxy.platform-kernel.svc.cluster.local:4000"
