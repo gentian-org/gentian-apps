@@ -201,9 +201,7 @@ spec:
 
               XML_CONTENT=$(curl -sf "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/protocol/saml/descriptor" | sed 's/WantAuthnRequestsSigned="true"/WantAuthnRequestsSigned="false"/g')
               CERT_VAL=$(echo "$XML_CONTENT" | sed -n 's/.*<ds:X509Certificate>\(.*\)<\/ds:X509Certificate>.*/\1/p')
-              CERT_PEM="-----BEGIN CERTIFICATE-----
-${CERT_VAL}
------END CERTIFICATE-----"
+              CERT_PEM=$(printf -- "-----BEGIN CERTIFICATE-----\n%s\n-----END CERTIFICATE-----" "${CERT_VAL}")
 
               PGPASSWORD="$AP_POSTGRES_PASSWORD" psql -h "$AP_POSTGRES_HOST" -p "$AP_POSTGRES_PORT" -U "$AP_POSTGRES_USERNAME" -d "$AP_POSTGRES_DATABASE" <<SQL
               INSERT INTO "user" (id, created, updated, email, "firstName", "lastName", password, status, verified, "platformRole")
