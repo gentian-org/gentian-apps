@@ -193,10 +193,22 @@ spec:
             PLATFORM_COUNT=$(PGPASSWORD="$AP_POSTGRES_PASSWORD" psql -h "$AP_POSTGRES_HOST" -p "$AP_POSTGRES_PORT" -U "$AP_POSTGRES_USERNAME" -d "$AP_POSTGRES_DATABASE" -tAc "SELECT count(*) FROM platform;")
             if [ "$PLATFORM_COUNT" -eq 0 ]; then
               echo "Seeding Activepieces database..."
-              PGPASSWORD="$AP_POSTGRES_PASSWORD" psql -h "$AP_POSTGRES_HOST" -p "$AP_POSTGRES_PORT" -U "$AP_POSTGRES_USERNAME" -d "$AP_POSTGRES_DATABASE" <<'SQL'
+
+              echo "Waiting for Keycloak..."
+              until curl -sf "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/protocol/saml/descriptor" > /dev/null; do
+                sleep 2
+              done
+
+              XML_CONTENT=$(curl -sf "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/protocol/saml/descriptor" | sed 's/WantAuthnRequestsSigned="true"/WantAuthnRequestsSigned="false"/g')
+              CERT_VAL=$(echo "$XML_CONTENT" | sed -n 's/.*<ds:X509Certificate>\(.*\)<\/ds:X509Certificate>.*/\1/p')
+              CERT_PEM="-----BEGIN CERTIFICATE-----
+${CERT_VAL}
+-----END CERTIFICATE-----"
+
+              PGPASSWORD="$AP_POSTGRES_PASSWORD" psql -h "$AP_POSTGRES_HOST" -p "$AP_POSTGRES_PORT" -U "$AP_POSTGRES_USERNAME" -d "$AP_POSTGRES_DATABASE" <<SQL
               INSERT INTO "user" (id, created, updated, email, "firstName", "lastName", password, status, verified, "platformRole")
-              VALUES ('usrActivepiecesAdmin1', now(), now(), 'admin-${TENANT_ID}@${KERNEL_DOMAIN}', 'Admin', '${TENANT_ID}', '$2b$10$EPY9LjgjhWG./xyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxy', 'ACTIVE', true, 'ADMIN');
-              
+              VALUES ('usrActivepiecesAdmin1', now(), now(), 'admin-${TENANT_ID}@${KERNEL_DOMAIN}', 'Admin', '${TENANT_ID}', '\$2b\$10\$EPY9LjgjhWG./xyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxy', 'ACTIVE', true, 'ADMIN');
+
               INSERT INTO platform (
                 id, created, updated, "ownerId", name, "primaryColor", "logoIconUrl", "fullLogoUrl", "favIconUrl",
                 "filteredPieceNames", "filteredPieceBehavior", "showPoweredBy", "cloudAuthEnabled", "defaultLocale",
@@ -208,20 +220,25 @@ spec:
                 'plaActivepiecesPlatf1', now(), now(), 'usrActivepiecesAdmin1', 'Gentian', '#000000', '', '', '',
                 '{}', 'ALLOWED', false, true, 'en',
                 true, true, '{}', false,
-                true, '{"saml": {"idpMetadataUrl": "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/protocol/saml/descriptor", "ssoDomain": "${KERNEL_DOMAIN}"}}'::jsonb, true, true, true,
+                true, jsonb_build_object(
+                  'saml', jsonb_build_object(
+                    'idpMetadata', \$\${XML_CONTENT}\$\$,
+                    'idpCertificate', \$\${CERT_PEM}\$\$
+                  )
+                ), true, true, true,
                 true, true, true, true,
                 true, true, true, true, '{}'
               );
-              
+
               INSERT INTO project (id, created, updated, "ownerId", "displayName", "notifyStatus", "platformId")
               VALUES ('prjActivepiecesProje1', now(), now(), 'usrActivepiecesAdmin1', 'Default Project', 'ALWAYS', 'plaActivepiecesPlatf1');
-              
+
               INSERT INTO project_member (id, created, updated, "projectId", role, "userId", "platformId")
               VALUES ('memActivepiecesMembe1', now(), now(), 'prjActivepiecesProje1', 'ADMIN', 'usrActivepiecesAdmin1', 'plaActivepiecesPlatf1');
 
               INSERT INTO custom_domain (id, created, updated, domain, "platformId", status)
               VALUES ('domActivepiecesDoma1', now(), now(), 'auto.${TENANT_DOMAIN}', 'plaActivepiecesPlatf1', 'ACTIVE');
-            SQL
+SQL
               echo "Database seeded successfully."
             else
               echo "Database already seeded."
