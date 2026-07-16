@@ -233,7 +233,7 @@ spec:
                 "VALUES ('memActivepiecesMembe1', now(), now(), 'prjActivepiecesProje1', 'ADMIN', 'usrActivepiecesAdmin1', 'plaActivepiecesPlatf1');" \
                 'INSERT INTO custom_domain (id, created, updated, domain, "platformId", status)' \
                 "VALUES ('domActivepiecesDoma1', now(), now(), 'auto.${TENANT_DOMAIN}', 'plaActivepiecesPlatf1', 'ACTIVE');" \
-                'CREATE OR REPLACE FUNCTION auto_assign_project() RETURNS TRIGGER AS $$ BEGIN IF NEW."platformId" = \'plaActivepiecesPlatf1\' THEN INSERT INTO project_member (id, created, updated, "projectId", role, "userId", "platformId") VALUES (substring(md5(NEW.id) from 1 for 21), now(), now(), \'prjActivepiecesProje1\', \'ADMIN\', NEW.id, \'plaActivepiecesPlatf1\') ON CONFLICT DO NOTHING; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql;' \
+                'CREATE OR REPLACE FUNCTION auto_assign_project() RETURNS TRIGGER AS $$ BEGIN IF NEW."platformId" = $$plaActivepiecesPlatf1$$ THEN INSERT INTO project_member (id, created, updated, "projectId", role, "userId", "platformId") VALUES (substring(md5(NEW.id) from 1 for 21), now(), now(), $$prjActivepiecesProje1$$, $$ADMIN$$, NEW.id, $$plaActivepiecesPlatf1$$) ON CONFLICT DO NOTHING; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql;' \
                 'CREATE OR REPLACE TRIGGER trg_auto_assign_project AFTER INSERT ON "user" FOR EACH ROW EXECUTE FUNCTION auto_assign_project();' \
                 | PGPASSWORD="$AP_POSTGRES_PASSWORD" psql -h "$AP_POSTGRES_HOST" -p "$AP_POSTGRES_PORT" -U "$AP_POSTGRES_USERNAME" -d "$AP_POSTGRES_DATABASE" -v xml_val="$XML_CONTENT" -v cert_val="$CERT_VAL"
               echo "Database seeded successfully."
