@@ -208,7 +208,7 @@ spec:
                 'plaActivepiecesPlatf1', now(), now(), 'usrActivepiecesAdmin1', 'Gentian', '#000000', '', '', '',
                 '{}', 'ALLOWED', false, true, 'en',
                 true, true, '{}', false,
-                true, '{"saml": {"idpMetadataUrl": "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/saml/descriptor", "ssoDomain": "${KERNEL_DOMAIN}"}}'::jsonb, true, true, true,
+                true, '{"saml": {"idpMetadataUrl": "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/protocol/saml/descriptor", "ssoDomain": "${KERNEL_DOMAIN}"}}'::jsonb, true, true, true,
                 true, true, true, true,
                 true, true, true, true, '{}'
               );
