@@ -31,7 +31,7 @@ data:
         # Set cookie if token query parameter is present
         map $arg_token $auth_cookie {
             default "";
-            ~.+ "ap_logged_in=true; Path=/; Max-Age=31536000; Secure; SameSite=Lax";
+            ~.+ "ap_logged_in=true; Path=/; Secure; SameSite=Lax";
         }
 
         server_tokens off;
