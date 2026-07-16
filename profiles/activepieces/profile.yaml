@@ -38,7 +38,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: activepieces
-    version: "0.3.17"
+    version: "0.3.18"
 
   valueMapping:
     database:
@@ -76,28 +76,7 @@ spec:
       - /bin/sh
       - -c
       - |
-        cat << 'EOF' > /tmp/patch.py
-        with open('/usr/src/app/dist/packages/server/api/main.js', 'r') as f:
-            c = f.read()
-
-        # 1. Rename release query parameter to ignored
-        c = c.replace('.append("release",', '.append("ignored",')
-
-        # 2. Mock listVersions API to return empty string version to fetch latest version
-        target_versions = 'const r=`${T}/versions?${t.toString()}`,i=yield fetch(r);return(0,s.parseAndVerify)(y.ListVersionsResponse,yield i.json())'
-        replacement_versions = 'const r=1,i=2;return {"":{}}'
-        c = c.replace(target_versions, replacement_versions)
-
-        # 3. Force license verification to always succeed and enable SSO
-        target_license = 'verifyKeyAndApplyLimits(e){return i.__awaiter(this,arguments,void 0,(function*({platformId:e,license:t}){if((0,a.isNil)(t))yield N(e);else{try{yield this.activateKey({key:t,platformId:e})}catch(r){}try{const r=yield this.getKey(t);if((0,a.isNil)(r)||(0,n.default)(r.expiresAt).isBefore((0,n.default)()))return void(yield N(e));yield c.platformService.update({id:e,ssoEnabled:r.ssoEnabled,gitSyncEnabled:r.gitSyncEnabled,showPoweredBy:r.showPoweredBy,embeddingEnabled:r.embeddingEnabled,auditLogEnabled:r.auditLogEnabled,customAppearanceEnabled:r.customAppearanceEnabled,manageProjectsEnabled:r.manageProjectsEnabled,managePiecesEnabled:r.managePiecesEnabled,manageTemplatesEnabled:r.manageTemplatesEnabled,apiKeysEnabled:r.apiKeysEnabled,customDomainsEnabled:r.customDomainsEnabled,projectRolesEnabled:r.projectRolesEnabled,flowIssuesEnabled:r.flowIssuesEnabled,alertsEnabled:r.alertsEnabled,premiumPieces:r.premiumPieces})}catch(r){u.logger.error(`[ERROR]: Failed to verify license key: ${r}`)}}}))}}'
-        replacement_license = 'verifyKeyAndApplyLimits(e){return i.__awaiter(this,arguments,void 0,(function*({platformId:e}){yield c.platformService.update({id:e,ssoEnabled:!0,gitSyncEnabled:!0,showPoweredBy:!0,embeddingEnabled:!0,auditLogEnabled:!0,customAppearanceEnabled:!0,manageProjectsEnabled:!0,managePiecesEnabled:!0,manageTemplatesEnabled:!0,apiKeysEnabled:!0,customDomainsEnabled:!0,projectRolesEnabled:!0,flowIssuesEnabled:!0,alertsEnabled:!0})}))}'
-        c = c.replace(target_license, replacement_license)
-
-        with open('/usr/src/app/dist/packages/server/api/main.js', 'w') as f:
-            f.write(c)
-        EOF
-        python3 /tmp/patch.py
-        exec /usr/src/app/docker-entrypoint.sh
+        sleep 3600
     extraEnvVars:
       - name: AP_EDITION
         value: "ee"
