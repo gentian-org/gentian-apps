@@ -313,6 +313,7 @@ export function StorePage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [purgeTarget, setPurgeTarget] = useState<string | null>(null);
+  const [optimisticInstalling, setOptimisticInstalling] = useState<Record<string, string>>({});
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async () => {
@@ -357,9 +358,40 @@ export function StorePage() {
     };
   }, []);
 
-  const installedByProfile = new Map(installed.map((app) => [app.profile, app]));
-  const readyApps = installed.filter((app) => isAppReady(app));
-  const installingApps = installed.filter((app) => !isAppReady(app));
+  useEffect(() => {
+    if (installed.length > 0) {
+      const installedProfiles = new Set(installed.map((app) => app.profile));
+      setOptimisticInstalling((current) => {
+        let changed = false;
+        const next = { ...current };
+        Object.keys(next).forEach((profile) => {
+          if (installedProfiles.has(profile)) {
+            delete next[profile];
+            changed = true;
+          }
+        });
+        return changed ? next : current;
+      });
+    }
+  }, [installed]);
+
+  // Merge optimistic installing state into the installed list
+  const mergedInstalled = [...installed];
+  const installedProfilesForMerge = new Set(installed.map((app) => app.profile));
+  Object.entries(optimisticInstalling).forEach(([profile, message]) => {
+    if (!installedProfilesForMerge.has(profile)) {
+      mergedInstalled.push({
+        profile,
+        ready: false,
+        phase: "installing",
+        message,
+      });
+    }
+  });
+
+  const installedByProfile = new Map(mergedInstalled.map((app) => [app.profile, app]));
+  const readyApps = mergedInstalled.filter((app) => isAppReady(app));
+  const installingApps = mergedInstalled.filter((app) => !isAppReady(app));
   const hasInstalling = installingApps.length > 0;
 
   const catalogueApps = catalogue?.apps ?? [];
@@ -408,6 +440,13 @@ export function StorePage() {
         });
         return next;
       });
+
+      if (!result.ready) {
+        setOptimisticInstalling((current) => ({
+          ...current,
+          [profile]: "Install requested — waiting for GitOps sync",
+        }));
+      }
 
       await refresh().catch(() => undefined);
 
