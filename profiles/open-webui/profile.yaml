@@ -88,6 +88,18 @@ spec:
         value: "true"
       - name: WEBUI_SESSION_COOKIE_SECURE
         value: "true"
+    # The chart's own openai* values keys template literal env: entries,
+    # which win over extraEnvFrom's llm-credentials-open-webui Secret for
+    # the same names (chart's own docs: "extraEnvVars will take precedence
+    # over the value from extraEnvFrom") — without these, the chart's
+    # default openaiBaseApiUrl/openaiApiKey (real https://api.openai.com/v1
+    # + a placeholder key) silently win instead, and Open WebUI's model
+    # list request to that default times out reaching the public internet.
+    # extraEnvFrom stays wired for WEBUI_SECRET_KEY, which has no
+    # dedicated values key.
+    openaiBaseApiUrl: "http://litellm-proxy.platform-kernel.svc.cluster.local:4000/v1"
+    openaiApiKeyExistingSecret: "llm-credentials-open-webui"
+    openaiApiKeyExistingSecretKey: "OPENAI_API_KEY"
     ingress:
       enabled: false
 
