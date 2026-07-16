@@ -38,7 +38,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: activepieces
-    version: "0.3.13"
+    version: "0.3.14"
 
   valueMapping:
     database:
@@ -63,6 +63,12 @@ spec:
     serviceName: "activepieces"
     servicePort: 8080
     tlsEnabled: true
+
+  security:
+    egress:
+      - ports:
+          - port: 443
+            protocol: TCP
 
   extraValues:
     fullnameOverride: "activepieces"
@@ -148,13 +154,6 @@ spec:
         add: ["NET_BIND_SERVICE", "CHOWN", "SETUID", "SETGID", "DAC_OVERRIDE"]
       seccompProfile:
         type: RuntimeDefault
-
-    hostAliases:
-      - ip: "127.0.0.1"
-        hostnames:
-          - "raw.githubusercontent.com"
-          - "activepieces.com"
-          - "cloud.activepieces.com"
 
     initContainers:
       - name: fetch-keycloak-metadata
