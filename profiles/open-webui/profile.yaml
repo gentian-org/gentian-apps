@@ -86,6 +86,8 @@ spec:
         value: "false"
       - name: OAUTH_AUTO_REDIRECT
         value: "true"
+      - name: WEBUI_SESSION_COOKIE_SECURE
+        value: "true"
     ingress:
       enabled: false
 
