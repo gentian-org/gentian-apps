@@ -152,3 +152,70 @@ spec:
         drop: ["ALL"]
       seccompProfile:
         type: RuntimeDefault
+
+  # Open WebUI seeds its OpenAI connection settings into its own persisted
+  # SQLite DB on first boot only — later pod restarts do NOT re-sync from
+  # extraEnvFrom/openaiBaseApiUrl above, so a wrong/absent first-boot value
+  # (e.g. before this profile set the LiteLLM URL) stays stuck until fixed
+  # via Open WebUI's own admin API. This job mints a short-lived admin JWT
+  # itself (HS256, signed with WEBUI_SECRET_KEY, the same secret Open WebUI
+  # verifies incoming tokens with) and POSTs the correct config — idempotent,
+  # and a no-op once the persisted config already matches. See
+  # app-profile-guide.md, "Post-install bootstrap jobs".
+  postInstallJob:
+    image: alpine:3.20
+    envFrom:
+      - llm-credentials-open-webui
+    readOnlyPVC:
+      claimName: open-webui
+      mountPath: /data
+    script: |
+      #!/bin/sh
+      set -eu
+      apk add --no-cache curl sqlite openssl jq >/dev/null 2>&1
+
+      DB=/data/webui.db
+      if [ ! -f "$DB" ]; then
+        echo "[open-webui post-install] webui.db not present yet -- will retry"
+        exit 1
+      fi
+
+      # immutable=1: avoid touching the WAL file while Open WebUI's own pod
+      # has the DB open for writing -- we only need a long-lived admin row.
+      ADMIN_ID=$(sqlite3 "file:${DB}?mode=ro&immutable=1" \
+        "SELECT id FROM user WHERE role='admin' LIMIT 1;" 2>/dev/null || true)
+      if [ -z "$ADMIN_ID" ]; then
+        echo "[open-webui post-install] no admin user yet -- will retry"
+        exit 1
+      fi
+
+      b64url() {
+        openssl base64 -A | tr '+/' '-_' | tr -d '='
+      }
+
+      EXP=$(( $(date +%s) + 300 ))
+      HEADER='{"alg":"HS256","typ":"JWT"}'
+      PAYLOAD=$(printf '{"id":"%s","exp":%s}' "$ADMIN_ID" "$EXP")
+      H=$(printf '%s' "$HEADER" | b64url)
+      P=$(printf '%s' "$PAYLOAD" | b64url)
+      SIG=$(printf '%s.%s' "$H" "$P" | openssl dgst -sha256 -hmac "$WEBUI_SECRET_KEY" -binary | b64url)
+      JWT="${H}.${P}.${SIG}"
+
+      BASE="http://open-webui"
+      AUTH="Authorization: Bearer ${JWT}"
+
+      CURRENT=$(curl -sf --max-time 10 -H "$AUTH" "${BASE}/openai/config" || echo '{}')
+      ENABLED=$(printf '%s' "$CURRENT" | jq -r '.ENABLE_OPENAI_API // false')
+      CURRENT_URL=$(printf '%s' "$CURRENT" | jq -r '.OPENAI_API_BASE_URLS[0] // ""')
+      if [ "$ENABLED" = "true" ] && [ "$CURRENT_URL" = "$OPENAI_API_BASE_URL" ]; then
+        echo "[open-webui post-install] openai config already correct -- skipping"
+        exit 0
+      fi
+
+      UPDATE=$(jq -n --arg url "$OPENAI_API_BASE_URL" --arg key "$OPENAI_API_KEY" \
+        '{ENABLE_OPENAI_API:true, OPENAI_API_BASE_URLS:[$url], OPENAI_API_KEYS:[$key], OPENAI_API_CONFIGS:{}}')
+
+      curl -sf --max-time 10 -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+        -d "$UPDATE" "${BASE}/openai/config/update" >/dev/null
+
+      echo "[open-webui post-install] openai config updated"
