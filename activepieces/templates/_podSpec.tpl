@@ -38,6 +38,14 @@ template:
       - name: {{ .Chart.Name }}
         image: {{ include "activepieces.image" . }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- if .Values.command }}
+        command:
+          {{- toYaml .Values.command | nindent 10 }}
+        {{- end }}
+        {{- if .Values.args }}
+        args:
+          {{- toYaml .Values.args | nindent 10 }}
+        {{- end }}
         envFrom:
           - configMapRef:
               name: {{ include "activepieces.fullname" . }}
