@@ -218,6 +218,9 @@ spec:
               
               INSERT INTO project_member (id, created, updated, "projectId", role, "userId", "platformId")
               VALUES ('memActivepiecesMembe1', now(), now(), 'prjActivepiecesProje1', 'ADMIN', 'usrActivepiecesAdmin1', 'plaActivepiecesPlatf1');
+
+              INSERT INTO custom_domain (id, created, updated, domain, "platformId", status)
+              VALUES ('domActivepiecesDoma1', now(), now(), 'auto.${TENANT_DOMAIN}', 'plaActivepiecesPlatf1', 'ACTIVE');
             SQL
               echo "Database seeded successfully."
             else
