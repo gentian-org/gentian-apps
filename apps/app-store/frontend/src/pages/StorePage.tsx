@@ -375,6 +375,19 @@ export function StorePage() {
     }
   }, [installed]);
 
+  useEffect(() => {
+    if (notice?.kind === "info" && notice.text.includes("is installing")) {
+      const match = notice.text.match(/^(.*) is installing\./);
+      if (match) {
+        const label = match[1];
+        const app = installed.find((a) => displayNameFor(a.profile, catalogue) === label);
+        if (app && isAppReady(app)) {
+          setNotice({ kind: "success", text: `${label} is ready.` });
+        }
+      }
+    }
+  }, [installed, notice, catalogue]);
+
   // Merge optimistic installing state into the installed list
   const mergedInstalled = [...installed];
   const installedProfilesForMerge = new Set(installed.map((app) => app.profile));

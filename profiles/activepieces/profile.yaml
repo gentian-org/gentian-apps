@@ -156,6 +156,15 @@ spec:
 
     initContainers:
       - name: db-seed
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+            add: ["NET_BIND_SERVICE", "CHOWN", "SETUID", "SETGID", "DAC_OVERRIDE"]
+          seccompProfile:
+            type: RuntimeDefault
         image: ghcr.io/cloudnative-pg/postgresql:17.2
         env:
           - name: AP_POSTGRES_USERNAME
