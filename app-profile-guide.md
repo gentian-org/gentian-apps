@@ -150,7 +150,8 @@ profile's **`composition.yaml`** (`app-ox`, `app-element`, …).
 | **`spec.kernelRequirements` + `valueMapping`** | Any app needs a standard kernel function (OIDC, LDAP, DB, S3, mail) | `clientId`, `redirectUris`, `databasePerTenant` |
 | **Profile annotation** | Operator or gateway reconciler must do the same thing for many apps; value is small and stable | `gentianos.io/deployment-role`, `gentianos.io/gateway-api-backends`, `gentianos.io/oidc-default-redirect-uris` |
 | **`spec.extraValues`** | Helm chart needs non-secret structured config; composition passes it through | Odoo `module: crm`, chart feature flags |
-| **`composition.yaml`** | Custom Crossplane MR graph, bootstrap Jobs, RBAC, chart-specific sequencing | OX bootstrap Job, Element Jitsi overlay, module install Jobs |
+| **`spec.postInstallJob`** | Bootstrap must call the app's own runtime admin API (not Helm values, not `kernelRequirements`); small and self-contained | open-webui LiteLLM config seed (§13a) |
+| **`composition.yaml`** | Custom Crossplane MR graph, multi-Job/RBAC sequencing, chart-specific workarounds | OX bootstrap Job, Element Jitsi overlay, module install Jobs |
 | **Upstream chart / vendor** | Fix belongs in the supplier chart long-term | OX `initconfigdb -i`, Keycloak client scopes in openDesk |
 
 **Never** add per-app fields to the `AppProfile` CRD. **Never** hardcode
@@ -1230,6 +1231,88 @@ BAO_TOKEN=$(curl -k -sf --max-time 10 "${BAO_ADDR}/v1/auth/kubernetes/login" \
   -d "{\"role\":\"app-init\",\"jwt\":\"${JWT}\"}" \
   | jq -r '.auth.client_token')
 ```
+
+### 13a. Post-install bootstrap jobs (`spec.postInstallJob`)
+
+Some apps need bootstrap that can only happen through their own admin API (or
+a one-time data read) after the Helm release is up — not something Helm
+values alone can express. `AppProfile.spec.postInstallJob` is a **generic**
+mechanism in gentian-os for exactly this: declare an image + shell script in
+the profile, and the `app-default` composition renders it as a retried Job —
+no custom `composition.yaml` required.
+
+**Before reaching for this, check whether gentian-os already does the thing
+generically.** gentian-os already provisions per-tenant PostgreSQL/MariaDB
+databases, MinIO S3 buckets, and Redis/Memcached caches generically, driven
+purely by `AppProfile.spec.kernelRequirements` (see
+`internal/controller/{database,storage,cache}_reconciler.go` in gentian-os).
+OpenProject's profile once shipped bespoke `s3-init`/`db-init` Jobs in
+`composition.yaml` that quietly duplicated exactly this — added months after
+the generic mechanism existed, writing to the same OpenBao paths with a
+different credential-derivation scheme, running in parallel with the generic
+path on every tenant reconcile. They were removed once confirmed redundant.
+`spec.postInstallJob` is for what genuinely *isn't* covered generically:
+talking to an app's own runtime admin API, not provisioning platform
+infrastructure.
+
+**When to use it:**
+
+- The app persists config to its own database on first boot and ignores env
+  vars on later restarts, so a wrong first-boot value can only be corrected
+  by calling the app's own admin API (open-webui's LiteLLM connection
+  settings, for example).
+- The fix is small and self-contained enough not to justify a full custom
+  `composition.yaml` — if the bootstrap logic needs multiple resources or
+  inter-Job ordering, write a real composition instead (as in §13 above).
+
+Fields:
+
+```yaml
+spec:
+  postInstallJob:
+    image: alpine:3.20        # required
+    script: |                 # required — run via /bin/sh -c, mounted from a ConfigMap
+      #!/bin/sh
+      set -eu
+      ...
+    envFrom:                  # optional — Secret names already present in the tenant namespace
+      - llm-credentials-open-webui
+    serviceAccountName: app-init   # optional — reuse an existing ServiceAccount + RBAC
+    readOnlyPVC:               # optional, rare — mount an existing PVC read-only
+      claimName: open-webui
+      mountPath: /data
+```
+
+`envFrom` only accepts **Secret** names — there is no generic ConfigMap or
+literal `env:` passthrough, deliberately: if a script needs cluster-config-
+derived values (a MinIO endpoint, a CNPG host), that's a sign it belongs in
+`kernelRequirements`/a real composition, not a static per-app script. A
+script that needs its own namespace/tenant name can read them at runtime via
+the Kubernetes downward file
+(`/var/run/secrets/kubernetes.io/serviceaccount/namespace`) or by calling its
+own app's Service unqualified (`http://open-webui`, resolved by the
+in-namespace DNS search domain) instead of needing them injected.
+
+**Retry / idempotency contract:** the rendered Job uses
+`ttlSecondsAfterFinished` + `backoffLimit`, the same pattern as every other
+bootstrap Job in this codebase (§13) — once the Job finishes (success or
+failure) it's deleted after the TTL, and the next tenant reconcile recreates
+it. There is no `dependsOn`/readiness gate between the Job and the rest of
+the app's resources, so **the script itself** must:
+
+- Exit non-zero if a dependency isn't ready yet (e.g. no admin user exists in
+  the app's DB yet) — the Job simply retries on the next reconcile.
+- Be a no-op once the desired state is already correct — check current state
+  (e.g. `GET` the app's own config endpoint) before writing, rather than
+  blindly re-applying every run.
+
+**Worked example — open-webui:** `profiles/open-webui/profile.yaml`'s
+`postInstallJob` mints a short-lived admin JWT itself (HS256, signed with the
+same `WEBUI_SECRET_KEY` Open WebUI verifies incoming tokens with, sourced via
+`envFrom: [llm-credentials-open-webui]`), reads the admin user id from Open
+WebUI's own SQLite DB (`readOnlyPVC`, since no HTTP API can supply it before
+authentication exists), and POSTs the correct LiteLLM connection config
+through Open WebUI's own admin API. See that profile for the full script.
 
 ---
 
