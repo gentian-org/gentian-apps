@@ -38,7 +38,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: activepieces
-    version: "0.3.15"
+    version: "0.3.16"
 
   valueMapping:
     database:
@@ -76,8 +76,16 @@ spec:
       - /bin/sh
       - -c
       - |
-        sed -i 's/append("release",/append("ignored",/g' /usr/src/app/dist/packages/server/api/main.js || true
-        sed -i "s/append('release',/append('ignored',/g" /usr/src/app/dist/packages/server/api/main.js || true
+        python3 -c "
+        with open('/usr/src/app/dist/packages/server/api/main.js', 'r') as f:
+            c = f.read()
+        c = c.replace('.append(\"release\",', '.append(\"ignored\",')
+        target = 'const r=\`\${T}/versions?\${t.toString()}\`,i=yield fetch(r);return(0,s.parseAndVerify)(y.ListVersionsResponse,yield i.json())'
+        replacement = 'const r=1,i=2;return {\"\":{}}'
+        c = c.replace(target, replacement)
+        with open('/usr/src/app/dist/packages/server/api/main.js', 'w') as f:
+            f.write(c)
+        "
         exec /usr/src/app/docker-entrypoint.sh
     extraEnvVars:
       - name: AP_EDITION
