@@ -6,7 +6,7 @@ metadata:
     gentianos.io/profile-name: open-webui
   annotations:
     # OpenWebUI needs network access to the platform-kernel namespace where LiteLLM resides
-    gentianos.io/kernel-egress-namespaces: platform-kernel
+    gentianos.io/kernel-egress-namespaces: platform-kernel,envoy-gateway-system
     gentianos.io/standard-image-pull-secrets: "true"
 spec:
   displayName: "AI Chat"
