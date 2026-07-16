@@ -68,6 +68,7 @@ data:
                 proxy_set_header Upgrade $http_upgrade;
                 proxy_set_header Connection "Upgrade";
                 proxy_set_header Host $host;
+                proxy_redirect http:// https://;
             }
 
             # Fallback to default language if no preference defined by browser
