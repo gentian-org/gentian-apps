@@ -344,9 +344,18 @@ spec:
         mountPath: /etc/gentian-mcp
         readOnly: true
       hooks:
-        before-starting: "#!/bin/bash\nset -eu\nNC=\"php /var/www/html/occ\"\nCOLLABORA_PUBLIC=\"\
-          https://collabora.${TENANT_DOMAIN}\"\nCOLLABORA_INTERNAL=\"http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980\"\
-          \nNEXTCLOUD_CALLBACK=\"http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080\"\
+        before-starting: "#!/bin/bash\nset -eu\nNC=\"php /var/www/html/occ\"\n\n#\
+          \ Nextcloud's own PHP-side install check requires this sentinel file to\n\
+          # exist before it will run the automatic, non-interactive install that\n\
+          # autoconfig.php sets up (DB/admin credentials are already correctly\n#\
+          \ wired -- this is the only missing piece). Only touched while genuinely\n\
+          # not yet installed, so the safety gate this file exists for (don't\n# silently\
+          \ reinstall over live data if config.php ever gets corrupted)\n# stays intact\
+          \ for the rest of the deployment's life.\nif ! $NC status 2>/dev/null |\
+          \ grep -q \"installed: true\"; then\n  touch /var/www/html/config/CAN_INSTALL\n\
+          fi\nCOLLABORA_PUBLIC=\"https://collabora.${TENANT_DOMAIN}\"\nCOLLABORA_INTERNAL=\"\
+          http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980\"\n\
+          NEXTCLOUD_CALLBACK=\"http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080\"\
           \npatch_portal_bridge_htaccess() {\n  python3 - <<'PY'\nfrom pathlib import\
           \ Path\nhtaccess = Path(\"/var/www/html/.htaccess\")\nif not htaccess.is_file():\n\
           \    raise SystemExit(0)\ntext = htaccess.read_text()\nif \"gentian-portal-bridge\"\
