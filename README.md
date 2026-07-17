@@ -6,7 +6,6 @@ App Store catalogue for Gentian OS — `AppProfile` CRs plus first-party app imp
 
 ```text
 profiles/              # OSS App catalogue bundles — synced by Argo CD gentian-catalogue
-  CATALOGUE.md         # layout and workflow
   nextcloud/
   app-store/
 apps/                  # first-party implementations (FastAPI + React + Helm)
@@ -27,7 +26,7 @@ icons/                 # shared SVG assets
 
 ## Adding an upstream app
 
-Add `profiles/<app>/` (see [profiles/CATALOGUE.md](profiles/CATALOGUE.md) and [docs/app-profile-guide.md](docs/app-profile-guide.md)).
+Add `profiles/<app>/` (see [docs/app-profile-guide.md](docs/app-profile-guide.md)).
 
 ```bash
 kubectl gentian apps list

@@ -1158,7 +1158,7 @@ extraValues:
 Each app lives under `profiles/<name>/` with a `kustomization.yaml`. Argo CD
 ApplicationSet **`gentian-catalogue`** syncs one Application per bundle
 (`catalogue-<name>`): AppProfile, optional `composition.yaml`, optional cluster
-assets. See [profiles/CATALOGUE.md](profiles/CATALOGUE.md).
+assets.
 
 Set `compositionRef` only when using a non-default composition:
 
