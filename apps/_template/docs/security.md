@@ -76,7 +76,7 @@ only references contract **names** that match those definitions.
 |---|---|---|---|
 | **Declaration** | `provides` + `optionalIntegrations` on AppProfile | Catalogue / app developer | **Implemented** (CRD) |
 | **Wiring** | `IntegrationBinding` — credentials + OIDC between installed apps | Platform operator (auto when peers match) | **Implemented** |
-| **Grant (ReBAC)** | Future `AppGrant` — tenant-approved subset + OpenFGA tuples | Tenant admin at install | **Planned** (Stage 2 in security architecture) |
+| **Grant (ReBAC)** | `AppGrant` — tenant-approved subset + OpenFGA tuples | Tenant admin at install | **Done** (CRD + OpenFGA tuple sync; install-time UI subset pending) |
 
 `kernelRequirements` (OIDC, Postgres, S3, …) is **separate** — it declares
 **kernel services**, not cross-app integration contracts.
@@ -85,7 +85,7 @@ only references contract **names** that match those definitions.
 |---|-------------|-----|
 | M18 | **Declare kernel needs honestly** | `kernelRequirements` — only OIDC/DB/storage/mail the app actually uses |
 | M19 | **Declare integration contracts honestly** | `provides` / `optionalIntegrations` — only contracts the app implements or consumes; see existing profiles under `gentian-apps/profiles/` |
-| M20 | **Never implement tenant grants in app code** | Cross-app access is wired by `IntegrationBinding` (today) and `AppGrant` + OpenFGA (future) — apps declare, they do not grant |
+| M20 | **Never implement tenant grants in app code** | Cross-app access is wired by `IntegrationBinding` and `AppGrant` + OpenFGA — apps declare, they do not grant |
 
 Kernel-only repos (e.g. `gentian-ui`) skip M18–M20; they deploy via ApplicationSet, not AppProfile.
 
@@ -115,7 +115,7 @@ When OpenFGA is available in the cluster, these become mandatory for all apps
 | # | Requirement |
 |---|-------------|
 | S1 | Call OpenFGA **Check** (AuthZEN API) on every mutation and sensitive read |
-| S2 | Effective access = `AppProfile contract declaration ∩ tenant grant (AppGrant, future) ∩ user ceiling ∩ ABAC` |
+| S2 | Effective access = `AppProfile contract declaration ∩ tenant grant (AppGrant) ∩ user ceiling ∩ ABAC` |
 | S3 | Agent routes validate **delegation tuple + task TTL** before acting |
 
 Until then, M1–M4 + M26 are the minimum authorization bar.
