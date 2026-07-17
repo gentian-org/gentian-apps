@@ -146,11 +146,32 @@ spec:
     - activepieces-postgresql-credentials
     script: |
       set -eu
+
+      # Resolve environment variables using python
+      python3 -c '
+      import urllib.request, re, os
+      with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
+          ns = f.read().strip()
+      tenant_id = ns.replace("tenant-", "")
+      url = f"http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/{tenant_id}/protocol/saml/descriptor"
+      xml = urllib.request.urlopen(url).read().decode("utf-8")
+      match = re.search(r"https://id\.([^/\"]+)", xml)
+      kernel_domain = match.group(1) if match else "gentian.org"
+      tenant_domain = f"{tenant_id}.{kernel_domain}"
+
+      with open("/tmp/env.sh", "w") as f:
+          f.write(f"export TENANT_ID={tenant_id}\n")
+          f.write(f"export KERNEL_DOMAIN={kernel_domain}\n")
+          f.write(f"export TENANT_DOMAIN={tenant_domain}\n")
+      '
+      . /tmp/env.sh
+
       echo "Waiting for database..."
       until pg_isready -h postgres-rw.platform-kernel.svc.cluster.local -p 5432; do
         sleep 2
       done
 
+      # Check if platform table exists
       TABLE_EXISTS=$(PGPASSWORD="$password" psql -h postgres-rw.platform-kernel.svc.cluster.local -p 5432 -U "$username" -d "${TENANT_ID}_activepieces" -tAc "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'platform');")
       if [ "$TABLE_EXISTS" = "f" ]; then
         echo "Database tables do not exist yet. Activepieces container needs to run migrations first."
@@ -161,15 +182,15 @@ spec:
       if [ "$PLATFORM_COUNT" -eq 0 ]; then
         echo "Seeding Activepieces database..."
 
+        # Download Keycloak metadata XML
         python3 -c '
-      import urllib.request
-      try:
-          response = urllib.request.urlopen("http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/protocol/saml/descriptor")
-          print(response.read().decode("utf-8"))
-      except Exception as e:
-          import sys
-          print(f"Error fetching metadata: {e}", file=sys.stderr)
-          sys.exit(1)
+      import urllib.request, os
+      with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
+          ns = f.read().strip()
+      tenant_id = ns.replace("tenant-", "")
+      url = f"http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/{tenant_id}/protocol/saml/descriptor"
+      xml = urllib.request.urlopen(url).read().decode("utf-8")
+      print(xml)
       ' > /tmp/idp-metadata.xml
 
         XML_CONTENT=$(cat /tmp/idp-metadata.xml | sed 's/WantAuthnRequestsSigned="true"/WantAuthnRequestsSigned="false"/g')
