@@ -3,7 +3,7 @@
 image:
   repository: ghcr.io/gentian-org/gentian-sidecar-git-modules
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 git:
   repoUrl: ""
