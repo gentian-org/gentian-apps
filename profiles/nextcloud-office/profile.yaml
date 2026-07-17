@@ -220,6 +220,28 @@ spec:
             type: RuntimeDefault
     podAnnotations:
       secret.reloader.stakater.com/reload: nextcloud-office-sensitive-values
+    # Defaults (failureThreshold: 3, periodSeconds: 10 => ~30s tolerance)
+    # kill the pod mid-install on a fresh deploy: Nextcloud's one-time,
+    # non-interactive install (schema creation) ties up Apache's single
+    # busy worker long enough that the liveness probe's own /status.php
+    # check can't get answered in time, so it gets killed and retried
+    # from scratch -- confirmed live, never once got far enough to finish.
+    # startupProbe wouldn't help here since it (like liveness/readiness)
+    # only checks /status.php, which already returns 200 instantly
+    # regardless of install state -- the slow part is a real page load,
+    # not startup itself. Widening tolerance to ~5 minutes covers a slow
+    # first install; a genuinely hung instance is still caught, just not
+    # as fast.
+    livenessProbe:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 10
+      failureThreshold: 30
+    readinessProbe:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 10
+      failureThreshold: 30
     nextcloud:
       containerPort: 8080
       securityContext:
