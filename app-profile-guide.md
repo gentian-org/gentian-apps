@@ -83,6 +83,15 @@ Leaving a hotfix in place "until we have time" is not acceptable — it will
 outlast the original incident and cause confusion for every engineer who works on
 the system after you.
 
+### ❌ Absolute prohibition — no licensing bypass or software cracking
+
+> **Gentian OS must never bundle, configure, or apply any code modification, patch, or workaround designed to bypass software license key validation, crack enterprise capabilities, or circumvent terms of service for proprietary application features.**
+
+#### Guidelines for Compliant Catalogue Integration:
+1. **Edition Strictness:** If an application offers both a Community Edition (CE) and a proprietary Enterprise Edition (EE), the default profile in the catalogue repository MUST configure the Community Edition (e.g., standard free auth methods, omitting licensed Enterprise features like SAML SSO, git sync, or advanced RBAC unless a valid license key is provided).
+2. **Proper License Key Activation:** If enterprise features are desired for testing or staging, configure them legally by passing a valid partner/customer license key via secure environment variables (`AP_LICENSE_KEY`, etc.), rather than patching compiled frontend or API server bundles (e.g. `main.js`) on startup.
+3. **No Hacking Workarounds:** Never inject base64-encoded patches, runtime script overrides, or SQL trigger hacks to artificially toggle Boolean flag columns (such as `ssoEnabled: true` or `customAppearanceEnabled: true`) in database platform configurations.
+
 ---
 
 ## 1. Mandatory top-level fields
