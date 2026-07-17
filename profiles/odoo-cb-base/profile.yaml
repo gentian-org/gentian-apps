@@ -60,7 +60,7 @@ spec:
       tile:
         icon: settings
       linkSuffix: "/web?gentian_embed=1&action=base_setup.action_general_configuration"
-      linkTarget: embedded
+      linkTarget: newwindow
       allowedGroup: "Tenant Admins"
 
   chart:
