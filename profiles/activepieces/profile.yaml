@@ -137,23 +137,28 @@ spec:
     command:
     - /bin/sh
     - -c
-    - "# 1. Patch all index.html files to auto-sync cookie token and user to localStorage\n\
+    - "# 1. Patch all index.html files with cookie sync and history interceptor\n\
       node -e \"\nconst fs = require('fs');\nconst root = '/usr/share/nginx/html';\n\
       const files = ['/usr/share/nginx/html/index.html'];\ntry {\n    fs.readdirSync(root).forEach(dir\
       \ => {\n        files.push(root + '/' + dir + '/index.html');\n    });\n} catch\
       \ (e) {}\n\nfiles.forEach(file => {\n    if (fs.existsSync(file) && !fs.lstatSync(file).isDirectory())\
       \ {\n        let html = fs.readFileSync(file, 'utf8');\n        if (!html.includes('ap_token'))\
-      \ {\n            const script = '<script>if(!localStorage.getItem(\\'token\\\
-      ')){const mT=document.cookie.match(/ap_token=([^;]+)/);const mU=document.cookie.match(/ap_user=([^;]+)/);if(mT&&mU){localStorage.setItem(\\\
-      'token\\',mT[1]);localStorage.setItem(\\'currentUser\\',decodeURIComponent(mU[1]));window.location.reload();}else{window.location.href=\\\
-      '/api/v1/authn/saml/login\\';}}</script>';\n            html = html.replace('<head>',\
-      \ '<head>' + script);\n            fs.writeFileSync(file, html, 'utf8');\n \
-      \           console.log('Injected token/user sync script into ' + file);\n \
-      \       }\n    }\n});\n\"\n\n# 2. Patch main.js to disable upgrade banner by\
-      \ redirecting getLatestRelease to getCurrentRelease\ncat << 'EOF' > /tmp/patch_banner.py\n\
-      import os\nfile = \"/usr/src/app/dist/packages/server/api/main.js\"\nif os.path.exists(file):\n\
-      \    with open(file, \"r\") as f:\n        c = f.read()\n    old = 'try{return(yield\
-      \ n.default.get(\"https://raw.githubusercontent.com/activepieces/activepieces/main/package.json\"\
+      \ {\n            const script = '<script>(function(){const loginUrl=\\'/api/v1/authn/saml/login\\\
+      ';if(!localStorage.getItem(\\'token\\')){const mT=document.cookie.match(/ap_token=([^;]+)/);const\
+      \ mU=document.cookie.match(/ap_user=([^;]+)/);if(mT&&mU){localStorage.setItem(\\\
+      'token\\',mT[1]);localStorage.setItem(\\'currentUser\\',decodeURIComponent(mU[1]));window.location.reload();}else{window.location.href=loginUrl;}}const\
+      \ intercept=function(url){if(url&&(url.includes(\\'sign-in\\')||url.includes(\\\
+      'sign-up\\'))){window.location.href=loginUrl;return true;}return false;};const\
+      \ originalPush=window.history.pushState;window.history.pushState=function(state,title,url){if(intercept(url))return;return\
+      \ originalPush.apply(this,arguments);};const originalReplace=window.history.replaceState;window.history.replaceState=function(state,title,url){if(intercept(url))return;return\
+      \ originalReplace.apply(this,arguments);};})();</script>';\n            html\
+      \ = html.replace('<head>', '<head>' + script);\n            fs.writeFileSync(file,\
+      \ html, 'utf8');\n            console.log('Injected token sync and history interceptor\
+      \ script into ' + file);\n        }\n    }\n});\n\"\n\n# 2. Patch main.js to\
+      \ disable upgrade banner by redirecting getLatestRelease to getCurrentRelease\n\
+      cat << 'EOF' > /tmp/patch_banner.py\nimport os\nfile = \"/usr/src/app/dist/packages/server/api/main.js\"\
+      \nif os.path.exists(file):\n    with open(file, \"r\") as f:\n        c = f.read()\n\
+      \    old = 'try{return(yield n.default.get(\"https://raw.githubusercontent.com/activepieces/activepieces/main/package.json\"\
       )).data.version}catch(e){return\"0.0.0\"}'\n    new = 'try{return yield this.getCurrentRelease()}catch(e){return\"\
       0.0.0\"}'\n    if old in c:\n        c = c.replace(old, new)\n        with open(file,\
       \ \"w\") as f:\n            f.write(c)\n        print(\"Patched main.js successfully\
