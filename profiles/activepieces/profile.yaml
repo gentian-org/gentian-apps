@@ -358,7 +358,7 @@ spec:
       - name: AP_POSTGRES_PORT
         value: '5432'
       - name: AP_POSTGRES_USERNAME
-        value: gentian_activepieces
+        value: ${TENANT_ID}_activepieces
       - name: AP_POSTGRES_DATABASE
         value: ${TENANT_ID}_activepieces
       - name: AP_JWT_SECRET
