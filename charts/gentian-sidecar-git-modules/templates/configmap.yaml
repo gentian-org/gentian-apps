@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-git-modules-scripts
+data:
+  post-sync.sh: |
+{{ .Values.postSyncScript | indent 4 }}

@@ -1,0 +1,32 @@
+# Default values for gentian-sidecar-git-modules
+
+image:
+  repository: gentian/sidecar-git-modules
+  tag: latest
+  pullPolicy: IfNotPresent
+
+git:
+  repoUrl: ""
+  branch: "main"
+  syncInterval: 60
+  sshKey: ""
+
+syncDir: "/usr/src/app/modules"
+
+postSyncScript: |
+  # Add any custom post-sync logic here
+  # echo "Sync complete!"
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 50m
+    memory: 128Mi
+
+persistence:
+  enabled: false
+  size: 1Gi
+  storageClass: "nfs-csi"
+  accessMode: "ReadWriteMany"

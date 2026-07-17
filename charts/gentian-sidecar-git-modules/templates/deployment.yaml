@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-git-modules
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-git-modules
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-git-modules
+    spec:
+      containers:
+        - name: git-modules
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: GIT_REPO_URL
+              value: {{ .Values.git.repoUrl | quote }}
+            - name: GIT_BRANCH
+              value: {{ .Values.git.branch | quote }}
+            - name: SYNC_INTERVAL
+              value: {{ .Values.git.syncInterval | quote }}
+            - name: SYNC_DIR
+              value: {{ .Values.syncDir | quote }}
+          volumeMounts:
+            - name: sync-volume
+              mountPath: {{ .Values.syncDir }}
+            - name: scripts-volume
+              mountPath: /scripts
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: sync-volume
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: scripts-volume
+          configMap:
+            name: {{ .Release.Name }}-git-modules-scripts
