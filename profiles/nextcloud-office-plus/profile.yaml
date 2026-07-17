@@ -310,7 +310,6 @@ spec:
       trustedDomains:
       - nextcloud
       username: admin
-      password: ''
       update: 0
       mail:
         enabled: true
