@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-sso-saml
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-sso-saml
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-sso-saml
+    spec:
+      containers:
+        - name: sso-saml
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8081
+          {{- if .Values.envFrom }}
+          envFrom:
+            {{- toYaml .Values.envFrom | nindent 12 }}
+          {{- end }}
+          env:
+            - name: SSO_TENANT_ID
+              value: {{ .Values.sso.tenantId | quote }}
+            - name: SSO_KERNEL_DOMAIN
+              value: {{ .Values.sso.kernelDomain | quote }}
+            - name: SSO_ISSUER
+              value: {{ .Values.sso.issuer | quote }}
+            - name: APP_HANDLER_SCRIPT
+              value: "/usr/src/app/custom/handler.js"
+            {{- if .Values.extraEnvVars }}
+            {{- range .Values.extraEnvVars }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - name: handler-script
+              mountPath: /usr/src/app/custom
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: handler-script
+          configMap:
+            name: {{ .Release.Name }}-sso-handler

@@ -1,0 +1,28 @@
+# Default values for gentian-sidecar-sso-saml
+
+image:
+  repository: gentian/sidecar-sso-saml
+  tag: latest
+  pullPolicy: IfNotPresent
+
+sso:
+  tenantId: "demo"
+  kernelDomain: "gentian.org"
+  issuer: "GentianSidecar"
+
+handlerScript: |
+  module.exports = {
+      onLogin: async (profile, req, res) => {
+          // Default behavior
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ profile }));
+      }
+  };
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi

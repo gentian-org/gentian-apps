@@ -290,6 +290,31 @@ jobs:
           helm package activepieces -d /tmp
           helm push "/tmp/activepieces-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
 
+  build-sso-saml-sidecar-chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Package and push chart
+        if: github.event_name != 'pull_request'
+        run: |
+          CHART_VERSION=$(grep '^version:' charts/gentian-sidecar-sso-saml/Chart.yaml | awk '{print $2}')
+          helm package charts/gentian-sidecar-sso-saml -d /tmp
+          helm push "/tmp/gentian-sidecar-sso-saml-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+
   build-git-modules-sidecar-chart:
     runs-on: ubuntu-latest
     permissions:
