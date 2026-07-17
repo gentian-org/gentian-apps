@@ -78,10 +78,10 @@ spec:
     resources:
       requests:
         cpu: 100m
-        memory: 256Mi
+        memory: 512Mi
       limits:
         cpu: 1
-        memory: 512Mi
+        memory: 1Gi
     podLabels:
       mac-waiver.gentianos.io/gentian-restrict-capabilities: approved
       mac-waiver.gentianos.io/gentian-require-non-root: approved
