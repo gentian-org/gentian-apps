@@ -96,13 +96,16 @@ spec:
         ports:
           - protocol: TCP
             port: 9418
+      - ports:
+          - protocol: TCP
+            port: 443
 
   sidecars:
     - name: git-modules
       chart:
         repository: oci://ghcr.io/gentian-org/charts
         name: gentian-sidecar-git-modules
-        version: "0.1.3"
+        version: "0.1.4"
       extraValues:
         podLabels:
           gentianos.io/app: odoo-cb-base

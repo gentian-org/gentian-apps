@@ -16,6 +16,9 @@ if [ -z "$GIT_REPO_URL" ]; then
   exit 1
 fi
 
+# Configure git to ignore ownership checks for all directories in container
+git config --global --add safe.directory '*'
+
 echo "[INFO] Starting git-modules sync sidecar..."
 echo "       Repo: $GIT_REPO_URL"
 echo "       Branch: $GIT_BRANCH"
@@ -35,12 +38,15 @@ if [ ! -d "$SYNC_DIR/.git" ]; then
     echo "[ERROR] Initial clone failed. Exiting."
     exit 1
   fi
+  cd "$SYNC_DIR" || exit 1
+  git submodule update --init --recursive
 else
   echo "[INFO] Existing repository found. Updating..."
   cd "$SYNC_DIR" || exit 1
   git fetch origin "$GIT_BRANCH"
   git reset --hard "origin/$GIT_BRANCH"
   git clean -fd
+  git submodule update --init --recursive
 fi
 
 # Infinite sync loop
@@ -51,6 +57,7 @@ while true; do
   git fetch origin "$GIT_BRANCH"
   git reset --hard "origin/$GIT_BRANCH"
   git clean -fd
+  git submodule update --init --recursive
   
   # Check if a post-sync script is provided
   if [ -f "/scripts/post-sync.sh" ]; then
