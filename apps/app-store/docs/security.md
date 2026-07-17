@@ -1,7 +1,7 @@
 # Security conventions for Gentian apps
 
 This template implements the **application-layer** slice of
-[gentian-os/docs/design/new-security-architecture.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/new-security-architecture.md).
+[gentian-os/docs/design/security.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/security.md).
 Platform MAC (namespaces, default-deny egress, mesh) is enforced by Gentian OS;
 apps must not weaken it.
 
@@ -174,7 +174,7 @@ in the chart unless platform docs explicitly require an app-specific supplement.
 ## Related
 
 - [gentian-os/docs/design/app-catalogue.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/app-catalogue.md) — contracts, `provides`, `IntegrationBinding`
-- [gentian-os/docs/design/new-security-architecture.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/new-security-architecture.md) §3.4 — same model as `provides`/`optionalIntegrations`, plus future AppGrant/ReBAC
+- [gentian-os/docs/design/security.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/security.md) §3.4 — same model as `provides`/`optionalIntegrations`, plus AppGrant/ReBAC
 - [gentian-os/docs/design/gateway.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/gateway.md)
 - [gentian-os/docs/design/security.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/security.md)
 - [gentian-os/docs/design/app-catalogue-security.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/app-catalogue-security.md)
