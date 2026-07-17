@@ -287,11 +287,13 @@ spec:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
       name: gentian-sidecar-sso-saml
-      version: 0.1.2
+      version: 0.1.3
     appSecrets:
     - name: jwt_secret
       valuePath: extraEnvVars[4].value
     extraValues:
+      podLabels:
+        gentianos.io/app: activepieces
       sso:
         tenantId: ${TENANT_ID}
         kernelDomain: ${KERNEL_DOMAIN}
@@ -367,6 +369,8 @@ spec:
       name: gentian-sidecar-git-modules
       version: 0.1.7
     extraValues:
+      podLabels:
+        gentianos.io/app: activepieces
       git:
         repoUrl: https://github.com/gentian-org/gentian-activepieces-content.git
         branch: main
