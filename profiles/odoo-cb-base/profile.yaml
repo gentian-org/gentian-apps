@@ -105,7 +105,7 @@ spec:
       chart:
         repository: oci://ghcr.io/gentian-org/charts
         name: gentian-sidecar-git-modules
-        version: "0.1.5"
+        version: "0.1.6"
       extraValues:
         podLabels:
           gentianos.io/app: odoo-cb-base

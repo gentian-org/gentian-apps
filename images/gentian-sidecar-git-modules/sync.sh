@@ -16,6 +16,9 @@ if [ -z "$GIT_REPO_URL" ]; then
   exit 1
 fi
 
+# Configure writable HOME directory for git config commands
+export HOME=/tmp
+
 # Configure git to ignore ownership checks for all directories in container
 git config --global --add safe.directory '*'
 
