@@ -149,15 +149,24 @@ spec:
       '/api/v1/authn/saml/login\\';}}</script>';\n            html = html.replace('<head>',\
       \ '<head>' + script);\n            fs.writeFileSync(file, html, 'utf8');\n \
       \           console.log('Injected token/user sync script into ' + file);\n \
-      \       }\n    }\n});\n\"\n\n# 2. Write custom nginx.conf\ncat << 'EOF' > /tmp/nginx.conf\n\
-      events{}\nhttp {\n    include /etc/nginx/mime.types;\n    client_max_body_size\
-      \ 4m;\n\n    map $http_accept_language $accept_language {\n        ~*^en en;\n\
-      \        ~*^fr fr;\n        ~*^it it;\n        ~*^de de;\n        ~*^nl nl;\n\
-      \        ~*^ja ja;\n        ~*^es es;\n        ~*^id id;\n        ~*^vi vi;\n\
-      \        ~*^zh zh;\n        ~*^pt pt;\n        ~*^hu hu;\n        ~*^uk uk;\n\
-      \        ~*^bg bg;\n    }\n\n    map $arg_token $auth_cookie {\n        default\
-      \ \"\";\n        ~.+ \"ap_logged_in=true; Path=/; Secure; SameSite=Lax\";\n\
-      \    }\n\n    server_tokens off;\n\n    add_header Strict-Transport-Security\
+      \       }\n    }\n});\n\"\n\n# 2. Patch main.js to disable upgrade banner by\
+      \ redirecting getLatestRelease to getCurrentRelease\nnode -e \"\nconst fs =\
+      \ require('fs');\nconst file = '/usr/src/app/dist/packages/server/api/main.js';\n\
+      if (fs.existsSync(file)) {\n    let content = fs.readFileSync(file, 'utf8');\n\
+      \    const oldStr = 'try{return(yield n.default.get(\"https://raw.githubusercontent.com/activepieces/activepieces/main/package.json\"\
+      )).data.version}catch(e){return\"0.0.0\"}';\n    const newStr = 'try{return\
+      \ yield this.getCurrentRelease()}catch(e){return\"0.0.0\"}';\n    if (content.includes(oldStr))\
+      \ {\n        content = content.replace(oldStr, newStr);\n        fs.writeFileSync(file,\
+      \ content, 'utf8');\n        console.log('Successfully patched main.js to disable\
+      \ upgrade banner checks.');\n    }\n}\n\"\n\n# 3. Write custom nginx.conf\n\
+      cat << 'EOF' > /tmp/nginx.conf\nevents{}\nhttp {\n    include /etc/nginx/mime.types;\n\
+      \    client_max_body_size 4m;\n\n    map $http_accept_language $accept_language\
+      \ {\n        ~*^en en;\n        ~*^fr fr;\n        ~*^it it;\n        ~*^de\
+      \ de;\n        ~*^nl nl;\n        ~*^ja ja;\n        ~*^es es;\n        ~*^id\
+      \ id;\n        ~*^vi vi;\n        ~*^zh zh;\n        ~*^pt pt;\n        ~*^hu\
+      \ hu;\n        ~*^uk uk;\n        ~*^bg bg;\n    }\n\n    map $arg_token $auth_cookie\
+      \ {\n        default \"\";\n        ~.+ \"ap_logged_in=true; Path=/; Secure;\
+      \ SameSite=Lax\";\n    }\n\n    server_tokens off;\n\n    add_header Strict-Transport-Security\
       \ \"max-age=31536000; includeSubDomains; preload\" always;\n    add_header X-Content-Type-Options\
       \ \"nosniff\" always;\n\n    server {\n        listen 80;\n        server_name\
       \ localhost;\n        root /usr/share/nginx/html;\n        index index.html;\n\
@@ -204,7 +213,7 @@ spec:
       \    location / {\n           root /usr/share/nginx/html/en;\n           try_files\
       \ $uri $uri/ /index.html?$args;\n        }\n\n        location /not-found {\n\
       \           root /usr/share/nginx/html/en;\n           try_files $uri $uri/\
-      \ /index.html?$args =404;\n        }\n    }\n}\nEOF\n\n# 3. Write sidecar.js\n\
+      \ /index.html?$args =404;\n        }\n    }\n}\nEOF\n\n# 4. Write sidecar.js\n\
       cat << 'EOF' > /tmp/sidecar.js\nconst http = require('http');\nconst url = require('url');\n\
       const querystring = require('querystring');\nconst fs = require('fs');\nconst\
       \ zlib = require('zlib');\nconst { Client } = require('/usr/src/app/dist/packages/server/api/node_modules/pg');\n\
@@ -309,9 +318,9 @@ spec:
       \ res.end('Not Found');\n        }\n    });\n    \n    server.listen(8081, '127.0.0.1',\
       \ () => {\n        console.log('SSO Sidecar listening on http://127.0.0.1:8081');\n\
       \    });\n}\n\nstartServer().catch(err => {\n    console.error('SSO Sidecar\
-      \ startup failed:', err);\n});\nEOF\n\n# 4. Start sidecar in background\nnode\
-      \ /tmp/sidecar.js > /tmp/sidecar.log 2>&1 &\n\n# 5. Start Nginx with custom\
-      \ config path\nnginx -c /tmp/nginx.conf -g \"daemon off;\" &\n\n# 6. Start backend\
+      \ startup failed:', err);\n});\nEOF\n\n# 5. Start sidecar in background\nnode\
+      \ /tmp/sidecar.js > /tmp/sidecar.log 2>&1 &\n\n# 6. Start Nginx with custom\
+      \ config path\nnginx -c /tmp/nginx.conf -g \"daemon off;\" &\n\n# 7. Start backend\
       \ server\nexec node --enable-source-maps /usr/src/app/dist/packages/server/api/main.js\n"
   postInstallJob:
     image: ghcr.io/cloudnative-pg/postgresql:17.2
