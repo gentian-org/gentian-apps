@@ -182,7 +182,7 @@ spec:
       # sidecar talks to Nextcloud over its in-namespace Service name, which
       # needs to be explicitly trusted or WebDAV/OCS calls 400.
       trustedDomains:
-        - nextcloud
+      - nextcloud
       username: admin
       password: ''
       update: 0
@@ -207,37 +207,16 @@ spec:
           \  'overwritehost' => 'cloud.${TENANT_DOMAIN}',\n  'overwriteprotocol' =>\
           \ 'https',\n  'overwrite.cli.url' => 'https://cloud.${TENANT_DOMAIN}',\n\
           \  'trusted_proxies' => array('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'),\n\
-          \  'allow_local_remote_servers' => true,\n  'memcache_customprefix' => '${TENANT_ID}:nextcloud:',\n\
-          \  'redis' => array(\n    'user' => '${TENANT_ID}-${APP_ID}',\n  ),\n);"
-      # fsGroup (below) only grants GROUP access to the nfs-csi volume --
-      # it never changes the file OWNER. Nextcloud's own startup check
-      # (OC_Util::checkDataDirectoryPermissions) calls chmod() on the data
-      # directory directly, which requires actual ownership, not just group
-      # membership -- fails with "Operation not permitted" on a fresh PVC
-      # (owned by whatever the CSI driver defaulted to, not uid 33) and
-      # crash-loops the whole app. Runs once, as root, only long enough to
-      # fix ownership; the main container still runs fully non-root
-      # afterward -- doesn't touch the ongoing security posture. Standard
-      # pattern for non-root apps on NFS (see e.g. Bitnami's
-      # volume-permissions init containers) -- gentian-require-non-root
-      # only validates spec.containers, not spec.initContainers, so this
-      # doesn't need a MAC waiver.
-      extraInitContainers:
-      - name: fix-volume-ownership
-        image: busybox:1.36
-        command: ["/bin/sh", "-c", "chown -R 33:33 /volume"]
-        securityContext:
-          runAsUser: 0
-          runAsNonRoot: false
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
-            add: ["CHOWN", "FOWNER"]
-          seccompProfile:
-            type: RuntimeDefault
-        volumeMounts:
-        - name: nextcloud-main
-          mountPath: /volume
+          \  'allow_local_remote_servers' => true,\n  // NFS doesn't support chmod-by-non-owner\
+          \ even when the process has\n  // group access via fsGroup, and Kyverno's\
+          \ gentian-restrict-capabilities\n  // policy blocks the CAP_CHOWN a root\
+          \ init container would need to fix\n  // real ownership instead. This is\
+          \ Nextcloud's own documented escape\n  // hatch for filesystems that don't\
+          \ support standard Unix owner\n  // semantics (NFS chief among them) --\
+          \ the actual access control is\n  // still enforced by the PVC (RWO, this\
+          \ pod only) and the tenant\n  // NetworkPolicy, not by this check.\n  'check_data_directory_permissions'\
+          \ => false,\n  'memcache_customprefix' => '${TENANT_ID}:nextcloud:',\n \
+          \ 'redis' => array(\n    'user' => '${TENANT_ID}-${APP_ID}',\n  ),\n);"
       extraVolumes:
       - name: gentian-sensitive
         secret:
