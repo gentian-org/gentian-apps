@@ -2,10 +2,18 @@
 
 App Store catalogue for Gentian OS — `AppProfile` CRs plus first-party app implementations.
 
+**This is the single source of truth for AppProfile catalogue metadata — OSS *and* commercial.**
+Commercial (OpenDesk-packaged) profiles live here too, marked `license: proprietary`; they
+render with a **Buy** button pointing at the Gentian organization's checkout (gentian-corp),
+and the operator gates install on entitlement, not on catalogue visibility. The private
+chart/image artifacts those profiles reference come from
+[gentian-pro](https://github.com/gentian-org/gentian-pro), which does **not** sync its own
+catalogue — it's being migrated to hold only those artifacts.
+
 ## Structure
 
 ```text
-profiles/              # OSS App catalogue bundles — synced by Argo CD gentian-catalogue
+profiles/              # App catalogue bundles (OSS + commercial) — synced by Argo CD gentian-catalogue
   nextcloud/
   app-store/
 apps/                  # first-party implementations (FastAPI + React + Helm)
@@ -39,7 +47,7 @@ kubectl gentian apps list
 3. Add `profiles/<name>/profile.yaml` (+ `kustomization.yaml`)
 4. CI (`.github/workflows/apps-ci.yaml`) publishes images + OCI chart
 
-See [custom-app-guide.md](custom-app-guide.md).
+See [docs/custom-app-guide.md](docs/custom-app-guide.md).
 
 ## Related repos
 
@@ -47,6 +55,6 @@ See [custom-app-guide.md](custom-app-guide.md).
 |------|---------|
 | [gentian-os](https://github.com/gentian-org/gentian-os) | Orchestrator, CRDs, kernel |
 | [gentian-deployments](https://github.com/gentian-org/gentian-deployments) | Per-environment tenant state |
-| [gentian-pro](https://github.com/gentian-org/gentian-pro) | OpenDesk (pro) catalogue |
+| [gentian-pro](https://github.com/gentian-org/gentian-pro) | Private chart/image artifacts for commercial (OpenDesk) profiles |
 | [gentian-app-template](https://github.com/gentian-org/gentian-app-template) | Scaffold for new apps |
 | [gentian-ui](https://github.com/gentian-org/gentian-ui) | Portal shell |

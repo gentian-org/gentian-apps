@@ -2,12 +2,15 @@
 
 ## Project overview
 
-`gentian-apps` is the OSS AppProfile catalogue for Gentian OS: profile bundles
-(`profiles/<name>/`, synced to clusters by the ArgoCD ApplicationSet `gentian-catalogue`) plus
-first-party app implementations (`apps/<name>/`, FastAPI + React + Helm — same stack as
-[gentian-app-template](https://github.com/gentian-org/gentian-app-template) /
-[gentian-ui](https://github.com/gentian-org/gentian-ui)). See [README.md](README.md) for full
-scope and [docs/app-profile-guide.md](docs/app-profile-guide.md) /
+`gentian-apps` is **the single source of truth for AppProfile catalogue metadata** for Gentian
+OS — profile bundles (`profiles/<name>/`, synced to clusters by the ArgoCD ApplicationSet
+`gentian-catalogue`) plus first-party app implementations (`apps/<name>/`, FastAPI + React +
+Helm — same stack as [gentian-app-template](https://github.com/gentian-org/gentian-app-template) /
+[gentian-ui](https://github.com/gentian-org/gentian-ui)). This includes commercial
+(`license: proprietary`) profiles, not just OSS ones — [gentian-pro](https://github.com/gentian-org/gentian-pro)
+holds only the private chart/image artifacts those profiles reference, it does not sync its own
+catalogue. See [README.md](README.md) for full scope and
+[docs/app-profile-guide.md](docs/app-profile-guide.md) /
 [docs/custom-app-guide.md](docs/custom-app-guide.md) for the two main workflows.
 
 ## Build & deployment — CI/GitOps only
@@ -93,9 +96,10 @@ docker compose -f docker-compose.dev.yaml up --build
 
 `AUTH_DISABLED=true` / `VITE_AUTH_DISABLED=true` skip OIDC locally.
 
-## Adding/editing OSS profiles (`profiles/<name>/`)
+## Adding/editing profiles (`profiles/<name>/`, OSS or commercial)
 
 Each profile bundle holds `kustomization.yaml` (required), `profile.yaml` (the AppProfile CR —
 describe the app there, not in a separate catalogue doc), and optionally `oidc-catalog.yaml`,
-`composition.yaml`, `assets/`. See [docs/app-profile-guide.md](docs/app-profile-guide.md) for
-the full workflow.
+`composition.yaml`, `assets/`. Commercial profiles set `spec.license: proprietary`; the App
+Store surfaces those with a Buy button and the operator gates install on entitlement. See
+[docs/app-profile-guide.md](docs/app-profile-guide.md) for the full workflow.
