@@ -69,7 +69,7 @@ spec:
     - name: AP_TELEMETRY_ENABLED
       value: 'false'
     - name: AP_TEMPLATES_SOURCE_URL
-      value: http://localhost:3000/v1/flow-templates
+      value: http://127.0.0.1:3000/v1/flow-templates
     ingress:
       enabled: false
       tls:
