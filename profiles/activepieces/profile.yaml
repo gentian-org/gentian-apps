@@ -5,83 +5,76 @@ metadata:
   labels:
     gentianos.io/profile-name: activepieces
 spec:
-  displayName: "Automation"
-  description: "Open-source workflow automation with 200+ integrations, webhook triggers, and visual flow builder."
+  displayName: Automation
+  description: Open-source workflow automation with 200+ integrations, webhook triggers,
+    and visual flow builder.
   family: activepieces
-  catalogueVersion: "1.0.0"
+  catalogueVersion: 1.0.0
   edition: full
   trustTier: certified
   license: MIT
   tile:
     icon: analytics
   deploymentMethod: crossplane
-
   kernelRequirements:
     identity:
       saml:
-        entityId: "Activepieces"
-        acsUrl: "https://auto.${TENANT_DOMAIN}/api/v1/authn/saml/acs"
+        entityId: Activepieces
+        acsUrl: https://auto.${TENANT_DOMAIN}/api/v1/authn/saml/acs
     database:
       engine: postgresql
       databasePerTenant: true
     cache:
       engine: redis
-
   portalTiles:
-    - name: activepieces
-      displayName:
-        de_DE: "Automatisierung"
-        en_US: "Automation"
-      linkTarget: embedded
-      allowedGroup: "App Users"
-
+  - name: activepieces
+    displayName:
+      de_DE: Automatisierung
+      en_US: Automation
+    linkTarget: embedded
+    allowedGroup: App Users
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: activepieces
-    version: "0.3.21"
-
+    version: 0.3.21
   valueMapping:
     database:
-      hostKey: "activepieces.postgresql.host"
-      portKey: "activepieces.postgresql.port"
-      nameKey: "activepieces.postgresql.database"
-      userKey: "activepieces.postgresql.username"
-      passwordKey: "activepieces.postgresql.password"
+      hostKey: activepieces.postgresql.host
+      portKey: activepieces.postgresql.port
+      nameKey: activepieces.postgresql.database
+      userKey: activepieces.postgresql.username
+      passwordKey: activepieces.postgresql.password
     cache:
-      hostKey: "activepieces.redis.host"
-      portKey: "activepieces.redis.port"
-      passwordKey: "activepieces.redis.password"
-
+      hostKey: activepieces.redis.host
+      portKey: activepieces.redis.port
+      passwordKey: activepieces.redis.password
   appSecrets:
-    - name: encryption_key
-      valuePath: "activepieces.encryption.connection"
-    - name: jwt_secret
-      valuePath: "activepieces.encryption.jwt"
-
+  - name: encryption_key
+    valuePath: activepieces.encryption.connection
+  - name: jwt_secret
+    valuePath: activepieces.encryption.jwt
   ingress:
-    subDomain: "auto"
-    serviceName: "activepieces"
+    subDomain: auto
+    serviceName: activepieces
     servicePort: 8080
     tlsEnabled: true
-
   security:
     egress:
-      - ports:
-          - port: 443
-            protocol: TCP
-
+    - ports:
+      - port: 443
+        protocol: TCP
   extraValues:
-    fullnameOverride: "activepieces"
+    fullnameOverride: activepieces
     extraEnvVars:
-      - name: AP_TELEMETRY_ENABLED
-        value: "false"
-      - name: AP_TEMPLATES_SOURCE_URL
-        value: "http://localhost:3000/v1/flow-templates"
+    - name: AP_TELEMETRY_ENABLED
+      value: 'false'
+    - name: AP_TEMPLATES_SOURCE_URL
+      value: http://localhost:3000/v1/flow-templates
     ingress:
       enabled: false
       tls:
-        - hosts:
-            - "auto.${TENANT_DOMAIN}"
+      - hosts:
+        - auto.${TENANT_DOMAIN}
     resources:
       requests:
         cpu: 100m
@@ -89,153 +82,114 @@ spec:
       limits:
         cpu: 1
         memory: 512Mi
-
     podLabels:
-      mac-waiver.gentianos.io/gentian-restrict-capabilities: "approved"
-      mac-waiver.gentianos.io/gentian-require-non-root: "approved"
-
+      mac-waiver.gentianos.io/gentian-restrict-capabilities: approved
+      mac-waiver.gentianos.io/gentian-require-non-root: approved
     extraVolumes:
-      - name: nginx-log
-        emptyDir: {}
-      - name: nginx-lib
-        emptyDir: {}
-      - name: nginx-run
-        emptyDir: {}
-      - name: nginx-config
-        configMap:
-          name: activepieces-nginx-config
-      - name: shared-init-data
-        emptyDir: {}
-
+    - name: nginx-log
+      emptyDir: {}
+    - name: nginx-lib
+      emptyDir: {}
+    - name: nginx-run
+      emptyDir: {}
+    - name: nginx-config
+      configMap:
+        name: activepieces-nginx-config
     extraVolumeMounts:
-      - mountPath: /var/log/nginx
-        name: nginx-log
-      - mountPath: /var/lib/nginx
-        name: nginx-lib
-      - mountPath: /run
-        name: nginx-run
-      - name: nginx-config
-        mountPath: /etc/nginx/nginx.conf
-        subPath: nginx.conf
-
+    - mountPath: /var/log/nginx
+      name: nginx-log
+    - mountPath: /var/lib/nginx
+      name: nginx-lib
+    - mountPath: /run
+      name: nginx-run
+    - name: nginx-config
+      mountPath: /etc/nginx/nginx.conf
+      subPath: nginx.conf
     postgresql:
       enabled: false
     redis:
       enabled: false
-
     activepieces:
-      domain: "auto.${TENANT_DOMAIN}"
+      domain: auto.${TENANT_DOMAIN}
       database: postgres
       queue:
         mode: redis
       redis:
-        username: "${TENANT_ID}-activepieces"
+        username: ${TENANT_ID}-activepieces
       sandbox:
         executionMode: SANDBOXED
       telemetry: false
-      templateSourceURL: ""
+      templateSourceURL: ''
       data:
         pvc:
-          storageClass: "nfs-csi"
-
+          storageClass: nfs-csi
     podSecurityContext:
       fsGroup: 1000
-
     securityContext:
       runAsNonRoot: false
       runAsUser: 0
       allowPrivilegeEscalation: false
       capabilities:
-        drop: ["ALL"]
-        add: ["NET_BIND_SERVICE", "CHOWN", "SETUID", "SETGID", "DAC_OVERRIDE"]
+        drop:
+        - ALL
+        add:
+        - NET_BIND_SERVICE
+        - CHOWN
+        - SETUID
+        - SETGID
+        - DAC_OVERRIDE
       seccompProfile:
         type: RuntimeDefault
+  postInstallJob:
+    image: ghcr.io/cloudnative-pg/postgresql:17.2
+    envFrom:
+    - activepieces-postgresql-credentials
+    script: |
+      set -eu
+      echo "Waiting for database..."
+      until pg_isready -h postgres-rw.platform-kernel.svc.cluster.local -p 5432; do
+        sleep 2
+      done
 
-    initContainers:
-      - name: fetch-keycloak-metadata
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 1001
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
-          seccompProfile:
-            type: RuntimeDefault
-        image: docker.io/curlimages/curl:8.2.1
-        command:
-          - /bin/sh
-          - -c
-          - |
-            set -eu
-            echo "Waiting for Keycloak..."
-            until curl -sf "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/protocol/saml/descriptor" > /tmp/shared/idp-metadata.xml; do
-              sleep 2
-            done
-            echo "SAML metadata fetched successfully."
-        volumeMounts:
-          - name: shared-init-data
-            mountPath: /tmp/shared
-      - name: db-seed
-        securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
-            add: ["NET_BIND_SERVICE", "CHOWN", "SETUID", "SETGID", "DAC_OVERRIDE"]
-          seccompProfile:
-            type: RuntimeDefault
-        image: ghcr.io/cloudnative-pg/postgresql:17.2
-        env:
-          - name: AP_POSTGRES_USERNAME
-            valueFrom:
-              secretKeyRef:
-                name: activepieces-postgresql-credentials
-                key: username
-          - name: AP_POSTGRES_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: activepieces-postgresql-credentials
-                key: password
-        envFrom:
-          - configMapRef:
-              name: activepieces
-        command:
-          - /bin/bash
-          - -c
-          - |
-            set -eu
-            echo "Waiting for database..."
-            until pg_isready -h "$AP_POSTGRES_HOST" -p "$AP_POSTGRES_PORT"; do
-              sleep 2
-            done
+      TABLE_EXISTS=$(PGPASSWORD="$password" psql -h postgres-rw.platform-kernel.svc.cluster.local -p 5432 -U "$username" -d "${TENANT_ID}_activepieces" -tAc "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'platform');")
+      if [ "$TABLE_EXISTS" = "f" ]; then
+        echo "Database tables do not exist yet. Activepieces container needs to run migrations first."
+        exit 1
+      fi
 
-            PLATFORM_COUNT=$(PGPASSWORD="$AP_POSTGRES_PASSWORD" psql -h "$AP_POSTGRES_HOST" -p "$AP_POSTGRES_PORT" -U "$AP_POSTGRES_USERNAME" -d "$AP_POSTGRES_DATABASE" -tAc "SELECT count(*) FROM platform;")
-            if [ "$PLATFORM_COUNT" -eq 0 ]; then
-              echo "Seeding Activepieces database..."
+      PLATFORM_COUNT=$(PGPASSWORD="$password" psql -h postgres-rw.platform-kernel.svc.cluster.local -p 5432 -U "$username" -d "${TENANT_ID}_activepieces" -tAc "SELECT count(*) FROM platform;")
+      if [ "$PLATFORM_COUNT" -eq 0 ]; then
+        echo "Seeding Activepieces database..."
 
-              XML_CONTENT=$(cat /tmp/shared/idp-metadata.xml | sed 's/WantAuthnRequestsSigned="true"/WantAuthnRequestsSigned="false"/g')
-              CERT_VAL=$(echo "$XML_CONTENT" | sed -n 's/.*<ds:X509Certificate>\(.*\)<\/ds:X509Certificate>.*/\1/p')
+        python3 -c '
+      import urllib.request
+      try:
+          response = urllib.request.urlopen("http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/protocol/saml/descriptor")
+          print(response.read().decode("utf-8"))
+      except Exception as e:
+          import sys
+          print(f"Error fetching metadata: {e}", file=sys.stderr)
+          sys.exit(1)
+      ' > /tmp/idp-metadata.xml
 
-              printf "%s\n" \
-                'INSERT INTO "user" (id, created, updated, email, "firstName", "lastName", password, status, verified, "platformRole")' \
-                "VALUES ('usrActivepiecesAdmin1', now(), now(), 'admin-${TENANT_ID}@${KERNEL_DOMAIN}', 'Admin', '${TENANT_ID}', '\$2b\$10\$EPY9LjgjhWG./xyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxy', 'ACTIVE', true, 'ADMIN');" \
-                'INSERT INTO platform (id, created, updated, "ownerId", name, "primaryColor", "logoIconUrl", "fullLogoUrl", "favIconUrl", "filteredPieceNames", "filteredPieceBehavior", "showPoweredBy", "cloudAuthEnabled", "defaultLocale", "embeddingEnabled", "gitSyncEnabled", "allowedAuthDomains", "enforceAllowedAuthDomains", "ssoEnabled", "federatedAuthProviders", "emailAuthEnabled", "auditLogEnabled", "customDomainsEnabled", "customAppearanceEnabled", "manageProjectsEnabled", "managePiecesEnabled", "manageTemplatesEnabled", "apiKeysEnabled", "projectRolesEnabled", "flowIssuesEnabled", "alertsEnabled", "premiumPieces")' \
-                "VALUES ('plaActivepiecesPlatf1', now(), now(), 'usrActivepiecesAdmin1', 'Gentian', '#000000', '', '', '', '{}', 'ALLOWED', false, true, 'en', true, true, '{}', false, true, jsonb_build_object('saml', jsonb_build_object('idpMetadata', :'xml_val', 'idpCertificate', concat('-----BEGIN CERTIFICATE-----', chr(10), :'cert_val', chr(10), '-----END CERTIFICATE-----'))), true, true, true, true, true, true, true, true, true, true, true, '{}');" \
-                'INSERT INTO project (id, created, updated, "ownerId", "displayName", "notifyStatus", "platformId")' \
-                "VALUES ('prjActivepiecesProje1', now(), now(), 'usrActivepiecesAdmin1', 'Default Project', 'ALWAYS', 'plaActivepiecesPlatf1');" \
-                'INSERT INTO project_member (id, created, updated, "projectId", role, "userId", "platformId")' \
-                "VALUES ('memActivepiecesMembe1', now(), now(), 'prjActivepiecesProje1', 'ADMIN', 'usrActivepiecesAdmin1', 'plaActivepiecesPlatf1');" \
-                'INSERT INTO custom_domain (id, created, updated, domain, "platformId", status)' \
-                "VALUES ('domActivepiecesDoma1', now(), now(), 'auto.${TENANT_DOMAIN}', 'plaActivepiecesPlatf1', 'ACTIVE');" \
-                'CREATE OR REPLACE FUNCTION auto_assign_project() RETURNS TRIGGER AS $$ BEGIN IF NEW."platformId" = $$plaActivepiecesPlatf1$$ THEN INSERT INTO project_member (id, created, updated, "projectId", role, "userId", "platformId") VALUES (substring(md5(NEW.id) from 1 for 21), now(), now(), $$prjActivepiecesProje1$$, $$ADMIN$$, NEW.id, $$plaActivepiecesPlatf1$$) ON CONFLICT DO NOTHING; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql;' \
-                'CREATE OR REPLACE TRIGGER trg_auto_assign_project AFTER INSERT ON "user" FOR EACH ROW EXECUTE FUNCTION auto_assign_project();' \
-                | PGPASSWORD="$AP_POSTGRES_PASSWORD" psql -h "$AP_POSTGRES_HOST" -p "$AP_POSTGRES_PORT" -U "$AP_POSTGRES_USERNAME" -d "$AP_POSTGRES_DATABASE" -v xml_val="$XML_CONTENT" -v cert_val="$CERT_VAL"
-              echo "Database seeded successfully."
-            else
-              echo "Database already seeded."
-            fi
-        volumeMounts:
-          - name: shared-init-data
-            mountPath: /tmp/shared
+        XML_CONTENT=$(cat /tmp/idp-metadata.xml | sed 's/WantAuthnRequestsSigned="true"/WantAuthnRequestsSigned="false"/g')
+        CERT_VAL=$(echo "$XML_CONTENT" | sed -n 's/.*<ds:X509Certificate>\(.*\)<\/ds:X509Certificate>.*/\1/p')
 
+        printf "%s\n" \
+          'INSERT INTO "user" (id, created, updated, email, "firstName", "lastName", password, status, verified, "platformRole")' \
+          "VALUES ('usrActivepiecesAdmin1', now(), now(), 'admin-${TENANT_ID}@${KERNEL_DOMAIN}', 'Admin', '${TENANT_ID}', '\$2b\$10\$EPY9LjgjhWG./xyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxy', 'ACTIVE', true, 'ADMIN');" \
+          'INSERT INTO platform (id, created, updated, "ownerId", name, "primaryColor", "logoIconUrl", "fullLogoUrl", "favIconUrl", "filteredPieceNames", "filteredPieceBehavior", "showPoweredBy", "cloudAuthEnabled", "defaultLocale", "embeddingEnabled", "gitSyncEnabled", "allowedAuthDomains", "enforceAllowedAuthDomains", "ssoEnabled", "federatedAuthProviders", "emailAuthEnabled", "auditLogEnabled", "customDomainsEnabled", "customAppearanceEnabled", "manageProjectsEnabled", "managePiecesEnabled", "manageTemplatesEnabled", "apiKeysEnabled", "projectRolesEnabled", "flowIssuesEnabled", "alertsEnabled", "premiumPieces")' \
+          "VALUES ('plaActivepiecesPlatf1', now(), now(), 'usrActivepiecesAdmin1', 'Gentian', '#000000', '', '', '', '{}', 'ALLOWED', false, true, 'en', true, true, '{}', false, true, jsonb_build_object('saml', jsonb_build_object('idpMetadata', :'xml_val', 'idpCertificate', concat('-----BEGIN CERTIFICATE-----', chr(10), :'cert_val', chr(10), '-----END CERTIFICATE-----'))), true, true, true, true, true, true, true, true, true, true, true, '{}');" \
+          'INSERT INTO project (id, created, updated, "ownerId", "displayName", "notifyStatus", "platformId")' \
+          "VALUES ('prjActivepiecesProje1', now(), now(), 'usrActivepiecesAdmin1', 'Default Project', 'ALWAYS', 'plaActivepiecesPlatf1');" \
+          'INSERT INTO project_member (id, created, updated, "projectId", role, "userId", "platformId")' \
+          "VALUES ('memActivepiecesMembe1', now(), now(), 'prjActivepiecesProje1', 'ADMIN', 'usrActivepiecesAdmin1', 'plaActivepiecesPlatf1');" \
+          'INSERT INTO custom_domain (id, created, updated, domain, "platformId", status)' \
+          "VALUES ('domActivepiecesDoma1', now(), now(), 'auto.${TENANT_DOMAIN}', 'plaActivepiecesPlatf1', 'ACTIVE');" \
+          'CREATE OR REPLACE FUNCTION auto_assign_project() RETURNS TRIGGER AS $$ BEGIN IF NEW."platformId" = $$plaActivepiecesPlatf1$$ THEN INSERT INTO project_member (id, created, updated, "projectId", role, "userId", "platformId") VALUES (substring(md5(NEW.id) from 1 for 21), now(), now(), $$prjActivepiecesProje1$$, $$ADMIN$$, NEW.id, $$plaActivepiecesPlatf1$$) ON CONFLICT DO NOTHING; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql;' \
+          'CREATE OR REPLACE TRIGGER trg_auto_assign_project AFTER INSERT ON "user" FOR EACH ROW EXECUTE FUNCTION auto_assign_project();' \
+          | PGPASSWORD="$password" psql -h postgres-rw.platform-kernel.svc.cluster.local -p 5432 -U "$username" -d "${TENANT_ID}_activepieces" -v xml_val="$XML_CONTENT" -v cert_val="$CERT_VAL"
+        echo "Database seeded successfully."
+      else
+        echo "Database already seeded."
+      fi
