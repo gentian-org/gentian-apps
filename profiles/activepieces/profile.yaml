@@ -192,23 +192,18 @@ spec:
       const querystring = require('querystring');\nconst fs = require('fs');\nconst\
       \ zlib = require('zlib');\nconst { Client } = require('/usr/src/app/dist/packages/server/api/node_modules/pg');\n\
       const jwt = require('/usr/src/app/dist/packages/server/api/node_modules/jsonwebtoken');\n\
-      \nconst ns = fs.readFileSync('/var/run/secrets/kubernetes.io/serviceaccount/namespace',\
-      \ 'utf8').trim();\nconst tenantId = ns.replace('tenant-', '');\nlet kernelDomain\
-      \ = 'gentian.org';\n\nfunction getKernelDomain() {\n    return new Promise((resolve)\
-      \ => {\n        const url = `http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${tenantId}/protocol/saml/descriptor`;\n\
-      \        http.get(url, (res) => {\n            let data = '';\n            res.on('data',\
-      \ chunk => data += chunk);\n            res.on('end', () => {\n            \
-      \    const match = data.match(/https:\\/\\/id\\.([^/\"]+)/);\n             \
-      \   resolve(match ? match[1] : 'gentian.org');\n            });\n        }).on('error',\
-      \ () => {\n            resolve('gentian.org');\n        });\n    });\n}\n\n\
-      function generateAuthnRequest(host, tenantId, kernelDomain) {\n    const id\
-      \ = \"_\" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2,\
-      \ 15);\n    const issueInstant = new Date().toISOString();\n    const xml =\
-      \ `<samlp:AuthnRequest xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\"\n\
-      \                        xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:assertion\"\
-      \n                        ID=\"${id}\"\n                        Version=\"2.0\"\
-      \n                        IssueInstant=\"${issueInstant}\"\n               \
-      \         AssertionConsumerServiceURL=\"https://${host}/api/v1/authn/saml/acs\"\
+      \n// Resolve tenantId and kernelDomain from AP_FRONTEND_URL\nconst frontendUrl\
+      \ = process.env.AP_FRONTEND_URL || 'https://auto.demo.desk.gentian.org';\nconst\
+      \ hostname = frontendUrl.replace('https://', '').split('/')[0];\nconst hostParts\
+      \ = hostname.split('.');\nconst tenantId = hostParts[1] || 'demo';\nconst kernelDomain\
+      \ = hostParts.slice(2).join('.') || 'gentian.org';\n\nfunction generateAuthnRequest(host,\
+      \ tenantId, kernelDomain) {\n    const id = \"_\" + Math.random().toString(36).substring(2,\
+      \ 15) + Math.random().toString(36).substring(2, 15);\n    const issueInstant\
+      \ = new Date().toISOString();\n    const xml = `<samlp:AuthnRequest xmlns:samlp=\"\
+      urn:oasis:names:tc:SAML:2.0:protocol\"\n                        xmlns:saml=\"\
+      urn:oasis:names:tc:SAML:2.0:assertion\"\n                        ID=\"${id}\"\
+      \n                        Version=\"2.0\"\n                        IssueInstant=\"\
+      ${issueInstant}\"\n                        AssertionConsumerServiceURL=\"https://${host}/api/v1/authn/saml/acs\"\
       \n                        Destination=\"https://id.${kernelDomain}/auth/realms/${tenantId}/protocol/saml\"\
       >\n        <saml:Issuer>Activepieces</saml:Issuer>\n        <samlp:NameIDPolicy\
       \ Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified\"\n       \
@@ -248,13 +243,13 @@ spec:
       \       lastName: lastName || 'User',\n        trackEvents: false,\n       \
       \ newsLetter: false,\n        platformRole: 'ADMIN',\n        platformId: 'plaActivepiecesPlatf1',\n\
       \        projectId: projectId\n    };\n    \n    return jwt.sign(payload, process.env.AP_JWT_SECRET,\
-      \ { expiresIn: '7d' });\n}\n\nasync function startServer() {\n    kernelDomain\
-      \ = await getKernelDomain();\n    console.log(`SSO Sidecar: resolved kernel\
-      \ domain: ${kernelDomain}`);\n    \n    const server = http.createServer(async\
-      \ (req, res) => {\n        const parsedUrl = url.parse(req.url, true);\n   \
-      \     \n        if (parsedUrl.pathname === '/sso/login') {\n            const\
-      \ host = req.headers.host;\n            const samlRedirect = generateAuthnRequest(host,\
-      \ tenantId, kernelDomain);\n            const redirectUrl = `https://id.${kernelDomain}/auth/realms/${tenantId}/protocol/saml?SAMLRequest=${samlRedirect}`;\n\
+      \ { expiresIn: '7d' });\n}\n\nasync function startServer() {\n    console.log(`SSO\
+      \ Sidecar: tenantId=${tenantId}, kernelDomain=${kernelDomain}`);\n    \n   \
+      \ const server = http.createServer(async (req, res) => {\n        const parsedUrl\
+      \ = url.parse(req.url, true);\n        \n        if (parsedUrl.pathname ===\
+      \ '/sso/login') {\n            const host = req.headers.host;\n            const\
+      \ samlRedirect = generateAuthnRequest(host, tenantId, kernelDomain);\n     \
+      \       const redirectUrl = `https://id.${kernelDomain}/auth/realms/${tenantId}/protocol/saml?SAMLRequest=${samlRedirect}`;\n\
       \            \n            res.writeHead(302, { 'Location': redirectUrl });\n\
       \            res.end();\n            \n        } else if (parsedUrl.pathname\
       \ === '/sso/acs' && req.method === 'POST') {\n            let body = '';\n \
