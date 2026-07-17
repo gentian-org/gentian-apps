@@ -148,8 +148,8 @@ spec:
       \ mU=document.cookie.match(/ap_user=([^;]+)/);if(mT&&mU){localStorage.setItem(\\\
       'token\\',mT[1]);localStorage.setItem(\\'currentUser\\',decodeURIComponent(mU[1]));window.location.reload();}else{window.location.href=loginUrl;}}const\
       \ intercept=function(url){if(url&&(url.includes(\\'sign-in\\')||url.includes(\\\
-      'sign-up\\'))){window.location.href=loginUrl;return true;}return false;};const\
-      \ originalPush=window.history.pushState;window.history.pushState=function(state,title,url){if(intercept(url))return;return\
+      'sign-up\\'))){if(!localStorage.getItem(\\'token\\')){window.location.href=loginUrl;return\
+      \ true;}}return false;};const originalPush=window.history.pushState;window.history.pushState=function(state,title,url){if(intercept(url))return;return\
       \ originalPush.apply(this,arguments);};const originalReplace=window.history.replaceState;window.history.replaceState=function(state,title,url){if(intercept(url))return;return\
       \ originalReplace.apply(this,arguments);};})();</script>';\n            html\
       \ = html.replace('<head>', '<head>' + script);\n            fs.writeFileSync(file,\
