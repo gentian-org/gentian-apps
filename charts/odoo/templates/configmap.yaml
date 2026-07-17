@@ -5,7 +5,7 @@
 {{- if and .Values.gentian.git.enabled (eq (len $gitSources) 0) -}}
   {{- $gitSources = list (dict "name" "default" "repo" .Values.gentian.git.repo "branch" .Values.gentian.git.branch "syncInterval" (int .Values.gentian.git.syncInterval) "secretName" .Values.gentian.git.secretName) -}}
 {{- end -}}
-{{- $addonsPaths := list "/opt/odoo/src/odoo/addons" -}}
+{{- $addonsPaths := list "/opt/odoo/src/odoo/addons" "/opt/odoo/custom-addons" -}}
 {{- range $gitSources -}}
   {{- $addonsPaths = append $addonsPaths (printf "%s/%s/current" $.Values.gentian.modulesPath .name) -}}
 {{- end -}}
