@@ -254,18 +254,16 @@ spec:
       \ user ${userId}`);\n        }\n        \n        return { userId, projectId\
       \ };\n    } finally {\n        await client.end();\n    }\n}\n\nfunction signJwt(userId,\
       \ email, firstName, lastName, projectId) {\n    const payload = {\n        id:\
-      \ userId,\n        email: email,\n        firstName: firstName || 'SSO',\n \
-      \       lastName: lastName || 'User',\n        trackEvents: false,\n       \
-      \ newsLetter: false,\n        platformRole: 'ADMIN',\n        platformId: 'plaActivepiecesPlatf1',\n\
-      \        projectId: projectId\n    };\n    \n    return jwt.sign(payload, process.env.AP_JWT_SECRET,\
-      \ { \n        algorithm: 'HS256',\n        issuer: 'activepieces',\n       \
-      \ expiresIn: '7d' \n    });\n}\n\nasync function startServer() {\n    console.log(`SSO\
-      \ Sidecar: tenantId=${tenantId}, kernelDomain=${kernelDomain}`);\n    \n   \
-      \ const server = http.createServer(async (req, res) => {\n        const parsedUrl\
-      \ = url.parse(req.url, true);\n        \n        if (parsedUrl.pathname ===\
-      \ '/sso/login') {\n            const host = req.headers.host;\n            const\
-      \ samlRedirect = generateAuthnRequest(host, tenantId, kernelDomain);\n     \
-      \       const redirectUrl = `https://id.${kernelDomain}/auth/realms/${tenantId}/protocol/saml?SAMLRequest=${samlRedirect}`;\n\
+      \ userId,\n        type: 'USER',\n        projectId: projectId,\n        platform:\
+      \ {\n            id: 'plaActivepiecesPlatf1'\n        }\n    };\n    \n    return\
+      \ jwt.sign(payload, process.env.AP_JWT_SECRET, { \n        algorithm: 'HS256',\n\
+      \        issuer: 'activepieces',\n        expiresIn: '7d' \n    });\n}\n\nasync\
+      \ function startServer() {\n    console.log(`SSO Sidecar: tenantId=${tenantId},\
+      \ kernelDomain=${kernelDomain}`);\n    \n    const server = http.createServer(async\
+      \ (req, res) => {\n        const parsedUrl = url.parse(req.url, true);\n   \
+      \     \n        if (parsedUrl.pathname === '/sso/login') {\n            const\
+      \ host = req.headers.host;\n            const samlRedirect = generateAuthnRequest(host,\
+      \ tenantId, kernelDomain);\n            const redirectUrl = `https://id.${kernelDomain}/auth/realms/${tenantId}/protocol/saml?SAMLRequest=${samlRedirect}`;\n\
       \            \n            res.writeHead(302, { 'Location': redirectUrl });\n\
       \            res.end();\n            \n        } else if (parsedUrl.pathname\
       \ === '/sso/acs' && req.method === 'POST') {\n            let body = '';\n \
@@ -300,20 +298,19 @@ spec:
       \                    ]\n                    });\n                    res.end(`<!DOCTYPE\
       \ html>\n<html>\n<head>\n    <title>Logging in...</title>\n</head>\n<body>\n\
       \    <script>\n        localStorage.setItem('token', '${token}');\n        localStorage.setItem('currentUser',\
-      \ JSON.stringify(${JSON.stringify(userObj)}));\n        window.location.href\
-      \ = '/';\n    </script>\n</body>\n</html>`);\n                } catch (err)\
-      \ {\n                    console.error('ACS callback error:', err);\n      \
-      \              res.writeHead(500, { 'Content-Type': 'text/plain' });\n     \
-      \               res.end('Internal Server Error: ' + err.message);\n        \
-      \        }\n            });\n        } else {\n            res.writeHead(404,\
-      \ { 'Content-Type': 'text/plain' });\n            res.end('Not Found');\n  \
-      \      }\n    });\n    \n    server.listen(8081, '127.0.0.1', () => {\n    \
-      \    console.log('SSO Sidecar listening on http://127.0.0.1:8081');\n    });\n\
-      }\n\nstartServer().catch(err => {\n    console.error('SSO Sidecar startup failed:',\
-      \ err);\n});\nEOF\n\n# 4. Start sidecar in background\nnode /tmp/sidecar.js\
-      \ > /tmp/sidecar.log 2>&1 &\n\n# 5. Start Nginx with custom config path\nnginx\
-      \ -c /tmp/nginx.conf -g \"daemon off;\" &\n\n# 6. Start backend server\nexec\
-      \ node --enable-source-maps /usr/src/app/dist/packages/server/api/main.js\n"
+      \ '${JSON.stringify(userObj)}');\n        window.location.href = '/';\n    </script>\n\
+      </body>\n</html>`);\n                } catch (err) {\n                    console.error('ACS\
+      \ callback error:', err);\n                    res.writeHead(500, { 'Content-Type':\
+      \ 'text/plain' });\n                    res.end('Internal Server Error: ' +\
+      \ err.message);\n                }\n            });\n        } else {\n    \
+      \        res.writeHead(404, { 'Content-Type': 'text/plain' });\n           \
+      \ res.end('Not Found');\n        }\n    });\n    \n    server.listen(8081, '127.0.0.1',\
+      \ () => {\n        console.log('SSO Sidecar listening on http://127.0.0.1:8081');\n\
+      \    });\n}\n\nstartServer().catch(err => {\n    console.error('SSO Sidecar\
+      \ startup failed:', err);\n});\nEOF\n\n# 4. Start sidecar in background\nnode\
+      \ /tmp/sidecar.js > /tmp/sidecar.log 2>&1 &\n\n# 5. Start Nginx with custom\
+      \ config path\nnginx -c /tmp/nginx.conf -g \"daemon off;\" &\n\n# 6. Start backend\
+      \ server\nexec node --enable-source-maps /usr/src/app/dist/packages/server/api/main.js\n"
   postInstallJob:
     image: ghcr.io/cloudnative-pg/postgresql:17.2
     envFrom:
