@@ -1,7 +1,7 @@
 # Default values for gentian-sidecar-git-modules
 
 image:
-  repository: gentian/sidecar-git-modules
+  repository: ghcr.io/gentian-org/gentian-sidecar-git-modules
   tag: latest
   pullPolicy: IfNotPresent
 
