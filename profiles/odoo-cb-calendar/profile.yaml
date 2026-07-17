@@ -35,7 +35,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: odoo
-    version: "0.1.11"
+    version: "0.1.12"
   extraValues:
     odoo:
       module: calendar
