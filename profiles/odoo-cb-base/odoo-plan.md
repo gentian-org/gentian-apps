@@ -176,7 +176,7 @@ technical names, depends-on lists, and Job commands are **not** platform CRD fie
 ## 4. Identity and access
 
 Follow the **standard Gentian AppProfile IdM pattern**
-([app-profile-guide.md](../../app-profile-guide.md) §2, §8):
+([app-profile-guide.md](../../docs/app-profile-guide.md) §2, §8):
 
 | Concern | Configuration |
 |---|---|
@@ -967,9 +967,9 @@ from the base bundle (cluster-scoped Composition name `app-odoo`).
 | Topic | Document |
 |---|---|
 | Platform architecture | [architecture.md](../../../gentian-os/docs/architecture.md) |
-| AppProfile authoring | [app-profile-guide.md](../../app-profile-guide.md) |
+| AppProfile authoring | [app-profile-guide.md](../../docs/app-profile-guide.md) |
 | IAM / portal tiles | [iam.md](../../../gentian-os/docs/design/iam.md), [portal-admin-tile.md](../../docs/portal-admin-tile.md) |
-| OIDC paths (path A vs pack catalogue) | [app-profile-guide.md](../../app-profile-guide.md) §8 |
+| OIDC paths (path A vs pack catalogue) | [app-profile-guide.md](../../docs/app-profile-guide.md) §8 |
 | Commerce Odoo (platform) | [business-logic-plan.md](../../../gentian-os/docs/design/business-logic-plan.md) |
 | Legacy Odoo deployment | `server/base/odoo/`, `odoo-modules/docs/modules-management.md` |
 | **`gentian_os` addon source** | `odoo-modules/gentian_os/` (to be created) |

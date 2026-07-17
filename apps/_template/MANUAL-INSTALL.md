@@ -18,7 +18,7 @@ backend/          FastAPI API
 frontend/         React SPA (Vite + TanStack Router/Query + Tailwind)
 chart/            Helm chart (Gateway API HTTPRoute)
 profile/          AppProfile YAML template (catalogue apps)
-docs/             AGENTS.md, SECURITY.md, FRONTEND-STACK.md
+docs/             security.md, frontend-stack.md
 docker-compose.dev.yaml
 README.md
 ```

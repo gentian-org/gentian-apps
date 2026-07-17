@@ -183,14 +183,19 @@ spec:
           volumeMounts:
             - name: odoo-data
               mountPath: /opt/odoo/data
+            {{- if not .Values.extraVolumeMounts }}
             - name: extra-addons
               mountPath: {{ .Values.gentian.modulesPath }}
+            {{- end }}
             - name: odoo-config
               mountPath: /etc/odoo
             - name: gentian-config
               mountPath: /etc/gentian
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.extraVolumeMounts }}
+            {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /web/health
@@ -244,8 +249,13 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- if not .Values.extraVolumes }}
         - name: extra-addons
           emptyDir: {}
+        {{- end }}
+        {{- if .Values.extraVolumes }}
+        {{- toYaml .Values.extraVolumes | nindent 8 }}
+        {{- end }}
         - name: odoo-config
           configMap:
             name: {{ include "odoo.fullname" . }}-config

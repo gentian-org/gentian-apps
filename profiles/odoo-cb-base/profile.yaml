@@ -127,6 +127,8 @@ spec:
     gentian:
       initModules: "base,web,gentian_os,account"
       modulesPath: /opt/odoo/custom-addons
+      git:
+        enabled: false
 
   ingress:
     subDomain: erp

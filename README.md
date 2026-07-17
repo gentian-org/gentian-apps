@@ -22,12 +22,12 @@ icons/                 # shared SVG assets
 
 | Guide | Audience |
 |-------|----------|
-| [app-profile-guide.md](app-profile-guide.md) | Publish an **existing** Helm chart (profile YAML only) |
-| [custom-app-guide.md](custom-app-guide.md) | Build a **new** Gentian-native app end-to-end |
+| [docs/app-profile-guide.md](docs/app-profile-guide.md) | Publish an **existing** Helm chart (profile YAML only) |
+| [docs/custom-app-guide.md](docs/custom-app-guide.md) | Build a **new** Gentian-native app end-to-end |
 
 ## Adding an upstream app
 
-Add `profiles/<app>/` (see [profiles/CATALOGUE.md](profiles/CATALOGUE.md) and [app-profile-guide.md](app-profile-guide.md)).
+Add `profiles/<app>/` (see [profiles/CATALOGUE.md](profiles/CATALOGUE.md) and [docs/app-profile-guide.md](docs/app-profile-guide.md)).
 
 ```bash
 kubectl gentian apps list

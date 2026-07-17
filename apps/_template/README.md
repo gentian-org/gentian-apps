@@ -25,17 +25,19 @@ backend/          FastAPI (Python 3.12+)
 frontend/         React SPA — Vite, TanStack Router/Query, Zustand, Tailwind
 chart/            Helm — HTTPRoute (Gateway API), api + web Deployments
 profile/          AppProfile skeleton (catalogue apps; omit for kernel-only repos)
-docs/             AGENTS.md, SECURITY.md, FRONTEND-STACK.md
+docs/             security.md, frontend-stack.md
 ```
+
+Agent conventions for this scaffold live in the repo-wide [../../AGENTS.md](../../AGENTS.md).
 
 ## Why React?
 
 Greenfield platform decision: React for agent-assisted development and admin/console
-ecosystem. See [docs/FRONTEND-STACK.md](docs/FRONTEND-STACK.md).
+ecosystem. See [docs/frontend-stack.md](docs/frontend-stack.md).
 
 ## Security
 
-See [docs/SECURITY.md](docs/SECURITY.md) for OIDC, ReBAC hooks, pod hardening, and
+See [docs/security.md](docs/security.md) for OIDC, ReBAC hooks, pod hardening, and
 what the platform enforces vs what app authors must implement.
 
 ## Create a catalogue app
@@ -43,7 +45,7 @@ what the platform enforces vs what app authors must implement.
 1. Copy this repo to `gentian-apps/apps/<name>/`.
 2. Rename chart, images, and `profile/appprofile.yaml.tmpl`.
 3. Add `gentian-apps/profiles/<name>/profile.yaml`.
-4. See [custom-app-guide.md](https://github.com/gentian-org/gentian-apps/blob/main/custom-app-guide.md).
+4. See [custom-app-guide.md](https://github.com/gentian-org/gentian-apps/blob/main/docs/custom-app-guide.md).
 
 ## Kernel shell (gentian-ui)
 

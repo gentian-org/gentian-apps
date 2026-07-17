@@ -620,6 +620,177 @@ spec:
                 name: kubernetes
             {{- end }}
 
+            {{- /* ── Emit sidecars (AppProfile.spec.sidecars) ────────────────────── */}}
+            {{- $sidecars := default list $pSpec.sidecars }}
+            {{- range $sc := $sidecars }}
+            {{- if and $sc.name $sc.chart.name }}
+            {{- $scKey := printf "%s-%s" $app $sc.name }}
+            {{- $scAppSecrets := default list $sc.appSecrets }}
+            {{- $scSecretName := printf "%s-sensitive-values" $scKey }}
+            {{- $scEsData := list }}
+            {{- $scRelSet := list }}
+            {{- range $s := $scAppSecrets }}
+            {{- if and $s.name $s.valuePath }}
+            {{- $scInternalPath := printf "gentian-os/tenants/%s/apps/%s/internal/%s" $tenant $scKey $s.name }}
+            {{- $scEsData = append $scEsData (dict "secretKey" (printf "internal-%s" $s.name)
+                "remoteRef" (dict "key" $scInternalPath "property" "value")) }}
+            {{- $scRelSet = append $scRelSet (dict "name" $s.valuePath
+                "valueFrom" (dict "secretKeyRef" (dict "name" $scSecretName "namespace" $ns "key" (printf "internal-%s" $s.name)))) }}
+            {{- end }}
+            {{- end }}
+
+            {{- /* OpenBao KV seeders for each sidecar appSecret */}}
+            {{- range $s := $scAppSecrets }}
+            {{- if and $s.name $s.valuePath }}
+            {{- $scSafeName := $s.name | replace "_" "-" }}
+            {{- $scSeedName := printf "%s-%s-%s-seed" $xrName $sc.name $scSafeName }}
+            {{- $scKvPath   := printf "gentian-os/tenants/%s/apps/%s/internal/%s" $tenant $scKey $s.name }}
+            {{- $scSeedVal  := sha256sum (printf "%s:%s:%s" $xrName $scKey $s.name) }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $sc.name }}-{{ $scSafeName }}-seed-secret
+              name: {{ $scSeedName }}
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Secret
+                  metadata:
+                    name: {{ $scSeedName }}
+                    namespace: crossplane-system
+                  type: Opaque
+                  stringData:
+                    data.json: '{"value":"{{ $scSeedVal }}"}'
+              providerConfigRef:
+                name: kubernetes
+            ---
+            apiVersion: kv.vault.upbound.io/v1alpha1
+            kind: SecretV2
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $sc.name }}-{{ $scSafeName }}-kv
+              name: {{ $scSeedName }}-kv
+            spec:
+              deletionPolicy: Orphan
+              managementPolicies:
+                - Observe
+                - Create
+              forProvider:
+                mount: secret
+                name: {{ $scKvPath }}
+                dataJsonSecretRef:
+                  name: {{ $scSeedName }}
+                  namespace: crossplane-system
+                  key: data.json
+              providerConfigRef:
+                name: openbao
+            {{- end }}
+            {{- end }}
+
+            {{- if gt (len $scEsData) 0 }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $sc.name }}-externalsecret
+              name: {{ $xrName }}-{{ $sc.name }}-es
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: external-secrets.io/v1
+                  kind: ExternalSecret
+                  metadata:
+                    name: {{ $scSecretName }}
+                    namespace: {{ $ns }}
+                  spec:
+                    refreshInterval: 1h
+                    secretStoreRef:
+                      kind: ClusterSecretStore
+                      name: openbao
+                    target:
+                      name: {{ $scSecretName }}
+                      creationPolicy: Owner
+                      deletionPolicy: Retain
+                    data:
+                      {{ toYaml $scEsData | nindent 22 }}
+              providerConfigRef:
+                name: kubernetes
+            {{- end }}
+
+            {{- $scExtraVals := dict }}
+            {{- if $sc.extraValues }}
+            {{- $scRaw := $sc.extraValues | toJson }}
+            {{- $scRaw = $scRaw | replace "${TENANT_DOMAIN}"    $domain }}
+            {{- $scRaw = $scRaw | replace "${TENANT_NAMESPACE}" $ns }}
+            {{- $scRaw = $scRaw | replace "${TENANT_ID}"        $tenant }}
+            {{- $scRaw = $scRaw | replace "${APP_ID}"           $app }}
+            {{- $scRaw = $scRaw | replace "${SIDECAR_ID}"       $sc.name }}
+            {{- $scExtraVals = $scRaw | fromJson }}
+            {{- end }}
+            {{- $scExtraVals = $scExtraVals | toJson | fromJson }}
+            ---
+            apiVersion: helm.crossplane.io/v1beta1
+            kind: Release
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $sc.name }}-release
+              name: {{ $tenant }}-{{ $app }}-{{ $sc.name }}
+            spec:
+              rollbackLimit: 3
+              forProvider:
+                chart:
+                  repository: {{ $sc.chart.repository }}
+                  name: {{ $sc.chart.name }}
+                  version: {{ $sc.chart.version | quote }}
+                namespace: {{ $ns }}
+                wait: false
+                skipCRDs: true
+                {{- if gt (len $scExtraVals) 0 }}
+                values:
+                  {{ toYaml $scExtraVals | nindent 18 }}
+                {{- end }}
+                {{- if gt (len $scRelSet) 0 }}
+                set:
+                  {{ toYaml $scRelSet | nindent 18 }}
+                {{- end }}
+              providerConfigRef:
+                name: kubernetes
+
+            {{- if $sc.stableServiceName }}
+            {{- $scSvcPort := default 80 ($sc.stableServicePort | int) }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $sc.name }}-stable-svc
+              name: {{ $xrName }}-{{ $sc.name }}-stable-svc
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Service
+                  metadata:
+                    name: {{ $sc.stableServiceName }}
+                    namespace: {{ $ns }}
+                  spec:
+                    selector:
+                      app.kubernetes.io/instance: {{ $tenant }}-{{ $app }}-{{ $sc.name }}
+                    ports:
+                    - name: http
+                      port: {{ $scSvcPort }}
+                      targetPort: {{ $scSvcPort }}
+                      protocol: TCP
+              providerConfigRef:
+                name: kubernetes
+            {{- end }}
+            {{- end }}
+            {{- end }}
+
             {{- else if eq $role "module" }}
             {{- $module := dig "extraValues" "odoo" "module" "" $pSpec }}
             {{- if eq $module "" }}{{- fail "Module name not specified in spec.extraValues.odoo.module" }}{{- end }}
@@ -758,7 +929,8 @@ spec:
                             persistentVolumeClaim:
                               claimName: odoo-data
                           - name: extra-addons
-                            emptyDir: {}
+                            persistentVolumeClaim:
+                              claimName: {{ $tenant }}-odoo-cb-base-git-modules-pvc
               providerConfigRef:
                 name: kubernetes
             {{- end }}

@@ -6,7 +6,7 @@ with an AppProfile only, see [app-profile-guide.md](app-profile-guide.md).
 
 ## Prerequisites
 
-- A running Gentian OS cluster (see [gentian-os/getting-started.md](https://github.com/gentian-org/gentian-os/blob/main/getting-started.md))
+- A running Gentian OS cluster (see [gentian-os/GETTING-STARTED.md](https://github.com/gentian-org/gentian-os/blob/main/GETTING-STARTED.md))
 - [gentian-app-template](https://github.com/gentian-org/gentian-app-template) cloned locally (e.g. `/develop`)
 - Push access to `gentian-org/gentian-apps`
 
@@ -60,7 +60,7 @@ docker compose -f docker-compose.dev.yaml up --build
 
 `AUTH_DISABLED=true` skips OIDC for local testing.
 
-See [docs/AGENTS.md](apps/_template/docs/AGENTS.md) for agent-oriented conventions.
+See [AGENTS.md](../AGENTS.md) for agent-oriented conventions.
 
 ## Step 3 — Helm chart
 
