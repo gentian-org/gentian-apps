@@ -88,9 +88,31 @@ spec:
     - name: admin_password
       valuePath: "odoo.adminPassword"
 
+  sidecars:
+    - name: git-modules
+      chart:
+        repository: oci://ghcr.io/gentian-org/charts
+        name: gentian-sidecar-git-modules
+        version: "0.1.0"
+      extraValues:
+        persistence:
+          enabled: true
+          size: 1Gi
+          storageClass: nfs-csi
+        git:
+          repoUrl: "git://192.168.0.100:9418/odoo-modules"
+          branch: "develop"
+
   extraValues:
     fullnameOverride: odoo
     tenantId: "${TENANT_ID}"
+    extraVolumes:
+      - name: custom-addons
+        persistentVolumeClaim:
+          claimName: "${TENANT_ID}-odoo-cb-base-git-modules-pvc"
+    extraVolumeMounts:
+      - name: custom-addons
+        mountPath: /opt/odoo/custom-addons
     resources:
       requests:
         cpu: 500m
@@ -105,10 +127,6 @@ spec:
     gentian:
       initModules: "base,web,gentian_os,account"
       modulesPath: /opt/odoo/custom-addons
-      git:
-        enabled: true
-        repo: "git://192.168.0.100:9418/odoo-modules"
-        branch: "develop"
 
   ingress:
     subDomain: erp
