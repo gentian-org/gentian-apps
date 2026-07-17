@@ -31,4 +31,4 @@ spec:
         en_US: "LLM Admin Panel"
         de_DE: "LLM Admin Panel"
       linkTarget: embedded
-      allowedGroup: "Tenant Admins"
+      allowedGroup: "Domain Admins"

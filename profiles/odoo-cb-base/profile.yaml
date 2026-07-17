@@ -61,7 +61,7 @@ spec:
         icon: settings
       linkSuffix: "/web?gentian_embed=1&action=base_setup.action_general_configuration"
       linkTarget: newwindow
-      allowedGroup: "Tenant Admins"
+      allowedGroup: "App Admins"
 
   chart:
     repository: oci://ghcr.io/gentian-org/charts
