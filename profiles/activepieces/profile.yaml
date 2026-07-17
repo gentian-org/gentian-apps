@@ -171,10 +171,10 @@ spec:
         sleep 2
       done
 
-      # Check if platform table exists
-      TABLE_EXISTS=$(PGPASSWORD="$password" psql -h postgres-rw.platform-kernel.svc.cluster.local -p 5432 -U "$username" -d "${TENANT_ID}_activepieces" -tAc "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'platform');")
-      if [ "$TABLE_EXISTS" = "f" ]; then
-        echo "Database tables do not exist yet. Activepieces container needs to run migrations first."
+      # Check if required tables exist
+      TABLES_COUNT=$(PGPASSWORD="$password" psql -h postgres-rw.platform-kernel.svc.cluster.local -p 5432 -U "$username" -d "${TENANT_ID}_activepieces" -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('platform', 'project_member', 'custom_domain');")
+      if [ "$TABLES_COUNT" -ne 3 ]; then
+        echo "Activepieces migrations are not complete yet (found $TABLES_COUNT/3 required tables)."
         exit 1
       fi
 
@@ -207,9 +207,8 @@ spec:
           "VALUES ('memActivepiecesMembe1', now(), now(), 'prjActivepiecesProje1', 'ADMIN', 'usrActivepiecesAdmin1', 'plaActivepiecesPlatf1');" \
           'INSERT INTO custom_domain (id, created, updated, domain, "platformId", status)' \
           "VALUES ('domActivepiecesDoma1', now(), now(), 'auto.${TENANT_DOMAIN}', 'plaActivepiecesPlatf1', 'ACTIVE');" \
-          'CREATE OR REPLACE FUNCTION auto_assign_project() RETURNS TRIGGER AS $$ BEGIN IF NEW."platformId" = $$plaActivepiecesPlatf1$$ THEN INSERT INTO project_member (id, created, updated, "projectId", role, "userId", "platformId") VALUES (substring(md5(NEW.id) from 1 for 21), now(), now(), $$prjActivepiecesProje1$$, $$ADMIN$$, NEW.id, $$plaActivepiecesPlatf1$$) ON CONFLICT DO NOTHING; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql;' \
-          'CREATE OR REPLACE TRIGGER trg_auto_assign_project AFTER INSERT ON "user" FOR EACH ROW EXECUTE FUNCTION auto_assign_project();' \
-          | PGPASSWORD="$password" psql -h postgres-rw.platform-kernel.svc.cluster.local -p 5432 -U "$username" -d "${TENANT_ID}_activepieces" -v xml_val="$XML_CONTENT" -v cert_val="$CERT_VAL"
+          'CREATE OR REPLACE FUNCTION auto_assign_project() RETURNS TRIGGER AS $func$ BEGIN IF NEW."platformId" = \'plaActivepiecesPlatf1\' THEN INSERT INTO project_member (id, created, updated, "projectId", role, "userId", "platformId") VALUES (substring(md5(NEW.id) from 1 for 21), now(), now(), \'prjActivepiecesProje1\', \'ADMIN\', NEW.id, \'plaActivepiecesPlatf1\') ON CONFLICT DO NOTHING; END IF; RETURN NEW; END; $func$ LANGUAGE plpgsql;' \
+          'CREATE OR REPLACE TRIGGER trg_auto_assign_project AFTER INSERT ON "user" FOR EACH ROW EXECUTE FUNCTION auto_assign_project();'     | PGPASSWORD="$password" psql -v ON_ERROR_STOP=1 -h postgres-rw.platform-kernel.svc.cluster.local -p 5432 -U "$username" -d "${TENANT_ID}_activepieces" -v xml_val="$XML_CONTENT" -v cert_val="$CERT_VAL"
         echo "Database seeded successfully."
       else
         echo "Database already seeded."
