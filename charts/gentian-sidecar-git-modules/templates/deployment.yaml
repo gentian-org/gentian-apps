@@ -43,7 +43,7 @@ spec:
         - name: sync-volume
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ .Release.Name }}-pvc
+            claimName: {{ default (printf "%s-pvc" .Release.Name) .Values.persistence.pvcName }}
           {{- else }}
           emptyDir: {}
           {{- end }}

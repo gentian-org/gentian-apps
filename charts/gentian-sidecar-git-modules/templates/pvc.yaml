@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ .Release.Name }}-pvc
+  name: {{ default (printf "%s-pvc" .Release.Name) .Values.persistence.pvcName }}
   labels:
     app: {{ .Release.Name }}-git-modules
 spec:

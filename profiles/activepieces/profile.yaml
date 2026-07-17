@@ -372,7 +372,7 @@ spec:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
       name: gentian-sidecar-git-modules
-      version: 0.1.6
+      version: 0.1.7
     extraValues:
       git:
         repoUrl: https://github.com/gentian-org/gentian-activepieces-content.git
