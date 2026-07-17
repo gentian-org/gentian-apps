@@ -137,53 +137,54 @@ spec:
     command:
     - /bin/sh
     - -c
-    - "# 1. Patch all index.html files to auto-sync cookie token to localStorage\n\
+    - "# 1. Patch all index.html files to auto-sync cookie token and user to localStorage\n\
       node -e \"\nconst fs = require('fs');\nconst root = '/usr/share/nginx/html';\n\
       const files = ['/usr/share/nginx/html/index.html'];\ntry {\n    fs.readdirSync(root).forEach(dir\
       \ => {\n        files.push(root + '/' + dir + '/index.html');\n    });\n} catch\
       \ (e) {}\n\nfiles.forEach(file => {\n    if (fs.existsSync(file) && !fs.lstatSync(file).isDirectory())\
       \ {\n        let html = fs.readFileSync(file, 'utf8');\n        if (!html.includes('ap_token'))\
       \ {\n            const script = '<script>if(!localStorage.getItem(\\'token\\\
-      ')){const m=document.cookie.match(/ap_token=([^;]+)/);if(m){localStorage.setItem(\\\
-      'token\\',m[1]);window.location.reload();}else{window.location.href=\\'/api/v1/authn/saml/login\\\
-      ';}}</script>';\n            html = html.replace('<head>', '<head>' + script);\n\
-      \            fs.writeFileSync(file, html, 'utf8');\n            console.log('Injected\
-      \ token sync script into ' + file);\n        }\n    }\n});\n\"\n\n# 2. Write\
-      \ custom nginx.conf\ncat << 'EOF' > /tmp/nginx.conf\nevents{}\nhttp {\n    include\
-      \ /etc/nginx/mime.types;\n    client_max_body_size 4m;\n\n    map $http_accept_language\
-      \ $accept_language {\n        ~*^en en;\n        ~*^fr fr;\n        ~*^it it;\n\
-      \        ~*^de de;\n        ~*^nl nl;\n        ~*^ja ja;\n        ~*^es es;\n\
-      \        ~*^id id;\n        ~*^vi vi;\n        ~*^zh zh;\n        ~*^pt pt;\n\
-      \        ~*^hu hu;\n        ~*^uk uk;\n        ~*^bg bg;\n    }\n\n    map $arg_token\
-      \ $auth_cookie {\n        default \"\";\n        ~.+ \"ap_logged_in=true; Path=/;\
-      \ Secure; SameSite=Lax\";\n    }\n\n    server_tokens off;\n\n    add_header\
-      \ Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\"\
-      \ always;\n    add_header X-Content-Type-Options \"nosniff\" always;\n\n   \
-      \ server {\n        listen 80;\n        server_name localhost;\n        root\
-      \ /usr/share/nginx/html;\n        index index.html;\n\n        add_header Set-Cookie\
-      \ $auth_cookie always;\n\n        error_page 404 /404.html;\n        location\
-      \ = /404.html {\n            root /usr/share/nginx/html;\n            try_files\
-      \ $uri $uri/ /index.html;\n        }\n\n        location /socket.io {\n    \
-      \        proxy_pass http://localhost:3000/socket.io;\n            proxy_http_version\
-      \ 1.1;\n            proxy_set_header Upgrade $http_upgrade;\n            proxy_set_header\
-      \ Connection \"Upgrade\";\n            proxy_set_header Host $host;\n      \
-      \  }\n\n        location = /api/v1/authn/saml/login {\n            proxy_pass\
-      \ http://127.0.0.1:8081/sso/login;\n            proxy_set_header Host $host;\n\
-      \            proxy_set_header X-Real-IP $remote_addr;\n            proxy_set_header\
-      \ X-Forwarded-For $proxy_add_x_forwarded_for;\n            proxy_set_header\
-      \ X-Forwarded-Proto https;\n        }\n\n        location = /api/v1/authn/saml/acs\
-      \ {\n            proxy_pass http://127.0.0.1:8081/sso/acs;\n            proxy_set_header\
+      ')){const mT=document.cookie.match(/ap_token=([^;]+)/);const mU=document.cookie.match(/ap_user=([^;]+)/);if(mT&&mU){localStorage.setItem(\\\
+      'token\\',mT[1]);localStorage.setItem(\\'currentUser\\',decodeURIComponent(mU[1]));window.location.reload();}else{window.location.href=\\\
+      '/api/v1/authn/saml/login\\';}}</script>';\n            html = html.replace('<head>',\
+      \ '<head>' + script);\n            fs.writeFileSync(file, html, 'utf8');\n \
+      \           console.log('Injected token/user sync script into ' + file);\n \
+      \       }\n    }\n});\n\"\n\n# 2. Write custom nginx.conf\ncat << 'EOF' > /tmp/nginx.conf\n\
+      events{}\nhttp {\n    include /etc/nginx/mime.types;\n    client_max_body_size\
+      \ 4m;\n\n    map $http_accept_language $accept_language {\n        ~*^en en;\n\
+      \        ~*^fr fr;\n        ~*^it it;\n        ~*^de de;\n        ~*^nl nl;\n\
+      \        ~*^ja ja;\n        ~*^es es;\n        ~*^id id;\n        ~*^vi vi;\n\
+      \        ~*^zh zh;\n        ~*^pt pt;\n        ~*^hu hu;\n        ~*^uk uk;\n\
+      \        ~*^bg bg;\n    }\n\n    map $arg_token $auth_cookie {\n        default\
+      \ \"\";\n        ~.+ \"ap_logged_in=true; Path=/; Secure; SameSite=Lax\";\n\
+      \    }\n\n    server_tokens off;\n\n    add_header Strict-Transport-Security\
+      \ \"max-age=31536000; includeSubDomains; preload\" always;\n    add_header X-Content-Type-Options\
+      \ \"nosniff\" always;\n\n    server {\n        listen 80;\n        server_name\
+      \ localhost;\n        root /usr/share/nginx/html;\n        index index.html;\n\
+      \n        add_header Set-Cookie $auth_cookie always;\n\n        error_page 404\
+      \ /404.html;\n        location = /404.html {\n            root /usr/share/nginx/html;\n\
+      \            try_files $uri $uri/ /index.html;\n        }\n\n        location\
+      \ /socket.io {\n            proxy_pass http://localhost:3000/socket.io;\n  \
+      \          proxy_http_version 1.1;\n            proxy_set_header Upgrade $http_upgrade;\n\
+      \            proxy_set_header Connection \"Upgrade\";\n            proxy_set_header\
+      \ Host $host;\n        }\n\n        location = /api/v1/authn/saml/login {\n\
+      \            proxy_pass http://127.0.0.1:8081/sso/login;\n            proxy_set_header\
       \ Host $host;\n            proxy_set_header X-Real-IP $remote_addr;\n      \
       \      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n      \
       \      proxy_set_header X-Forwarded-Proto https;\n        }\n\n        location\
-      \ /api/ {\n            proxy_pass http://localhost:3000/;\n            proxy_http_version\
-      \ 1.1;\n            proxy_set_header Upgrade $http_upgrade;\n            proxy_set_header\
-      \ Connection \"Upgrade\";\n            proxy_set_header Host $host;\n      \
-      \      proxy_redirect http:// https://;\n        }\n\n        if ($accept_language\
-      \ ~ \"^$\") {\n            set $accept_language \"en\";\n        }\n\n     \
-      \   location /assets/img/custom {\n            alias /usr/share/nginx/html/en/assets/img/custom;\n\
-      \        }\n\n        location = / {\n            root /usr/share/nginx/html/en;\n\
-      \            if ($cookie_ap_token = \"\") {\n                return 302 https://$host/api/v1/authn/saml/login;\n\
+      \ = /api/v1/authn/saml/acs {\n            proxy_pass http://127.0.0.1:8081/sso/acs;\n\
+      \            proxy_set_header Host $host;\n            proxy_set_header X-Real-IP\
+      \ $remote_addr;\n            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+      \            proxy_set_header X-Forwarded-Proto https;\n        }\n\n      \
+      \  location /api/ {\n            proxy_pass http://localhost:3000/;\n      \
+      \      proxy_http_version 1.1;\n            proxy_set_header Upgrade $http_upgrade;\n\
+      \            proxy_set_header Connection \"Upgrade\";\n            proxy_set_header\
+      \ Host $host;\n            proxy_redirect http:// https://;\n        }\n\n \
+      \       if ($accept_language ~ \"^$\") {\n            set $accept_language \"\
+      en\";\n        }\n\n        location /assets/img/custom {\n            alias\
+      \ /usr/share/nginx/html/en/assets/img/custom;\n        }\n\n        location\
+      \ = / {\n            root /usr/share/nginx/html/en;\n            if ($cookie_ap_token\
+      \ = \"\") {\n                return 302 https://$host/api/v1/authn/saml/login;\n\
       \            }\n            try_files $uri $uri/ /index.html?$args;\n      \
       \  }\n\n        location = /sign-in {\n            return 302 https://$host/api/v1/authn/saml/login;\n\
       \        }\n\n        location = /sign-up {\n            return 302 https://$host/api/v1/authn/saml/login;\n\
@@ -257,7 +258,8 @@ spec:
       \       lastName: lastName || 'User',\n        trackEvents: false,\n       \
       \ newsLetter: false,\n        platformRole: 'ADMIN',\n        platformId: 'plaActivepiecesPlatf1',\n\
       \        projectId: projectId\n    };\n    \n    return jwt.sign(payload, process.env.AP_JWT_SECRET,\
-      \ { expiresIn: '7d' });\n}\n\nasync function startServer() {\n    console.log(`SSO\
+      \ { \n        algorithm: 'HS256',\n        issuer: 'activepieces',\n       \
+      \ expiresIn: '7d' \n    });\n}\n\nasync function startServer() {\n    console.log(`SSO\
       \ Sidecar: tenantId=${tenantId}, kernelDomain=${kernelDomain}`);\n    \n   \
       \ const server = http.createServer(async (req, res) => {\n        const parsedUrl\
       \ = url.parse(req.url, true);\n        \n        if (parsedUrl.pathname ===\
@@ -284,13 +286,21 @@ spec:
       \  \n                    const { userId, projectId } = await upsertUserAndProject(email,\
       \ firstName, lastName);\n                    const token = signJwt(userId, email,\
       \ firstName, lastName, projectId);\n                    \n                 \
-      \   res.writeHead(200, { \n                        'Content-Type': 'text/html',\n\
-      \                        'Set-Cookie': [\n                            `ap_token=${token};\
+      \   const userObj = {\n                        id: userId,\n               \
+      \         email: email,\n                        firstName: firstName || 'SSO',\n\
+      \                        lastName: lastName || 'User',\n                   \
+      \     status: 'ACTIVE',\n                        verified: true,\n         \
+      \               platformRole: 'ADMIN'\n                    };\n            \
+      \        \n                    res.writeHead(200, { \n                     \
+      \   'Content-Type': 'text/html',\n                        'Set-Cookie': [\n\
+      \                            `ap_token=${token}; Path=/; Secure; SameSite=Lax;\
+      \ Max-Age=604800`,\n                            `ap_user=${encodeURIComponent(JSON.stringify(userObj))};\
       \ Path=/; Secure; SameSite=Lax; Max-Age=604800`,\n                         \
       \   `ap_logged_in=true; Path=/; Secure; SameSite=Lax; Max-Age=604800`\n    \
       \                    ]\n                    });\n                    res.end(`<!DOCTYPE\
       \ html>\n<html>\n<head>\n    <title>Logging in...</title>\n</head>\n<body>\n\
-      \    <script>\n        localStorage.setItem('token', '${token}');\n        window.location.href\
+      \    <script>\n        localStorage.setItem('token', '${token}');\n        localStorage.setItem('currentUser',\
+      \ JSON.stringify(${JSON.stringify(userObj)}));\n        window.location.href\
       \ = '/';\n    </script>\n</body>\n</html>`);\n                } catch (err)\
       \ {\n                    console.error('ACS callback error:', err);\n      \
       \              res.writeHead(500, { 'Content-Type': 'text/plain' });\n     \
