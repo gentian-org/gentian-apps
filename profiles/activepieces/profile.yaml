@@ -293,10 +293,12 @@ spec:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
       name: gentian-sidecar-sso-saml
-      version: 0.1.3
+      version: 0.1.4
     extraValues:
       podLabels:
         gentianos.io/app: activepieces
+      podAnnotations:
+        gentianos.io/restart-reason: encryption-keys-secret-stabilized-2026-07-18
       sso:
         tenantId: ${TENANT_ID}
         kernelDomain: ${KERNEL_DOMAIN}
