@@ -303,6 +303,7 @@ spec:
       sso:
         tenantId: ${TENANT_ID}
         kernelDomain: ${KERNEL_DOMAIN}
+        issuer: Activepieces
       handlerScript: "const { Client } = require('pg');\nconst jwt = require('jsonwebtoken');\n\
         \nasync function upsertUserAndProject(email, firstName, lastName) {\n    const\
         \ client = new Client({\n        host: process.env.AP_POSTGRES_HOST,\n   \
