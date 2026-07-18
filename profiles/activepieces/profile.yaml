@@ -75,7 +75,7 @@ spec:
     - name: AP_TELEMETRY_ENABLED
       value: 'false'
     - name: AP_TEMPLATES_SOURCE_URL
-      value: http://127.0.0.1/custom-content/templates.json
+      value: https://auto.${TENANT_DOMAIN}/custom-content/templates.json
     ingress:
       enabled: false
       tls:
