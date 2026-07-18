@@ -335,9 +335,7 @@ spec:
         \ {\n        await client.end();\n    }\n}\n\nfunction signJwt(userId, email,\
         \ firstName, lastName, projectId) {\n    const payload = {\n        id: userId,\n\
         \        type: 'USER',\n        projectId: projectId,\n        platform: {\n\
-        \            id: 'plaActivepiecesPlatf1'\n        }\n    };\n    \n    return\
-        \ jwt.sign(payload, process.env.AP_JWT_SECRET, { \n        algorithm: 'HS256',\n\
-        \        issuer: 'activepieces',\n        expiresIn: '7d' \n    });\n}\n\n\
+        \            id: 'plaActivepiecesPlatf1'\n        }\n    };\n    \n    const secret = process.env.jwt || process.env.AP_JWT_SECRET;\n    return jwt.sign(payload, secret, { \n        algorithm: 'HS256',\n        issuer: 'activepieces',\n        expiresIn: '7d' \n    });\n}\n\n\
         module.exports = {\n    onLogin: async (profile, req, res) => {\n        const\
         \ { email, firstName, lastName } = profile;\n        const { userId, projectId\
         \ } = await upsertUserAndProject(email, firstName, lastName);\n        const\
@@ -359,6 +357,8 @@ spec:
       envFrom:
       - secretRef:
           name: activepieces-postgresql-credentials
+      - secretRef:
+          name: activepieces-encryption-keys
       extraEnvVars:
       - name: AP_POSTGRES_HOST
         value: postgres-rw.platform-kernel.svc.cluster.local
