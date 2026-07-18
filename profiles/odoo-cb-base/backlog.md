@@ -33,3 +33,15 @@ This solution is highly elegant and respects the Gentian OS architecture:
 - No SSO sidecar proxies needed (saving resources and complexity).
 - Immune to mobile Safari Intelligent Tracking Prevention (ITP) issues.
 - Adheres entirely to existing platform patterns.
+
+---
+
+## Future Backlog: Direct GitHub Sync for Private Repositories
+
+Currently, the `git-sync` sidecar clones from a local git daemon mirror (`git://192.168.0.100:9418/odoo-modules`) to bypass namespace egress block and private repository authentication. We should investigate transitioning this to sync directly from the remote GitHub repository (`https://github.com/gentian-org/odoo-modules.git`).
+
+### Plan
+1. Add custom egress NetworkPolicy exceptions to allow the sidecar pods to connect to GitHub (port 22 for SSH or 443 for HTTPS).
+2. Update the `git-modules` sidecar chart to mount an SSH private key or Personal Access Token from a Secret.
+3. Configure `profile.yaml` to point to GitHub directly instead of the host VM's git daemon.
+
