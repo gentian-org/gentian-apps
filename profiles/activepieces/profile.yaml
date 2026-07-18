@@ -63,6 +63,12 @@ spec:
     - ports:
       - port: 443
         protocol: TCP
+    - ports:
+      - port: 9418
+        protocol: TCP
+      to:
+      - ipBlock:
+          cidr: 192.168.0.100/32
   extraValues:
     fullnameOverride: activepieces
     extraEnvVars:
