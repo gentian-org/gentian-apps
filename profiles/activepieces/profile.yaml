@@ -125,6 +125,9 @@ spec:
         executionMode: SANDBOXED
       telemetry: false
       templateSourceURL: ''
+      pieces:
+        source: FILE
+        syncMode: NONE
       data:
         pvc:
           storageClass: nfs-csi
