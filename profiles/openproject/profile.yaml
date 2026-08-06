@@ -38,6 +38,7 @@ spec:
   edition: full
   trustTier: certified
   license: Apache-2.0
+  author: OpenProject
   tile:
     icon: projects
   compositionRef: app-openproject

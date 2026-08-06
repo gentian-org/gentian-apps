@@ -20,6 +20,7 @@ spec:
   edition: full
   trustTier: platform
   license: LGPL-3.0
+  author: OCA
   tile:
     icon: erp
   compositionRef: app-odoo

@@ -15,6 +15,7 @@ metadata:
 spec:
   displayName: "App Store"
   description: "Browse the Gentian app catalogue and install or uninstall applications for your tenant."
+  author: Gentian
   tile:
     icon: store
 

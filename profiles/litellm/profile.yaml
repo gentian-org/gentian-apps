@@ -11,6 +11,7 @@ spec:
   displayName: "LLM Admin Panel"
   description: "Manage LLM configurations, models, virtual keys, and track token usage."
   license: MIT
+  author: LiteLLM
   tile:
     icon: settings
 

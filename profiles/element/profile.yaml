@@ -12,6 +12,7 @@ spec:
   compositionRef: app-element
   description: "Federated team chat and collaboration based on the Matrix protocol, with Synapse homeserver."
   license: Apache-2.0
+  author: Element
   tile:
     icon: chat
 

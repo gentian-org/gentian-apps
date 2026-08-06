@@ -20,6 +20,7 @@ spec:
   displayName: "Gentian Subscriptions"
   description: "Manage Pro app subscriptions, billing, and entitlements for this tenant."
   license: Apache-2.0
+  author: Gentian
   tile:
     icon: erp
 

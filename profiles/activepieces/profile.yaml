@@ -13,6 +13,7 @@ spec:
   edition: full
   trustTier: certified
   license: MIT
+  author: Activepieces
   tile:
     icon: analytics
   deploymentMethod: crossplane

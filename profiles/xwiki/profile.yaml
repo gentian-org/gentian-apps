@@ -39,6 +39,7 @@ spec:
   edition: full
   trustTier: certified
   license: LGPL-2.1
+  author: XWiki
   tile:
     icon: wiki
 
