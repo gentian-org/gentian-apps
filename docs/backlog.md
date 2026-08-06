@@ -68,9 +68,11 @@ opposite directions. The plan unifies both as customization-ladder rung L3
 "addons", decommissions packages, and moves addon selection out of the App Store
 grid into a post-install window plus an Edit button.
 
-It also **settles the edition-vocabulary question** left open below: the leaf suffix
-*is* the edition, so `minimal · standard · full · performant` is replaced by
-`ce · me · od · pro`.
+It also **settles the edition-vocabulary question** left open below:
+`minimal · standard · full · performant` is replaced by **`ce · me · pro`**. `od` is
+not an edition — openDesk is a *vendor*, so `nextcloud-office-od` is a `pro` edition
+supplied by openDesk. Leaf names are free-form hints; `spec.edition` is
+authoritative, and nothing may derive the edition from a name.
 
 ## Pro / Solid tiers in the catalogue
 
