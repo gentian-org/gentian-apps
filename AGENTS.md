@@ -27,7 +27,7 @@ catalogue. See [README.md](README.md) for full scope and
 * **Never commit secrets.** Kernel-injected values (`DATABASE_URL`, `OIDC_ISSUER`,
   `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, etc.) arrive via ExternalSecret at runtime — never
   hardcode or commit them.
-* **Respect third-party license terms** for vendored charts (`activepieces/`) and upstream app
+* **Respect third-party license terms** for vendored charts (`charts/activepieces/`) and upstream app
   images (Nextcloud, XWiki, Odoo, OpenProject, ...) — check upstream licensing before modifying
   or repackaging.
 

@@ -9,7 +9,7 @@ on:
       - "images/**"
       - "charts/odoo/**"
       - "charts/gentian-sidecar-git-modules/**"
-      - "activepieces/**"
+      - "charts/activepieces/**"
       - ".github/workflows/apps-ci.yaml"
   pull_request:
     branches: [main, develop]
@@ -19,7 +19,7 @@ on:
       - "images/**"
       - "charts/odoo/**"
       - "charts/gentian-sidecar-git-modules/**"
-      - "activepieces/**"
+      - "charts/activepieces/**"
 
 env:
   REGISTRY: ghcr.io
@@ -290,8 +290,8 @@ jobs:
       - name: Package and push chart
         if: github.event_name != 'pull_request'
         run: |
-          CHART_VERSION=$(grep '^version:' activepieces/Chart.yaml | awk '{print $2}')
-          helm package activepieces -d /tmp
+          CHART_VERSION=$(grep '^version:' charts/activepieces/Chart.yaml | awk '{print $2}')
+          helm package charts/activepieces -d /tmp
           helm push "/tmp/activepieces-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
 
   build-sso-saml-sidecar-chart:

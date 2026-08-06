@@ -19,11 +19,19 @@ profiles/              # App catalogue bundles (OSS + commercial) — synced by 
 apps/                  # first-party implementations (FastAPI + React + Helm)
   _template/           # copy of gentian-app-template
   app-store/           # tenant admin App Store UI
+charts/                # Helm charts published to oci://ghcr.io/gentian-org/charts
+  activepieces/        # vendored upstream chart (adnoctem/helm), patched
+  odoo/                # Gentian-authored chart for OCB
+  gentian-sidecar-*/   # sidecar charts referenced by profiles
 contracts/             # integration contract schemas
 icons/                 # shared SVG assets
 ```
 
-**Discovery:** catalogue = `profiles/` · implementation = `apps/<name>/`
+**Discovery:** catalogue = `profiles/` · implementation = `apps/<name>/` · chart = `charts/<name>/`
+
+`apps/` is only for first-party apps we build. A chart that wraps an upstream image — vendored
+or Gentian-authored — belongs in `charts/<name>/`, and its profile references it by OCI
+coordinates, not by path.
 
 ## Guides
 
