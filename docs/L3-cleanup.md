@@ -1,6 +1,7 @@
 # L3 cleanup — one addon model
 
-**Status:** Plan, not started. Tracking document.
+**Status:** In progress. All design questions resolved (§6); `spec.author` and the
+`AppPackage` CRD have shipped (gentian-os `a1b79c0`). Remaining work in §3, ordered in §8.
 **Companion to:** [app-profile-guide.md](app-profile-guide.md) §0 (repo layout),
 [customization-ladder.md](customization-ladder.md),
 [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md) (rung L3)
@@ -69,8 +70,20 @@ suggest the edition, but nothing may depend on it.
 
 **Consequence: `spec.edition` is authoritative; CI must NOT enforce name ↔ edition.**
 This is the same principle already applied twice in this repo — a path may not encode
-a fact that a field owns. It also means a `spec.vendor` field is likely needed, so the
-App Store can render "Pro edition by openDesk" rather than parsing `-od` out of a name.
+a fact that a field owns.
+
+**`spec.author` — implemented** (gentian-os `a1b79c0`). Records who supplies and
+maintains *this entry*: a company (vendor), an organisation, or an individual. It
+describes the catalogue entry, not the upstream project, so one application can
+appear as several profiles from different authors. `spec.edition` + `spec.author`
+are the authoritative pair; the App Store renders "Pro edition by openDesk" from the
+fields rather than parsing `-od` out of a name.
+
+Populated so far: `nextcloud-office-od` → `openDesk`, `nextcloud-suite-me` →
+`Gentian`. The remaining 19 profiles need an author assigned by the catalogue owner —
+for a `ce` edition packaged by Gentian from an upstream project, decide whether the
+author is Gentian (who packages it) or the upstream project (who writes it), and
+apply that rule consistently.
 
 ### 2.3 Packages become UI presets
 
@@ -78,16 +91,30 @@ A package is **not a deployable profile**. It is a very small file that adds an 
 to the UI which pre-selects a subset of addons — the user can then adjust the
 selection before installing.
 
+**The `AppPackage` CRD is implemented** (gentian-os `a1b79c0`): cluster-scoped, no
+`status`, no reconciler, no workload.
+
 ```yaml
-# profiles/nextcloud/packages/nextcloud-suite.yaml  (shape TBD)
+# profiles/nextcloud/packages/nextcloud-suite.yaml
+apiVersion: gentianos.io/v1alpha1
 kind: AppPackage
 metadata:
   name: nextcloud-suite
 spec:
-  family: nextcloud
-  displayName: Nextcloud Suite
-  addons: [richdocuments, forms, mail, calendar, contacts, tasks, deck, collectives, spreed]
+  family: nextcloud                    # required — offered only for this family
+  displayName: Nextcloud Suite         # required
+  description: Files, office, groupware and collaboration.
+  addons:                              # required, min 1
+    [nextcloud-richdocuments-ce, nextcloud-forms-ce, nextcloud-mail-ce,
+     nextcloud-calendar-ce, nextcloud-contacts-ce, nextcloud-tasks-ce,
+     nextcloud-deck-ce, nextcloud-collectives-ce, nextcloud-spreed-ce]
+  author: Gentian
+  tile: { icon: cloud }
 ```
+
+The addon list is a **starting point, not a constraint**: the user may untick any
+entry and add addons the preset omits. A preset may name a `pro` addon the tenant
+is not entitled to — that renders with a Buy button rather than blocking install.
 
 This keeps the curated bundles as a convenience while removing them as artifacts —
 the flexibility problem and the curation benefit stop being in tension.
@@ -111,10 +138,10 @@ Afterwards an **Edit** button on the installed app reopens the same list.
 | 3 | **Invert `implicit_base_apps.go`** | Today installing a module profile injects its `requires-profile` base. Target: install base, select addons — addons never appear in `spec.apps`. This logic becomes dead; confirm before deleting. |
 | 4 | Addon activation reconciler | Reconcile `spec.apps[].addons` → native activation (Odoo `-i`, Nextcloud `occ app:enable`). Generic; no per-app branching (platform boundary). |
 | 5 | `spec.edition` enum → `ce · me · pro` | Admission-validated → **deploy before** any profile uses a new value. |
-| 6 | `spec.vendor` (new, §2.2) | So the store can show the supplier without parsing names. Confirm the name. |
+| 6 | ~~`spec.author`~~ **done** (`a1b79c0`) | Who supplies this entry — company, organisation or individual. 2 of 21 profiles populated; rest need an author rule (§2.2). |
 | 7 | Entitlement gates edition **and** pro-addon activation | Per §2.1 this is what makes editions interchangeable — authorization, not technical compatibility. |
 | 8 | Addons stop being App claims | An addon is activation state inside the base app, not its own workload. Check `app_reconciler.go`. |
-| 9 | `AppPackage` kind (§2.3) | Or an equivalent lightweight object the App Store can read. Not deployable, no reconciler. |
+| 9 | ~~`AppPackage` kind~~ **done** (`a1b79c0`) | Cluster-scoped, no status, no reconciler. gentian-ui granted read access (`29545416`). |
 
 **Ordering trap (hit twice already):** CRD enum/field changes are admission-validated,
 so gentian-os ships and syncs *before* gentian-apps uses the new values. Same lesson
@@ -222,8 +249,8 @@ per-tenant database — see [backlog.md](backlog.md).
 | 2 | Do packages survive? | Yes, as **UI presets** in a `packages/` folder — very small files pre-selecting a subset of addons. Not deployable. |
 | 3 | Sub-tier names (`pro-super`, `pro-bigTec`) | Names are free-form. `spec.edition` is authoritative; CI must not derive edition from a name. Implies a `vendor` field. |
 | 4 | Addon↔base compatibility across editions | Editions stay compatible. **Authorization** (paid licence) decides whether an edition may run; **version** manages technical compatibility. No per-edition matrix. |
-| 5 | Scale: one Application per addon | **Keep one bundle per addon.** See below. |
-| 6 | Rename `gentianOdooModules`? | No — Odoo calls its addons modules. |
+| 5 | Scale: one Application per addon | **Individual CRs per addon, one bundle each.** Packages absorb the resulting UI complexity. See §6.1. |
+| 6 | Rename `gentianOdooModules`? | No — Odoo calls its addons modules, so an Odoo-specific attribute using Odoo's word is correct. |
 
 ### 6.1 On Q5 — why one bundle per addon
 

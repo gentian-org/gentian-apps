@@ -26,6 +26,7 @@ spec:
   edition: full
   trustTier: certified
   license: proprietary
+  author: openDesk
   tile:
     icon: files
 
