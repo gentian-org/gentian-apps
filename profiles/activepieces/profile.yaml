@@ -24,6 +24,7 @@ spec:
     database:
       engine: postgresql
       databasePerTenant: true
+      allowDynamicDatabaseCreation: false
     cache:
       engine: redis
   portalTiles:
@@ -58,6 +59,7 @@ spec:
     serviceName: activepieces
     servicePort: 8080
     tlsEnabled: true
+    clusterIssuer: letsencrypt-http01
   security:
     egress:
     - ports:

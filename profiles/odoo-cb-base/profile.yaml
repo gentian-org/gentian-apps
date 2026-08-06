@@ -35,6 +35,7 @@ spec:
     database:
       engine: postgresql
       databasePerTenant: true
+      allowDynamicDatabaseCreation: false
     mail:
       smtp:
         auth: plain
@@ -149,6 +150,7 @@ spec:
     serviceName: odoo
     servicePort: 8069
     tlsEnabled: true
+    clusterIssuer: letsencrypt-http01
 
   # Customization ladder — see customization.md and
   # gentian-os/docs/app-customization.md
