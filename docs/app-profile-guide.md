@@ -89,11 +89,27 @@ why `charts/packages/*.tgz` was removed — CI publishes to
 Debian does not commit `.deb` files into its packaging tree, and nixpkgs does not
 commit build outputs.
 
-The same rule explains why a **vendored** chart is a smell rather than a pattern:
-`charts/activepieces/` currently contains a full copy of upstream including
-Bitnami's postgresql and redis subcharts. The distribution answer is to carry the
-*delta*, not the copy — Debian's `debian/patches/`, Gentoo's `files/` — which for
-Helm means a thin wrapper declaring upstream via `dependencies:`.
+The same rule explains why a **vendored** chart is a smell rather than a pattern.
+Carry the *delta*, not the copy — Debian's `debian/patches/`, Gentoo's `files/`.
+
+`charts/activepieces/` is the worked example. It used to be a 151-file copy of
+upstream including Bitnami's postgresql and redis subcharts; it is now
+[`UPSTREAM`](../charts/activepieces/UPSTREAM) (pinned coordinates) plus
+[`patches/`](../charts/activepieces/patches/) (a DEP-3 series), built by
+`scripts/build-activepieces-chart.sh`. That removed ~22k lines — but the real
+payoff was diagnostic: the actual delta was **240 lines across 4 files**, and
+three of the five patches turned out to be plain upstream bugs (secrets
+regenerated on every deploy, YAML indentation, a Redis username read from a
+nonexistent secret key). A copy had been hiding them as "just how our chart
+looks"; as patches they have `Forwarded:` headers and an owner.
+
+Set `chartOwnership: patched` for this shape — `vendored` means a copy still
+exists and should be reviewed.
+
+**When you hit a chart that needs template changes, measure the delta before
+assuming a copy is necessary.** `helm pull --untar` the pinned upstream version
+and `diff -ruN` against what you have; a few hundred lines is a patch series, not
+a fork.
 
 ### Consequence 4 — profiles group by family; discovery keys off a marker file
 

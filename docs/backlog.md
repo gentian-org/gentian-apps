@@ -33,9 +33,16 @@ pre-OCI Helm HTTP repo) removed — CI publishes to `oci://ghcr.io/gentian-org/c
 which is the artifact store. See app-profile-guide.md §0 "version packaging, never built
 artifacts".
 
-**Still open (unchanged by this work):** `charts/activepieces/` is a full vendored copy
-of upstream including Bitnami postgresql/redis subcharts. The distribution-repo answer is
-a thin wrapper carrying the delta via Helm `dependencies:`, not a copy.
+**Follow-up, now also done** (`ab12e1b`): `charts/activepieces/` was a full vendored copy
+of upstream including Bitnami postgresql/redis subcharts. It now carries pinned upstream
+(`UPSTREAM`) plus a 5-patch DEP-3 series — net −22,086/+495 lines. Three of those patches
+turned out to be genuine upstream bugs that a copy had been hiding; they now have
+`Forwarded:` headers so offering them upstream is tracked. Built by
+`scripts/build-activepieces-chart.sh`, which CI runs on pull requests too so a stale
+series fails review instead of merging.
+
+Note the delta was only 240 lines across 4 files — worth checking before assuming any
+other "vendored" chart needs to stay that way.
 
 ## Pro / Solid tiers in the catalogue
 

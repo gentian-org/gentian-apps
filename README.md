@@ -24,7 +24,7 @@ apps/                  # first-party implementations (FastAPI + React + Helm)
   _template/           # copy of gentian-app-template
   app-store/           # tenant admin App Store UI
 charts/                # Helm charts published to oci://ghcr.io/gentian-org/charts
-  activepieces/        # vendored upstream chart (adnoctem/helm), patched
+  activepieces/        # pinned upstream (adnoctem/helm) + patch series — no copy
   odoo/                # Gentian-authored chart for OCB — backs all 10 odoo profiles
   gentian-sidecar-*/   # sidecar charts referenced by profiles
 images/                # Dockerfiles published to ghcr.io
