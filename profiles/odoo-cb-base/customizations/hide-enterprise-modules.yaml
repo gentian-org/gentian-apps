@@ -7,7 +7,10 @@ apiVersion: gentianos.io/v1alpha1
 kind: Customization
 metadata:
   name: hide-enterprise-modules
-  namespace: gentian-catalogue
+  # Profile-scoped catalogue objects (AppProfile, Composition) are cluster-scoped
+  # and have no namespace of their own; the gentian-catalogue ApplicationSet syncs
+  # every profile's namespaced resources into this one fixed system namespace.
+  namespace: gentian-system
 spec:
   summary: "Hide Odoo Enterprise-only modules from the apps list"
 
