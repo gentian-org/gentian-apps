@@ -21,13 +21,24 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 
 | Rung | Available | How, here |
 |---|---|---|
-| **L0** Configure | yes | `spec.extraValues` → `AP_*` values on the vendored chart |
+| **L0** Configure | yes | `spec.extraValues` → `AP_*` values on the chart |
 | **L1** Drop-in | yes | `branding` static assets (tenant-editable) |
 | **L2** Companion | always | REST API, or a webhook-triggered service |
 | **L3** Extension | yes | a **custom piece**, delivered by the `git-sync` sidecar already declared on this profile (`gentian-sidecar-git-modules` 0.1.7) |
-| **L4** Repackage | yes | the chart is vendored under `activepieces/` — see its `UPSTREAM.md` |
-| **L5** Patch | **no** | not permitted |
+| **L4** Repackage | yes | `charts/activepieces/` — pinned upstream + a DEP-3 patch series, `chartOwnership: patched` |
+| **L5** Patch | **no** | not permitted — see below |
 | **L6** Fork | **no** | not permitted |
+
+### L4 patches the chart; L5 would patch the app — only one of those is allowed
+
+`charts/activepieces/` carries a 5-patch series against upstream `adnoctem/helm`
+(3 upstream bug fixes, 2 Gentian extension points). That is **L4 Repackage**: a
+chart is *packaging*, and patching packaging is what a distribution repo does.
+
+**L5 remains forbidden**, because at this rung the patch target would be the
+Activepieces application itself — its server bundles and database flags — and
+that is precisely where the licence-bypass temptation lives (see below). The
+distinction is the target, not the technique.
 
 ## L3 is the intended path
 
@@ -43,4 +54,7 @@ patching bundles or flipping database flags. This is an explicit absolute prohib
 `app-profile-guide.md`. It is also why `patch.allowed` is `false` for this app: the temptation
 lives exactly here.
 
-The chart is vendored, so respect the upstream licence terms recorded in `activepieces/UPSTREAM.md`.
+Upstream chart provenance and licence terms are pinned in
+[`charts/activepieces/UPSTREAM`](../../charts/activepieces/UPSTREAM); the local delta is
+[`charts/activepieces/patches/`](../../charts/activepieces/patches/). Nothing about that
+series touches licensing — it is 3 upstream bug fixes plus 2 additive extension points.

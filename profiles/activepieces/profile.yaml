@@ -37,7 +37,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: activepieces
-    version: 0.3.22
+    version: 0.3.23
   valueMapping:
     database:
       hostKey: activepieces.postgresql.host
@@ -423,7 +423,7 @@ spec:
           path: /api/v1
           auth: oidc-token-exchange
     repackage:
-      chartOwnership: vendored
+      chartOwnership: patched
     patch:
       allowed: false      # enterprise features are licence-gated; never patch to unlock
       seriesPath: patches/series

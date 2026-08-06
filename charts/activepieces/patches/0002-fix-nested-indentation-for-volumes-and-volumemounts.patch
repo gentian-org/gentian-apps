@@ -1,0 +1,34 @@
+Description: Fix nested indentation for volumes and volumeMounts
+ Both lists were rendered with an nindent two columns deeper than the
+ surrounding sequence, producing YAML that either fails to parse or silently
+ nests the entries under the preceding item. volumeMounts needs 10 (not 12) and
+ volumes needs 6 (not 8) to line up with the keys they belong to.
+Author: Gentian Platform <platform@gentian.org>
+Origin: other, https://github.com/gentian-org/gentian-apps
+Forwarded: not-yet
+Bug-Upstream: none filed
+Applied-Upstream: no
+Last-Update: 2026-08-06
+---
+diff --git a/templates/_podSpec.tpl b/templates/_podSpec.tpl
+index acec19e..71e34c1 100644
+--- a/templates/_podSpec.tpl
++++ b/templates/_podSpec.tpl
+@@ -105,7 +105,7 @@ template:
+           - name: {{ include "activepieces.pv" . }}
+             mountPath: {{ .Values.activepieces.data.rootPath }}
+         {{- if .Values.volumeMounts }}
+-          {{- toYaml .Values.volumeMounts | nindent 12 }}
++          {{- toYaml .Values.volumeMounts | nindent 10 }}
+         {{- end }}
+         {{- if .Values.resources }}
+         resources:
+@@ -156,7 +156,7 @@ template:
+         persistentVolumeClaim:
+           claimName: {{ default (include "activepieces.pvc" .) .Values.activepieces.data.pvc.existingClaim }}
+     {{- if .Values.volumes }}
+-      {{- toYaml .Values.volumes | nindent 8 }}
++      {{- toYaml .Values.volumes | nindent 6 }}
+     {{- end }}
+     {{- if .Values.priorityClassName }}
+     priorityClassName: {{ .Values.priorityClassName }}

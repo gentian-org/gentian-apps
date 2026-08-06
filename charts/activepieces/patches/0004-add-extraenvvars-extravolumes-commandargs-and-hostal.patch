@@ -1,0 +1,78 @@
+Description: Add extraEnvVars, extraVolumes, command/args and hostAliases hooks
+ Gentian wraps this chart rather than forking it, so the AppProfile needs to
+ inject tenant-specific configuration through values alone: extra environment
+ variables, extra volumes/mounts for the git-synced custom pieces PVC, a
+ container command override for the startup nginx/asset preparation, and
+ hostAliases for in-cluster hostname pinning.
+ These are additive extension points guarded by 'if' — with the values unset the
+ rendered output is byte-identical to upstream. Deliberately separate from the
+ preceding bug fixes so those can be forwarded on their own merits.
+   generic 'extra*' convention, but not a defect report.
+Author: Gentian Platform <platform@gentian.org>
+Origin: other, https://github.com/gentian-org/gentian-apps
+Forwarded: no
+Bug-Upstream: none filed
+Reason: Gentian-specific extension points; worth proposing upstream as a
+  generic 'extra*' convention, but not a defect report.
+Bug-Upstream: none filed
+Applied-Upstream: no
+Last-Update: 2026-08-06
+---
+diff --git a/templates/_podSpec.tpl b/templates/_podSpec.tpl
+index bda92e6..0502ff3 100644
+--- a/templates/_podSpec.tpl
++++ b/templates/_podSpec.tpl
+@@ -38,6 +38,14 @@ template:
+       - name: {{ .Chart.Name }}
+         image: {{ include "activepieces.image" . }}
+         imagePullPolicy: {{ .Values.image.pullPolicy }}
++        {{- if .Values.command }}
++        command:
++          {{- toYaml .Values.command | nindent 10 }}
++        {{- end }}
++        {{- if .Values.args }}
++        args:
++          {{- toYaml .Values.args | nindent 10 }}
++        {{- end }}
+         envFrom:
+           - configMapRef:
+               name: {{ include "activepieces.fullname" . }}
+@@ -94,6 +102,9 @@ template:
+                 name: {{ default (include "activepieces.secrets.openai" .) .Values.activepieces.copilot.openAI.existingSecret }}
+                 key: apiKey
+           {{- end }}
++          {{- if .Values.extraEnvVars }}
++          {{- toYaml .Values.extraEnvVars | nindent 10 }}
++          {{- end }}
+         ports:
+           - name: http
+             containerPort: 80
+@@ -104,6 +115,9 @@ template:
+         {{- if .Values.volumeMounts }}
+           {{- toYaml .Values.volumeMounts | nindent 10 }}
+         {{- end }}
++        {{- if .Values.extraVolumeMounts }}
++          {{- toYaml .Values.extraVolumeMounts | nindent 10 }}
++        {{- end }}
+         {{- if .Values.resources }}
+         resources:
+           {{- toYaml .Values.resources | nindent 12 }}
+@@ -155,6 +169,9 @@ template:
+     {{- if .Values.volumes }}
+       {{- toYaml .Values.volumes | nindent 6 }}
+     {{- end }}
++    {{- if .Values.extraVolumes }}
++      {{- toYaml .Values.extraVolumes | nindent 6 }}
++    {{- end }}
+     {{- if .Values.priorityClassName }}
+     priorityClassName: {{ .Values.priorityClassName }}
+     {{- end }}
+@@ -178,4 +195,8 @@ template:
+     initContainers:
+       {{- toYaml .Values.initContainers | nindent 8 }}
+     {{- end }}
++    {{- if .Values.hostAliases }}
++    hostAliases:
++      {{- toYaml .Values.hostAliases | nindent 6 }}
++    {{- end }}
+ {{- end }}

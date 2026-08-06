@@ -1,0 +1,154 @@
+Description: Add nginx ConfigMap for portal SSO forwarding and HTTPS redirects
+ Activepieces is served inside the Gentian portal behind Envoy Gateway with SAML
+ SSO terminated by a sidecar. That needs nginx configuration upstream has no
+ reason to ship: forward unauthenticated / to the SAML login endpoint, map the
+ ?token query parameter onto a session cookie so the SPA picks up the sidecar's
+ session, and rewrite backend redirects to HTTPS since TLS terminates at the edge.
+ Rendered only as a ConfigMap; nothing references it unless the AppProfile mounts
+ it, so with default values this adds one unused object and changes no existing one.
+   deployment-topology-specific nginx configuration.
+Author: Gentian Platform <platform@gentian.org>
+Origin: other, https://github.com/gentian-org/gentian-apps
+Forwarded: not-needed
+Reason: Gentian portal integration glue — upstream would rightly decline
+  deployment-topology-specific nginx configuration.
+Applied-Upstream: no
+Last-Update: 2026-08-06
+---
+diff --git a/templates/nginx-config.yaml b/templates/nginx-config.yaml
+new file mode 100644
+index 0000000..30b8781
+--- /dev/null
++++ b/templates/nginx-config.yaml
+@@ -0,0 +1,131 @@
++apiVersion: v1
++kind: ConfigMap
++metadata:
++  name: {{ include "activepieces.fullname" . }}-nginx-config
++  labels:
++    {{- include "activepieces.labels" . | nindent 4 }}
++data:
++  nginx.conf: |
++    events{}
++    http {
++        include /etc/nginx/mime.types;
++        client_max_body_size 4m;
++
++        map $http_accept_language $accept_language {
++            ~*^en en;
++            ~*^fr fr;
++            ~*^it it;
++            ~*^de de;
++            ~*^nl nl;
++            ~*^ja ja;
++            ~*^es es;
++            ~*^id id;
++            ~*^vi vi;
++            ~*^zh zh;
++            ~*^pt pt;
++            ~*^hu hu;
++            ~*^uk uk;
++            ~*^bg bg;
++        }
++
++        # Set cookie if token query parameter is present
++        map $arg_token $auth_cookie {
++            default "";
++            ~.+ "ap_logged_in=true; Path=/; Secure; SameSite=Lax";
++        }
++
++        server_tokens off;
++
++        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
++        add_header X-Content-Type-Options "nosniff" always;
++
++        server {
++            listen 80;
++            server_name localhost;
++            root /usr/share/nginx/html;
++            index index.html;
++
++            # Set auth cookie at server level so it is inherited and works with internal redirects
++            add_header Set-Cookie $auth_cookie always;
++
++            error_page 404 /404.html;
++            location = /404.html {
++                root /usr/share/nginx/html;
++                try_files $uri $uri/ /index.html;
++            }
++
++            location /socket.io {
++                proxy_pass http://localhost:3000/socket.io;
++                proxy_http_version 1.1;
++                proxy_set_header Upgrade $http_upgrade;
++                proxy_set_header Connection "Upgrade";
++                proxy_set_header Host $host;
++            }
++
++            location /api/ {
++                proxy_pass http://localhost:3000/;
++                proxy_http_version 1.1;
++                proxy_set_header Upgrade $http_upgrade;
++                proxy_set_header Connection "Upgrade";
++                proxy_set_header Host $host;
++                proxy_redirect http:// https://;
++            }
++
++            # Fallback to default language if no preference defined by browser
++            if ($accept_language ~ "^$") {
++                set $accept_language "en";
++            }
++
++            location /assets/img/custom {
++                alias /usr/share/nginx/html/en/assets/img/custom;
++            }
++
++            # SAML Auto-forward redirects (explicitly HTTPS to prevent HTTP downgrade)
++            location = / {
++                root /usr/share/nginx/html/en;
++                if ($cookie_ap_logged_in != "true") {
++                    return 302 https://$host/api/v1/authn/saml/login;
++                }
++                try_files $uri $uri/ /index.html?$args;
++            }
++
++            location = /sign-in {
++                return 302 https://$host/api/v1/authn/saml/login;
++            }
++
++            location /redirect {
++                root /usr/share/nginx/html/en;
++                try_files $uri $uri/ /index.html?$args;
++            }
++
++            # Everything under the Angular application is always redirected to Angular in the
++            # correct language
++            location ~ ^/(fr|de|it|pt|nl|ja|es|zh|pt|vi|id|hu|uk|bg) {
++                root /usr/share/nginx/html;
++                try_files $uri $uri/ /$1/index.html;
++            }
++
++            location ~ ^/(fr|de|it|pt|nl|ja|es|zh|pt|vi|id|hu|uk|bg)$ {
++               rewrite ^/(fr|de|it|pt|nl|ja|es|zh|pt|vi|id|hu|uk|bg)$ /$1/ permanent;
++            }
++
++            location ~* \.(css|js|jpg|jpeg|png|gif|ico|svg)$ {
++                root /usr/share/nginx/html/en;
++                add_header Pragma "no-cache";
++                add_header Expires "0";
++                add_header Cache-Control "public, max-age=31536000, immutable";
++            }
++
++            # Use the default language for the root of the application
++            location / {
++               root /usr/share/nginx/html/en;
++               try_files $uri $uri/ /index.html?$args;
++            }
++
++            location /not-found {
++               root /usr/share/nginx/html/en;
++               try_files $uri $uri/ /index.html?$args =404;
++            }
++
++        }
++    }

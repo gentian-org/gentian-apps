@@ -1,0 +1,18 @@
+# Pinned upstream for the activepieces chart.
+#
+# This directory holds NO copy of the upstream chart — only the delta, as a
+# quilt-style patch series (see patches/). The chart is fetched at build time,
+# patched, and packaged. See docs/app-profile-guide.md §0 for why a distribution
+# repo carries the delta rather than a vendored copy.
+#
+# Bumping UPSTREAM_VERSION: run scripts/build-activepieces-chart.sh. If a patch
+# no longer applies, that failure is the point — resolve it deliberately rather
+# than letting the fork drift silently.
+
+REPO=https://adnoctem.github.io/helm
+CHART=activepieces
+UPSTREAM_VERSION=0.3.1
+
+# Version published to oci://ghcr.io/gentian-org/charts. Bump on every change to
+# UPSTREAM_VERSION or patches/; profiles pin this via spec.chart.version.
+CHART_VERSION=0.3.23

@@ -316,12 +316,20 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
 
-      - name: Package and push chart
+      # The chart is not vendored: upstream is fetched at the pinned version and
+      # the local patch series is applied on top. This step runs on pull requests
+      # too — a series that no longer applies must fail review, not merge.
+      - name: Build chart from pinned upstream + patch series
+        id: build
+        run: scripts/build-activepieces-chart.sh --out /tmp/ap-dist
+
+      - name: Push chart
         if: github.event_name != 'pull_request'
         run: |
-          CHART_VERSION=$(grep '^version:' charts/activepieces/Chart.yaml | awk '{print $2}')
-          helm package charts/activepieces -d /tmp
-          helm push "/tmp/activepieces-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+          # shellcheck source=/dev/null
+          source charts/activepieces/UPSTREAM
+          helm push "/tmp/ap-dist/activepieces-${CHART_VERSION}.tgz" \
+            oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
 
   build-sso-saml-sidecar-chart:
     runs-on: ubuntu-latest
