@@ -424,6 +424,18 @@ All app routes for that tenant reference the same TLS secret on the tenant Gatew
 is reserved for a possible future mode and is **ignored** by the operator today.
 See [gentian-os/docs/architecture.md](../gentian-os/docs/architecture.md) §6.1.
 
+**Narrow exception:** an older gentian-os CRD schema defaulted this field
+server-side (removed; see gentian-os commit `5484346`), which permanently
+baked `clusterIssuer: letsencrypt-http01` into any live `AppProfile` that hit
+the code path (profiles declaring `sidecars`, e.g. `activepieces`,
+`odoo-cb-base`). Since Server-Side Apply doesn't retroactively prune a value
+it never itself declared, those two profiles set it explicitly in git to
+match — not because the field does anything, but so ArgoCD stops reporting a
+permanent diff against a value only the API server ever wrote. **Do not copy
+this into a new profile** unless `kubectl get appprofile <name> -o
+jsonpath='{.spec.ingress.clusterIssuer}'` shows it's already live and
+undeclared.
+
 ```yaml
 ingress:
   subDomain: "projects"        # → projects.demo.desk.gentian.org
