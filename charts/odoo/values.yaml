@@ -55,7 +55,7 @@ resources:
     cpu: "2000m"
     memory: "4Gi"
 
-# Customization ladder rung L1 (see gentian-apps/profiles/odoo/odoo-cb-base/customization.md
+# Customization ladder rung L1 (see gentian-apps/profiles/odoo/base/odoo-base-ce/customization.md
 # and gentian-os/docs/app-customization.md §2.2). Off by default so a plain install
 # has no extra init container or volumes.
 #

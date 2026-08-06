@@ -26,7 +26,7 @@ generic mechanisms only).
 
 A bundle is any directory containing a `kustomization.yaml`. Singletons sit at
 `profiles/<name>/`; members of a multi-profile family sit one level deeper at
-`profiles/<family>/<name>/` (e.g. `profiles/odoo/odoo-cb-crm/`). Locate a bundle by its
+`profiles/<family>/<app>/<name>/` (e.g. `profiles/odoo/crm/odoo-crm-ce/`). Locate a bundle by its
 leaf directory name — which must equal the AppProfile's `metadata.name` — never by
 counting path segments.
 

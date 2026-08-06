@@ -11,7 +11,7 @@ nextcloudBaseUrl: "http://nextcloud"
 nextcloudMcpUser: "mcp-service"
 # nextcloudMcpPassword is populated by the AppProfile's appSecrets ->
 # Release set[] mechanism (Crossplane resolves the OpenBao-seeded Secret
-# to a plain value at release time -- same pattern nextcloud-base's own
+# to a plain value at release time -- same pattern nextcloud-drive-ce's own
 # admin_password/OIDC secrets already use). Never set this directly.
 
 resources:

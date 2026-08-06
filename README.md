@@ -14,11 +14,18 @@ catalogue — it's being migrated to hold only those artifacts.
 
 ```text
 profiles/              # App catalogue bundles (OSS + commercial) — synced by Argo CD gentian-catalogue
-  odoo/                #   multi-profile family: 10 bundles one level deeper
-    odoo-cb-base/
-    odoo-cb-crm/
-  nextcloud/           #   multi-profile family: base / office / office-plus / suite
-    nextcloud-base/
+  odoo/                #   family
+    base/              #     app
+      odoo-base-ce/    #       leaf = the AppProfile, named <family>-<app>-<tier>
+    crm/
+      odoo-crm-ce/
+  nextcloud/           #   family: drive / office / suite
+    office/
+      nextcloud-office-ce/   # Community Edition
+      nextcloud-office-od/   # openDesk (proprietary, private registry)
+    suite/
+      nextcloud-suite-ce/
+      nextcloud-suite-me/    # Managed Edition — maintained by Gentian for MSPs
   xwiki/               #   true singleton: stays flat
 apps/                  # first-party implementations (FastAPI + React + Helm)
   _template/           # copy of gentian-app-template
