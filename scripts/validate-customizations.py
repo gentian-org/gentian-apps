@@ -8,7 +8,7 @@ Two things are checked:
    ``{grade: unknown, supportedRungs: [L0, L4]}``, which is a deliberate floor, not
    a default to leave in place.
 
-2. Every ``profiles/*/customizations/*.yaml`` record satisfies the ladder policy:
+2. Every ``profiles/**/customizations/*.yaml`` record satisfies the ladder policy:
    the rung x scope cost matrix, the upstream-first obligation, the justification
    chain, and the review date.
 
@@ -215,7 +215,7 @@ def main() -> int:
     # profiles inherit from it rather than repeating the declaration.
     profiles = []
     characterised_families: set[str] = set()
-    for profile_path in sorted(PROFILES_DIR.glob("*/profile.yaml")):
+    for profile_path in sorted(PROFILES_DIR.glob("**/profile.yaml")):
         doc = load_yaml(profile_path)
         if not isinstance(doc, dict):
             errors.append(f"{profile_path}: not a mapping")
@@ -231,7 +231,7 @@ def main() -> int:
         surfaces += 1
         errors.extend(check_surface(profile_path, doc, characterised_families))
 
-    for record_path in sorted(PROFILES_DIR.glob("*/customizations/*.yaml")):
+    for record_path in sorted(PROFILES_DIR.glob("**/customizations/*.yaml")):
         doc = load_yaml(record_path)
         if not isinstance(doc, dict):
             errors.append(f"{record_path}: not a mapping")

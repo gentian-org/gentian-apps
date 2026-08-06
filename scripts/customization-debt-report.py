@@ -37,7 +37,7 @@ RUNG_ORDER = {rung: index for index, rung in enumerate(RUNGS)}
 
 def load_records() -> list[dict]:
     records = []
-    for path in sorted(PROFILES_DIR.glob("*/customizations/*.yaml")):
+    for path in sorted(PROFILES_DIR.glob("**/customizations/*.yaml")):
         doc = yaml.safe_load(path.read_text())
         if isinstance(doc, dict) and doc.get("kind") == "Customization":
             doc["_path"] = str(path.relative_to(REPO_ROOT))
@@ -54,7 +54,7 @@ def load_grades() -> dict[str, str]:
     """
     entries = []
     family_grades: dict[str, str] = {}
-    for path in sorted(PROFILES_DIR.glob("*/profile.yaml")):
+    for path in sorted(PROFILES_DIR.glob("**/profile.yaml")):
         doc = yaml.safe_load(path.read_text())
         if not isinstance(doc, dict):
             continue
@@ -130,7 +130,7 @@ def render_markdown(report: dict) -> str:
     lines = [
         "# Customization debt report",
         "",
-        f"Generated {report['generated']} from `profiles/*/customizations/`.",
+        f"Generated {report['generated']} from `profiles/**/customizations/`.",
         "",
         f"**{report['totalRecords']}** record(s); "
         f"**{report['carriedDeltas']}** carried delta(s) at L4 or above.",

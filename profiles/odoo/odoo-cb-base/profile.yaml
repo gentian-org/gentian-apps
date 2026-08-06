@@ -158,7 +158,7 @@ spec:
     grade: A
     rubricScore: 8
     supportedRungs: [L0, L1, L3, L4, L5, L6]   # L2 is always available, never listed
-    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/odoo-cb-base/customization.md
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/odoo/odoo-cb-base/customization.md
 
     configure:
       valuesSchema: charts/odoo/values.schema.json

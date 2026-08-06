@@ -23,7 +23,7 @@ Currently, Odoo embedded apps require an intermediate popup window to bootstrap 
 - **Reasoning**: This completely encapsulates the logic within the `gentian_os` module and does not require Odoo-specific logic in the `gentian-ui` core.
 
 ### 3. Update Odoo AppProfiles
-- **Files**: `gentian-apps/profiles/odoo-cb-*/profile.yaml` (Base and module profiles)
+- **Files**: `gentian-apps/profiles/odoo/odoo-cb-*/profile.yaml` (Base and module profiles)
 - **Action**: Change `gentianos.io/portal-auth-mode: oidc` to `gentianos.io/portal-auth-mode: portal-bridge`.
 - **Reasoning**: This declaratively instructs the generic Gentian UI to use the `portal-bridge` flow for Odoo instead of popping up the Keycloak window.
 

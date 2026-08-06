@@ -73,7 +73,7 @@ def main() -> int:
     catalogue_ids = load_catalogue_ids()
     all_errors: list[str] = []
 
-    for profile_path in sorted(PROFILES.glob("*/profile.yaml")):
+    for profile_path in sorted(PROFILES.glob("**/profile.yaml")):
         all_errors.extend(validate_profile(profile_path, catalogue_ids))
 
     if all_errors:
@@ -81,7 +81,7 @@ def main() -> int:
             print(err, file=sys.stderr)
         return 1
 
-    print(f"Validated tiles for {len(list(PROFILES.glob('*/profile.yaml')))} profiles")
+    print(f"Validated tiles for {len(list(PROFILES.glob('**/profile.yaml')))} profiles")
     return 0
 
 

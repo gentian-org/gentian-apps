@@ -3,7 +3,7 @@
 Proof of concept for AppProfile.spec.sidecars — a small companion service
 deployed alongside Nextcloud, authenticating as its own dedicated,
 low-privilege Nextcloud account (never the tenant admin). See
-gentian-apps/profiles/nextcloud-base/profile.yaml for how this is wired in.
+gentian-apps/profiles/nextcloud/nextcloud-base/profile.yaml for how this is wired in.
 
 Exposes three tools, deliberately narrow (files only, no tasks/calendar/etc
 — see the AppProfile decision record for why): listFiles, searchFiles,

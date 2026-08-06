@@ -26,7 +26,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 | **L1** Drop-in | yes | `odoo-conf` (ini fragments merged into `odoo.conf` by an init container — Odoo has no native conf.d, so this is a Gentian mechanism, not an upstream promise) and `branding` (static files, tenant-editable) |
 | **L2** Companion | always | consume the `erp-core` contract from a separate app |
 | **L3** Extension | yes | Odoo addon in [`odoo-modules`](https://github.com/gentian-org/odoo-modules), synced by `gentian-sidecar-git-modules` into `/opt/odoo/custom-addons` |
-| **L4** Repackage | yes | `charts/odoo` (Gentian-owned) + `profiles/odoo-cb-base/composition.yaml` (`app-odoo`) |
+| **L4** Repackage | yes | `charts/odoo` (Gentian-owned) + `profiles/odoo/odoo-cb-base/composition.yaml` (`app-odoo`) |
 | **L5** Patch | yes | patch series in [`ocb`](https://github.com/gentian-org/ocb) — platform approval required |
 | **L6** Fork | yes | `ocb` is the fork; owner `platform-erp` |
 

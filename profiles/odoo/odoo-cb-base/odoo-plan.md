@@ -1,10 +1,10 @@
 # Odoo on Gentian OS — integration plan
 
 **Status:** Design proposal  
-**Companion to:** [architecture.md](../../../gentian-os/docs/architecture.md),
-[app-catalogue.md](../../../gentian-os/docs/design/app-catalogue.md),
-[iam.md](../../../gentian-os/docs/design/iam.md),
-[business-logic-plan.md](../../../gentian-os/docs/design/business-logic-plan.md)
+**Companion to:** [architecture.md](../../../../gentian-os/docs/architecture.md),
+[app-catalogue.md](../../../../gentian-os/docs/design/app-catalogue.md),
+[iam.md](../../../../gentian-os/docs/design/iam.md),
+[business-logic-plan.md](../../../../gentian-os/docs/design/business-logic-plan.md)
 
 This document outlines how to add **Odoo Community** as a Gentian **base app**
 with individually installable Odoo modules as catalogue entries, Gentian IdM,
@@ -39,7 +39,7 @@ version line and one install path.
 ### Non-goals (this plan)
 
 - Replacing **platform commerce Odoo** (customers, orders, entitlements in
-  [business-logic-plan.md](../../../gentian-os/docs/design/business-logic-plan.md)) —
+  [business-logic-plan.md](../../../../gentian-os/docs/design/business-logic-plan.md)) —
   that remains a **separate** kernel- or corp-scoped instance (see §2).
 - Odoo Enterprise licensing / proprietary modules in `gentian-premium` (can follow
   the same pattern later with `edition: enterprise` profiles).
@@ -176,7 +176,7 @@ technical names, depends-on lists, and Job commands are **not** platform CRD fie
 ## 4. Identity and access
 
 Follow the **standard Gentian AppProfile IdM pattern**
-([app-profile-guide.md](../../docs/app-profile-guide.md) §2, §8):
+([app-profile-guide.md](../../../docs/app-profile-guide.md) §2, §8):
 
 | Concern | Configuration |
 |---|---|
@@ -188,8 +188,8 @@ Follow the **standard Gentian AppProfile IdM pattern**
 
 ### 4.1 Admin vs user visibility (IAM)
 
-Align with [iam.md](../../../gentian-os/docs/design/iam.md) and
-[portal-admin-tile.md](../../docs/portal-admin-tile.md):
+Align with [iam.md](../../../../gentian-os/docs/design/iam.md) and
+[portal-admin-tile.md](../../../docs/portal-admin-tile.md):
 
 | Surface | Portal tile | Who sees it |
 |---|---|---|
@@ -267,7 +267,7 @@ machinery:
    entirely — composition-only.
 
 This matches the catalogue security principle: **declarative data in
-gentian-apps**, **generic pipelines in gentian-os** ([app-catalogue-security.md](../../../gentian-os/docs/design/app-catalogue-security.md) §2.2).
+gentian-apps**, **generic pipelines in gentian-os** ([app-catalogue-security.md](../../../../gentian-os/docs/design/app-catalogue-security.md) §2.2).
 
 **Interim:** Odoo and other non-openDesk apps use Client MR with OIDC token claims mapping; openDesk
 apps keep embedded packs until the catalog CR migration lands.
@@ -848,10 +848,10 @@ provides:
 | `contacts-store` | Odoo consumes CardDAV hub | `gentian_os_contacts` — sync `res.partner` (§5.5) |
 | `central-navigation` | Portal consumes Odoo menus | Portal navigation tiles first; optional later |
 | `erp-ledger` (new) | Odoo provides | Future `gentian_os` provider |
-| MCP / AI | Odoo provides | `browserProxy` + MCP in `gentian_os` (see [agentic-ai.md](../../../gentian-os/docs/design/agentic-ai.md)) |
+| MCP / AI | Odoo provides | `browserProxy` + MCP in `gentian_os` (see [agentic-ai.md](../../../../gentian-os/docs/design/agentic-ai.md)) |
 
 Bindings are **operator-reconciled** when provider and consumer appear in
-`Tenant.spec.apps` ([app-catalogue.md](../../../gentian-os/docs/design/app-catalogue.md) §4).
+`Tenant.spec.apps` ([app-catalogue.md](../../../../gentian-os/docs/design/app-catalogue.md) §4).
 The operator writes OpenBao paths; ESO syncs a Secret mounted into the Odoo pod;
 **`gentian_os`** reads credentials — secrets never appear in AppProfile YAML.
 
@@ -860,7 +860,7 @@ The operator writes OpenBao paths; ESO syncs a Secret mounted into the Odoo pod;
 ## 9. Profile bundle layout (this folder)
 
 ```
-profiles/odoo-cb-base/
+profiles/odoo/odoo-cb-base/
 ├── odoo-plan.md           # this document
 ├── kustomization.yaml
 ├── profile.yaml             # base AppProfile
@@ -928,7 +928,7 @@ from the base bundle (cluster-scoped Composition name `app-odoo`).
 
 - [ ] Admission: block base uninstall with dependents
 - [ ] `catalogue-tier: platform` on base; CI render tests for each module profile
-- [ ] Backup/restore note in [operations.md](../../../gentian-os/docs/design/operations.md) (Postgres + filestore PVC)
+- [ ] Backup/restore note in [operations.md](../../../../gentian-os/docs/design/operations.md) (Postgres + filestore PVC)
 - [ ] Uninstall/purge semantics via `gtnctl apps uninstall --purge`
 
 ---
@@ -966,11 +966,11 @@ from the base bundle (cluster-scoped Composition name `app-odoo`).
 
 | Topic | Document |
 |---|---|
-| Platform architecture | [architecture.md](../../../gentian-os/docs/architecture.md) |
-| AppProfile authoring | [app-profile-guide.md](../../docs/app-profile-guide.md) |
-| IAM / portal tiles | [iam.md](../../../gentian-os/docs/design/iam.md), [portal-admin-tile.md](../../docs/portal-admin-tile.md) |
-| OIDC paths (path A vs pack catalogue) | [app-profile-guide.md](../../docs/app-profile-guide.md) §8 |
-| Commerce Odoo (platform) | [business-logic-plan.md](../../../gentian-os/docs/design/business-logic-plan.md) |
+| Platform architecture | [architecture.md](../../../../gentian-os/docs/architecture.md) |
+| AppProfile authoring | [app-profile-guide.md](../../../docs/app-profile-guide.md) |
+| IAM / portal tiles | [iam.md](../../../../gentian-os/docs/design/iam.md), [portal-admin-tile.md](../../../docs/portal-admin-tile.md) |
+| OIDC paths (path A vs pack catalogue) | [app-profile-guide.md](../../../docs/app-profile-guide.md) §8 |
+| Commerce Odoo (platform) | [business-logic-plan.md](../../../../gentian-os/docs/design/business-logic-plan.md) |
 | Legacy Odoo deployment | `server/base/odoo/`, `odoo-modules/docs/modules-management.md` |
 | **`gentian_os` addon source** | `odoo-modules/gentian_os/` (to be created) |
-| OX multi-tile reference | [profiles/ox-appsuite/profile.yaml](../ox-appsuite/profile.yaml) |
+| OX multi-tile reference | [profiles/ox-appsuite/profile.yaml](../../ox-appsuite/profile.yaml) |

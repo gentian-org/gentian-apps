@@ -363,7 +363,7 @@ spec:
     grade: A
     rubricScore: 7
     supportedRungs: [L0, L1, L3, L4]
-    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/nextcloud-base/customization.md
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/nextcloud/nextcloud-base/customization.md
     configure:
       hotReload: false
     dropIns:
