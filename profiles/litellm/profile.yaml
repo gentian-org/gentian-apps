@@ -32,3 +32,39 @@ spec:
         de_DE: "LLM Admin Panel"
       linkTarget: embedded
       allowedGroup: "Domain Admins"
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: B
+    rubricScore: 5
+    supportedRungs: [L0, L1, L3, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/litellm/customization.md
+    configure:
+      hotReload: false
+    dropIns:
+      - name: litellm-config
+        path: /app/config.d
+        format: yaml
+        source: configMap
+        upstreamDocumented: true
+        tenantEditable: false    # model routing is a platform cost control
+    extension:
+      mechanism: litellm-callback
+      delivery: [image-layer]
+      apiStability: evolving
+      apiDocs: https://docs.litellm.ai/docs/proxy/logging
+      perTenantModules: false
+      testMatrix: ["1.55"]
+    publishes:
+      apis:
+        - contract: llm-gateway
+          protocol: http-json
+          spec: openapi
+          path: /v1
+          auth: oidc-token-exchange
+    repackage:
+      chartOwnership: upstream
+    patch:
+      allowed: false
+    fork:
+      allowed: false

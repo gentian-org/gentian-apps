@@ -91,3 +91,33 @@ spec:
         de_DE: "App Store"
       linkTarget: embedded
       allowedGroup: "Tenant Admins"
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: B
+    rubricScore: 5
+    supportedRungs: [L0, L1, L4]    # L3 unlocks once the template extension loader is adopted
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/app-store/customization.md
+    configure:
+      valuesSchema: apps/app-store/chart/values.schema.json
+      hotReload: false
+    dropIns:
+      - name: app-config
+        path: /etc/gentian/app-store/conf.d
+        format: yaml
+        source: configMap
+        upstreamDocumented: true
+        tenantEditable: false
+    publishes:
+      apis:
+        - contract: app-catalogue
+          protocol: http-json
+          spec: openapi
+          path: /api/v1
+          auth: oidc-token-exchange
+    repackage:
+      chartOwnership: gentian-owned
+    patch:
+      allowed: false
+    fork:
+      allowed: false

@@ -8,6 +8,13 @@ This guide captures the accumulated learnings and best practices from the existi
 AppProfile implementations. Read it before writing a new profile — every section
 corresponds to a class of bug that was caught in git history.
 
+**Before extending an already-installed app**, use the
+[customization ladder](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md)
+and [docs/customization-ladder.md](customization-ladder.md) instead of this guide —
+they give the decision procedure (which rung, which repo) and the per-app declaration
+(`spec.customization`) that make `extraValues` vs `dropins/` vs `composition.yaml`
+placement (§1 below) a lookup rather than a judgment call.
+
 ## Platform boundary — **no app-specific hardcoding in gentian-os**
 
 **Never** put app-specific values, profile names, or `case "myapp"` logic in gentian-os.
@@ -162,6 +169,13 @@ profile's **`composition.yaml`** (`app-ox`, `app-element`, …).
 | **`spec.postInstallJob`** | Bootstrap must call the app's own runtime admin API (not Helm values, not `kernelRequirements`); small and self-contained | open-webui LiteLLM config seed (§13a) |
 | **`composition.yaml`** | Custom Crossplane MR graph, multi-Job/RBAC sequencing, chart-specific workarounds | OX bootstrap Job, Element Jitsi overlay, module install Jobs |
 | **Upstream chart / vendor** | Fix belongs in the supplier chart long-term | OX `initconfigdb -i`, Keycloak client scopes in openDesk |
+
+This table is the rung mapping in different words —
+[customization-ladder.md](customization-ladder.md) names them: `extraValues` is
+**L0**, a declared drop-in directory is **L1**, `composition.yaml` /
+`postInstallJob` is **L4**, and vendoring the chart is an **L4** repackage too
+(an actual source patch is **L5**). Use that doc's decision procedure to pick the
+row; use this table to find the file.
 
 **Never** add per-app fields to the `AppProfile` CRD. **Never** hardcode
 profile names or app-specific branches in gentian-os reconcilers — see
@@ -589,12 +603,9 @@ kubectl delete httproute -n tenant-demo httproute-demo-element
 > not in this repository.
 
 Element Web is served at `chat.<tenant-domain>` but the Matrix homeserver (Synapse)
-and OIDC callback live at **`matrix.<tenant-domain>`** (synapse-web Service).
-The `element` AppProfile declares `additionalIngresses` for `matrix` →
-`synapse-web:8008`; the operator creates the HTTPRoute. The synapse-web Helm release
-has chart ingress disabled to avoid duplicate routes.
-
-Keycloak `redirectUris` must target the homeserver host:
+and OIDC callback live at **`matrix.<tenant-domain>`** (synapse-web Service). The
+`element` AppProfile declares `additionalIngresses` for `matrix` → `synapse-web:8008`;
+Keycloak `redirectUris` must target that homeserver host, not the chat host:
 
 ```yaml
 kernelRequirements:
@@ -604,100 +615,38 @@ kernelRequirements:
         - "https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback"
 ```
 
-Using `chat.${TENANT_DOMAIN}` causes OIDC to fail after Keycloak login; Element
-shows **“Invalid username or password”** even though credentials are correct.
-Reconcile the tenant / identity jobs after fixing the AppProfile so the Keycloak
-client `opendesk-synapse` picks up the new redirect URI.
-
-On **ACME staging** clusters, the same message after the matrix host routes
-correctly usually means Synapse failed the **token/userinfo exchange** (Twisted
-HTTPS to `id.<kernel>` on the hairpin path) — the server-to-server trap from §2.
-The `app-element` composition applies the "internal service URL" remedy: it points
-server-side OIDC endpoints at in-cluster Keycloak (`KEYCLOAK_INTERNAL_URL` in
-`gentian-kernel-services`); confirm the Element XApp reconciled after the operator
-upgrade.
+Using `chat.${TENANT_DOMAIN}` here causes OIDC to fail after Keycloak login —
+Element shows **"Invalid username or password"** even though credentials are
+correct.
 
 **Matrix localpart:** use `matrixIdLocalpart: "opendesk_username"` (LDAP `uid`) and
 request scope `opendesk-matrix-scope`. Do not use `preferred_username` — kernel-broker
 tokens may carry `mailPrimaryAddress` there, which is not a valid Matrix localpart.
 
 **Kernel IdP broker (tenant realm):** after portal login, Element/XWiki hit
-`/realms/${TENANT_ID}/broker/kernel/endpoint`. A **502** on that URL (Synapse
-`mapping_error`, empty localpart, or Firefox framing on a Cloudflare error page) is
-usually **operator/IAM**, not AppProfile YAML: broker token exchange must use the
-**in-cluster** Keycloak URL (not `https://id.${KERNEL_DOMAIN}` from inside the cluster),
-and tenant-realm IdP mappers must import `opendesk_username` from the broker token
-(LDAP `uid`). Confirm `keycloak-broker-idp-${TENANT_ID}` and OIDC pack jobs completed.
-See `gentian-os/docs/design/iam.md`.
+`/realms/${TENANT_ID}/broker/kernel/endpoint`. Broker token exchange must use the
+**in-cluster** Keycloak URL (not `https://id.${KERNEL_DOMAIN}` from inside the
+cluster), and tenant-realm IdP mappers must import `opendesk_username` from the
+broker token. See `gentian-os/docs/design/iam.md`.
 
-**Loading screen / `net.nordeck.element_web.module.opendesk` error:** the
-`opendesk-element-web` image bundles the Nordeck OpenDesk module; `additionalConfiguration`
-must include its `banner` URLs (`portal_url`, `ics_*`, `portal_logo_svg_url`) and
-`custom_css_variables` — see `profiles/element.yaml`.
+**Wrong user after switching portal accounts:** portal login uses the **kernel**
+realm; Element/Synapse OIDC uses the **tenant** realm. A previous user's
+tenant-realm SSO cookie or cached Matrix session in the browser can reopen Chat as
+the wrong person. The Element AppProfile sets `logout_redirect_url`; gentian-ui app
+tiles pass `login_hint` and `prompt=login` (and `#/logout` on `chat.*`) when opening
+SSO apps from the portal.
 
-**Loading screen flicker / white page after SSO succeeds:** Matrix login can work
-(Synapse logs show `POST /_matrix/client/v3/login` 200) while the Nordeck banner still
-loops on ICS silent login. This is **kernel intercom (Pattern A)**, not tenant
-Crossplane — Element's Nordeck config points at `https://ics.${KERNEL_DOMAIN}`.
+**Known pitfalls** (operator/IAM territory, not AppProfile YAML — diagnose via
+`gentian-os/docs/design/iam.md` and the kernel intercom service before touching a
+profile):
 
-**Loading screen flicker during SSO (Synapse `invalid_scope`):** tenant Crossplane.
-The manifest-bridge OIDC pack Job creates `opendesk-matrix-scope`, but
-provider-keycloak `Client` reconciliation can strip it from `opendesk-synapse`.
-`app-element` emits matching `ClientDefaultScopes` MRs and sequences them before
-Synapse/Element Helm releases. Symptom: Synapse logs
-`Received OIDC callback with error: invalid_scope Invalid scopes: openid opendesk-matrix-scope`
-and Element reloads in a tight loop. Verify:
-`kubectl get clientdefaultscopes | grep element-keycloak-default-scopes`.
-
-Common causes:
-
-1. **Wrong ICS `BASE_URL` on the intercom pod** — with `ROUTING_MODE=gateway`, chart
-   ingress is disabled and the Helm Secret defaults to `http://intercom-service-<env>:8008`.
-   `kernel/services/intercom-service/values/gateway.yaml` must set `extraEnvVars`
-   (`BASE_URL`, `INTERCOM_URL`, `NODE_EXTRA_CA_CERTS`) so they override `envFrom`.
-   Argo CD `valuesFrom` on `intercom-gateway-values` alone is not reliable; re-sync
-   `intercom-service-dev` after install/update. Symptom: ICS `/silent` HTTP 500 and logs
-   `Issuer.discover() failed … unable to get local issuer certificate` when
-   `NODE_EXTRA_CA_CERTS` is unset on the pod.
-
-2. **Intercom cannot reach Redis** — ICS stores OIDC sessions in Redis. If intercom logs
-   `Redis error: getaddrinfo ENOTFOUND redis-*`, fix the Redis host (use
-   `redis-<env>-master.gentian-infra-<env>.svc.cluster.local`, not headless) and restart
-   intercom after Redis is healthy:
-   `kubectl rollout restart deployment/intercom-service-dev -n gentian-dev`.
-   `install.sh` / `update.sh` run `verify_intercom_ics` to catch this.
-
-3. **Stale ICS session cookies** — after Redis/BASE_URL fixes, intercom may still log
-   `Error verifying ICS OIDC access_token` + `Silent login, logged in false` in a tight
-   loop while Element's Nordeck banner flickers. The browser is retrying
-   `https://ics.<kernel>/navigation.json` with an invalid ICS session cookie from an
-   earlier broken deploy. **Clear site data for `ics.<kernel>`** (Firefox: Storage tab →
-   delete all cookies for that host), reload the portal, then reopen Element.
-
-4. **Silent login blocked in nested iframes** — Nordeck loads `ics_silent_url` inside
-   `chat.<tenant>` inside the portal WinBox. If step 3 did not help, Firefox (and other
-   browsers with strict third-party cookie rules) may not send the Keycloak kernel session
-   cookie to `id.<kernel>` inside that hidden iframe (`login_required` / silent login
-   false) even though portal login works. **Workaround:** Ctrl/Cmd+click the Element tile
-   to open Chat in a top-level tab (gentian-ui `linkTarget: embedded` override).
-
-5. **OIDC Client Secret mapping missing** — Synapse configuration files cannot resolve raw env
-   vars directly. Sensitive values (like `client_secret`) must be dynamically mapped from
-   the Kubernetes secret store via the Helm Release `set[]` override configuration in the
-   composition (e.g. mapping `extraSecrets.oidc_providers[0].client_secret` to
-   `oidc-client-secret`). If it remains as the static placeholder string `'@@OIDC_CLIENT_SECRET@@'`,
-   Keycloak rejects the token exchange request with `invalid_client_credentials`.
-
-6. **OIDC Issuer format missing /auth** — Keycloak in the Gentian OS homelab installation
-   runs with a root path `/auth`. The configured `issuer` URL (e.g. under `extraSecrets.oidc_providers`)
-   must match the exact realm issuer (i.e. `https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}`).
-   Omitting the `/auth` path prefix results in OIDC verification failing with `invalid_claim: Invalid claim "iss"`.
-
-**Wrong user after switching portal accounts:** portal login uses the **kernel** realm;
-Element/Synapse OIDC uses the **tenant** realm (`demo`, …). A previous user's tenant-realm
-SSO cookie or cached Matrix session in the browser can reopen Chat as the wrong person.
-The Element AppProfile sets `logout_redirect_url`; gentian-ui app tiles pass `login_hint`
-and `prompt=login` (and `#/logout` on `chat.*`) when opening SSO apps from the portal.
+| Symptom | Likely cause |
+|---|---|
+| Login succeeds but Synapse logs `invalid_scope` in a reload loop | Keycloak client scope reconciliation stripped `opendesk-matrix-scope` from the Synapse client |
+| Nordeck banner flickers on silent login after Matrix login already works | Kernel intercom (ICS) session/config issue, not tenant Crossplane |
+| `502` on `/realms/.../broker/kernel/endpoint` | Broker using the external instead of in-cluster Keycloak URL, or a missing IdP mapper |
+| `invalid_client_credentials` from Keycloak | Synapse `client_secret` still holds the unsubstituted placeholder — check the composition's secret mapping |
+| `invalid_claim: Invalid claim "iss"` | Configured OIDC issuer doesn't match the cluster's actual realm issuer URL byte-for-byte |
 
 ### 6e. IdP login inside a portal-embedded app (Keycloak `frame-ancestors`)
 
@@ -931,34 +880,11 @@ Element room widgets and portal realtime links.
    (`Password login has been disabled`) and leaves the Element XApp Not Ready.
    Human users still use OIDC: `app-element` sets `sso_redirect_options.immediate`
    on the Element web `config.json` only.
-7. **Retry after a bootstrap failure:** the chart hook runs at post-install only.
-   After Synapse password auth is restored, delete the failed Job and let Crossplane
-   retry the bootstrap `Release` (or delete `opendesk-matrix-user-verification-service-bootstrap`
-   and re-sync the Element `App` claim):
 
-   ```bash
-   kubectl delete job -n tenant-demo opendesk-matrix-user-verification-service-bootstrap --ignore-not-found
-   ```
-
-   **Stale `@uvs` user (reinstall):** if bootstrap logs loop on
-   `Invalid username or password`, the Matrix `@uvs` service account from a prior
-   Element install still exists in Postgres with an old password while OpenBao holds
-   the current derived secret. Remove the user, delete the bootstrap Job, then retry
-   install (or re-sync the Element `App`):
-
-   ```bash
-   kubectl exec -n platform-kernel postgres-1 -c postgres -- \
-     psql -U postgres -d demo_element \
-     -c "DELETE FROM demo_element.users WHERE name = '@uvs:demo.desk.gentian.org';"
-   kubectl delete job -n tenant-demo opendesk-matrix-user-verification-service-bootstrap --ignore-not-found
-   ```
-
-   Replace `demo_element` / `@uvs:demo.desk.gentian.org` with the tenant DB name and
-   Synapse `server_name` for your tenant.
-
-   If bootstrap logs show `profiles_user_id_key` duplicate but `users` has no `@uvs`
-   row, also run `DELETE FROM demo_element.profiles WHERE user_id = 'uvs';` then
-   delete the bootstrap Job and re-sync (or delete `element-*-uvs-bootstrap-release`).
+The bootstrap Job runs at post-install only; a failed or stale `@uvs` account after
+a reinstall needs the Job deleted and the Element `App` claim re-synced so
+Crossplane retries it. This is an operational recovery step, not an AppProfile
+concern — see the platform team's runbook rather than hand-editing the profile.
 
 Sidecar OIDC clients and internal secrets use the synthetic app key
 `element-jitsi` in OpenBao and Keycloak jobs (`SidecarAppName` in the API).

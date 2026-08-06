@@ -54,3 +54,18 @@ resources:
   limits:
     cpu: "2000m"
     memory: "4Gi"
+
+# Customization ladder rung L1 (see gentian-apps/profiles/odoo-cb-base/customization.md
+# and gentian-os/docs/app-customization.md §2.2). Off by default so a plain install
+# has no extra init container or volumes.
+#
+# odoo.conf has no native conf.d support — fragments are merged into the rendered
+# base config by an init container before Odoo starts, so the *effect* is a drop-in
+# directory even though Odoo itself only understands a single file.
+dropIns:
+  odooConf:
+    enabled: false
+    configMaps: []   # INI fragments, applied in the order listed (platform, then profile, then tenant)
+  branding:
+    enabled: false
+    configMaps: []   # static assets, mounted read-only at /opt/odoo/custom-branding

@@ -290,3 +290,40 @@ spec:
       OPENPROJECT_USER__DEFAULT__TIMEZONE: "Europe/Berlin"
       OPENPROJECT_DEFAULT__COMMENT__SORT__ORDER: "desc"
       OPENPROJECT_PLUGIN__OPENPROJECT__AVATARS: '{enable_gravatars: false, enable_local_avatars: true}'
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: B
+    rubricScore: 5
+    supportedRungs: [L0, L1, L3, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/openproject/customization.md
+    configure:
+      hotReload: false
+    dropIns:
+      - name: branding
+        path: /app/public/gentian-branding
+        format: files
+        source: configMap
+        upstreamDocumented: false   # no upstream drop-in dir — this mount is really L4
+        tenantEditable: true
+        maxBytes: 262144
+    extension:
+      mechanism: openproject-plugin
+      delivery: [image-layer]       # plugins resolve at build time
+      apiStability: undocumented
+      apiDocs: https://www.openproject.org/docs/development/
+      perTenantModules: false
+      testMatrix: ["15"]
+    publishes:
+      apis:
+        - contract: project-management
+          protocol: http-json
+          spec: openapi
+          path: /api/v3
+          auth: oidc-token-exchange
+    repackage:
+      chartOwnership: upstream
+    patch:
+      allowed: false
+    fork:
+      allowed: false

@@ -298,3 +298,47 @@ spec:
         allowPrivilegeEscalation: false
         seccompProfile:
           type: "RuntimeDefault"
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: A
+    rubricScore: 7
+    supportedRungs: [L0, L1, L3, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/xwiki/customization.md
+    configure:
+      hotReload: false
+    dropIns:
+      - name: xwiki-properties
+        path: /usr/local/xwiki/data
+        format: properties
+        source: configMap
+        upstreamDocumented: true
+        tenantEditable: false
+      - name: skin
+        path: /usr/local/xwiki/data/skins/gentian
+        format: files
+        source: configMap
+        upstreamDocumented: true
+        tenantEditable: true
+        maxBytes: 262144
+    extension:
+      mechanism: xwiki-extension
+      delivery: [app-store-api, image-layer]
+      registry: https://extensions.xwiki.org
+      apiStability: stable
+      apiDocs: https://extensions.xwiki.org/xwiki/bin/view/Documentation/
+      perTenantModules: true
+      testMatrix: ["16"]
+    publishes:
+      apis:
+        - contract: wiki-content
+          protocol: http-json
+          spec: openapi
+          path: /rest
+          auth: oidc-token-exchange
+    repackage:
+      chartOwnership: upstream
+    patch:
+      allowed: false
+    fork:
+      allowed: false

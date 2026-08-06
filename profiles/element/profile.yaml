@@ -124,3 +124,45 @@ spec:
       target: "http://synapse-web.{namespace}.svc/_matrix/"
       authMode: forward-bearer
       stripPrefix: true
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: B
+    rubricScore: 6
+    supportedRungs: [L0, L1, L3, L4]   # L3 is Synapse-side only; Element Web has no plugin API
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/element/customization.md
+    configure:
+      hotReload: false
+    dropIns:
+      - name: synapse-config
+        path: /data/conf.d
+        format: yaml
+        source: configMap
+        upstreamDocumented: true
+        tenantEditable: false
+      - name: element-config
+        path: /app/config.d
+        format: json
+        source: configMap
+        upstreamDocumented: true
+        tenantEditable: true
+        maxBytes: 65536
+    extension:
+      mechanism: synapse-module
+      delivery: [image-layer]
+      apiStability: evolving
+      apiDocs: https://element-hq.github.io/synapse/latest/modules/index.html
+      perTenantModules: false
+      testMatrix: ["1.121"]
+    publishes:
+      apis:
+        - contract: chat
+          protocol: matrix
+          path: /_matrix/client
+          auth: oidc-token-exchange
+    repackage:
+      chartOwnership: upstream
+    patch:
+      allowed: false
+    fork:
+      allowed: false

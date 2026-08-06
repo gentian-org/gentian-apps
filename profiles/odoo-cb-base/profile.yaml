@@ -66,7 +66,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: odoo
-    version: "0.1.13"
+    version: "0.1.14"
 
   deploymentMethod: crossplane
 
@@ -149,3 +149,68 @@ spec:
     serviceName: odoo
     servicePort: 8069
     tlsEnabled: true
+
+  # Customization ladder — see customization.md and
+  # gentian-os/docs/app-customization.md
+  customization:
+    grade: A
+    rubricScore: 8
+    supportedRungs: [L0, L1, L3, L4, L5, L6]   # L2 is always available, never listed
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/odoo-cb-base/customization.md
+
+    configure:
+      valuesSchema: charts/odoo/values.schema.json
+      hotReload: false
+
+    dropIns:
+      - name: odoo-conf
+        path: /etc/odoo-conf-fragments
+        format: ini
+        source: configMap
+        # Odoo has no native conf.d — this is a Gentian-built mechanism (an init
+        # container merges fragments into odoo.conf before start), not an upstream
+        # promise about the path. See charts/odoo/templates/deployment.yaml.
+        upstreamDocumented: false
+        tenantEditable: false
+      - name: branding
+        path: /opt/odoo/custom-branding
+        format: files
+        source: configMap
+        upstreamDocumented: false
+        tenantEditable: true
+        maxBytes: 262144
+
+    extension:
+      mechanism: odoo-addon
+      delivery: [git-sidecar, module-profile, image-layer]
+      registry: https://github.com/gentian-org/odoo-modules
+      modulePath: /opt/odoo/custom-addons
+      apiStability: stable
+      apiDocs: https://www.odoo.com/documentation/18.0/developer.html
+      perTenantModules: true      # one Odoo per tenant namespace — see framework §2.4
+      testMatrix: ["18.0"]
+
+    publishes:
+      apis:
+        - contract: erp-core
+          protocol: http-json
+          spec: openapi
+          path: /api
+          auth: oidc-token-exchange
+
+    repackage:
+      chartOwnership: gentian-owned
+      compositionRef: app-odoo
+
+    patch:
+      allowed: true
+      buildRepo: https://github.com/gentian-org/ocb
+      seriesPath: patches/series
+      requiresApproval: platform-team
+
+    fork:
+      allowed: true
+      repo: https://github.com/gentian-org/ocb
+      upstream: https://github.com/odoo/odoo
+      owner: platform-erp
+      cveWatch: true

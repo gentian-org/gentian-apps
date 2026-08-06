@@ -388,3 +388,41 @@ spec:
         size: 2Gi
         accessMode: ReadWriteMany
         pvcName: ${TENANT_ID}-activepieces-git-content-pvc
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: A
+    rubricScore: 7
+    supportedRungs: [L0, L1, L3, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/activepieces/customization.md
+    configure:
+      hotReload: false
+    dropIns:
+      - name: branding
+        path: /usr/src/app/branding
+        format: files
+        source: configMap
+        upstreamDocumented: false
+        tenantEditable: true
+        maxBytes: 262144
+    extension:
+      mechanism: activepieces-piece
+      delivery: [git-sidecar, image-layer]
+      modulePath: /usr/src/app/modules
+      apiStability: stable
+      apiDocs: https://www.activepieces.com/docs/developers/building-pieces/overview
+      perTenantModules: true
+      testMatrix: ["0.68"]
+    publishes:
+      apis:
+        - contract: automation
+          protocol: http-json
+          spec: openapi
+          path: /api/v1
+          auth: oidc-token-exchange
+    repackage:
+      chartOwnership: vendored
+    patch:
+      allowed: false      # enterprise features are licence-gated; never patch to unlock
+    fork:
+      allowed: false

@@ -69,6 +69,49 @@ spec:
         {{- if and .Values.gentian.git.enabled (eq (len $gitSources) 0) -}}
           {{- $gitSources = list (dict "name" "default" "repo" .Values.gentian.git.repo "branch" .Values.gentian.git.branch "syncInterval" (int .Values.gentian.git.syncInterval) "secretName" .Values.gentian.git.secretName) -}}
         {{- end -}}
+        {{- if .Values.dropIns.odooConf.enabled }}
+        # Customization ladder rung L1 (docs/app-customization.md §2.2). Odoo has no
+        # native conf.d — merge platform/profile/tenant fragments into the rendered
+        # base config before Odoo starts, so the effect is a drop-in directory even
+        # though Odoo itself only understands a single file. Fragments apply in
+        # lexicographic order (00-49 platform, 50-89 profile, 90-99 tenant); later
+        # keys win via configparser's read-order semantics.
+        - name: merge-conf-d
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - python3
+            - -c
+            - |
+              import configparser, glob, os
+              cp = configparser.ConfigParser()
+              cp.read("/etc/odoo-base/odoo.conf")
+              fragments = sorted(
+                  glob.glob("/etc/odoo-conf-fragments/*.ini")
+                  + glob.glob("/etc/odoo-conf-fragments/*.conf")
+              )
+              for f in fragments:
+                  cp.read(f)
+              os.makedirs("/etc/odoo", exist_ok=True)
+              with open("/etc/odoo/odoo.conf", "w") as fh:
+                  cp.write(fh)
+              print(f"merged odoo.conf from base + {len(fragments)} fragment(s)")
+          volumeMounts:
+            - name: odoo-config-base
+              mountPath: /etc/odoo-base
+              readOnly: true
+            - name: conf-dropins
+              mountPath: /etc/odoo-conf-fragments
+              readOnly: true
+            - name: odoo-config
+              mountPath: /etc/odoo
+        {{- end }}
         {{- range $gitSources }}
         - name: git-sync-init-{{ .name }}
           image: registry.k8s.io/git-sync/git-sync:v4.2.3
@@ -189,10 +232,18 @@ spec:
             {{- end }}
             - name: odoo-config
               mountPath: /etc/odoo
+              {{- if .Values.dropIns.odooConf.enabled }}
+              readOnly: false
+              {{- end }}
             - name: gentian-config
               mountPath: /etc/gentian
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.dropIns.branding.enabled }}
+            - name: branding-dropins
+              mountPath: /opt/odoo/custom-branding
+              readOnly: true
+            {{- end }}
             {{- if .Values.extraVolumeMounts }}
             {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
             {{- end }}
@@ -256,9 +307,40 @@ spec:
         {{- if .Values.extraVolumes }}
         {{- toYaml .Values.extraVolumes | nindent 8 }}
         {{- end }}
+        {{- if .Values.dropIns.odooConf.enabled }}
+        # Written by the merge-conf-d init container; the raw rendered config lives
+        # at odoo-config-base instead of being mounted directly at /etc/odoo.
+        - name: odoo-config
+          emptyDir: {}
+        - name: odoo-config-base
+          configMap:
+            name: {{ include "odoo.fullname" . }}-config
+            items:
+              - key: odoo.conf
+                path: odoo.conf
+        - name: conf-dropins
+          projected:
+            sources:
+              {{- range .Values.dropIns.odooConf.configMaps }}
+              - configMap:
+                  name: {{ . }}
+                  optional: true
+              {{- end }}
+        {{- else }}
         - name: odoo-config
           configMap:
             name: {{ include "odoo.fullname" . }}-config
+        {{- end }}
+        {{- if .Values.dropIns.branding.enabled }}
+        - name: branding-dropins
+          projected:
+            sources:
+              {{- range .Values.dropIns.branding.configMaps }}
+              - configMap:
+                  name: {{ . }}
+                  optional: true
+              {{- end }}
+        {{- end }}
         - name: gentian-config
           configMap:
             name: {{ include "odoo.fullname" . }}-config

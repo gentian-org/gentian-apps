@@ -31,6 +31,39 @@ catalogue. See [README.md](README.md) for full scope and
   images (Nextcloud, XWiki, Odoo, OpenProject, ...) — check upstream licensing before modifying
   or repackaging.
 
+## Customizing an installed app — walk the ladder first
+
+**Before adding a feature to an app that already exists, run this procedure.** Do not start
+from "which file do I edit" — start from "what is the cheapest rung that can express this".
+Full framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md);
+local operations: [docs/customization-ladder.md](docs/customization-ladder.md).
+
+1. **Restate** the request as a capability ("users must approve invoices > 10k"), not an
+   implementation ("patch `account_move.py`"). Split multi-part requests and run this per part.
+2. **Read the app's ladder**: `AppProfile.spec.customization` in `profiles/<n>/profile.yaml`,
+   and `profiles/<n>/customization.md`. If absent, assume `{grade: unknown, supportedRungs:
+   [L0, L4]}` and raise a task to characterise the app — infer nothing more.
+3. **Walk L0 → L6 in order.** Stop at the first rung that (a) can express the change,
+   (b) is in `supportedRungs` (L2 is always available), and (c) is permitted at the requested
+   scope. Record a one-line reason for every rung skipped.
+4. **Tie-break L2 vs L3**: if the function must appear inside the app's own UI or extend its
+   data model, L3; otherwise L2. Default to L2 when `extension.apiStability` is not `stable`.
+5. **Gate**: at **L4 or above**, search upstream first, record what you found, and **stop for
+   human approval** — do not proceed autonomously. At L5+ platform trust tier and a named
+   owner are also required. A cluster hotfix is never a valid outcome.
+6. **Minimise scope** independently of rung: tenant → profile → platform.
+7. **Write the `Customization` record before the code** (`profiles/<n>/customizations/<name>.yaml`),
+   required from L2 up. It is the design review.
+8. **Emit into the repo that owns that rung** (table in `docs/customization-ladder.md`), never
+   into a live cluster.
+9. **Test** per the rung's CI obligation, then `python3 scripts/validate-customizations.py`.
+10. **Report**: chosen rung, scope, rungs skipped and why, upgrade risk, review date, and what
+    breaks this at the next upstream release.
+
+Rung → where it lives here: L0 `spec.extraValues` · L1 `profiles/<n>/dropins/` ·
+L2 `apps/<new>/` plus a contract · L3 the module repo (`odoo-modules`, …) ·
+L4 `charts/` or `composition.yaml` · L5 the build repo (`ocb`) · L6 a fork repo.
+
 ## First-party app development (`apps/app-store`, `apps/_template`)
 
 Both first-party apps share the FastAPI + React + Helm stack from gentian-app-template.

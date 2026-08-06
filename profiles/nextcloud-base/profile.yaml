@@ -357,3 +357,51 @@ spec:
       requests:
         cpu: 250m
         memory: 512Mi
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: A
+    rubricScore: 7
+    supportedRungs: [L0, L1, L3, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/nextcloud-base/customization.md
+    configure:
+      hotReload: false
+    dropIns:
+      - name: config
+        path: /var/www/html/config
+        format: files
+        source: configMap
+        upstreamDocumented: true
+        tenantEditable: false      # config/*.config.php is executable PHP
+      - name: theming
+        path: /var/www/html/themes/gentian
+        format: files
+        source: configMap
+        upstreamDocumented: true
+        tenantEditable: true
+        maxBytes: 262144
+    extension:
+      mechanism: nextcloud-app
+      delivery: [app-store-api, image-layer]
+      registry: https://apps.nextcloud.com
+      apiStability: stable
+      apiDocs: https://docs.nextcloud.com/server/stable/developer_manual/
+      perTenantModules: true
+      testMatrix: ["31"]
+    publishes:
+      apis:
+        - contract: file-store
+          protocol: webdav
+          path: /remote.php/dav
+          auth: oidc-token-exchange
+        - contract: filepicker
+          protocol: http-json
+          spec: ocs
+          path: /ocs/v2.php
+          auth: oidc-token-exchange
+    repackage:
+      chartOwnership: upstream
+    patch:
+      allowed: false
+    fork:
+      allowed: false
