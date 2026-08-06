@@ -1,7 +1,7 @@
 # Customization ladder — Nextcloud (family `nextcloud`)
 
 **Grade: A** · rubric score **7/8** · characterised 2026-08-06
-Applies to `nextcloud-drive-ce` and the `nextcloud-office*` / `nextcloud-suite-ce` profiles.
+Applies to `nextcloud-drive-ce` and the `nextcloud-office-*` / `nextcloud-suite-*` profiles.
 
 Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
 

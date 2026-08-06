@@ -24,7 +24,6 @@ profiles/              # App catalogue bundles (OSS + commercial) — synced by 
       nextcloud-office-ce/   # Community Edition
       nextcloud-office-od/   # openDesk (proprietary, private registry)
     suite/
-      nextcloud-suite-ce/
       nextcloud-suite-me/    # Managed Edition — maintained by Gentian for MSPs
   xwiki/               #   true singleton: stays flat
 apps/                  # first-party implementations (FastAPI + React + Helm)

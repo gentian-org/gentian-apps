@@ -57,6 +57,21 @@ series fails review instead of merging.
 Note the delta was only 240 lines across 4 files — worth checking before assuming any
 other "vendored" chart needs to stay that way.
 
+## L3 cleanup — one addon model, no packages
+
+Moved to its own tracking document: **[L3-cleanup.md](L3-cleanup.md)**.
+
+The second directory layer currently means *modules* for Odoo (individually
+installable, one profile each) and *packages* for Nextcloud (fixed plugin bundles
+baked into an image) — the same slot with incompatible semantics, scaling badly in
+opposite directions. The plan unifies both as customization-ladder rung L3
+"addons", decommissions packages, and moves addon selection out of the App Store
+grid into a post-install window plus an Edit button.
+
+It also **settles the edition-vocabulary question** left open below: the leaf suffix
+*is* the edition, so `minimal · standard · full · performant` is replaced by
+`ce · me · od · pro`.
+
 ## Pro / Solid tiers in the catalogue
 
 **Pro apps must be listed in the App Store**, not hidden until purchase. Folders in
