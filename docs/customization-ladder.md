@@ -24,14 +24,25 @@ generic mechanisms only).
 
 ## Profile bundle layout
 
+A bundle is any directory containing a `kustomization.yaml`. Singletons sit at
+`profiles/<name>/`; members of a multi-profile family sit one level deeper at
+`profiles/<family>/<name>/` (e.g. `profiles/odoo/odoo-cb-crm/`). Locate a bundle by its
+leaf directory name — which must equal the AppProfile's `metadata.name` — never by
+counting path segments.
+
 ```text
-profiles/<name>/
-├── kustomization.yaml
+profiles/[<family>/]<name>/
+├── kustomization.yaml      # the marker: this is what makes it a synced bundle
 ├── profile.yaml            # includes spec.customization — the machine-readable ladder
 ├── customization.md        # the app's ladder in prose, incl. the rubric score
 ├── dropins/                # L1 content shipped with the profile (50-89 prefixes)
 └── customizations/         # Customization records (CRs) for deltas at L2+
 ```
+
+Charts and images are deliberately **not** in here — `charts/<name>/` and
+`images/<name>/` are separate flat trees, because a chart is referenced by OCI
+coordinate rather than path and is frequently shared (`charts/odoo` backs 10 profiles).
+See [app-profile-guide.md](app-profile-guide.md) §0.
 
 ## Characterising a new app
 

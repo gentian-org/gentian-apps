@@ -3,7 +3,7 @@
 ## Project overview
 
 `gentian-apps` is **the single source of truth for AppProfile catalogue metadata** for Gentian
-OS — profile bundles (`profiles/<name>/`, synced to clusters by the ArgoCD ApplicationSet
+OS — profile bundles (`profiles/[<family>/]<name>/`, synced to clusters by the ArgoCD ApplicationSet
 `gentian-catalogue`) plus first-party app implementations (`apps/<name>/`, FastAPI + React +
 Helm — same stack as [gentian-app-template](https://github.com/gentian-org/gentian-app-template) /
 [gentian-ui](https://github.com/gentian-org/gentian-ui)). This includes commercial
@@ -129,10 +129,27 @@ docker compose -f docker-compose.dev.yaml up --build
 
 `AUTH_DISABLED=true` / `VITE_AUTH_DISABLED=true` skip OIDC locally.
 
-## Adding/editing profiles (`profiles/<name>/`, OSS or commercial)
+## Adding/editing profiles (`profiles/[<family>/]<name>/`, OSS or commercial)
 
 Each profile bundle holds `kustomization.yaml` (required), `profile.yaml` (the AppProfile CR —
 describe the app there, not in a separate catalogue doc), and optionally `oidc-catalog.yaml`,
 `composition.yaml`, `assets/`. Commercial profiles set `spec.license: proprietary`; the App
 Store surfaces those with a Buy button and the operator gates install on entitlement. See
 [docs/app-profile-guide.md](docs/app-profile-guide.md) for the full workflow.
+
+**Layout rules — CI enforces both:**
+
+* Bundles are found by their `kustomization.yaml` at **any depth**. Singletons live at
+  `profiles/<name>/`; members of a multi-profile family live at `profiles/<family>/<name>/`.
+  Never assume a fixed path depth when globbing — use `**`.
+* The **leaf directory name must equal `metadata.name`**. The catalogue ApplicationSet names
+  Applications after it, and `AppProfile` is cluster-scoped, so this is what keeps those names
+  unique. A `profile.yaml` with no sibling `kustomization.yaml` is a CI error, not a silent
+  no-sync.
+
+**Do not move charts or images into profile folders.** `charts/<name>/` and `images/<name>/`
+are separate flat trees on purpose: a profile references its chart by OCI coordinate rather
+than by path, `charts/odoo` backs 10 profiles, and 7 profiles wrap external charts this repo
+never contains. The reasoning — this is a distribution repo, not an application monorepo — is
+in [docs/app-profile-guide.md](docs/app-profile-guide.md) §0. Read it before proposing layout
+changes.

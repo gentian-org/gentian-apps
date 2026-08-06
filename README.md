@@ -14,24 +14,37 @@ catalogue — it's being migrated to hold only those artifacts.
 
 ```text
 profiles/              # App catalogue bundles (OSS + commercial) — synced by Argo CD gentian-catalogue
-  nextcloud/
-  app-store/
+  odoo/                #   multi-profile family: 10 bundles one level deeper
+    odoo-cb-base/
+    odoo-cb-crm/
+  nextcloud/           #   multi-profile family: base / office / office-plus / suite
+    nextcloud-base/
+  xwiki/               #   true singleton: stays flat
 apps/                  # first-party implementations (FastAPI + React + Helm)
   _template/           # copy of gentian-app-template
   app-store/           # tenant admin App Store UI
 charts/                # Helm charts published to oci://ghcr.io/gentian-org/charts
   activepieces/        # vendored upstream chart (adnoctem/helm), patched
-  odoo/                # Gentian-authored chart for OCB
+  odoo/                # Gentian-authored chart for OCB — backs all 10 odoo profiles
   gentian-sidecar-*/   # sidecar charts referenced by profiles
+images/                # Dockerfiles published to ghcr.io
 contracts/             # integration contract schemas
 icons/                 # shared SVG assets
 ```
 
 **Discovery:** catalogue = `profiles/` · implementation = `apps/<name>/` · chart = `charts/<name>/`
 
+A profile bundle is identified by its **`kustomization.yaml`**, at any depth — singletons at
+`profiles/<name>/`, family members at `profiles/<family>/<name>/`. The leaf directory name must
+equal the AppProfile's `metadata.name` (CI enforces this; the catalogue ApplicationSet names
+Applications after it).
+
 `apps/` is only for first-party apps we build. A chart that wraps an upstream image — vendored
 or Gentian-authored — belongs in `charts/<name>/`, and its profile references it by OCI
-coordinates, not by path.
+coordinates, not by path. Charts and images are **not** nested inside profiles: `charts/odoo`
+backs 10 profiles, and 7 profiles wrap external charts this repo never contains. See
+[docs/app-profile-guide.md](docs/app-profile-guide.md) §0 for why this repo is organised as a
+distribution repo rather than an application monorepo.
 
 ## Guides
 

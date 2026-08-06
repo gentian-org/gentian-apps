@@ -15,6 +15,108 @@ they give the decision procedure (which rung, which repo) and the per-app declar
 (`spec.customization`) that make `extraValues` vs `dropins/` vs `composition.yaml`
 placement (§1 below) a lookup rather than a judgment call.
 
+---
+
+## 0. Why this repo is laid out the way it is
+
+Read this before proposing to move things around. `gentian-apps` is a
+**distribution repo**, not an application monorepo, and almost every layout
+decision follows from that one fact.
+
+### The two archetypes
+
+| | **Application monorepo** | **Distribution / catalogue repo** |
+|---|---|---|
+| Examples | company service monorepos (Nx, Turborepo, Bazel) | Debian, nixpkgs, Homebrew, `bitnami/charts` |
+| Contains | source code you own end-to-end | *packaging* for software mostly written elsewhere |
+| Layout | **colocate** — `services/foo/{src,Dockerfile,chart}` | **name-addressed trees per artifact type** |
+| Why | one team owns the whole vertical and ships it as a unit | many independent packages; tooling globs by type |
+
+`gentian-apps` is overwhelmingly the second. Of 21 profiles, 7 wrap **external**
+charts (Nextcloud, XWiki, OpenProject, Element) that this repo will never
+contain, 2 declare no chart at all, and the remaining 13 share just **three**
+in-repo charts — `charts/odoo` alone backs 10 profiles. The repo holds catalogue
+metadata and a little packaging, with exactly one first-party application
+(`apps/app-store/`). That is Debian's shape, not Google's.
+
+### Consequence 1 — artifact types get their own flat, name-addressed trees
+
+```
+profiles/     catalogue metadata      → synced by ArgoCD
+charts/       chart source            → built + pushed to OCI by CI
+images/       Dockerfiles             → built + pushed to GHCR by CI
+apps/         first-party source      → the one monorepo-shaped corner
+contracts/    cross-app interfaces    → owned by no single app
+```
+
+Charts and images are **not** nested inside the profile that uses them, for three
+concrete reasons:
+
+1. **The link is by coordinate, not by path.** A profile references its chart as
+   `oci://ghcr.io/gentian-org/charts` + `name` + `version`. Nothing ever reads a
+   chart off disk relative to a profile. Filesystem adjacency would imply a
+   coupling the pipeline does not have.
+2. **The cardinality is wrong.** `charts/odoo` serves 10 profiles; `images/nextcloud`
+   is one Dockerfile matrix-built into 4 editions. Nesting forces an arbitrary
+   choice of which consumer "owns" it.
+3. **Helm tooling assumes it.** `chart-testing` (`ct lint --all`) and
+   `helm/chart-releaser-action` both default to `charts/` at the repo root.
+
+### Consequence 2 — placement never encodes mutable facts
+
+A tempting rule is "shared assets live at the nearest common ancestor, specific
+ones live in the profile folder." **We deliberately rejected it.** It makes a
+directory's location depend on how many things currently use it, so gaining a
+second consumer forces a physical move — new path, new CI trigger, broken git
+history — even though nothing about the artifact changed. You also lose the
+ability to answer "show me every chart" with one glob.
+
+This is the mistake nixpkgs spent years unwinding: `pkgs/applications/networking/
+browsers/firefox/` encoded a classification, and classifications drift. Their 2023
+migration to `pkgs/by-name/fi/firefox/` made location encode *nothing but the
+name*. A sidecar chart used by two unrelated apps is therefore just
+`charts/gentian-sidecar-git-modules/` — a chart like any other.
+
+The same principle is why `spec.tier` is a **field**, not a directory level (see
+`docs/backlog.md`), and why `contracts/` stays flat: a contract is cross-app by
+definition, so nesting it under one family would misstate what it is.
+
+### Consequence 3 — version packaging, never built artifacts
+
+Distribution repos track the *recipe*; the registry stores the *output*. That is
+why `charts/packages/*.tgz` was removed — CI publishes to
+`oci://ghcr.io/gentian-org/charts`, and that registry is the artifact store.
+Debian does not commit `.deb` files into its packaging tree, and nixpkgs does not
+commit build outputs.
+
+The same rule explains why a **vendored** chart is a smell rather than a pattern:
+`charts/activepieces/` currently contains a full copy of upstream including
+Bitnami's postgresql and redis subcharts. The distribution answer is to carry the
+*delta*, not the copy — Debian's `debian/patches/`, Gentoo's `files/` — which for
+Helm means a thin wrapper declaring upstream via `dependencies:`.
+
+### Consequence 4 — profiles group by family; discovery keys off a marker file
+
+`profiles/` groups multi-profile families one level deeper
+(`profiles/odoo/odoo-cb-crm/`) while true singletons stay flat
+(`profiles/xwiki/`). Bundles are discovered by the presence of
+`kustomization.yaml` at **any** depth, not by a fixed directory level, so mixed
+depth needs no exclude-list of "known family folders".
+
+Two invariants make that safe, and CI enforces both:
+
+- **Leaf directory name == `metadata.name`.** The catalogue ApplicationSet names
+  each Application after the leaf directory. `AppProfile` is cluster-scoped, so
+  those names are globally unique — but only while this holds.
+- **A `profile.yaml` must have a sibling `kustomization.yaml`**, or the bundle is
+  invisible to the generator and would silently never sync.
+
+Because leaf names are stable, regrouping a profile updates its Application's
+source path *in place* — no rename, no delete/recreate, and no prune of a live
+`AppProfile` (the ApplicationSet runs `prune: true`).
+
+---
+
 ## Platform boundary — **no app-specific hardcoding in gentian-os**
 
 **Never** put app-specific values, profile names, or `case "myapp"` logic in gentian-os.
