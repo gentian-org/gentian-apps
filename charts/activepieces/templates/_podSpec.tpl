@@ -38,7 +38,11 @@ template:
       - name: {{ .Chart.Name }}
         image: {{ include "activepieces.image" . }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        {{- if .Values.command }}
+        {{- if .Values.gentian.enabled }}
+        command:
+          - /bin/sh
+          - /etc/activepieces/entrypoint.sh
+        {{- else if .Values.command }}
         command:
           {{- toYaml .Values.command | nindent 10 }}
         {{- end }}
@@ -102,6 +106,14 @@ template:
                 name: {{ default (include "activepieces.secrets.openai" .) .Values.activepieces.copilot.openAI.existingSecret }}
                 key: apiKey
           {{- end }}
+          {{- if .Values.gentian.enabled }}
+          - name: GENTIAN_SSO_HOST
+            value: {{ .Values.gentian.sso.host | quote }}
+          - name: GENTIAN_INJECT_SESSION_SCRIPT
+            value: {{ .Values.gentian.startup.injectSessionScript | quote }}
+          - name: GENTIAN_DISABLE_UPGRADE_BANNER
+            value: {{ .Values.gentian.startup.disableUpgradeBanner | quote }}
+          {{- end }}
           {{- if .Values.extraEnvVars }}
           {{- toYaml .Values.extraEnvVars | nindent 10 }}
           {{- end }}
@@ -112,6 +124,11 @@ template:
         volumeMounts:
           - name: {{ include "activepieces.pv" . }}
             mountPath: {{ .Values.activepieces.data.rootPath }}
+        {{- if .Values.gentian.enabled }}
+          - name: gentian-runtime
+            mountPath: /etc/activepieces
+            readOnly: true
+        {{- end }}
         {{- if .Values.volumeMounts }}
           {{- toYaml .Values.volumeMounts | nindent 10 }}
         {{- end }}
@@ -166,6 +183,12 @@ template:
       - name: {{ include "activepieces.pv" . }}
         persistentVolumeClaim:
           claimName: {{ default (include "activepieces.pvc" .) .Values.activepieces.data.pvc.existingClaim }}
+    {{- if .Values.gentian.enabled }}
+      - name: gentian-runtime
+        configMap:
+          name: {{ include "activepieces.fullname" . }}-gentian-runtime
+          defaultMode: 0555
+    {{- end }}
     {{- if .Values.volumes }}
       {{- toYaml .Values.volumes | nindent 6 }}
     {{- end }}

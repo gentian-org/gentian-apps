@@ -727,3 +727,28 @@ redis:
     ## @param redis.auth.usePasswordFiles Mount credentials as files instead of using an environment variable
     ##
     usePasswordFiles: true
+
+## Gentian additions (not upstream) — see files/nginx.conf and files/entrypoint.sh.
+## Everything a Gentian AppProfile needs is a value here; profiles must never pass
+## `command` or `args`. Entrypoint ownership is L4 and belongs to the chart.
+##
+gentian:
+  ## @param gentian.enabled Serve the Gentian nginx config and entrypoint instead of the image defaults
+  ##
+  enabled: false
+
+  sso:
+    ## @param gentian.sso.host Host or ClusterIP of the gentian-sidecar-sso-saml Service.
+    ## Empty falls back to discovering `*_SSO_SAML_SERVICE_HOST`, which Kubernetes only
+    ## injects when that Service predates the pod — set this explicitly to avoid the
+    ## cold-start ordering trap. Port is fixed at 8081 by the sidecar chart.
+    ##
+    host: ""
+
+  startup:
+    ## @param gentian.startup.injectSessionScript Inject the session-restore <script> into index.html (L5 — see entrypoint.sh)
+    ##
+    injectSessionScript: true
+    ## @param gentian.startup.disableUpgradeBanner Patch main.js to suppress the upgrade banner (L5 — replaceable by an egress rule)
+    ##
+    disableUpgradeBanner: true

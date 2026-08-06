@@ -25,7 +25,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 | **L1** Drop-in | yes | `branding` static assets (tenant-editable) |
 | **L2** Companion | always | REST API, or a webhook-triggered service |
 | **L3** Extension | yes | a **custom piece**, delivered by the `git-sync` sidecar already declared on this profile (`gentian-sidecar-git-modules` 0.1.7) |
-| **L4** Repackage | yes | the chart is vendored under `activepieces/` — see its `UPSTREAM.md` |
+| **L4** Repackage | yes | the chart is vendored under `charts/activepieces/` — see its [UPSTREAM.md](../../charts/activepieces/UPSTREAM.md) |
 | **L5** Patch | **no** | not permitted |
 | **L6** Fork | **no** | not permitted |
 
@@ -43,4 +43,4 @@ patching bundles or flipping database flags. This is an explicit absolute prohib
 `app-profile-guide.md`. It is also why `patch.allowed` is `false` for this app: the temptation
 lives exactly here.
 
-The chart is vendored, so respect the upstream licence terms recorded in `activepieces/UPSTREAM.md`.
+The chart is vendored, so respect the upstream licence terms recorded in [charts/activepieces/UPSTREAM.md](../../charts/activepieces/UPSTREAM.md).
