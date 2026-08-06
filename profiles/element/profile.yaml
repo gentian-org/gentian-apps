@@ -138,6 +138,7 @@ spec:
         path: /data/conf.d
         format: yaml
         source: configMap
+        maxBytes: 262144
         upstreamDocumented: true
         tenantEditable: false
       - name: element-config
@@ -164,5 +165,7 @@ spec:
       chartOwnership: upstream
     patch:
       allowed: false
+      seriesPath: patches/series
+      requiresApproval: platform-team
     fork:
       allowed: false

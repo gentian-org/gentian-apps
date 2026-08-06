@@ -51,6 +51,7 @@ spec:
         path: /etc/gentian/gentian-subscriptions/conf.d
         format: yaml
         source: configMap
+        maxBytes: 262144
         upstreamDocumented: true
         tenantEditable: false
     publishes:
@@ -64,5 +65,7 @@ spec:
       chartOwnership: gentian-owned
     patch:
       allowed: false
+      seriesPath: patches/series
+      requiresApproval: platform-team
     fork:
       allowed: false

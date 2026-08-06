@@ -371,6 +371,7 @@ spec:
         path: /var/www/html/config
         format: files
         source: configMap
+        maxBytes: 262144
         upstreamDocumented: true
         tenantEditable: false      # config/*.config.php is executable PHP
       - name: theming
@@ -403,5 +404,7 @@ spec:
       chartOwnership: upstream
     patch:
       allowed: false
+      seriesPath: patches/series
+      requiresApproval: platform-team
     fork:
       allowed: false

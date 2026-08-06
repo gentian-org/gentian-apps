@@ -325,5 +325,7 @@ spec:
       chartOwnership: upstream
     patch:
       allowed: false
+      seriesPath: patches/series
+      requiresApproval: platform-team
     fork:
       allowed: false

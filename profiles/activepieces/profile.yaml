@@ -424,5 +424,7 @@ spec:
       chartOwnership: vendored
     patch:
       allowed: false      # enterprise features are licence-gated; never patch to unlock
+      seriesPath: patches/series
+      requiresApproval: platform-team
     fork:
       allowed: false

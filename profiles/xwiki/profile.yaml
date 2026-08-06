@@ -312,6 +312,7 @@ spec:
         path: /usr/local/xwiki/data
         format: properties
         source: configMap
+        maxBytes: 262144
         upstreamDocumented: true
         tenantEditable: false
       - name: skin
@@ -340,5 +341,7 @@ spec:
       chartOwnership: upstream
     patch:
       allowed: false
+      seriesPath: patches/series
+      requiresApproval: platform-team
     fork:
       allowed: false

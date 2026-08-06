@@ -167,6 +167,7 @@ spec:
         path: /etc/odoo-conf-fragments
         format: ini
         source: configMap
+        maxBytes: 262144
         # Odoo has no native conf.d — this is a Gentian-built mechanism (an init
         # container merges fragments into odoo.conf before start), not an upstream
         # promise about the path. See charts/odoo/templates/deployment.yaml.
