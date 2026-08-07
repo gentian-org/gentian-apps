@@ -36,7 +36,9 @@ RUNG_ORDER = {"L0": 0, "L1": 1, "L2": 2, "L3": 3, "L4": 4, "L5": 5, "L6": 6}
 GRADE_BANDS = [(7, "A"), (5, "B"), (3, "C"), (0, "D")]
 
 # Module profiles inherit their base profile's declaration rather than repeating it.
-INHERITING_ROLES = {"module"}
+# "module" is the deprecated spelling of "addon"; both are accepted while the
+# catalogue migrates.
+INHERITING_ROLES = {"addon", "module"}
 
 
 def grade_for_score(score: int) -> str:
@@ -71,16 +73,34 @@ def check_surface(path: pathlib.Path, doc: dict, characterised_families: set[str
     surface = spec.get("customization")
 
     if surface is None:
-        # Module profiles and edition profiles inherit the surface of the family's
+        # Addon profiles and edition profiles inherit the surface of the family's
         # characterised profile: they are the same app with a different feature set,
         # so their customization ladder is identical by construction.
         if role in INHERITING_ROLES or family in characterised_families:
             return errors
         return [
             f"{path}: missing spec.customization — characterise the app "
-            f"(see docs/customization-ladder.md), mark it deployment-role: module, "
+            f"(see docs/customization-ladder.md), mark it deployment-role: addon, "
             f"or give it a family whose base profile is characterised"
         ]
+
+    # An addon declares spec.customization only to carry `addon:`. Its ladder is the
+    # base's, so restating grade/rubricScore/supportedRungs here just forks a mutable
+    # fact into N files that go stale the next time the base is rescored.
+    if role in INHERITING_ROLES:
+        for field in ("grade", "rubricScore", "supportedRungs"):
+            if field in surface:
+                errors.append(
+                    f"{path}: spec.customization.{field} must not be set on an addon — "
+                    f"the ladder is inherited from the base named in "
+                    f"spec.customization.addon.of; remove it and grade the base instead"
+                )
+        if not surface.get("addon"):
+            errors.append(
+                f"{path}: deployment-role addon needs spec.customization.addon.{{id,of}} "
+                f"so the operator knows what the hosting app calls it"
+            )
+        return errors
 
     grade = surface.get("grade")
     score = surface.get("rubricScore")

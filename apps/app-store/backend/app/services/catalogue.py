@@ -9,11 +9,28 @@ from app.services.k8s_client import K8sClient
 from app.services.tile_resolver import resolve_tile_logo
 
 PLATFORM_ANNOTATION = "gentianos.io/platform-app"
+DEPLOYMENT_ROLE_ANNOTATION = "gentianos.io/deployment-role"
+# "module" is the deprecated spelling of "addon"; both must be filtered while the
+# catalogue migrates.
+ADDON_ROLES = {"addon", "module"}
 
 
 def _is_platform_app(profile: dict[str, Any]) -> bool:
     annotations = profile.get("metadata", {}).get("annotations") or {}
     return annotations.get(PLATFORM_ANNOTATION) == "true"
+
+
+def _is_addon(profile: dict[str, Any]) -> bool:
+    """Addons are activated inside an installed app, never installed on their own.
+
+    They must not appear as store tiles: they are chosen in the addon selection
+    window after install, and behind the Edit button afterwards. Listing them here
+    would put ~18 uninstallable entries in the grid and let a user try to install
+    one standalone.
+    """
+    annotations = profile.get("metadata", {}).get("annotations") or {}
+    role = (annotations.get(DEPLOYMENT_ROLE_ANNOTATION) or "").strip().lower()
+    return role in ADDON_ROLES
 
 
 def build_catalogue(
@@ -38,6 +55,8 @@ def build_catalogue(
         name = entry.get("name")
         profile = profiles.get(name, {})
         if not include_platform and _is_platform_app(profile):
+            continue
+        if _is_addon(profile):
             continue
         spec = profile.get("spec", {})
         meta = profile.get("metadata", {})

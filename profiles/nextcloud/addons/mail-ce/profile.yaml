@@ -25,9 +25,6 @@ spec:
   deploymentMethod: crossplane
 
   customization:
-    grade: A
-    rubricScore: 7
-    supportedRungs: [L0, L1, L4]
     addon:
       id: mail
       of: nextcloud-base-ce

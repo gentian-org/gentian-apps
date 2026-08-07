@@ -364,7 +364,35 @@ spec:
     grade: A
     rubricScore: 7
     supportedRungs: [L0, L1, L3, L4]
-    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/nextcloud/nextcloud-base-ce/customization.md
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/nextcloud/base/base-ce/customization.md
+    # How a tenant's addon selection becomes real. The upstream chart writes this to
+    # /docker-entrypoint-hooks.d/before-starting/helm.sh, so it runs inside the
+    # Nextcloud container on every start with occ, config and data already in place —
+    # no Job, no second copy of the DB and S3 wiring.
+    addonActivation:
+      valuesPath: nextcloud.hooks.before-starting
+      script: |
+        #!/bin/sh
+        # Reconcile enabled apps to the tenant's selection. Idempotent by design: it
+        # re-runs on every pod start, which is how a changed selection converges.
+        set -eu
+        SELECTED="__GENTIAN_ADDON_IDS__"
+        OCC="php /var/www/html/occ"
+
+        for id in $SELECTED; do
+          $OCC app:enable "$id" || echo "warning: could not enable $id"
+        done
+
+        # Anything staged but no longer selected goes back to disabled. custom_apps/
+        # holds exactly the optional Gentian addon set, so the container can derive
+        # this itself — user_oidc lives in apps/ and is deliberately out of reach.
+        # app:disable keeps the app's data, so re-selecting restores it intact.
+        for dir in /var/www/html/custom_apps/*/; do
+          [ -d "$dir" ] || continue
+          id=$(basename "$dir")
+          case " $SELECTED " in *" $id "*) continue ;; esac
+          $OCC app:disable "$id" || echo "warning: could not disable $id"
+        done
     configure:
       hotReload: false
     dropIns:
