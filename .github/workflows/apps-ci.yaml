@@ -1,6 +1,11 @@
 name: Apps CI
 
 on:
+  # Manual trigger. Push events are path-filtered and can also be dropped entirely
+  # when GitHub throttles webhook delivery during an incident — as happened on
+  # 2026-08-06, leaving several merged commits with no run at all. This gives a way
+  # to test a commit without pushing an empty one.
+  workflow_dispatch:
   push:
     branches: [main, develop]
     paths:
