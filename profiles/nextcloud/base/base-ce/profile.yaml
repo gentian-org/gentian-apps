@@ -8,7 +8,7 @@ metadata:
     gentianos.io/kernel-egress-namespaces: envoy-gateway-system
     gentianos.io/portal-auth-mode: portal-bridge
 spec:
-  displayName: Nextcloud Base
+  displayName: Nextcloud
   description: Self-hosted file sync and share with OIDC SSO.
   family: nextcloud
   catalogueVersion: 1.0.0
@@ -23,7 +23,7 @@ spec:
     identity:
       oidc:
         clientId: gentian-nextcloud-base-ce
-        name: Nextcloud Base
+        name: Nextcloud
         accessType: CONFIDENTIAL
         redirectUris:
         - https://cloud.${TENANT_DOMAIN}/*

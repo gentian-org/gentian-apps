@@ -108,7 +108,14 @@ export function AddonWindow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ addons: [...selected] }),
       });
-      onSaved(`Addons updated for ${appName}. Changes roll out shortly.`);
+      // The enable/disable runs when the app restarts, which takes minutes. Saying
+      // only "updated" reads as "nothing happened" while you watch an unchanged app.
+      const on = selected.size;
+      const off = (data?.addons.length ?? 0) - on;
+      onSaved(
+        `${appName}: ${on} addon${on === 1 ? "" : "s"} on, ${off} off. ` +
+          `${appName} is restarting to apply this — allow a few minutes.`,
+      );
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -127,8 +134,35 @@ export function AddonWindow({
       <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
         <div className="border-b border-slate-200 px-5 py-4">
           <h2 className="text-lg font-semibold">Addons for {appName}</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Enabled inside the app. Clearing one turns the feature off; your data is kept.
+          <p className="mt-0.5 text-sm text-slate-600">
+            Choose which features are switched on inside {appName}. Addons are not separate
+            apps — they are turned on and off within this one.
+          </p>
+          {/* Checkboxes alone do not say what they do. Spell out both directions, and
+              say explicitly that nothing here deletes data — that is the question a
+              tick box cannot answer. */}
+          <dl className="mt-3 space-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            <div className="flex gap-2">
+              <dt className="w-20 shrink-0 font-medium text-slate-700">Ticked</dt>
+              <dd>Switched on and available to your users.</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-20 shrink-0 font-medium text-slate-700">Unticked</dt>
+              <dd>
+                Switched off and hidden. Its data is <strong>kept</strong> — ticking it again
+                restores everything.
+              </dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-20 shrink-0 font-medium text-slate-700">Never</dt>
+              <dd>
+                Nothing here deletes data. That only happens if you uninstall {appName} itself
+                and choose Purge.
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-2 text-xs text-slate-500">
+            Saving restarts {appName}, so changes take a few minutes to appear.
           </p>
         </div>
 
@@ -186,6 +220,22 @@ export function AddonWindow({
                     <span className="min-w-0">
                       <span className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">{addon.displayName}</span>
+                        {/* State as a word, not just a tick — "On"/"Off" answers what a
+                            checkbox alone leaves ambiguous. */}
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[11px] ${
+                            checked
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-slate-200 text-slate-600"
+                          }`}
+                        >
+                          {checked ? "On" : "Off"}
+                        </span>
+                        {initial.has(addon.name) !== checked && (
+                          <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[11px] text-sky-800">
+                            {checked ? "will be switched on" : "will be switched off"}
+                          </span>
+                        )}
                         {locked && (
                           <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-800">
                             Subscription required
@@ -225,7 +275,7 @@ export function AddonWindow({
             disabled={saving || !dirty}
             className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
           >
-            {saving ? "Saving…" : "Save"}
+            {saving ? "Applying…" : "Apply changes"}
           </button>
         </div>
       </div>
