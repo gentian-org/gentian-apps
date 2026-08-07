@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - profile.yaml
+  - composition.yaml
+  - oidc-catalog.yaml
+configMapGenerator:
+  - name: openproject-portal-bridge-assets
+    namespace: crossplane-system
+    files:
+      - bridge.py=assets/portal_bridge.py
+      - openproject-portal-sso.html=assets/openproject-portal-sso.html
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    gentianos.io/profile-name: openproject-ce
+    gentianos.io/asset: openproject-portal-bridge
+    app.kubernetes.io/managed-by: gentian-os

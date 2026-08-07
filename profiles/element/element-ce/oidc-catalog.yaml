@@ -1,0 +1,45 @@
+# OIDC packs for Element / Synapse.
+apiVersion: gentianos.io/v1alpha1
+kind: OIDCPackCatalog
+metadata:
+  name: gentian-element-oidc
+  labels:
+    gentianos.io/oidc-catalog: element-ce
+    gentianos.io/profile-name: element-ce
+spec:
+  mapperTemplates:
+    email:
+      protocolMapper: oidc-usermodel-property-mapper
+      config:
+        user.attribute: email
+        claim.name: email
+        jsonType.label: String
+        id.token.claim: "true"
+        access.token.claim: "true"
+        userinfo.token.claim: "true"
+        introspection.token.claim: "true"
+    full_name:
+      keycloakName: "full name"
+      protocolMapper: oidc-full-name-mapper
+      config:
+        id.token.claim: "true"
+        access.token.claim: "true"
+        userinfo.token.claim: "true"
+        introspection.token.claim: "true"
+  packs:
+    gentian-synapse:
+      scopeName: matrix-scope
+      scopeDescription: "Scope for Matrix / Synapse OIDC clients."
+      clientRole: matrix-access-control
+      entitlementGroup: managed-by-attribute-Livecollaboration
+      publicClient: false
+      fullScopeAllowed: false
+      defaultScopes:
+        - profile
+        - email
+        - roles
+        - web-origins
+        - acr
+      mappers:
+        - full_name
+        - email

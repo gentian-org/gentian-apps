@@ -23,7 +23,7 @@ spec:
   description: "OpenDesk Nextcloud AIO file sync and share with OIDC SSO and portal integration."
   family: nextcloud
   catalogueVersion: "1.0.0"
-  edition: full
+  edition: pro
   trustTier: certified
   license: proprietary
   author: openDesk

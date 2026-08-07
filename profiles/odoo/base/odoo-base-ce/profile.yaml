@@ -17,7 +17,7 @@ spec:
   description: "Odoo Community ERP runtime — required base for Odoo module apps."
   family: odoo
   catalogueVersion: "1.0.0"
-  edition: full
+  edition: ce
   trustTier: platform
   license: LGPL-3.0
   author: OCA

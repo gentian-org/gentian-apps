@@ -1,0 +1,128 @@
+# AppProfile — Gentian App Store (tenant admin UI)
+#
+# First-party app built from gentian-apps/apps/app-store-me/.
+# Chart published to ghcr.io/gentian-org/charts/app-store-me.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: app-store-me
+  labels:
+    gentianos.io/profile-name: app-store-me
+  annotations:
+    gentianos.io/platform-app: "true"
+    gentianos.io/kernel-egress-namespaces: gentian-system
+    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/api","serviceName":"app-store-api","port":8000},{"pathPrefix":"/oauth","serviceName":"app-store-api","port":8000}]'
+spec:
+  displayName: "App Store"
+  edition: me
+  description: "Browse the Gentian app catalogue and install or uninstall applications for your tenant."
+  author: Gentian
+  tile:
+    icon: store
+
+  kernelRequirements:
+    identity:
+      oidc:
+        clientId: "app-store-me"
+        name: "App Store"
+        accessType: CONFIDENTIAL
+        redirectUris:
+          - "https://store.${TENANT_DOMAIN}/oauth/callback"
+    database:
+      engine: postgresql
+      databasePerTenant: true
+
+  chart:
+    repository: oci://ghcr.io/gentian-org/charts
+    name: app-store-me
+    version: "0.3.5"
+
+  deploymentMethod: crossplane
+
+  valueMapping:
+    oidc:
+      issuerKey: "oidc.issuer"
+      clientIdKey: "oidc.clientId"
+      clientSecretKey: "oidc.clientSecret"
+    database:
+      hostKey: "database.host"
+      portKey: "database.port"
+      nameKey: "database.name"
+      userKey: "database.user"
+      passwordKey: "database.password"
+
+  extraValues:
+    tenantId: "${TENANT_ID}"
+    tenantNamespace: "${TENANT_NAMESPACE}"
+    installMode: gitops
+    gentian:
+      deploymentsRepo: "https://github.com/gentian-org/gentian-deployments"
+      appsRepo: "https://github.com/gentian-org/gentian-apps"
+      appsBranch: main
+      lifecycleUrl: "http://gentian-os-lifecycle.gentian-system.svc.cluster.local:8082"
+      # Phase A commerce (optional; enable when gentian-corp is deployed)
+      commerceEnabled: false
+      corpApiUrl: ""
+      corpCheckoutUrl: ""
+    ingress:
+      enabled: false
+    auth:
+      disabled: true
+    gateway:
+      # Kernel operator owns HTTPRoute via spec.ingress + browserProxy; chart route duplicates it.
+      enabled: false
+      subDomain: store
+    tenantDomain: "${TENANT_DOMAIN}"
+
+  ingress:
+    subDomain: store
+    serviceName: app-store-web
+    servicePort: 8080
+    tlsEnabled: true
+
+  browserProxy:
+    - path: api
+      target: "http://app-store-api:8000/api"
+    - path: oauth
+      target: "http://app-store-api:8000/oauth"
+
+  portalTiles:
+    - name: app-store-me
+      displayName:
+        en_US: "App Store"
+        de_DE: "App Store"
+      linkTarget: embedded
+      allowedGroup: "Tenant Admins"
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: B
+    rubricScore: 5
+    supportedRungs: [L0, L1, L4]    # L3 unlocks once the template extension loader is adopted
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/app-store-me/customization.md
+    configure:
+      valuesSchema: apps/app-store-me/chart/values.schema.json
+      hotReload: false
+    dropIns:
+      - name: app-config
+        path: /etc/gentian/app-store-me/conf.d
+        format: yaml
+        source: configMap
+        maxBytes: 262144
+        upstreamDocumented: true
+        tenantEditable: false
+    publishes:
+      apis:
+        - contract: app-catalogue
+          protocol: http-json
+          spec: openapi
+          path: /api/v1
+          auth: oidc-token-exchange
+    repackage:
+      chartOwnership: gentian-owned
+    patch:
+      allowed: false
+      seriesPath: patches/series
+      requiresApproval: platform-team
+    fork:
+      allowed: false

@@ -1,0 +1,49 @@
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: odoo-crm-ce
+  labels:
+    gentianos.io/profile-name: odoo-crm-ce
+  annotations:
+    gentianos.io/platform-app: "false"
+    gentianos.io/deployment-role: addon
+    gentianos.io/requires-profile: odoo-base-ce
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["crm"],"gentianOdooGroupRoles":["sales_team.group_sale_salesman"]}'
+    gentianos.io/portal-auth-mode: oidc
+spec:
+  displayName: "Odoo CRM"
+  description: "Customer Relationship Management module for Odoo."
+  family: odoo
+  catalogueVersion: "1.0.0"
+  edition: ce
+  trustTier: platform
+  license: LGPL-3.0
+  author: OCA
+  tile:
+    icon: crm
+
+  portalTiles:
+    - name: odoo-crm
+      displayName:
+        en_US: "Odoo CRM"
+        de_DE: "Odoo CRM"
+      linkSuffix: "/web?gentian_embed=1&action=crm.crm_lead_action_pipeline"
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  compositionRef: app-odoo
+  deploymentMethod: crossplane
+  chart:
+    repository: oci://ghcr.io/gentian-org/charts
+    name: odoo
+    version: "0.1.12"
+  extraValues:
+    odoo:
+      module: crm
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi

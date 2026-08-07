@@ -1,0 +1,75 @@
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: litellm-me
+  labels:
+    gentianos.io/profile-name: litellm-me
+  annotations:
+    gentianos.io/platform-app: "true"
+    gentianos.io/deployment-role: base
+spec:
+  displayName: "LLM Admin Panel"
+  edition: me
+  description: "Manage LLM configurations, models, virtual keys, and track token usage."
+  license: MIT
+  author: Gentian
+  tile:
+    icon: settings
+
+  deploymentMethod: api
+
+  ingress:
+    subDomain: llm-admin
+    tlsEnabled: true
+
+  apiIntegration:
+    runtime: portal-proxy
+    baseUrl: "http://litellm-proxy.platform-kernel.svc.cluster.local:4000"
+    tenantBinding: none
+
+  portalTiles:
+    - name: litellm-me
+      displayName:
+        en_US: "LLM Admin Panel"
+        de_DE: "LLM Admin Panel"
+      linkTarget: embedded
+      allowedGroup: "Domain Admins"
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: B
+    rubricScore: 5
+    supportedRungs: [L0, L1, L3, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/litellm-me/customization.md
+    configure:
+      hotReload: false
+    dropIns:
+      - name: litellm-config
+        path: /app/config.d
+        format: yaml
+        source: configMap
+        maxBytes: 262144
+        upstreamDocumented: true
+        tenantEditable: false    # model routing is a platform cost control
+    extension:
+      mechanism: litellm-callback
+      delivery: [image-layer]
+      apiStability: evolving
+      apiDocs: https://docs.litellm-me.ai/docs/proxy/logging
+      perTenantModules: false
+      testMatrix: ["1.55"]
+    publishes:
+      apis:
+        - contract: llm-gateway
+          protocol: http-json
+          spec: openapi
+          path: /v1
+          auth: oidc-token-exchange
+    repackage:
+      chartOwnership: upstream
+    patch:
+      allowed: false
+      seriesPath: patches/series
+      requiresApproval: platform-team
+    fork:
+      allowed: false
