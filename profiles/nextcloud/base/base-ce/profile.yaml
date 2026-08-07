@@ -119,7 +119,7 @@ spec:
     image:
       registry: ghcr.io
       repository: gentian-org/nextcloud
-      tag: 33.0.6-gentian5
+      tag: 33.0.6-gentian6
     extraEnv:
     - name: REDIS_HOST_USER
       value: ${TENANT_ID}-${APP_ID}
@@ -377,17 +377,28 @@ spec:
         # re-runs on every pod start, which is how a changed selection converges.
         set -eu
         SELECTED="__GENTIAN_ADDON_IDS__"
+        STAGE=/usr/src/gentian-addons
+        APPS=/var/www/html/custom_apps
         OCC="php /var/www/html/occ"
 
+        mkdir -p "$APPS"
+
+        # Copy in what was selected. The image stages addons outside the tree the
+        # entrypoint syncs, because its custom_apps copy only runs while that
+        # directory is still empty — so anything added to the image later would
+        # never reach an existing install. Copying here works on every start.
         for id in $SELECTED; do
+          if [ -d "$STAGE/$id" ] && [ ! -d "$APPS/$id" ]; then
+            cp -a "$STAGE/$id" "$APPS/$id"
+          fi
           $OCC app:enable "$id" || echo "warning: could not enable $id"
         done
 
-        # Anything staged but no longer selected goes back to disabled. custom_apps/
-        # holds exactly the optional Gentian addon set, so the container can derive
-        # this itself — user_oidc lives in apps/ and is deliberately out of reach.
-        # app:disable keeps the app's data, so re-selecting restores it intact.
-        for dir in /var/www/html/custom_apps/*/; do
+        # Anything staged but no longer selected goes back to disabled. Driven by the
+        # image's staging directory, so the container derives this itself — user_oidc
+        # ships in apps/ and is deliberately out of reach. app:disable keeps the app's
+        # data, so re-selecting restores it intact.
+        for dir in "$STAGE"/*/; do
           [ -d "$dir" ] || continue
           id=$(basename "$dir")
           case " $SELECTED " in *" $id "*) continue ;; esac

@@ -5,13 +5,24 @@
 # /usr/src/nextcloud/apps/ and thereby *enabling* them. That allowed exactly four
 # combinations, so a tenant wanting files + calendar but not office could not have it.
 #
-# Now every optional app is staged in /usr/src/nextcloud/custom_apps/ instead.
-# Nextcloud does not run an app merely because it is present — it must be enabled —
-# so the same image serves any subset: the addon activation Job runs
-# `occ app:enable <id>` for exactly what the tenant selected. The official image's
-# entrypoint copies /usr/src/nextcloud into the tenant volume on first start, and
-# custom_apps is already registered as a writable apps_path there, so this needs no
-# chart change.
+# Now every optional app is staged in /usr/src/gentian-addons/, OUTSIDE the tree the
+# entrypoint syncs, and the activation hook copies the selected ones into
+# /var/www/html/custom_apps/ before enabling them.
+#
+# Staging directly in /usr/src/nextcloud/custom_apps/ does not work, and the reason is
+# easy to miss. The entrypoint syncs /usr/src/nextcloud/ over the volume but excludes
+# /custom_apps/ (see /upgrade.exclude), then copies it only as a special case:
+#
+#     for dir in config data custom_apps themes; do
+#         if [ ! -d "/var/www/html/$dir" ] || directory_empty "/var/www/html/$dir"; then
+#
+# So it lands once, on a volume where that directory is still empty, and never again.
+# Any tenant installed before an addon was added to the image would never receive it,
+# and the failure is silent: `occ app:enable` simply reports the app does not exist.
+#
+# Copying at activation time instead is idempotent and works on existing installs.
+# Nextcloud does not run an app merely because it is present — it must be enabled — so
+# the same image still serves any subset.
 #
 # user_oidc stays in apps/ and stays enabled: it is platform SSO, not optional.
 #
@@ -48,12 +59,12 @@ RUN set -eux; \
     tar -xzf /tmp/user_oidc.tar.gz -C /usr/src/nextcloud/apps/; \
     chown -R www-data:www-data /usr/src/nextcloud/apps/user_oidc; \
     \
-    # --- optional apps: staged in custom_apps/, left disabled --------------- \
-    mkdir -p /usr/src/nextcloud/custom_apps; \
+    # --- optional apps: staged outside the synced tree, left disabled ------- \
+    mkdir -p /usr/src/gentian-addons; \
     fetch_addon() { \
       url="$1"; \
       curl -fsSL -o /tmp/addon.tar.gz "$url"; \
-      tar -xzf /tmp/addon.tar.gz -C /usr/src/nextcloud/custom_apps/; \
+      tar -xzf /tmp/addon.tar.gz -C /usr/src/gentian-addons/; \
       rm -f /tmp/addon.tar.gz; \
     }; \
     fetch_addon "https://github.com/nextcloud-releases/richdocuments/releases/download/v${RICHDOCUMENTS_VERSION}/richdocuments-v${RICHDOCUMENTS_VERSION}.tar.gz"; \
@@ -66,7 +77,7 @@ RUN set -eux; \
     fetch_addon "https://github.com/nextcloud/collectives/releases/download/v${COLLECTIVES_VERSION}/collectives-${COLLECTIVES_VERSION}.tar.gz"; \
     fetch_addon "https://github.com/nextcloud-releases/spreed/releases/download/v${SPREED_VERSION}/spreed-v${SPREED_VERSION}.tar.gz"; \
     rm -f /tmp/*.tar.gz; \
-    chown -R www-data:www-data /usr/src/nextcloud/custom_apps; \
+    chown -R www-data:www-data /usr/src/gentian-addons; \
     \
     # --- Gentian runtime adjustments --------------------------------------- \
     printf '%s\n' 'redis.session.locking_enabled = 0' > /usr/local/etc/php/conf.d/zz-gentian-redis-session.ini; \
@@ -78,7 +89,7 @@ RUN set -eux; \
 USER www-data
 
 LABEL org.opencontainers.image.title="Gentian Nextcloud" \
-      org.opencontainers.image.description="Nextcloud with user_oidc enabled and the Gentian addon set staged (disabled) in custom_apps" \
+      org.opencontainers.image.description="Nextcloud with user_oidc enabled and the Gentian addon set staged (disabled) in /usr/src/gentian-addons" \
       org.gentian.nextcloud.base="${NEXTCLOUD_VERSION}" \
       org.gentian.apps.user_oidc="${USER_OIDC_VERSION}" \
       org.gentian.addons.richdocuments="${RICHDOCUMENTS_VERSION}" \
