@@ -37,7 +37,7 @@ spec:
     allowedGroup: App Users
   chart:
     repository: oci://ghcr.io/gentian-org/charts
-    name: activepieces-me
+    name: activepieces
     version: 0.3.23
   valueMapping:
     database:

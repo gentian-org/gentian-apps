@@ -262,6 +262,8 @@ jobs:
         run: python3 scripts/validate-profile-tiles.py
       - name: Validate customization ladder declarations and records
         run: python3 scripts/validate-customizations.py
+      - name: Validate chart references
+        run: python3 scripts/validate-chart-refs.py
       - name: Customization debt report
         run: python3 scripts/customization-debt-report.py >> "$GITHUB_STEP_SUMMARY"
 
