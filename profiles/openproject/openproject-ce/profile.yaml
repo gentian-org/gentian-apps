@@ -221,7 +221,7 @@ spec:
       runAsNonRoot: true
 
     podAnnotations:
-      secret.reloader.stakater.com/reload: openproject-sensitive-values
+      secret.reloader.stakater.com/reload: openproject-ce-sensitive-values
 
     seederJob:
       annotations:

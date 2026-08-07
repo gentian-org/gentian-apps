@@ -88,7 +88,7 @@ spec:
     redis:
       enabled: false
     externalPostgresql:
-      existingSecret: "element-sensitive-values"
+      existingSecret: "element-ce-sensitive-values"
       existingSecretPasswordKey: "db-password"
     extraConfig:
       email:

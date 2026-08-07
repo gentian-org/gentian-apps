@@ -52,6 +52,11 @@ spec:
       passwordKey: "database.password"
 
   extraValues:
+    # The composition names the ESO-managed Secret after this profile, so it must
+    # be stated here — the chart's default still assumed the pre-rename name
+    # "app-store", which left the API pod in CreateContainerConfigError.
+    existingSecret:
+      name: app-store-me-sensitive-values
     tenantId: "${TENANT_ID}"
     tenantNamespace: "${TENANT_NAMESPACE}"
     installMode: gitops

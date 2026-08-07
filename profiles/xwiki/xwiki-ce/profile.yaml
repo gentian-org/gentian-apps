@@ -147,7 +147,7 @@ spec:
       type: "postgresql"
       customKeyRef:
         enabled: true
-        name: "xwiki-sensitive-values"
+        name: "xwiki-ce-sensitive-values"
         key: "db-password"
 
     solr:
@@ -256,12 +256,12 @@ spec:
       xwiki-ce.properties:
         oidc.secret:
           secret:
-            name: xwiki-sensitive-values
+            name: xwiki-ce-sensitive-values
             key: oidc-client-secret
       xwiki-ce.cfg:
         xwiki-ce.superadminpassword:
           secret:
-            name: xwiki-sensitive-values
+            name: xwiki-ce-sensitive-values
             key: internal-superadmin_password
 
     # This chart exposes no pod-label value (no podLabels/commonLabels support),
@@ -272,7 +272,7 @@ spec:
     # (gentianos.io/app). Without this the pod gets no egress to platform-kernel
     # (Postgres, Keycloak).
     podAnnotations:
-      secret.reloader.stakater.com/reload: xwiki-sensitive-values
+      secret.reloader.stakater.com/reload: xwiki-ce-sensitive-values
       gentianos.io/app: xwiki-ce
       gentianos.io/tenant: "${TENANT_ID}"
 
