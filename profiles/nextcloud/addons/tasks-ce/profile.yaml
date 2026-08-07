@@ -1,0 +1,33 @@
+# AppProfile — Nextcloud Tasks (addon)
+#
+# Activated inside a Nextcloud base rather than deployed: the app ships disabled in
+# the base image's custom_apps, and selecting this addon runs `occ app:enable tasks`.
+# It therefore carries no chart of its own.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: nextcloud-tasks-ce
+  labels:
+    gentianos.io/profile-name: nextcloud-tasks-ce
+  annotations:
+    gentianos.io/deployment-role: addon
+spec:
+  displayName: "Tasks"
+  description: "CalDAV task lists, shared with Calendar."
+  family: nextcloud
+  catalogueVersion: "1.0.0"
+  edition: ce
+  trustTier: certified
+  license: AGPL-3.0-only
+  author: Nextcloud
+  tile:
+    icon: tasks
+  deploymentMethod: crossplane
+
+  customization:
+    grade: A
+    rubricScore: 7
+    supportedRungs: [L0, L1, L4]
+    addon:
+      id: tasks
+      of: nextcloud-base-ce

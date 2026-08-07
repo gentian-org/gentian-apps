@@ -1,41 +1,62 @@
-# Gentian Nextcloud bundle image
+# Gentian Nextcloud image
 
-Custom image extending the official [`library/nextcloud`](https://hub.docker.com/_/nextcloud)
-Apache variant with Gentian-required apps pre-installed at build time. No runtime
-downloads from the Nextcloud App Store or GitHub are needed on tenant clusters.
+One image extending the official [`library/nextcloud`](https://hub.docker.com/_/nextcloud)
+Apache variant. Published as `ghcr.io/gentian-org/nextcloud:<IMAGE_TAG>` (see
+`versions.env`). No runtime downloads from the Nextcloud App Store or GitHub are
+needed on tenant clusters.
 
-Published as `ghcr.io/gentian-org/nextcloud:<IMAGE_TAG>` (see `versions.env`).
+## Why one image and not four
 
-## Base
+This used to build four cumulative targets — `base` → `office` → `officeplus` →
+`suite` — each baking more apps into `/usr/src/nextcloud/apps/`, which *enables*
+them. That allowed exactly four combinations, so a tenant wanting files and calendar
+but not office editing could not have it.
 
-| Component | Version | Source |
-|-----------|---------|--------|
-| Nextcloud Server | 33.0.6 | `docker.io/library/nextcloud:33.0.6-apache` |
+Now every optional app is staged in `/usr/src/nextcloud/custom_apps/` instead.
+Nextcloud does not run an app merely because it is present — it has to be enabled —
+so one image serves any subset: the addon activation Job runs `occ app:enable <id>`
+for exactly what the tenant selected.
 
-## Bundled apps
+The official entrypoint copies `/usr/src/nextcloud` into the tenant volume on first
+start, and `custom_apps` is already a registered writable `apps_path` there, so this
+needs no chart change.
 
-| App | Version | Purpose | Source |
-|-----|---------|---------|--------|
-| richdocuments | 10.2.0 | Collabora / Nextcloud Office (document, spreadsheet, presentation) | [nextcloud-releases/richdocuments](https://github.com/nextcloud-releases/richdocuments) |
-| user_oidc | 8.10.1 | OIDC SSO (`gentian` provider configured at install hook) | [nextcloud-releases/user_oidc](https://github.com/nextcloud-releases/user_oidc) |
+## Always enabled
 
-Apps are extracted to `/usr/src/nextcloud/apps/` in the image. On first start (or when
-missing on the tenant PVC), profile hooks copy them into `/var/www/html/custom_apps/`
-and enable them with `occ app:enable` — no outbound HTTPS from the pod.
+| Component | Why |
+|-----------|-----|
+| `user_oidc` | Platform SSO. Not optional, so it stays in `apps/`. |
 
-## Not included
+## Staged, disabled — selected per tenant
 
-- **Collabora Online** remains a Helm subchart (`nextcloud-collabora`) deployed beside
-  Nextcloud per tenant — it is a separate service, not part of this image.
-- Portal SSO assets (`nextcloud-portal-sso.html`, `gentian-portal-bridge.php`) are
-  fetched from in-cluster portal-web on pod start (platform-kernel only).
+Each maps to an addon profile under `profiles/nextcloud/addons/`, whose
+`spec.customization.addon.id` is the id passed to `occ app:enable`.
 
-## Rebuild
+| App | Addon profile |
+|-----|---------------|
+| `richdocuments` | `nextcloud-richdocuments-ce` |
+| `forms` | `nextcloud-forms-ce` |
+| `mail` | `nextcloud-mail-ce` |
+| `calendar` | `nextcloud-calendar-ce` |
+| `contacts` | `nextcloud-contacts-ce` |
+| `tasks` | `nextcloud-tasks-ce` |
+| `deck` | `nextcloud-deck-ce` |
+| `collectives` | `nextcloud-collectives-ce` |
+| `spreed` | `nextcloud-spreed-ce` |
+
+The old `drive` / `office` / `suite` bundles survive as **AppPackage presets** in
+`profiles/nextcloud/packages/` — they pre-tick a set of addons in the selection
+window rather than freezing it into an image.
+
+## Versions
+
+All pinned in `versions.env` and passed as build args. Bump there, not in the
+Dockerfile.
+
+## Build
 
 ```bash
-./images/nextcloud/build.sh
-# or push via .github/workflows/apps-ci.yaml on merge to main/develop
+./build.sh          # honours REGISTRY, defaults to ghcr.io
 ```
 
-Bump `IMAGE_TAG` in `versions.env` and `profiles/nextcloud/profile.yaml` when changing
-bundled app versions or the base Nextcloud release.
+See gentian-apps/docs/L3-cleanup.md §4.

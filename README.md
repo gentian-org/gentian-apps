@@ -21,12 +21,13 @@ profiles/              # App catalogue bundles (OSS + commercial) — synced by 
       crm-ce/          #       -> odoo-crm-ce
       accounting-ce/   #       -> odoo-accounting-ce
     packages/          #       AppPackage presets (not deployable)
-  nextcloud/           #   family: drive / office / suite
-    office/
-      nextcloud-office-ce/   # Community Edition
-      nextcloud-office-od/   # openDesk (proprietary, private registry)
-    suite/
-      nextcloud-suite-me/    # Managed Edition — maintained by Gentian for MSPs
+  nextcloud/           #   family with addons (L3)
+    base/
+      base-ce/         #       -> nextcloud-base-ce
+      base-od/         #       -> nextcloud-base-od (openDesk, pro)
+    addons/            #       9 addons, enabled per tenant
+      calendar-ce/     #       -> nextcloud-calendar-ce
+    packages/          #       AppPackage presets: office, suite
   xwiki/               #   true singleton: stays flat
 apps/                  # first-party implementations (FastAPI + React + Helm)
   _template/           # copy of gentian-app-template

@@ -87,9 +87,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    strategy:
-      matrix:
-        target: [base, office, officeplus, suite]
     steps:
       - uses: actions/checkout@v4
 
@@ -99,9 +96,7 @@ jobs:
           # shellcheck disable=SC1091
           source images/nextcloud/versions.env
           # Parse version and gentian suffix
-          V_PART="${IMAGE_TAG%%-*}"
-          G_PART="${IMAGE_TAG#*-}"
-          echo "image_tag=${V_PART}-${{ matrix.target }}-${G_PART}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
           echo "nextcloud_version=${NEXTCLOUD_VERSION}" >> "$GITHUB_OUTPUT"
           echo "user_oidc_version=${USER_OIDC_VERSION}" >> "$GITHUB_OUTPUT"
           echo "richdocuments_version=${RICHDOCUMENTS_VERSION}" >> "$GITHUB_OUTPUT"
@@ -125,7 +120,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: images/nextcloud
-          target: ${{ matrix.target }}
           push: ${{ github.event_name != 'pull_request' }}
           build-args: |
             NEXTCLOUD_VERSION=${{ steps.versions.outputs.nextcloud_version }}
@@ -141,7 +135,7 @@ jobs:
             SPREED_VERSION=${{ steps.versions.outputs.spreed_version }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ steps.versions.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ github.sha }}-${{ matrix.target }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ github.sha }}
 
   build-nextcloud-mcp:
     runs-on: ubuntu-latest

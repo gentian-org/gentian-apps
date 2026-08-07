@@ -1,0 +1,33 @@
+# AppProfile — Nextcloud Deck (addon)
+#
+# Activated inside a Nextcloud base rather than deployed: the app ships disabled in
+# the base image's custom_apps, and selecting this addon runs `occ app:enable deck`.
+# It therefore carries no chart of its own.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: nextcloud-deck-ce
+  labels:
+    gentianos.io/profile-name: nextcloud-deck-ce
+  annotations:
+    gentianos.io/deployment-role: addon
+spec:
+  displayName: "Deck"
+  description: "Kanban-style project boards."
+  family: nextcloud
+  catalogueVersion: "1.0.0"
+  edition: ce
+  trustTier: certified
+  license: AGPL-3.0-only
+  author: Nextcloud
+  tile:
+    icon: projects
+  deploymentMethod: crossplane
+
+  customization:
+    grade: A
+    rubricScore: 7
+    supportedRungs: [L0, L1, L4]
+    addon:
+      id: deck
+      of: nextcloud-base-ce

@@ -1,0 +1,27 @@
+# AppPackage — Nextcloud Suite
+#
+# A preset, not a deployable: choosing it pre-ticks these addons in the selection
+# window. The user may untick any of them or add others before installing.
+# Replaces the old nextcloud-suite *profile*, which baked this exact set into an image and
+# so allowed no other combination.
+apiVersion: gentianos.io/v1alpha1
+kind: AppPackage
+metadata:
+  name: nextcloud-suite
+spec:
+  family: nextcloud
+  displayName: "Nextcloud Suite"
+  description: "Everything: files, office, groupware and collaboration."
+  author: Gentian
+  tile:
+    icon: cloud
+  addons:
+    - nextcloud-richdocuments-ce
+    - nextcloud-forms-ce
+    - nextcloud-mail-ce
+    - nextcloud-calendar-ce
+    - nextcloud-contacts-ce
+    - nextcloud-tasks-ce
+    - nextcloud-deck-ce
+    - nextcloud-collectives-ce
+    - nextcloud-spreed-ce

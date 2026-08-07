@@ -1,0 +1,24 @@
+# AppPackage — Nextcloud Office
+#
+# A preset, not a deployable: choosing it pre-ticks these addons in the selection
+# window. The user may untick any of them or add others before installing.
+# Replaces the old nextcloud-office *profile*, which baked this exact set into an image and
+# so allowed no other combination.
+apiVersion: gentianos.io/v1alpha1
+kind: AppPackage
+metadata:
+  name: nextcloud-office
+spec:
+  family: nextcloud
+  displayName: "Nextcloud Office"
+  description: "Files plus document editing, forms and groupware."
+  author: Gentian
+  tile:
+    icon: documents
+  addons:
+    - nextcloud-richdocuments-ce
+    - nextcloud-forms-ce
+    - nextcloud-mail-ce
+    - nextcloud-calendar-ce
+    - nextcloud-contacts-ce
+    - nextcloud-tasks-ce
