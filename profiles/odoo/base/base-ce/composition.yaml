@@ -791,7 +791,11 @@ spec:
             {{- end }}
             {{- end }}
 
-            {{- else if eq $role "module" }}
+            {{- /* "addon" is the current spelling; "module" is the deprecated alias.
+                   This template reads the raw annotation, so it cannot rely on the
+                   Go-side normalisation in EffectiveDeploymentRole and must accept
+                   both itself. */}}
+            {{- else if or (eq $role "addon") (eq $role "module") }}
             {{- $module := dig "extraValues" "odoo" "module" "" $pSpec }}
             {{- if eq $module "" }}{{- fail "Module name not specified in spec.extraValues.odoo.module" }}{{- end }}
             ---
