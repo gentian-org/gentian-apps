@@ -26,6 +26,10 @@ spec:
       engine: postgresql
       databasePerTenant: true
       allowDynamicDatabaseCreation: false
+      # Activepieces' TypeORM migrations create tables in public and then query
+      # them unqualified, so public has to resolve first. Previously the operator
+      # inferred this by matching "activepieces" in the role name.
+      schemaPreference: public
     cache:
       engine: redis
   portalTiles:
