@@ -491,6 +491,14 @@ export function StorePage() {
           text: `${label} is installing. Status refreshes automatically until it becomes ready.`,
         });
       }
+
+      // Choosing addons is part of setting the app up, so offer it now rather than
+      // making the user find the Addons button afterwards. Safe before the app is
+      // ready: the selection is written to the same tenant file the install just
+      // committed, so it lands on the first deployment instead of forcing a restart.
+      if (hasAddons(profile, catalogue)) {
+        setAddonTarget(profile);
+      }
     } catch (e) {
       setNotice({
         kind: "error",
@@ -630,6 +638,12 @@ export function StorePage() {
                 busy={busy}
                 onUninstall={(profile) => uninstall(profile)}
                 onPurge={requestPurge}
+                onEditAddons={
+                  // Also offered while installing: the selection is written to the
+                  // tenant file, not to a running pod, so it can be made before the
+                  // app comes up and takes effect on the first deployment.
+                  hasAddons(app.profile, catalogue) ? () => setAddonTarget(app.profile) : undefined
+                }
               />
             ))}
           </ul>

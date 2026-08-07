@@ -169,7 +169,7 @@ as the `patched` chartOwnership enum and the catalogue ApplicationSet generator.
 | # | Change | Notes |
 |---|---|---|
 | 16 | ~~Store grid filters addons~~ **done** (`1b91f4a`, `b98bc2d`) | Backend-side, so no client can list an addon as installable. Presets render as bundle buttons in the window. |
-| 17 | ~~Addon selection window~~ **done** (`b98bc2d`) | `frontend/src/components/AddonWindow.tsx`. Unentitled commercial addons are shown but disabled. |
+| 17 | ~~Addon selection window after install/provision~~ **done** (`b98bc2d` component, wired at install in a follow-up) | `frontend/src/components/AddonWindow.tsx`. Initially marked done when only the component and the Edit path existed — install/provision did not open it, so there was no install-time way to choose addons. Unentitled commercial addons are shown but disabled. |
 | 18 | ~~**Addons** button on installed apps~~ **done** (`b98bc2d`) | Shown only when the catalogue reports `hasAddons`, and only on Ready apps — an app still installing has no release to activate into. |
 | 19 | ~~Writes go through the **git** path~~ **done** (`90b42dc`) | `PUT /v1/tenants/{tenant}/apps/{profile}/addons` in applifecycle commits to gentian-deployments. `Tenant` is GitOps-managed with `selfHeal: true`, so a direct patch would be reverted and would violate the no-hand-patching rule. |
 
