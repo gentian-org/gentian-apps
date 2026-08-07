@@ -22,6 +22,18 @@ spec:
   author: Nextcloud
   tile:
     icon: notes
+  # Tile for the app menu / quick bar. The addon has no ingress of its own, so the
+  # shell resolves the base URL from spec.customization.addon.of and appends this
+  # suffix to deep-link into the feature inside Nextcloud.
+  portalTiles:
+    - name: forms
+      displayName:
+        en_US: "Forms"
+        de_DE: "Formulare"
+      linkSuffix: "/apps/forms/"
+      linkTarget: embedded
+      allowedGroup: "Domain Users"
+
   deploymentMethod: crossplane
 
   customization:

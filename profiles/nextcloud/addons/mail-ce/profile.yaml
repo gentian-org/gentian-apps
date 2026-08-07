@@ -22,6 +22,18 @@ spec:
   author: Nextcloud
   tile:
     icon: mail
+  # Tile for the app menu / quick bar. The addon has no ingress of its own, so the
+  # shell resolves the base URL from spec.customization.addon.of and appends this
+  # suffix to deep-link into the feature inside Nextcloud.
+  portalTiles:
+    - name: mail
+      displayName:
+        en_US: "Mail"
+        de_DE: "E-Mail"
+      linkSuffix: "/apps/mail/"
+      linkTarget: embedded
+      allowedGroup: "Domain Users"
+
   deploymentMethod: crossplane
 
   customization:

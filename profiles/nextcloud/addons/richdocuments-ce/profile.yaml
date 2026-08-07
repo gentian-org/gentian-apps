@@ -22,6 +22,18 @@ spec:
   author: Nextcloud
   tile:
     icon: documents
+  # Tile for the app menu / quick bar. The addon has no ingress of its own, so the
+  # shell resolves the base URL from spec.customization.addon.of and appends this
+  # suffix to deep-link into the feature inside Nextcloud.
+  portalTiles:
+    - name: richdocuments
+      displayName:
+        en_US: "Office"
+        de_DE: "Office"
+      linkSuffix: "/apps/richdocuments/"
+      linkTarget: embedded
+      allowedGroup: "Domain Users"
+
   deploymentMethod: crossplane
 
   customization:

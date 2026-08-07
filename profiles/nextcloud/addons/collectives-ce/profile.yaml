@@ -22,6 +22,18 @@ spec:
   author: Nextcloud
   tile:
     icon: wiki
+  # Tile for the app menu / quick bar. The addon has no ingress of its own, so the
+  # shell resolves the base URL from spec.customization.addon.of and appends this
+  # suffix to deep-link into the feature inside Nextcloud.
+  portalTiles:
+    - name: collectives
+      displayName:
+        en_US: "Collectives"
+        de_DE: "Collectives"
+      linkSuffix: "/apps/collectives/"
+      linkTarget: embedded
+      allowedGroup: "Domain Users"
+
   deploymentMethod: crossplane
 
   customization:

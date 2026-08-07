@@ -22,6 +22,18 @@ spec:
   author: Nextcloud
   tile:
     icon: projects
+  # Tile for the app menu / quick bar. The addon has no ingress of its own, so the
+  # shell resolves the base URL from spec.customization.addon.of and appends this
+  # suffix to deep-link into the feature inside Nextcloud.
+  portalTiles:
+    - name: deck
+      displayName:
+        en_US: "Deck"
+        de_DE: "Deck"
+      linkSuffix: "/apps/deck/"
+      linkTarget: embedded
+      allowedGroup: "Domain Users"
+
   deploymentMethod: crossplane
 
   customization:
