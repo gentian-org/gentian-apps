@@ -142,10 +142,10 @@ Afterwards an **Edit** button on the installed app reopens the same list.
 | 1 | ~~`Tenant.spec.apps[].addons`~~ **done** (`6e0d19c`) | Selected addon set for that app. Additive. |
 | 2 | ~~role rename~~ **done** (`6e0d19c`) | `addon` is now the word; `module` kept as a deprecated input alias that normalises to Addon, with a regression test. |
 | 3 | **Invert `implicit_base_apps.go`** | Today installing a module profile injects its `requires-profile` base. Target: install base, select addons — addons never appear in `spec.apps`. This logic becomes dead; confirm before deleting. |
-| 4 | Addon activation reconciler | Reconcile `spec.apps[].addons` → native activation (Odoo `-i`, Nextcloud `occ app:enable`). Generic; no per-app branching (platform boundary). |
+| 4 | ~~Addon activation~~ **done** (`b0acd19`, `4aeaa8d`, `6b3e91d`) | Two shapes, both catalogue-driven. Odoo has its own composition and installs database-side via one `-i` Job. Chart-based apps declare `spec.customization.addonActivation` (values path + script) and `app-default` renders it — nothing in gentian-os knows what `occ` is. |
 | 5 | ~~`spec.edition` → `ce · me · pro`~~ **done** (`6e0d19c` widen → `4a90d6d` narrow) | Migrated in two phases so old and new values were briefly both valid; narrowing caught `open-webui`, which ships from gentian-ui not the catalogue. Default is now `ce`. |
 | 6 | ~~`spec.author`~~ **done** (`a1b79c0`, populated `2322f9a`) | Who supplies this entry — company, organisation or individual. Set on all 22 profiles per the §2.2 rule. |
-| 7 | Entitlement gates edition **and** pro-addon activation | Per §2.1 this is what makes editions interchangeable — authorization, not technical compatibility. |
+| 7 | ~~Entitlement gates activation~~ **done** (`e7c53e9`, `90b42dc`) | `EntitledAddons` denies by default in the reconciler, and the lifecycle API rejects an unentitled selection before writing git. Per §2.1 authorization is the gate, never technical compatibility. |
 | 8 | Addons stop being App claims | An addon is activation state inside the base app, not its own workload. Check `app_reconciler.go`. |
 | 9 | ~~`AppPackage` kind~~ **done** (`a1b79c0`) | Cluster-scoped, no status, no reconciler. gentian-ui granted read access (`29545416`). |
 
@@ -159,19 +159,19 @@ as the `patched` chartOwnership enum and the catalogue ApplicationSet generator.
 |---|---|---|
 | 10 | ~~Odoo → `base/` + `addons/`~~ **done** (`2322f9a`) | Leaf names unchanged → source-path update in place, no prune. |
 | 11 | ~~`deployment-role: addon` on all 9~~ **done** (`2322f9a`) | `requires-profile` still present; drop once (3) lands. |
-| 12 | Nextcloud: collapse packages → base + addons + presets | See §4 — the real work. |
+| 12 | ~~Nextcloud: base + addons + presets~~ **done** (`6c7f2e1`, `1b91f4a`) | One image staging 9 apps disabled in `custom_apps/`; 2 bases, 9 addons, 2 presets. See §4. |
 | 13 | ~~Singletons → `profiles/<family>/<family>-<edition>/`~~ **done** (`2322f9a`) | Genuine renames; cheap only because nothing was installed. |
 | 14 | ~~editions + authors on all profiles~~ **done** (`2322f9a`, `66bcbc9a`) | Derived from the leaf tier; author follows ce=upstream / me=Gentian / pro=vendor. Corrected activepieces and litellm to Gentian — both are `me`. |
-| 15 | CI: `addons/` members carry `deployment-role: addon`; `packages/` members are presets, not profiles | **Do not** validate name ↔ edition (§2.2). |
+| 15 | ~~CI validates addon declarations~~ **done** (`1b91f4a`) | An addon must declare `customization.addon.{id,of}` and must **not** restate `grade`/`rubricScore`/`supportedRungs` — its ladder is the base's, and copying it forks a mutable fact. Name ↔ edition is still deliberately unvalidated (§2.2). |
 
 ### 3.3 `gentian-ui` + `apps/app-store` — the UI change
 
 | # | Change | Notes |
 |---|---|---|
-| 16 | Store grid filters out `deployment-role: addon` and renders packages as presets | `gentian-apps/apps/app-store/frontend/src/pages/StorePage.tsx`. |
-| 17 | Addon selection window after install/provision | Pre-selected from the chosen package; Buy button on `pro`. |
-| 18 | **Edit** button on installed apps → same list | Add/remove after the fact. |
-| 19 | Writes go through the **git** path, not the live CR | `Tenant` is GitOps-managed with `selfHeal: true`; a direct patch is reverted and violates the no-hand-patching rule. The existing `admin-demo` flow (`feat(demo): uninstall … (via admin-demo)` commits in gentian-deployments) is the precedent. |
+| 16 | ~~Store grid filters addons~~ **done** (`1b91f4a`, `b98bc2d`) | Backend-side, so no client can list an addon as installable. Presets render as bundle buttons in the window. |
+| 17 | ~~Addon selection window~~ **done** (`b98bc2d`) | `frontend/src/components/AddonWindow.tsx`. Unentitled commercial addons are shown but disabled. |
+| 18 | ~~**Addons** button on installed apps~~ **done** (`b98bc2d`) | Shown only when the catalogue reports `hasAddons`, and only on Ready apps — an app still installing has no release to activate into. |
+| 19 | ~~Writes go through the **git** path~~ **done** (`90b42dc`) | `PUT /v1/tenants/{tenant}/apps/{profile}/addons` in applifecycle commits to gentian-deployments. `Tenant` is GitOps-managed with `selfHeal: true`, so a direct patch would be reverted and would violate the no-hand-patching rule. |
 
 `gentianOdooModules` (`gentian-ui/backend/app/services/keycloak_admin_store.py`,
 `api/routes/admin.py`) **stays as-is** — Odoo calls its addons modules, so an
@@ -309,15 +309,35 @@ everything else in §3.1.
 
 ---
 
-## 8. Suggested order
+## 8. Order — status
 
-1. gentian-os: CRD changes — `Tenant.spec.apps[].addons`, role rename with alias,
-   `edition` enum, `vendor`, `AppPackage`. Ship and verify synced **before** step 2.
-2. gentian-apps: Odoo reshuffle to `base/` + `addons/` (leaf names unchanged → no
-   CR rename), singletons to two levels, `spec.edition` rewrite.
-3. gentian-os: addon activation reconciler; invert/remove implicit base install.
-4. gentian-ui + app-store: store filter, preset rendering, selection window, Edit
+1. ~~gentian-os CRD changes~~ **done** — `Tenant.spec.apps[].addons`, role rename with
+   alias, `edition` enum, `author`, `AppPackage`. Shipped and synced before step 2.
+2. ~~gentian-apps reshuffle~~ **done** — Odoo to `base/` + `addons/`, singletons to two
+   levels, `spec.edition` rewrite.
+3. ~~Addon activation~~ **done** — both shapes (Odoo composition Job, `addonActivation`
+   for chart-based apps). Inverting the implicit base install is the one item left; see
+   the note below.
+4. ~~app-store~~ **done** — store filter, preset rendering, selection window, Addons
    button, git write path.
-5. Nextcloud conversion (§4) — the long pole.
+5. ~~Nextcloud conversion (§4)~~ **done** — one image, 2 bases, 9 addons, 2 presets.
 6. gentian-deployments: re-install the demo tenant from the new catalogue.
-7. Documentation sweep (§7), last, so it describes what shipped.
+7. ~~Documentation sweep (§7)~~ **done** for the framework and profile guides.
+
+### Still open
+
+**Retire `implicit_base_apps.go` (item 3).** It is deliberately still live. It injects an
+addon's base when the addon appears in `spec.apps`, which is now the *old* way to install
+one — but until every caller selects addons through the window instead, deleting it would
+break the only path that still works for anything not yet migrated. Remove it once no
+tenant file lists an addon under `spec.apps`, and drop `requires-profile` (item 11) and
+the `module-profile` delivery enum value in the same change.
+
+**Odoo's per-addon composition branch.** Still present alongside the new base-side
+activation Job for the same reason: it is what installed addons before, and removing it
+is a separate, verifiable step.
+
+**Deselection on Odoo.** Nextcloud reconciles — deselecting disables the app and keeps its
+data. Odoo's `-i` only installs; deselecting an Odoo addon stops activating it but does not
+uninstall the module, because uninstalling an Odoo module drops its tables. That asymmetry
+is intentional and should be surfaced in the UI before Odoo addons are offered to tenants.
