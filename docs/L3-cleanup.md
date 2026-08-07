@@ -1,7 +1,11 @@
 # L3 cleanup — one addon model
 
-**Status:** In progress. All design questions resolved (§6); `spec.author` and the
-`AppPackage` CRD have shipped (gentian-os `a1b79c0`). Remaining work in §3, ordered in §8.
+**Status:** In progress. Design settled (§6). **Shipped:** `spec.author` + `AppPackage`
+(`a1b79c0`), the addon role + `Tenant.spec.apps[].addons` + ce/me/pro editions
+(`6e0d19c`, narrowed `4a90d6d`), and the catalogue layout — odoo `base/`+`addons/`,
+singleton family folders, editions and authors across all 22 profiles
+(gentian-apps `2322f9a`). **Remaining:** the addon activation reconciler, the App
+Store UI, and the Nextcloud conversion — §8 steps 3–7.
 **Companion to:** [app-profile-guide.md](app-profile-guide.md) §0 (repo layout),
 [customization-ladder.md](customization-ladder.md),
 [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md) (rung L3)
@@ -133,11 +137,11 @@ Afterwards an **Edit** button on the installed app reopens the same list.
 
 | # | Change | Notes |
 |---|---|---|
-| 1 | `Tenant.spec.apps[].addons: []string` | Selected addon set for that app. Additive. |
-| 2 | `ProfileDeploymentRoleModule` → `…Addon`; annotation value `module` → `addon` | `api/v1alpha1/catalogue_types.go`, `catalogue_helpers.go`. Accept `module` as a deprecated alias for one release to avoid a flag day. |
+| 1 | ~~`Tenant.spec.apps[].addons`~~ **done** (`6e0d19c`) | Selected addon set for that app. Additive. |
+| 2 | ~~role rename~~ **done** (`6e0d19c`) | `addon` is now the word; `module` kept as a deprecated input alias that normalises to Addon, with a regression test. |
 | 3 | **Invert `implicit_base_apps.go`** | Today installing a module profile injects its `requires-profile` base. Target: install base, select addons — addons never appear in `spec.apps`. This logic becomes dead; confirm before deleting. |
 | 4 | Addon activation reconciler | Reconcile `spec.apps[].addons` → native activation (Odoo `-i`, Nextcloud `occ app:enable`). Generic; no per-app branching (platform boundary). |
-| 5 | `spec.edition` enum → `ce · me · pro` | Admission-validated → **deploy before** any profile uses a new value. |
+| 5 | ~~`spec.edition` → `ce · me · pro`~~ **done** (`6e0d19c` widen → `4a90d6d` narrow) | Migrated in two phases so old and new values were briefly both valid; narrowing caught `open-webui`, which ships from gentian-ui not the catalogue. Default is now `ce`. |
 | 6 | ~~`spec.author`~~ **done** (`a1b79c0`) | Who supplies this entry — company, organisation or individual. 2 of 21 profiles populated; rest need an author rule (§2.2). |
 | 7 | Entitlement gates edition **and** pro-addon activation | Per §2.1 this is what makes editions interchangeable — authorization, not technical compatibility. |
 | 8 | Addons stop being App claims | An addon is activation state inside the base app, not its own workload. Check `app_reconciler.go`. |
@@ -151,11 +155,11 @@ as the `patched` chartOwnership enum and the catalogue ApplicationSet generator.
 
 | # | Change | Notes |
 |---|---|---|
-| 10 | Odoo: `profiles/odoo/<mod>/odoo-<mod>-ce` → `profiles/odoo/addons/odoo-<mod>-ce` | 9 profiles. Base → `profiles/odoo/base/odoo-base-ce`. Leaf names unchanged → no CR rename. |
-| 11 | `deployment-role: addon` on all 9; drop `requires-profile` once (3) lands | |
+| 10 | ~~Odoo → `base/` + `addons/`~~ **done** (`2322f9a`) | Leaf names unchanged → source-path update in place, no prune. |
+| 11 | ~~`deployment-role: addon` on all 9~~ **done** (`2322f9a`) | `requires-profile` still present; drop once (3) lands. |
 | 12 | Nextcloud: collapse packages → base + addons + presets | See §4 — the real work. |
-| 13 | Singletons → `profiles/<family>/<family>-<edition>/` | element, xwiki, openproject, litellm, activepieces, app-store, gentian-subscriptions. Two levels, no third layer. |
-| 14 | `spec.edition` rewritten to `ce`/`me`/`pro` on all profiles | `nextcloud-office-od` → `edition: pro`, `vendor: opendesk`. |
+| 13 | ~~Singletons → `profiles/<family>/<family>-<edition>/`~~ **done** (`2322f9a`) | Genuine renames; cheap only because nothing was installed. |
+| 14 | ~~editions + authors on all profiles~~ **done** (`2322f9a`, `66bcbc9a`) | Derived from the leaf tier; author follows ce=upstream / me=Gentian / pro=vendor. Corrected activepieces and litellm to Gentian — both are `me`. |
 | 15 | CI: `addons/` members carry `deployment-role: addon`; `packages/` members are presets, not profiles | **Do not** validate name ↔ edition (§2.2). |
 
 ### 3.3 `gentian-ui` + `apps/app-store` — the UI change
@@ -175,7 +179,7 @@ Odoo-specific attribute using Odoo's word is correct.
 
 | # | Change | Notes |
 |---|---|---|
-| 20 | MAC waiver allowlist follows any profile rename | `profiles/_base.yaml`. |
+| 20 | ~~allowlist + tenant refs follow the renames~~ **done** (`bfc2ff7`) | Both the `tenants/` and `definitions/` trees, incl. the `otro` tenant. |
 | 21 | Demo tenant re-installs from the new catalogue | No migration needed — all apps are uninstalled. |
 
 ---
