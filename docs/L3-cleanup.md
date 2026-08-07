@@ -278,9 +278,18 @@ So granularity is a choice:
 
 ---
 
-## 7. Documentation to adapt
+## 7. Documentation to adapt — **done**
 
-Counts are current occurrences of "module", to size the edit.
+The terminology sweep is complete (`24edf0f`+). "module" now appears only where it is
+upstream's own word: Odoo modules, the Synapse Module API, and identifiers like
+`odoo-modules`, `gentianOdooModules`, `initModules`, `git-modules`. References to
+"module" remaining *in this document* are deliberate — it describes the rename.
+
+API identifiers renamed with it: `extension.modulePath` → `addonPath`,
+`extension.perTenantModules` → `perTenantAddons`, `delivery: module-profile` →
+`addon-profile` (old value still accepted until the catalogue finishes migrating).
+
+Counts below were the occurrences before the sweep.
 
 | Document | What changes | Scale |
 |---|---|---|

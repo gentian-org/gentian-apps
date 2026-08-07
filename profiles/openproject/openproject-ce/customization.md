@@ -10,7 +10,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 |---|---|---|
 | Documented config reference | 1 | `configuration.yml` + `OPENPROJECT_*` env reference |
 | Declared drop-in directories | 0 | no upstream-documented config drop-in directory |
-| Documented plugin/module API | 1 | Rails engines registered via a plugins Gemfile |
+| Documented plugin/addon API | 1 | Rails engines registered via a plugins Gemfile |
 | Plugin API versioned + deprecation policy | 0 | no published plugin deprecation policy |
 | Published HTTP API with a spec | 1 | APIv3, documented |
 | Upstream accepts patches | 1 | active PR flow |

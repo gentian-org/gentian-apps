@@ -411,10 +411,10 @@ spec:
     extension:
       mechanism: activepieces-piece
       delivery: [git-sidecar, image-layer]
-      modulePath: /usr/src/app/modules
+      addonPath: /usr/src/app/modules
       apiStability: stable
       apiDocs: https://www.activepieces-me.com/docs/developers/building-pieces/overview
-      perTenantModules: true
+      perTenantAddons: true
       testMatrix: ["0.68"]
     publishes:
       apis:

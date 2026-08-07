@@ -10,7 +10,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 |---|---|---|
 | Documented config reference | 1 | `AP_*` environment reference |
 | Declared drop-in directories | 1 | the pieces directory, synced by the git-modules sidecar |
-| Documented plugin/module API | 1 | the Pieces framework (TypeScript) |
+| Documented plugin/addon API | 1 | the Pieces framework (TypeScript) |
 | Plugin API versioned + deprecation policy | 1 | pieces declare a framework version; breaking changes are versioned |
 | Published HTTP API with a spec | 1 | REST API |
 | Upstream accepts patches | 1 | active PR flow |
@@ -43,7 +43,7 @@ distinction is the target, not the technique.
 ## L3 is the intended path
 
 Custom pieces are Activepieces' native extension unit and the sidecar wiring already exists on
-this profile — adding a piece is a push to the module repo, not a platform change. Anything
+this profile — adding a piece is a push to the addon repo, not a platform change. Anything
 phrased as "add an integration/connector/step" is L3 here, not L2.
 
 ## Licensing — read before customizing

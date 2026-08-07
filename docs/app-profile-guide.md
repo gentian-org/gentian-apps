@@ -256,15 +256,15 @@ The gentian-os LDAP reconciler resolves `tile.icon` to a data URI when writing
 
 CI: `scripts/validate-profile-tiles.py` (see `.github/workflows/apps-ci.yaml`).
 
-### Base + module profile bundles
+### Base + addon profile bundles
 
-For apps with a shared runtime and thin module entries (Odoo, OX-style), use
+For apps with a shared runtime and thin addon entries (Odoo, OX-style), use
 **metadata annotations** — do not add per-app fields to `AppProfile` spec:
 
 | Annotation | Values | Purpose |
 |---|---|---|
-| `gentianos.io/deployment-role` | `standalone` (default), `base`, `module` | How the operator/composition deploys this entry |
-| `gentianos.io/requires-profile` | AppProfile name | Base profile auto-installed when `deployment-role=module` |
+| `gentianos.io/deployment-role` | `standalone` (default), `base`, `addon` | How the operator/composition deploys this entry |
+| `gentianos.io/requires-profile` | AppProfile name | Base profile auto-installed when `deployment-role=addon` |
 | `gentianos.io/platform-app` | `"true"` | Hidden from App Store listing (required base runtimes) |
 
 App-specific install parameters (e.g. Odoo module technical name) belong in
@@ -283,9 +283,9 @@ profile's **`composition.yaml`** (`app-ox`, `app-element`, …).
 |---|---|---|
 | **`spec.kernelRequirements` + `valueMapping`** | Any app needs a standard kernel function (OIDC, LDAP, DB, S3, mail) | `clientId`, `redirectUris`, `databasePerTenant` |
 | **Profile annotation** | Operator or gateway reconciler must do the same thing for many apps; value is small and stable | `gentianos.io/deployment-role`, `gentianos.io/gateway-api-backends`, `gentianos.io/oidc-default-redirect-uris` |
-| **`spec.extraValues`** | Helm chart needs non-secret structured config; composition passes it through | Odoo `module: crm`, chart feature flags |
+| **`spec.extraValues`** | Helm chart needs non-secret structured config; composition passes it through | Odoo `addon: crm`, chart feature flags |
 | **`spec.postInstallJob`** | Bootstrap must call the app's own runtime admin API (not Helm values, not `kernelRequirements`); small and self-contained | open-webui LiteLLM config seed (§13a) |
-| **`composition.yaml`** | Custom Crossplane MR graph, multi-Job/RBAC sequencing, chart-specific workarounds | OX bootstrap Job, Element Jitsi overlay, module install Jobs |
+| **`composition.yaml`** | Custom Crossplane MR graph, multi-Job/RBAC sequencing, chart-specific workarounds | OX bootstrap Job, Element Jitsi overlay, addon install Jobs |
 | **Upstream chart / vendor** | Fix belongs in the supplier chart long-term | OX `initconfigdb -i`, Keycloak client scopes in openDesk |
 
 This table is the rung mapping in different words —

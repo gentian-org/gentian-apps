@@ -61,7 +61,7 @@ local operations: [docs/customization-ladder.md](docs/customization-ladder.md).
     breaks this at the next upstream release.
 
 Rung → where it lives here: L0 `spec.extraValues` · L1 `profiles/<n>/dropins/` ·
-L2 `apps/<new>/` plus a contract · L3 the module repo (`odoo-modules`, …) ·
+L2 `apps/<new>/` plus a contract · L3 the addon repo (`odoo-modules`, …) ·
 L4 `charts/` or `composition.yaml` · L5 the build repo (`ocb`) · L6 a fork repo.
 
 ## First-party app development (`apps/app-store`, `apps/_template`)
@@ -139,13 +139,13 @@ Store surfaces those with a Buy button and the operator gates install on entitle
 
 **Layout rules — CI enforces both:**
 
-* Bundles are found by their `kustomization.yaml` at **any depth**. Singletons live at
-  `profiles/<name>/`; members of a multi-profile family live at `profiles/<family>/<name>/`.
-  Never assume a fixed path depth when globbing — use `**`.
-* The **leaf directory name must equal `metadata.name`**. The catalogue ApplicationSet names
-  Applications after it, and `AppProfile` is cluster-scoped, so this is what keeps those names
-  unique. A `profile.yaml` with no sibling `kustomization.yaml` is a CI error, not a silent
-  no-sync.
+* Bundles are found by their `profile.yaml` at **any depth**. Families with addons use
+  `profiles/<family>/{base,addons,packages}/<name>/`; families without L3 use
+  `profiles/<family>/<name>/`. Never assume a fixed path depth when globbing — use `**`.
+* **`metadata.name` must be globally unique** — the ApplicationSet names Applications after
+  it, not after the directory, so two profiles sharing a name would collapse into one
+  Application. Directory names are free (`addons/crm-ce` holds `odoo-crm-ce`). A
+  `profile.yaml` with no sibling `kustomization.yaml` is a CI error, not a silent no-sync.
 
 **Do not move charts or images into profile folders.** `charts/<name>/` and `images/<name>/`
 are separate flat trees on purpose: a profile references its chart by OCI coordinate rather

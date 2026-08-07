@@ -155,7 +155,7 @@ spec:
       delivery: [image-layer]
       apiStability: evolving
       apiDocs: https://element-hq.github.io/synapse/latest/modules/index.html
-      perTenantModules: false
+      perTenantAddons: false
       testMatrix: ["1.121"]
     publishes:
       apis:

@@ -313,7 +313,7 @@ spec:
       delivery: [image-layer]       # plugins resolve at build time
       apiStability: undocumented
       apiDocs: https://www.openproject-ce.org/docs/development/
-      perTenantModules: false
+      perTenantAddons: false
       testMatrix: ["15"]
     publishes:
       apis:

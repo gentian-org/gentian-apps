@@ -11,7 +11,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 |---|---|---|
 | Documented config reference | 1 | `config.php` admin manual |
 | Declared drop-in directories | 1 | `config/*.config.php` is an upstream-documented drop-in dir |
-| Documented plugin/module API | 1 | Nextcloud apps (OCP) + AppAPI ExApps |
+| Documented plugin/addon API | 1 | Nextcloud apps (OCP) + AppAPI ExApps |
 | Plugin API versioned + deprecation policy | 1 | `max-version` in `appinfo/info.xml`; OCP deprecation cycle |
 | Published HTTP API with a spec | 1 | OCS + WebDAV; `file-store` / `filepicker` contracts |
 | Upstream accepts patches | 1 | active GitHub PR flow |

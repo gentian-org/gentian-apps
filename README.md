@@ -14,11 +14,13 @@ catalogue — it's being migrated to hold only those artifacts.
 
 ```text
 profiles/              # App catalogue bundles (OSS + commercial) — synced by Argo CD gentian-catalogue
-  odoo/                #   family
-    base/              #     app
-      odoo-base-ce/    #       leaf = the AppProfile, named <family>-<app>-<tier>
-    crm/
-      odoo-crm-ce/
+  odoo/                #   family with addons (L3)
+    base/
+      base-ce/         #       dir is short; the AppProfile is odoo-base-ce
+    addons/
+      crm-ce/          #       -> odoo-crm-ce
+      accounting-ce/   #       -> odoo-accounting-ce
+    packages/          #       AppPackage presets (not deployable)
   nextcloud/           #   family: drive / office / suite
     office/
       nextcloud-office-ce/   # Community Edition
@@ -40,10 +42,11 @@ icons/                 # shared SVG assets
 
 **Discovery:** catalogue = `profiles/` · implementation = `apps/<name>/` · chart = `charts/<name>/`
 
-A profile bundle is identified by its **`kustomization.yaml`**, at any depth — singletons at
-`profiles/<name>/`, family members at `profiles/<family>/<name>/`. The leaf directory name must
-equal the AppProfile's `metadata.name` (CI enforces this; the catalogue ApplicationSet names
-Applications after it).
+A profile bundle is identified by its **`profile.yaml`**, at any depth. The catalogue
+ApplicationSet names each Application after the AppProfile's **`metadata.name`**, not after the
+directory — so directories can be short (`addons/crm-ce` holds `odoo-crm-ce`) and CI enforces
+that `metadata.name` is globally unique rather than that it matches the folder. Every bundle
+also needs a `kustomization.yaml`, since it is rendered with kustomize.
 
 `apps/` is only for first-party apps we build. A chart that wraps an upstream image — vendored
 or Gentian-authored — belongs in `charts/<name>/`, and its profile references it by OCI

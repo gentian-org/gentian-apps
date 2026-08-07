@@ -10,7 +10,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 |---|---|---|
 | Documented config reference | 1 | `xwiki-ce.cfg` / `xwiki-ce.properties` reference |
 | Declared drop-in directories | 1 | `/usr/local/xwiki-ce/data/` config and `lib/` extension dirs |
-| Documented plugin/module API | 1 | XWiki components + XAR extensions |
+| Documented plugin/addon API | 1 | XWiki components + XAR extensions |
 | Plugin API versioned + deprecation policy | 1 | XWiki keeps a long deprecation cycle and documents it per release |
 | Published HTTP API with a spec | 1 | REST API |
 | Upstream accepts patches | 1 | active Jira + PR flow |
@@ -33,7 +33,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 
 XWiki blurs L1 and L3 more than most apps: much of what other systems need a plugin for is
 authored as **wiki pages** (velocity/groovy in-page). Treat page-as-code imports as L3 — they
-are versioned artifacts loaded by the app, not configuration — and keep them in a module repo
+are versioned artifacts loaded by the app, not configuration — and keep them in an addon repo
 rather than editing pages in a live instance, which would be a Rung X hotfix in disguise.
 
 Extension installation is a runtime operation; drive it from `spec.postInstallJob`, not values.

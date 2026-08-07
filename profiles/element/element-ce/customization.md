@@ -13,7 +13,7 @@ the lower of the two, because a request usually lands on whichever one is less a
 |---|---|---|
 | Documented config reference | 1 | `config.json` (Element) and `homeserver.yaml` (Synapse) |
 | Declared drop-in directories | 1 | Synapse `conf.d`-style config directory |
-| Documented plugin/module API | 1 | Synapse Module API (server side only) |
+| Documented plugin/addon API | 1 | Synapse Module API (server side only) |
 | Plugin API versioned + deprecation policy | 1 | Synapse module API is versioned and deprecations are announced |
 | Published HTTP API with a spec | 1 | Matrix Client-Server API |
 | Upstream accepts patches | 1 | active PR flow |
@@ -27,7 +27,7 @@ the lower of the two, because a request usually lands on whichever one is less a
 | **L0** Configure | yes | `spec.extraValues` → `ananace/matrix-synapse` chart values |
 | **L1** Drop-in | yes | `synapse-config` (Synapse config directory, yaml) and `element-config` (`config.json`, tenant-editable for branding keys only) |
 | **L2** Companion | always | Matrix Client-Server API, or an application service |
-| **L3** Extension | **server only** | a Synapse Python module. There is **no** plugin system for the Element web client |
+| **L3** Extension | **server only** | a Synapse Python addon. There is **no** plugin system for the Element web client |
 | **L4** Repackage | yes | upstream chart + composition (Jitsi overlay lives here) |
 | **L5** Patch | **no** | not permitted |
 | **L6** Fork | **no** | not permitted |
@@ -41,7 +41,7 @@ and is not permitted here; treat a request that seems to need it as a signal to 
 a widget.
 
 Server-side behaviour (auth, spam checking, event hooks) *is* L3 via the Synapse Module API —
-but note the ABI score above: modules have broken across Synapse releases, so pin
+but note the ABI score above: addons have broken across Synapse releases, so pin
 `testMatrix` and expect to re-verify on every bump.
 
 ## Gotchas

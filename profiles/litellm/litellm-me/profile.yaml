@@ -56,7 +56,7 @@ spec:
       delivery: [image-layer]
       apiStability: evolving
       apiDocs: https://docs.litellm-me.ai/docs/proxy/logging
-      perTenantModules: false
+      perTenantAddons: false
       testMatrix: ["1.55"]
     publishes:
       apis:

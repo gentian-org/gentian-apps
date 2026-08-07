@@ -388,7 +388,7 @@ spec:
       registry: https://apps.nextcloud.com
       apiStability: stable
       apiDocs: https://docs.nextcloud.com/server/stable/developer_manual/
-      perTenantModules: true
+      perTenantAddons: true
       testMatrix: ["31"]
     publishes:
       apis:

@@ -11,7 +11,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 |---|---|---|
 | Documented config reference | 1 | `core/config.py` + chart values |
 | Declared drop-in directories | 1 | `/etc/gentian/gentian-subscriptions-me/conf.d` |
-| Documented plugin/module API | 0 | template extension loader not yet adopted |
+| Documented plugin/addon API | 0 | template extension loader not yet adopted |
 | Plugin API versioned + deprecation policy | 0 | — |
 | Published HTTP API with a spec | 1 | FastAPI → OpenAPI |
 | Upstream accepts patches | 1 | we are upstream |

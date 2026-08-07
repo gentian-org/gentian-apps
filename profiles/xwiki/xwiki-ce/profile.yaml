@@ -329,7 +329,7 @@ spec:
       registry: https://extensions.xwiki-ce.org
       apiStability: stable
       apiDocs: https://extensions.xwiki-ce.org/xwiki-ce/bin/view/Documentation/
-      perTenantModules: true
+      perTenantAddons: true
       testMatrix: ["16"]
     publishes:
       apis:

@@ -10,7 +10,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 |---|---|---|
 | Documented config reference | 1 | `config.yaml` proxy reference |
 | Declared drop-in directories | 1 | the proxy config directory |
-| Documented plugin/module API | 1 | custom callbacks / custom auth handlers loaded from config |
+| Documented plugin/addon API | 1 | custom callbacks / custom auth handlers loaded from config |
 | Plugin API versioned + deprecation policy | 0 | no published deprecation policy; the project moves fast |
 | Published HTTP API with a spec | 1 | OpenAI-compatible API |
 | Upstream accepts patches | 1 | active PR flow |

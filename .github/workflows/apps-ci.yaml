@@ -228,49 +228,42 @@ jobs:
         run: pip install pyyaml
       - name: Validate profile bundles
         run: |
-          # Bundles are discovered by kustomization.yaml at any depth, matching the
-          # gentian-catalogue ApplicationSet's files generator. Singletons live at
-          # profiles/<name>/, multi-profile families at profiles/<family>/<name>/.
+          # Bundles are discovered by profile.yaml at any depth, matching the
+          # gentian-catalogue ApplicationSet's files generator.
           found=0
-          while IFS= read -r k; do
-            d="$(dirname "$k")"
-            name="$(basename "$d")"
+          declare -A SEEN
+          while IFS= read -r f; do
+            d="$(dirname "$f")"
             found=$((found + 1))
             echo "Checking ${d}"
-            if test -f "${d}/profile.yaml"; then
-              python3 -c "import yaml; yaml.safe_load(open('${d}/profile.yaml'))"
-              # The ApplicationSet names each Application after the bundle's leaf
-              # directory, so that name must equal the AppProfile it contains.
-              # AppProfile is cluster-scoped, which makes leaf names globally
-              # unique — but only while this invariant holds.
-              cr="$(python3 -c "import yaml; print((yaml.safe_load(open('${d}/profile.yaml')).get('metadata') or {}).get('name',''))")"
-              if [ "$cr" != "$name" ]; then
-                echo "${d}: directory name '${name}' does not match AppProfile metadata.name '${cr}'" >&2
-                echo "  The catalogue ApplicationSet derives Application names from the leaf" >&2
-                echo "  directory; a mismatch silently decouples the Application from its CR." >&2
-                exit 1
-              fi
-            elif test -f "${d}/catalog.yaml"; then
-              python3 -c "import yaml; yaml.safe_load(open('${d}/catalog.yaml'))"
-            else
-              echo "${d}: expected profile.yaml (AppProfile) or catalog.yaml (platform catalogue CR)" >&2
+            python3 -c "import yaml; yaml.safe_load(open('${f}'))"
+
+            # The ApplicationSet names each Application after the AppProfile's
+            # metadata.name, not its directory, so directory naming is free — but
+            # metadata.name must be globally unique or two bundles collapse into one
+            # Application. AppProfile is cluster-scoped, so the API server would
+            # reject the duplicate too; catching it here names both offenders.
+            cr="$(python3 -c "import yaml; print((yaml.safe_load(open('${f}')).get('metadata') or {}).get('name',''))")"
+            if [ -z "$cr" ]; then
+              echo "${d}: profile.yaml has no metadata.name" >&2; exit 1
+            fi
+            if [ -n "${SEEN[$cr]:-}" ]; then
+              echo "duplicate AppProfile name '${cr}': ${SEEN[$cr]} and ${d}" >&2
+              echo "  Application names derive from metadata.name, so these would collide." >&2
+              exit 1
+            fi
+            SEEN[$cr]="$d"
+
+            # Generated from profile.yaml but rendered with kustomize: without a
+            # kustomization.yaml the Application exists and cannot sync.
+            if [ ! -f "${d}/kustomization.yaml" ]; then
+              echo "${d}: profile.yaml without kustomization.yaml — the Application would never sync" >&2
               exit 1
             fi
             kubectl kustomize "$d" >/dev/null
-          done < <(find profiles -name kustomization.yaml | sort)
+          done < <(find profiles -name profile.yaml | sort)
           echo "Validated ${found} profile bundle(s)"
 
-          # A profile.yaml with no kustomization.yaml beside it is invisible to the
-          # ApplicationSet — it would silently never sync. Catch that here.
-          orphans=0
-          while IFS= read -r p; do
-            d="$(dirname "$p")"
-            if [ ! -f "${d}/kustomization.yaml" ]; then
-              echo "${d}: profile.yaml without kustomization.yaml — this bundle would never be synced" >&2
-              orphans=1
-            fi
-          done < <(find profiles -name profile.yaml | sort)
-          exit "$orphans"
       - name: Validate profile tile specs
         run: python3 scripts/validate-profile-tiles.py
       - name: Validate customization ladder declarations and records

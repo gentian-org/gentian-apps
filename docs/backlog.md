@@ -61,7 +61,7 @@ other "vendored" chart needs to stay that way.
 
 Moved to its own tracking document: **[L3-cleanup.md](L3-cleanup.md)**.
 
-The second directory layer currently means *modules* for Odoo (individually
+The second directory layer currently means *addons* for Odoo (individually
 installable, one profile each) and *packages* for Nextcloud (fixed plugin bundles
 baked into an image) — the same slot with incompatible semantics, scaling badly in
 opposite directions. The plan unifies both as customization-ladder rung L3

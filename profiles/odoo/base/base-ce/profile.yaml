@@ -186,12 +186,12 @@ spec:
 
     extension:
       mechanism: odoo-addon
-      delivery: [git-sidecar, module-profile, image-layer]
+      delivery: [git-sidecar, addon-profile, image-layer]
       registry: https://github.com/gentian-org/odoo-modules
-      modulePath: /opt/odoo/custom-addons
+      addonPath: /opt/odoo/custom-addons
       apiStability: stable
       apiDocs: https://www.odoo.com/documentation/18.0/developer.html
-      perTenantModules: true      # one Odoo per tenant namespace — see framework §2.4
+      perTenantAddons: true      # one Odoo per tenant namespace — see framework §2.4
       testMatrix: ["18.0"]
 
     publishes:
