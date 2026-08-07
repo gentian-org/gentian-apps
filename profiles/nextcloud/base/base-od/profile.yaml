@@ -115,7 +115,10 @@ spec:
 
   ingress:
     subDomain: "files"
-    serviceName: "nextcloud-aio"
+    # Aligned with fullnameOverride, as nextcloud-base-ce is. "nextcloud-aio" could
+    # not have worked: it does not start with "nextcloud-base-od-", so the derived
+    # component selector was the whole service name and matched no pods.
+    serviceName: nextcloud
     servicePort: 8080
     tlsEnabled: true
     annotations:

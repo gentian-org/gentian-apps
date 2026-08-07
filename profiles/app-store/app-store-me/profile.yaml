@@ -84,7 +84,12 @@ spec:
 
   ingress:
     subDomain: store
-    serviceName: app-store-web
+    # Must start with the profile name: app-default derives the alias Service's
+    # component selector by trimming "<profile>-" off this value. As "app-store-web"
+    # it stopped matching after the rename, so the selector became
+    # component=app-store-web while the pod has component=web — a Service with no
+    # endpoints, and every request to "/" returning 500.
+    serviceName: app-store-me-web
     servicePort: 8080
     tlsEnabled: true
 

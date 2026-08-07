@@ -67,6 +67,39 @@ def check_gateway_backends(path: pathlib.Path, doc: dict) -> list[str]:
     return errors
 
 
+def check_ingress_service_name(path: pathlib.Path, doc: dict) -> list[str]:
+    """spec.ingress.serviceName must start with the profile name.
+
+    app-default builds the alias Service's pod selector by trimming "<profile>-"
+    off this value to get a component label. When the value does not start with
+    that prefix, trimPrefix is a no-op and the selector becomes the whole service
+    name — which is never a component label, so the Service gets no endpoints and
+    the route 500s. The failure is invisible in Argo CD: the Service exists and the
+    Application is Healthy.
+
+    Skipped when the chart already creates a Service of that name
+    (fullnameOverride == serviceName), because then no alias is emitted at all.
+    """
+    meta, spec = doc.get("metadata") or {}, doc.get("spec") or {}
+    if spec.get("compositionRef"):
+        return []
+    svc = (spec.get("ingress") or {}).get("serviceName")
+    if not svc:
+        return []
+    if svc == (spec.get("extraValues") or {}).get("fullnameOverride"):
+        return []
+
+    name = meta.get("name")
+    if svc.startswith(f"{name}-"):
+        return []
+    return [
+        f"{path}: spec.ingress.serviceName {svc!r} does not start with "
+        f"'{name}-', so the alias Service's selector resolves to "
+        f"component={svc!r} and will match no pods. Use '{name}-<component>', "
+        f"or set extraValues.fullnameOverride to {svc!r} so the chart owns it."
+    ]
+
+
 def main() -> int:
     errors: list[str] = []
     checked = 0
@@ -90,6 +123,7 @@ def main() -> int:
             )
 
         errors.extend(check_gateway_backends(path.relative_to(REPO), doc))
+        errors.extend(check_ingress_service_name(path.relative_to(REPO), doc))
 
     if errors:
         print("Reference errors:\n")
