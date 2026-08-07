@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from kubernetes import client, config
@@ -30,6 +31,20 @@ class K8sClient:
 
     def list_app_profiles(self) -> list[dict[str, Any]]:
         result = self._custom.list_cluster_custom_object(GROUP, VERSION, "appprofiles")
+        return result.get("items", [])
+
+    def list_app_packages(self) -> list[dict[str, Any]]:
+        """AppPackages are presets that pre-select a set of addons in the UI.
+
+        Absent CRD is not an error: a cluster that has not yet synced the
+        AppPackage CRD should still render the addon window, just without presets.
+        """
+        try:
+            result = self._custom.list_cluster_custom_object(GROUP, VERSION, "apppackages")
+        except ApiException as exc:
+            if exc.status == 404:
+                return []
+            raise
         return result.get("items", [])
 
     def get_tenant(self, name: str) -> dict[str, Any]:

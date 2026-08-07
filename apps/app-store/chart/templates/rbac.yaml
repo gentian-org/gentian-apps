@@ -8,7 +8,8 @@ metadata:
     {{- include "gentian-app.helm.annotations" . | nindent 4 }}
 rules:
   - apiGroups: ["gentianos.io"]
-    resources: ["appcatalogues", "appprofiles"]
+    # apppackages back the bundle presets in the addon window; tenants are read-only.
+    resources: ["appcatalogues", "appprofiles", "apppackages", "tenants"]
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from app.core.auth import get_current_user
 from app.core.config import get_settings
+from app.services.catalogue import build_addon_window
 from app.services.k8s_client import K8sClient
 from app.services.catalogue_tiers import is_proprietary
 from app.services.corp_client import fetch_entitled_profiles
@@ -47,6 +48,22 @@ def _assert_may_install(profile: str, settings) -> None:
         status_code=402,
         detail="This app requires a commercial subscription. Use Buy in the catalogue first.",
     )
+
+
+def _selected_addons(k8s: K8sClient, tenant: str, profile: str) -> list[str]:
+    """The tenant's current selection, read from the Tenant CR.
+
+    Read from the cluster rather than from git so the window shows what is actually
+    applied; a selection committed but not yet synced is not yet in effect.
+    """
+    try:
+        apps = (k8s.get_tenant(tenant).get("spec") or {}).get("apps") or []
+    except Exception:
+        return []
+    for app in apps:
+        if app.get("profile") == profile:
+            return list(app.get("addons") or [])
+    return []
 
 
 def _list_installed_entries() -> tuple[list[dict[str, Any]], str | None]:
@@ -135,6 +152,40 @@ def uninstall_app(
         "profile": profile,
         "purged": bool(result.get("purged")),
         "warnings": result.get("warnings") or [],
+    }
+
+
+@router.get("/{profile}/addons")
+def get_addons(profile: str, user: dict = Depends(get_current_user)) -> dict:
+    """Addons offered for an installed app, plus the tenant's current selection."""
+    settings = get_settings()
+    k8s = K8sClient()
+    try:
+        window = build_addon_window(k8s, profile, settings=settings)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown profile: {profile}") from exc
+    window["selected"] = _selected_addons(k8s, settings.tenant_id, profile)
+    return window
+
+
+@router.put("/{profile}/addons")
+def set_addons(
+    profile: str,
+    addons: list[str] = Body(default=[], embed=True),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Replace the addon selection. The body is the complete list; [] clears it."""
+    settings = get_settings()
+    try:
+        result = get_lifecycle_client().set_addons(profile, addons, _actor(user))
+    except LifecycleError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "status": result.get("status", "updated"),
+        "mode": "gitops",
+        "tenant": settings.tenant_id,
+        "profile": profile,
+        "addons": addons,
     }
 
 
