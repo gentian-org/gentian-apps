@@ -83,11 +83,13 @@ appear as several profiles from different authors. `spec.edition` + `spec.author
 are the authoritative pair; the App Store renders "Pro edition by openDesk" from the
 fields rather than parsing `-od` out of a name.
 
-Populated so far: `nextcloud-office-od` → `openDesk`, `nextcloud-suite-me` →
-`Gentian`. The remaining 19 profiles need an author assigned by the catalogue owner —
-for a `ce` edition packaged by Gentian from an upstream project, decide whether the
-author is Gentian (who packages it) or the upstream project (who writes it), and
-apply that rule consistently.
+**Populated on all 22 profiles** by the agreed rule: `ce` → the upstream
+organisation, `me` → Gentian, `pro` → the supplying vendor. That rule is why
+`activepieces` and `litellm` are authored by Gentian rather than upstream — both are
+`me` editions (Gentian carries a patch series for activepieces and runs litellm), and
+attributing a maintained edition to upstream would misstate who is on the hook for it.
+Odoo profiles credit **OCA**, not Odoo S.A., because the base image builds from
+`OCA/OCB` (see `ocb/UPSTREAM`).
 
 ### 2.3 Packages become UI presets
 
@@ -142,7 +144,7 @@ Afterwards an **Edit** button on the installed app reopens the same list.
 | 3 | **Invert `implicit_base_apps.go`** | Today installing a module profile injects its `requires-profile` base. Target: install base, select addons — addons never appear in `spec.apps`. This logic becomes dead; confirm before deleting. |
 | 4 | Addon activation reconciler | Reconcile `spec.apps[].addons` → native activation (Odoo `-i`, Nextcloud `occ app:enable`). Generic; no per-app branching (platform boundary). |
 | 5 | ~~`spec.edition` → `ce · me · pro`~~ **done** (`6e0d19c` widen → `4a90d6d` narrow) | Migrated in two phases so old and new values were briefly both valid; narrowing caught `open-webui`, which ships from gentian-ui not the catalogue. Default is now `ce`. |
-| 6 | ~~`spec.author`~~ **done** (`a1b79c0`) | Who supplies this entry — company, organisation or individual. 2 of 21 profiles populated; rest need an author rule (§2.2). |
+| 6 | ~~`spec.author`~~ **done** (`a1b79c0`, populated `2322f9a`) | Who supplies this entry — company, organisation or individual. Set on all 22 profiles per the §2.2 rule. |
 | 7 | Entitlement gates edition **and** pro-addon activation | Per §2.1 this is what makes editions interchangeable — authorization, not technical compatibility. |
 | 8 | Addons stop being App claims | An addon is activation state inside the base app, not its own workload. Check `app_reconciler.go`. |
 | 9 | ~~`AppPackage` kind~~ **done** (`a1b79c0`) | Cluster-scoped, no status, no reconciler. gentian-ui granted read access (`29545416`). |
