@@ -11,7 +11,10 @@ metadata:
   annotations:
     gentianos.io/platform-app: "true"
     gentianos.io/kernel-egress-namespaces: gentian-system
-    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/api","serviceName":"app-store-api","port":8000},{"pathPrefix":"/oauth","serviceName":"app-store-api","port":8000}]'
+    # app-default emits the stable API alias as "<profile>-api", so this must track
+    # the profile name. It still said "app-store-api" from before the rename, which
+    # left the HTTPRoute with BackendNotFound and every path returning 500.
+    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/api","serviceName":"app-store-me-api","port":8000},{"pathPrefix":"/oauth","serviceName":"app-store-me-api","port":8000}]'
 spec:
   displayName: "App Store"
   edition: me
