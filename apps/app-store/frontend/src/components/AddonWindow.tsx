@@ -26,6 +26,9 @@ type AddonWindow = {
   addons: Addon[];
   packages: AddonPackage[];
   selected: string[];
+  // Whether unticking actually switches an addon off, or only stops activating it.
+  // Derived by the backend from how the base activates addons.
+  deselectBehaviour?: "disables" | "keeps-installed";
 };
 
 /**
@@ -149,8 +152,18 @@ export function AddonWindow({
             <div className="flex gap-2">
               <dt className="w-20 shrink-0 font-medium text-slate-700">Unticked</dt>
               <dd>
-                Switched off and hidden. Its data is <strong>kept</strong> — ticking it again
-                restores everything.
+                {data?.deselectBehaviour === "keeps-installed" ? (
+                  <>
+                    <strong>Stops being added</strong>, but an addon already installed stays
+                    installed. {appName} cannot remove one safely once it is in place, so
+                    unticking here will not make it disappear.
+                  </>
+                ) : (
+                  <>
+                    Switched off and hidden. Its data is <strong>kept</strong> — ticking it
+                    again restores everything.
+                  </>
+                )}
               </dd>
             </div>
             <div className="flex gap-2">

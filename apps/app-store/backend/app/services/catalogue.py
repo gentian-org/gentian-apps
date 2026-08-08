@@ -136,7 +136,8 @@ def build_addon_window(
     base = next((p for p in profiles if p.get("metadata", {}).get("name") == base_profile), None)
     if base is None:
         raise KeyError(base_profile)
-    base_family = (base.get("spec", {}) or {}).get("family") or base_profile
+    base_spec = base.get("spec", {}) or {}
+    base_family = base_spec.get("family") or base_profile
 
     addons: list[dict[str, Any]] = []
     for profile in profiles:
@@ -185,4 +186,23 @@ def build_addon_window(
         )
     packages.sort(key=lambda p: p["displayName"].lower())
 
-    return {"base": base_profile, "family": base_family, "addons": addons, "packages": packages}
+    # Whether deselecting actually turns an addon off, or merely stops activating it.
+    #
+    # Derived, not hardcoded per app. A base declaring addonActivation reconciles on
+    # every start — it enables the selection and disables everything else — so
+    # unticking genuinely switches the addon off. A base that activates through its
+    # own composition Job (Odoo, which installs modules with `odoo-bin -i`) has no
+    # safe inverse: uninstalling an Odoo module drops its tables, so unticking stops
+    # activating it and leaves what is already installed in place.
+    #
+    # The UI has to say which, or unticking means two different things with no way
+    # to tell them apart.
+    reconciles = bool((base_spec.get("customization") or {}).get("addonActivation"))
+
+    return {
+        "base": base_profile,
+        "family": base_family,
+        "addons": addons,
+        "packages": packages,
+        "deselectBehaviour": "disables" if reconciles else "keeps-installed",
+    }

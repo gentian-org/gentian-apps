@@ -311,33 +311,45 @@ everything else in §3.1.
 
 ## 8. Order — status
 
-1. ~~gentian-os CRD changes~~ **done** — `Tenant.spec.apps[].addons`, role rename with
-   alias, `edition` enum, `author`, `AppPackage`. Shipped and synced before step 2.
-2. ~~gentian-apps reshuffle~~ **done** — Odoo to `base/` + `addons/`, singletons to two
-   levels, `spec.edition` rewrite.
-3. ~~Addon activation~~ **done** — both shapes (Odoo composition Job, `addonActivation`
-   for chart-based apps). Inverting the implicit base install is the one item left; see
-   the note below.
-4. ~~app-store~~ **done** — store filter, preset rendering, selection window, Addons
-   button, git write path.
-5. ~~Nextcloud conversion (§4)~~ **done** — one image, 2 bases, 9 addons, 2 presets.
-6. gentian-deployments: re-install the demo tenant from the new catalogue.
-7. ~~Documentation sweep (§7)~~ **done** for the framework and profile guides.
+All items are complete.
 
-### Still open
+1. ~~gentian-os CRD changes~~ — `Tenant.spec.apps[].addons`, role rename with alias,
+   `edition` enum, `author`, `AppPackage`.
+2. ~~gentian-apps reshuffle~~ — Odoo to `base/` + `addons/`, singletons to two levels,
+   `spec.edition` rewrite.
+3. ~~Addon activation~~ — two shapes: a composition Job for Odoo, whose install is
+   database-side, and `spec.customization.addonActivation` for chart-based apps.
+   `spec.customization.addonValues` additionally turns on chart infrastructure an
+   addon needs (Collabora for richdocuments) only while that addon is selected.
+4. ~~app-store~~ — store filter, preset rendering, selection window at install time and
+   behind the Addons button, git write path.
+5. ~~Nextcloud conversion (§4)~~ — one image, 2 bases, 9 addons, 2 presets.
+6. ~~gentian-deployments~~ — the demo tenant runs entirely on the new model: both bases
+   installed with their addons selected into `spec.apps[].addons`.
+7. ~~Documentation sweep (§7)~~.
+8. ~~Retire the transitional path~~ — `implicit_base_apps.go`, `ProfileRequiresProfile`
+   and the `gentianos.io/requires-profile` annotation, the `module-profile` delivery
+   enum value, and Odoo's per-addon composition branch are all gone. Preconditions were
+   checked first: no tenant lists an addon under `spec.apps`, and no live profile
+   declared `module-profile`.
 
-**Retire `implicit_base_apps.go` (item 3).** It is deliberately still live. It injects an
-addon's base when the addon appears in `spec.apps`, which is now the *old* way to install
-one — but until every caller selects addons through the window instead, deleting it would
-break the only path that still works for anything not yet migrated. Remove it once no
-tenant file lists an addon under `spec.apps`, and drop `requires-profile` (item 11) and
-the `module-profile` delivery enum value in the same change.
+### Notes for whoever comes next
 
-**Odoo's per-addon composition branch.** Still present alongside the new base-side
-activation Job for the same reason: it is what installed addons before, and removing it
-is a separate, verifiable step.
+**Deselection is not symmetric, and the UI now says so.** A base declaring
+`addonActivation` reconciles on every start, so unticking genuinely switches an addon
+off and keeps its data. Odoo activates through a composition Job using `odoo-bin -i`,
+which has no safe inverse — uninstalling a module drops its tables — so unticking stops
+it being added and leaves an installed module in place. The addon window derives which
+of the two applies from the base profile rather than hardcoding a family, and words the
+"Unticked" line accordingly.
 
-**Deselection on Odoo.** Nextcloud reconciles — deselecting disables the app and keeps its
-data. Odoo's `-i` only installs; deselecting an Odoo addon stops activating it but does not
-uninstall the module, because uninstalling an Odoo module drops its tables. That asymmetry
-is intentional and should be surfaced in the UI before Odoo addons are offered to tenants.
+**Odoo module visibility is gated in gentian-ui, not by the operator.** Tile visibility
+for an Odoo addon depends on a `gentianOdooModules` grant on one of the user's Keycloak
+groups. That gate had been inert since the profile rename and is now keyed on
+`spec.customization.addon`. It remains Odoo-specific code sitting in the portal; it
+belongs with the entitlement model.
+
+**`crossplane/tests/unit/render/app-odoo` in gentian-os holds a copy** of a composition
+that lives in this repo, because git cannot symlink across repos. It drifts silently —
+it did — so refresh it when changing `profiles/odoo/base/base-ce/composition.yaml`. See
+the README in that directory.
