@@ -117,6 +117,30 @@ spec:
         git:
           repoUrl: "git://192.168.0.100:9418/odoo-modules"
           branch: "develop"
+        # This sidecar writes the modules volume that Odoo reads, so the two have to
+        # agree on a group. Odoo runs 999:999 and creates the directory root:999 with
+        # the setgid bit; the sidecar chart defaults to gid 1000, which lands in
+        # "other" (r-x) and fails the initial clone with "Permission denied" on
+        # .git — the pod then crash-loops while Odoo itself looks perfectly healthy.
+        #
+        # The group belongs here rather than in the chart: the chart is generic and
+        # the correct gid is a property of the app it is paired with.
+        podSecurityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 999
+          fsGroup: 999
+          seccompProfile:
+            type: RuntimeDefault
+        containerSecurityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 999
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
 
   extraValues:
     fullnameOverride: odoo
