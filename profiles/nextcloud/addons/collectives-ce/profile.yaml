@@ -30,7 +30,7 @@ spec:
       displayName:
         en_US: "Collectives"
         de_DE: "Collectives"
-      linkSuffix: "/apps/collectives/"
+      linkSuffix: "?app=collectives"
       linkTarget: embedded
       allowedGroup: "Domain Users"
 

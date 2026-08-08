@@ -30,7 +30,7 @@ spec:
       displayName:
         en_US: "Forms"
         de_DE: "Formulare"
-      linkSuffix: "/apps/forms/"
+      linkSuffix: "?app=forms"
       linkTarget: embedded
       allowedGroup: "Domain Users"
 

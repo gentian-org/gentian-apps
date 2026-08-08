@@ -30,7 +30,7 @@ spec:
       displayName:
         en_US: "Tasks"
         de_DE: "Aufgaben"
-      linkSuffix: "/apps/tasks/"
+      linkSuffix: "?app=tasks"
       linkTarget: embedded
       allowedGroup: "Domain Users"
 

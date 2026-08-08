@@ -9,7 +9,6 @@ metadata:
   labels:
     gentianos.io/profile-name: odoo-base-ce
   annotations:
-    gentianos.io/platform-app: "true"
     gentianos.io/deployment-role: base
     gentianos.io/portal-auth-mode: oidc
 spec:

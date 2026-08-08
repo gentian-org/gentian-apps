@@ -30,7 +30,7 @@ spec:
       displayName:
         en_US: "Mail"
         de_DE: "E-Mail"
-      linkSuffix: "/apps/mail/"
+      linkSuffix: "?app=mail"
       linkTarget: embedded
       allowedGroup: "Domain Users"
 

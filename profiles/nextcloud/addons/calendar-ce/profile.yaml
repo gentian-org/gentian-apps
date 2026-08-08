@@ -30,7 +30,7 @@ spec:
       displayName:
         en_US: "Calendar"
         de_DE: "Kalender"
-      linkSuffix: "/apps/calendar/"
+      linkSuffix: "?app=calendar"
       linkTarget: embedded
       allowedGroup: "Domain Users"
 

@@ -30,7 +30,7 @@ spec:
       displayName:
         en_US: "Deck"
         de_DE: "Deck"
-      linkSuffix: "/apps/deck/"
+      linkSuffix: "?app=deck"
       linkTarget: embedded
       allowedGroup: "Domain Users"
 

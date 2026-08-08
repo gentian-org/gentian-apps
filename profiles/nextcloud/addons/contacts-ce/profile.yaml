@@ -30,7 +30,7 @@ spec:
       displayName:
         en_US: "Contacts"
         de_DE: "Kontakte"
-      linkSuffix: "/apps/contacts/"
+      linkSuffix: "?app=contacts"
       linkTarget: embedded
       allowedGroup: "Domain Users"
 

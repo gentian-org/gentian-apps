@@ -30,7 +30,7 @@ spec:
       displayName:
         en_US: "Talk"
         de_DE: "Talk"
-      linkSuffix: "/apps/spreed/"
+      linkSuffix: "?app=spreed"
       linkTarget: embedded
       allowedGroup: "Domain Users"
 
