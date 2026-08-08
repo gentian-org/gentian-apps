@@ -4,54 +4,116 @@
   "description": "Rung L0 of the customization ladder for Odoo. See gentian-os/docs/app-customization.md and profiles/odoo-cb-base/customization.md.",
   "type": "object",
   "additionalProperties": true,
-  "required": ["image", "existingSecret", "gentian"],
+  "required": [
+    "image",
+    "existingSecret",
+    "gentian"
+  ],
   "properties": {
-    "nameOverride": { "type": "string" },
-    "fullnameOverride": { "type": "string" },
-    "tenantId": { "type": "string" },
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    },
     "image": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repository", "tag"],
+      "required": [
+        "repository",
+        "tag"
+      ],
       "properties": {
-        "repository": { "type": "string", "minLength": 1 },
-        "tag": { "type": "string", "minLength": 1 },
-        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pullPolicy": {
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
       }
     },
     "existingSecret": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
-      "properties": { "name": { "type": "string", "minLength": 1 } }
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "database": {
       "type": "object",
       "description": "Set via valueMapping from OpenBao, not authored directly on a profile.",
       "properties": {
-        "host": { "type": "string" },
-        "port": { "type": "string" },
-        "name": { "type": "string" },
-        "user": { "type": "string" },
-        "password": { "type": "string" }
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": [
+            "string",
+            "integer"
+          ],
+          "description": "Accepts either type. The composition delivers this through provider-helm's set[], which parses with Helm strvals and coerces a numeric string to an integer; provider-helm has no --set-string equivalent. The chart itself never reads .Values.database.* \u2014 the deployment takes db-port straight from the ExternalSecret \u2014 so the type here is cosmetic, but declaring only 'string' made every install fail schema validation."
+        },
+        "name": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
       }
     },
     "oidc": {
       "type": "object",
       "properties": {
-        "issuer": { "type": "string" },
-        "clientId": { "type": "string" },
-        "clientSecret": { "type": "string" }
+        "issuer": {
+          "type": "string"
+        },
+        "clientId": {
+          "type": "string"
+        },
+        "clientSecret": {
+          "type": "string"
+        }
       }
     },
     "gentian": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["modulesPath", "initModules"],
+      "required": [
+        "modulesPath",
+        "initModules"
+      ],
       "properties": {
-        "configPath": { "type": "string" },
-        "bindingsPath": { "type": "string" },
-        "modulesPath": { "type": "string", "pattern": "^/.*" },
+        "configPath": {
+          "type": "string"
+        },
+        "bindingsPath": {
+          "type": "string"
+        },
+        "modulesPath": {
+          "type": "string",
+          "pattern": "^/.*"
+        },
         "initModules": {
           "type": "string",
           "description": "Comma-separated technical module names installed on first boot."
@@ -60,11 +122,22 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": { "type": "boolean" },
-            "repo": { "type": "string" },
-            "branch": { "type": "string" },
-            "syncInterval": { "type": "integer", "minimum": 0 },
-            "secretName": { "type": "string" }
+            "enabled": {
+              "type": "boolean"
+            },
+            "repo": {
+              "type": "string"
+            },
+            "branch": {
+              "type": "string"
+            },
+            "syncInterval": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "secretName": {
+              "type": "string"
+            }
           }
         },
         "gitSources": {
@@ -72,13 +145,28 @@
           "description": "Multiple module repos (customization ladder rung L3, delivery: git-sidecar).",
           "items": {
             "type": "object",
-            "required": ["name", "repo", "branch"],
+            "required": [
+              "name",
+              "repo",
+              "branch"
+            ],
             "properties": {
-              "name": { "type": "string" },
-              "repo": { "type": "string" },
-              "branch": { "type": "string" },
-              "syncInterval": { "type": "integer", "minimum": 0 },
-              "secretName": { "type": "string" }
+              "name": {
+                "type": "string"
+              },
+              "repo": {
+                "type": "string"
+              },
+              "branch": {
+                "type": "string"
+              },
+              "syncInterval": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "secretName": {
+                "type": "string"
+              }
             }
           }
         }
@@ -93,16 +181,30 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": { "type": "boolean" },
-            "configMaps": { "type": "array", "items": { "type": "string" } }
+            "enabled": {
+              "type": "boolean"
+            },
+            "configMaps": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           }
         },
         "branding": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": { "type": "boolean" },
-            "configMaps": { "type": "array", "items": { "type": "string" } }
+            "enabled": {
+              "type": "boolean"
+            },
+            "configMaps": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           }
         }
       }
@@ -111,24 +213,48 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
-        "size": { "type": "string" },
-        "storageClass": { "type": "string" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "type": "string"
+        },
+        "storageClass": {
+          "type": "string"
+        }
       }
     },
     "ingress": {
       "type": "object",
       "additionalProperties": false,
-      "properties": { "enabled": { "type": "boolean" } }
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
     },
     "service": {
       "type": "object",
       "additionalProperties": false,
-      "properties": { "port": { "type": "integer", "minimum": 1, "maximum": 65535 } }
+      "properties": {
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
     },
-    "resources": { "type": "object" },
-    "extraVolumes": { "type": "array" },
-    "extraVolumeMounts": { "type": "array" },
-    "podLabels": { "type": "object" }
+    "resources": {
+      "type": "object"
+    },
+    "extraVolumes": {
+      "type": "array"
+    },
+    "extraVolumeMounts": {
+      "type": "array"
+    },
+    "podLabels": {
+      "type": "object"
+    }
   }
 }

@@ -2,5 +2,5 @@ apiVersion: v2
 name: odoo
 description: Odoo Community (OCB) for Gentian OS tenants
 type: application
-version: 0.1.14
+version: 0.1.15
 appVersion: "19.0"
