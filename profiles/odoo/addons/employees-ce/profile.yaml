@@ -7,7 +7,6 @@ metadata:
   annotations:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: addon
-    gentianos.io/requires-profile: odoo-base-ce
     gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["employees"],"gentianOdooGroupRoles":["hr.group_hr_user"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:

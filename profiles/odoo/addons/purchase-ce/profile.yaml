@@ -7,7 +7,6 @@ metadata:
   annotations:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: addon
-    gentianos.io/requires-profile: odoo-base-ce
     gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["purchase"],"gentianOdooGroupRoles":["purchase.group_purchase_user","stock.group_stock_user"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
