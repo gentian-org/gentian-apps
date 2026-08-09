@@ -172,12 +172,20 @@ def get_addons(profile: str, user: dict = Depends(get_current_user)) -> dict:
 def set_addons(
     profile: str,
     addons: list[str] = Body(default=[], embed=True),
+    provision: bool = Body(default=False, embed=True),
     user: dict = Depends(get_current_user),
 ) -> dict:
-    """Replace the addon selection. The body is the complete list; [] clears it."""
+    """Replace the addon selection. The body is the complete list; [] clears it.
+
+    provision mirrors the app-level flag: install and grant access to every
+    existing tenant user, rather than install and leave access to be granted by
+    adding users to the addon's group.
+    """
     settings = get_settings()
     try:
-        result = get_lifecycle_client().set_addons(profile, addons, _actor(user))
+        result = get_lifecycle_client().set_addons(
+            profile, addons, _actor(user), provision=provision
+        )
     except LifecycleError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
@@ -186,6 +194,7 @@ def set_addons(
         "tenant": settings.tenant_id,
         "profile": profile,
         "addons": addons,
+        "provisioned": provision,
     }
 
 

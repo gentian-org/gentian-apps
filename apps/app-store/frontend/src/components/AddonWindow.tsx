@@ -54,6 +54,8 @@ export function AddonWindow({
 }) {
   const [data, setData] = useState<AddonWindow | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Addons queued with Provision rather than plain Install.
+  const [provisionFor, setProvisionFor] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -87,11 +89,29 @@ export function AddonWindow({
     return false;
   }, [selected, initial]);
 
-  function toggle(addon: Addon) {
+  // Install and Provision are different acts, so they are different buttons —
+  // a tick box cannot say which one it means. Wording and behaviour match the
+  // app cards exactly: Install activates the addon and leaves access to group
+  // membership; Provision also puts every existing tenant user in its group.
+  function add(addon: Addon, withProvision: boolean) {
     if (addon.requiresEntitlement && !addon.entitled) return;
+    setSelected((prev) => new Set([...prev, addon.name]));
+    setProvisionFor((prev) => {
+      const next = new Set(prev);
+      withProvision ? next.add(addon.name) : next.delete(addon.name);
+      return next;
+    });
+  }
+
+  function remove(addon: Addon) {
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(addon.name) ? next.delete(addon.name) : next.add(addon.name);
+      next.delete(addon.name);
+      return next;
+    });
+    setProvisionFor((prev) => {
+      const next = new Set(prev);
+      next.delete(addon.name);
       return next;
     });
   }
@@ -109,7 +129,7 @@ export function AddonWindow({
       await apiFetch(`/tenant/apps/${encodeURIComponent(profile)}/addons`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ addons: [...selected] }),
+        body: JSON.stringify({ addons: [...selected], provision: provisionFor.size > 0 }),
       });
       // The enable/disable runs when the app restarts, which takes minutes. Saying
       // only "updated" reads as "nothing happened" while you watch an unchanged app.
@@ -146,31 +166,21 @@ export function AddonWindow({
               tick box cannot answer. */}
           <dl className="mt-3 space-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
             <div className="flex gap-2">
-              <dt className="w-20 shrink-0 font-medium text-slate-700">Ticked</dt>
-              <dd>Switched on and available to your users.</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="w-20 shrink-0 font-medium text-slate-700">Unticked</dt>
+              <dt className="w-24 shrink-0 font-medium text-slate-700">Install</dt>
               <dd>
-                {data?.deselectBehaviour === "keeps-installed" ? (
-                  <>
-                    <strong>Stops being added</strong>, but an addon already installed stays
-                    installed. {appName} cannot remove one safely once it is in place, so
-                    unticking here will not make it disappear.
-                  </>
-                ) : (
-                  <>
-                    Switched off and hidden. Its data is <strong>kept</strong> — ticking it
-                    again restores everything.
-                  </>
-                )}
+                Turns the addon on. Who may use it is decided separately, by adding users
+                to its access group.
               </dd>
             </div>
             <div className="flex gap-2">
-              <dt className="w-20 shrink-0 font-medium text-slate-700">Never</dt>
+              <dt className="w-24 shrink-0 font-medium text-slate-700">Provision</dt>
+              <dd>Turns it on <strong>and</strong> grants it to every existing user now.</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-24 shrink-0 font-medium text-slate-700">Remove</dt>
               <dd>
-                Nothing here deletes data. That only happens if you uninstall {appName} itself
-                and choose Purge.
+                Stops adding it. Nothing is deleted — data is only removed by uninstalling
+                {" "}{appName} itself and choosing Purge.
               </dd>
             </div>
           </dl>
@@ -213,60 +223,72 @@ export function AddonWindow({
           <ul className="space-y-2">
             {data?.addons.map((addon) => {
               const locked = Boolean(addon.requiresEntitlement && !addon.entitled);
-              const checked = selected.has(addon.name);
+              const installed = selected.has(addon.name);
+              const provisioned = provisionFor.has(addon.name);
+              const wasInstalled = initial.has(addon.name);
               return (
-                <li key={addon.name}>
-                  <label
-                    className={`flex items-start gap-3 rounded-xl border p-3 ${
-                      locked
-                        ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-60"
-                        : "cursor-pointer border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={checked}
-                      disabled={locked || saving}
-                      onChange={() => toggle(addon)}
-                    />
-                    <span className="min-w-0">
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{addon.displayName}</span>
-                        {/* State as a word, not just a tick — "On"/"Off" answers what a
-                            checkbox alone leaves ambiguous. */}
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-[11px] ${
-                            checked
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-slate-200 text-slate-600"
-                          }`}
-                        >
-                          {checked ? "On" : "Off"}
-                        </span>
-                        {initial.has(addon.name) !== checked && (
-                          <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[11px] text-sky-800">
-                            {checked ? "will be switched on" : "will be switched off"}
-                          </span>
-                        )}
-                        {locked && (
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-800">
-                            Subscription required
-                          </span>
-                        )}
-                      </span>
-                      {addon.description && (
-                        <span className="mt-0.5 block text-xs text-slate-500">
-                          {addon.description}
+                <li
+                  key={addon.name}
+                  className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 p-3"
+                >
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{addon.displayName}</span>
+                      {installed && (
+                        <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] text-emerald-800">
+                          {provisioned ? "Provisioned" : "Installed"}
                         </span>
                       )}
-                      {addon.author && (
-                        <span className="mt-0.5 block text-[11px] text-slate-400">
-                          by {addon.author}
+                      {wasInstalled !== installed && (
+                        <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[11px] text-sky-800">
+                          {installed ? "will be added" : "will be removed"}
+                        </span>
+                      )}
+                      {locked && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-800">
+                          Subscription required
                         </span>
                       )}
                     </span>
-                  </label>
+                    {addon.description && (
+                      <span className="mt-0.5 block text-xs text-slate-500">{addon.description}</span>
+                    )}
+                  </span>
+
+                  <span className="flex shrink-0 gap-1.5">
+                    {installed ? (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => remove(addon)}
+                        className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs hover:bg-slate-50 disabled:opacity-50"
+                        title="Stops adding this addon. Nothing is deleted."
+                      >
+                        Remove
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          disabled={locked || saving}
+                          onClick={() => add(addon, false)}
+                          className="rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                          title="Installs the addon without adding any users to its access group."
+                        >
+                          Install
+                        </button>
+                        <button
+                          type="button"
+                          disabled={locked || saving}
+                          onClick={() => add(addon, true)}
+                          className="rounded-lg bg-slate-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                          title="Installs the addon and automatically adds all existing tenant users to its access group."
+                        >
+                          Provision
+                        </button>
+                      </>
+                    )}
+                  </span>
                 </li>
               );
             })}

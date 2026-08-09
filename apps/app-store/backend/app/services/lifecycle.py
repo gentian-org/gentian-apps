@@ -67,7 +67,9 @@ class LifecycleClient:
                 raise LifecycleError(_detail(res))
             return res.json()
 
-    def set_addons(self, profile: str, addons: list[str], actor: str) -> dict[str, Any]:
+    def set_addons(
+        self, profile: str, addons: list[str], actor: str, provision: bool = False
+    ) -> dict[str, Any]:
         """Replace the addon selection of an installed app.
 
         The full selection is sent, so an empty list clears it — that is a real
@@ -77,7 +79,7 @@ class LifecycleClient:
             with httpx.Client(timeout=120.0) as client:
                 res = client.put(
                     f"{self._url(profile)}/addons",
-                    json={"addons": addons},
+                    json={"addons": addons, "provision": provision},
                     headers=self._headers(actor),
                 )
         except httpx.TimeoutException as exc:

@@ -7,7 +7,7 @@ metadata:
   annotations:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: addon
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["accounting"],"gentianOdooGroupRoles":["account.group_account_invoice"]}'
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["account"],"gentianOdooGroupRoles":["account.group_account_invoice"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
   displayName: "Odoo Accounting"
