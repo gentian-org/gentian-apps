@@ -11,7 +11,11 @@ from app.services.k8s_client import K8sClient
 from app.services.catalogue_tiers import is_proprietary
 from app.services.corp_client import fetch_entitled_profiles
 from app.services.lifecycle import LifecycleError, get_lifecycle_client
-from app.services.tenant_app_status import claim_status_from_result, list_from_k8s
+from app.services.tenant_app_status import (
+    claim_status_from_result,
+    list_from_k8s,
+    merge_lifecycle_status,
+)
 
 router = APIRouter(prefix="/tenant/apps", tags=["tenant-apps"])
 
@@ -81,7 +85,7 @@ def _list_installed_entries() -> tuple[list[dict[str, Any]], str | None]:
         for entry in entries:
             lifecycle_app = lifecycle_by_profile.get(entry["profile"])
             if lifecycle_app:
-                entry.update(claim_status_from_result(lifecycle_app))
+                merge_lifecycle_status(entry, lifecycle_app)
     except LifecycleError as exc:
         lifecycle_warning = str(exc)
 
