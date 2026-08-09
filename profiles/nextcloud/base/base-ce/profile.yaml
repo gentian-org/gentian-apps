@@ -190,8 +190,7 @@ spec:
         - host: http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080
         - host: http://cloud.${TENANT_DOMAIN}:8080
         - host: https://cloud.${TENANT_DOMAIN}
-        extra_params: --o:ssl.enable=false --o:ssl.termination=true --o:net.proto=ipv4 --o:storage.ssl.as_scheme=true --o:storage.ssl.enable=false --o:mount_jail_tree=false --o:net.post_allow.host[0]=10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}
-          --o:net.post_allow.host[1]=.*\.svc\.cluster\.local
+        extra_params: --o:ssl.enable=false --o:ssl.termination=true --o:net.proto=ipv4 --o:storage.ssl.as_scheme=true --o:storage.ssl.enable=false --o:mount_jail_tree=false --o:net.post_allow.host[0]=10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3} --o:net.post_allow.host[1]=.*\.svc\.cluster\.local
         server_name: collabora.${TENANT_DOMAIN}
       ingress:
         enabled: false
@@ -242,6 +241,27 @@ spec:
           runAsGroup: 33
           seccompProfile:
             type: RuntimeDefault
+        # The image's /cron.sh runs `busybox crond`, and busybox crond setgroups()s
+        # to the user its crontab is filed under before running a job. This sidecar
+        # runs non-root as 33:33, so that call returns EPERM and every tick is
+        # skipped -- "crond: can't set groups: Operation not permitted", every five
+        # minutes, forever. The upstream chart says as much: "Note: crond requires
+        # root". Nothing surfaces it: the container stays Running and the pod
+        # reports 2/2 Ready while no background job has ever executed.
+
+        # So skip crond and loop in the shell. No user switching, so nothing to be
+        # denied, and cron.php still runs in-pod with the data volume and config
+        # already mounted. Keeping the sidecar (rather than type: cronjob) avoids
+        # needing RWX on the data PVC for a second pod.
+
+        # This is also what makes the Collabora wiring self-healing: ObtainCapabilities
+        # is a background job, so with cron dead a failed discovery fetch was never
+        # retried -- its last run read 1970-01-01 on a 14h-old pod.
+        command:
+        - /bin/sh
+        - -c
+        - |
+          while true; do php -f /var/www/html/cron.php || echo "gentian: cron.php exited non-zero"; sleep 300; done
     podAnnotations:
       secret.reloader.stakater.com/reload: nextcloud-base-ce-sensitive-values
     # Defaults (failureThreshold: 3, periodSeconds: 10 => ~30s tolerance)
@@ -330,8 +350,8 @@ spec:
         mountPath: /etc/gentian-mcp
         readOnly: true
       hooks:
-        before-starting: "#!/bin/bash\nset -eu\nNC=\"php /var/www/html/occ\"\n\n# Nextcloud's own PHP-side install check requires this sentinel file to\n# exist before it will run the automatic, non-interactive install that\n# autoconfig.php sets up (DB/admin credentials are already correctly\n# wired -- this is the only missing piece). Only touched while genuinely\n# not yet installed, so the safety gate this file exists for (don't\n# silently reinstall over live data if config.php ever gets corrupted)\n# stays intact for the rest of the deployment's life.\nif ! $NC status 2>/dev/null | grep -q \"installed: true\"; then\n  touch /var/www/html/config/CAN_INSTALL\nfi\npatch_portal_bridge_htaccess() {\n  python3 - <<'PY'\nfrom pathlib import Path\nhtaccess = Path(\"/var/www/html/.htaccess\")\nif not htaccess.is_file():\n    raise SystemExit(0)\ntext = htaccess.read_text()\nif \"gentian-portal-bridge\" in text:\n    text = text.replace(\"gentian-portal-bridge\", \"portal-bridge\")\n    htaccess.write_text(text)\nelif \"portal-bridge\" not in text:\n    old = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\\.php\"\n    new = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\\.php\"\n    if old in text:\n        htaccess.write_text(text.replace(old, new))\nPY\n}\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-sso.html \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-sso.html\" || true\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-bridge.php \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-bridge.php\" || true\nsed -i 's/:8080\\\\/api\\\\/v1/:8000\\\\/api\\\\/v1/' /var/www/html/portal-bridge.php 2>/dev/null || true\npatch_portal_bridge_htaccess\nif ! $NC status >/dev/null 2>&1; then\n  exit 0\nfi\nsync_bundled_apps() {\n  for app in user_oidc; do\n    if [ -d \"/usr/src/nextcloud/apps/${app}\" ]; then\n      rm -rf \"/var/www/html/custom_apps/${app}\"\n      cp -a \"/usr/src/nextcloud/apps/${app}\" \"/var/www/html/custom_apps/\"\n      chown -R www-data:www-data \"/var/www/html/custom_apps/${app}\"\n    fi\n    $NC app:enable \"${app}\" 2>/dev/null || true\n  done\n}\nsync_bundled_apps\n# Disable the password_policy breached-password check: it calls\n# api.pwnedpasswords.com (blocked by egress) and adds ~5s to every\n# password set — the portal bridge felt this on each Files open.\n$NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true\npatch_portal_bridge_htaccess\npatch_nextcloud_layouts() {\n  python3 - <<'PY'\nfrom pathlib import Path\nfor name in [\"layout.user.php\", \"layout.public.php\"]:\n    path = Path(f\"/var/www/html/core/templates/{name}\")\n    if not path.is_file():\n        continue\n    text = path.read_text()\n    if \"window.self !== window.top\" in text:\n        continue\n    patch = '''\t\t<script nonce=\"<?php p($_['cspNonce']); ?>\">\n\t\t\tif (window.self !== window.top) {\n\t\t\t\tconst style = document.createElement('style');\n\t\t\t\tstyle.innerHTML = '#header { display: none !important; } #content { padding-top: 0 !important; }';\n\t\t\t\tdocument.head.appendChild(style);\n\t\t\t}\n\t\t</script>\n\t</body>'''\n    if \"</body>\" in text:\n        path.write_text(text.replace(\"</body>\", patch))\nPY\n}\npatch_nextcloud_layouts\n\n# --- Collabora / WOPI wiring -------------------------------------------------\n# Self-guarding on richdocuments being enabled, so it stays inert until the addon\n# is selected -- at which point addonValues has also switched the Collabora\n# subchart on. Carried over verbatim from the retired suite profile.\nCOLLABORA_PUBLIC=\"https://collabora.${TENANT_DOMAIN}\"\nCOLLABORA_INTERNAL=\"http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980\"\nNEXTCLOUD_CALLBACK=\"http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080\"\nif $NC app:list --enabled 2>/dev/null | grep -q 'richdocuments:'; then\n  $NC config:app:set richdocuments wopi_url --value=\"${COLLABORA_INTERNAL}\" || true\n  $NC config:app:set richdocuments public_wopi_url --value=\"${COLLABORA_PUBLIC}\" || true\n  $NC config:app:set richdocuments doc_format --value=\"odf\" || true\n  $NC config:app:set richdocuments wopi_callback_url --value=\"${NEXTCLOUD_CALLBACK}\" || true\n  $NC richdocuments:activate-config --callback-url=\"${NEXTCLOUD_CALLBACK}\" || true\nfi\n"
-        post-installation: "#!/bin/bash\nset -eu\nNC=\"php /var/www/html/occ\"\nCLOUD_URL=\"https://cloud.${TENANT_DOMAIN}\"\nDISCOVERY_URI=\"http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration\"\nOIDC_SECRET=\"$(cat /etc/gentian/oidc-client-secret)\"\necho \"[gentian-nextcloud] waiting for Nextcloud to become ready...\"\nfor i in $(seq 1 90); do\n  if $NC status >/dev/null 2>&1; then break; fi\n  sleep 5\ndone\nsync_bundled_apps() {\n  for app in user_oidc; do\n    if [ -d \"/usr/src/nextcloud/apps/${app}\" ]; then\n      rm -rf \"/var/www/html/custom_apps/${app}\"\n      cp -a \"/usr/src/nextcloud/apps/${app}\" \"/var/www/html/custom_apps/\"\n      chown -R www-data:www-data \"/var/www/html/custom_apps/${app}\"\n    fi\n    $NC app:enable \"${app}\" 2>/dev/null || true\n  done\n}\nsync_bundled_apps\n$NC user_oidc:provider gentian \\\n  --clientid=\"gentian-nextcloud-base-ce\" \\\n  --clientsecret=\"${OIDC_SECRET}\" \\\n  --discoveryuri=\"${DISCOVERY_URI}\" \\\n  --scope=\"openid profile email gentian-nextcloud-base-ce-scope\" \\\n  --mapping-uid=\"gentian_username\" \\\n  --mapping-display-name=\"name\" \\\n  --mapping-email=\"email\" \\\n  --unique-uid=\"1\" \\\n  --check-bearer=\"0\" || true\n$NC config:app:set user_oidc id4me --value=\"0\" || true\n$NC config:app:set user_oidc allow_multiple_user_backends --value=\"1\" || true\n$NC config:system:set allow_local_remote_servers --type=boolean --value=true || true\n# Disable the password_policy breached-password check: it calls\n# api.pwnedpasswords.com (blocked by egress) and adds ~5s to every\n# password set — the portal bridge felt this on each Files open.\n$NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true\n$NC background:cron || true\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-sso.html \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-sso.html\" || true\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-bridge.php \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-bridge.php\" || true\nsed -i 's/:8080\\\\/api\\\\/v1/:8000\\\\/api\\\\/v1/' /var/www/html/portal-bridge.php 2>/dev/null || true\npatch_portal_bridge_htaccess() {\n  python3 - <<'PY'\nfrom pathlib import Path\nhtaccess = Path(\"/var/www/html/.htaccess\")\nif not htaccess.is_file():\n    raise SystemExit(0)\ntext = htaccess.read_text()\nif \"gentian-portal-bridge\" in text:\n    text = text.replace(\"gentian-portal-bridge\", \"portal-bridge\")\n    htaccess.write_text(text)\nelif \"portal-bridge\" not in text:\n    old = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\\.php\"\n    new = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\\.php\"\n    if old in text:\n        htaccess.write_text(text.replace(old, new))\nPY\n}\npatch_portal_bridge_htaccess\necho \"[gentian-nextcloud] bootstrap complete for ${CLOUD_URL}\"\n# Provision the dedicated, low-privilege account the nextcloud-mcp sidecar\n# authenticates as (never the tenant admin) -- see spec.sidecars and\n# app-profile-guide.md section 13a. Password is this sidecar's own appSecret,\n# mounted read-only alongside the primary app's own gentian-sensitive\n# volume so both sides derive from the exact same OpenBao-seeded value.\nif [ -f /etc/gentian-mcp/internal-service_password ]; then\n  if ! $NC user:info mcp-service >/dev/null 2>&1; then\n    OC_PASS=\"$(cat /etc/gentian-mcp/internal-service_password)\" $NC user:add \\\n      --password-from-env mcp-service --display-name \"MCP Service (read-only agent access)\"\n  fi\nfi\n\n# --- Collabora / WOPI wiring -------------------------------------------------\n# Self-guarding on richdocuments being enabled, so it stays inert until the addon\n# is selected -- at which point addonValues has also switched the Collabora\n# subchart on. Carried over verbatim from the retired suite profile.\nCOLLABORA_PUBLIC=\"https://collabora.${TENANT_DOMAIN}\"\nCOLLABORA_INTERNAL=\"http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980\"\nNEXTCLOUD_CALLBACK=\"http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080\"\nif $NC app:list --enabled 2>/dev/null | grep -q 'richdocuments:'; then\n  $NC config:app:set richdocuments wopi_url --value=\"${COLLABORA_INTERNAL}\" || true\n  $NC config:app:set richdocuments public_wopi_url --value=\"${COLLABORA_PUBLIC}\" || true\n  $NC config:app:set richdocuments doc_format --value=\"odf\" || true\n  $NC config:app:set richdocuments wopi_callback_url --value=\"${NEXTCLOUD_CALLBACK}\" || true\n  $NC richdocuments:activate-config --callback-url=\"${NEXTCLOUD_CALLBACK}\" || true\nfi\n"
+        before-starting: "#!/bin/bash\nset -eu\nNC=\"php /var/www/html/occ\"\n\n# Nextcloud's own PHP-side install check requires this sentinel file to\n# exist before it will run the automatic, non-interactive install that\n# autoconfig.php sets up (DB/admin credentials are already correctly\n# wired -- this is the only missing piece). Only touched while genuinely\n# not yet installed, so the safety gate this file exists for (don't\n# silently reinstall over live data if config.php ever gets corrupted)\n# stays intact for the rest of the deployment's life.\nif ! $NC status 2>/dev/null | grep -q \"installed: true\"; then\n  touch /var/www/html/config/CAN_INSTALL\nfi\npatch_portal_bridge_htaccess() {\n  python3 - <<'PY'\nfrom pathlib import Path\nhtaccess = Path(\"/var/www/html/.htaccess\")\nif not htaccess.is_file():\n    raise SystemExit(0)\ntext = htaccess.read_text()\nif \"gentian-portal-bridge\" in text:\n    text = text.replace(\"gentian-portal-bridge\", \"portal-bridge\")\n    htaccess.write_text(text)\nelif \"portal-bridge\" not in text:\n    old = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\\.php\"\n    new = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\\.php\"\n    if old in text:\n        htaccess.write_text(text.replace(old, new))\nPY\n}\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-sso.html \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-sso.html\" || true\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-bridge.php \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-bridge.php\" || true\nsed -i 's/:8080\\\\/api\\\\/v1/:8000\\\\/api\\\\/v1/' /var/www/html/portal-bridge.php 2>/dev/null || true\npatch_portal_bridge_htaccess\nif ! $NC status >/dev/null 2>&1; then\n  exit 0\nfi\nsync_bundled_apps() {\n  for app in user_oidc; do\n    if [ -d \"/usr/src/nextcloud/apps/${app}\" ]; then\n      rm -rf \"/var/www/html/custom_apps/${app}\"\n      cp -a \"/usr/src/nextcloud/apps/${app}\" \"/var/www/html/custom_apps/\"\n      chown -R www-data:www-data \"/var/www/html/custom_apps/${app}\"\n    fi\n    $NC app:enable \"${app}\" 2>/dev/null || true\n  done\n}\nsync_bundled_apps\n# Disable the password_policy breached-password check: it calls\n# api.pwnedpasswords.com (blocked by egress) and adds ~5s to every\n# password set — the portal bridge felt this on each Files open.\n$NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true\npatch_portal_bridge_htaccess\npatch_nextcloud_layouts() {\n  python3 - <<'PY'\nfrom pathlib import Path\nfor name in [\"layout.user.php\", \"layout.public.php\"]:\n    path = Path(f\"/var/www/html/core/templates/{name}\")\n    if not path.is_file():\n        continue\n    text = path.read_text()\n    if \"window.self !== window.top\" in text:\n        continue\n    patch = '''\t\t<script nonce=\"<?php p($_['cspNonce']); ?>\">\n\t\t\tif (window.self !== window.top) {\n\t\t\t\tconst style = document.createElement('style');\n\t\t\t\tstyle.innerHTML = '#header { display: none !important; } #content { padding-top: 0 !important; }';\n\t\t\t\tdocument.head.appendChild(style);\n\t\t\t}\n\t\t</script>\n\t</body>'''\n    if \"</body>\" in text:\n        path.write_text(text.replace(\"</body>\", patch))\nPY\n}\npatch_nextcloud_layouts\n"
+        post-installation: "#!/bin/bash\nset -eu\nNC=\"php /var/www/html/occ\"\nCLOUD_URL=\"https://cloud.${TENANT_DOMAIN}\"\nDISCOVERY_URI=\"http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration\"\nOIDC_SECRET=\"$(cat /etc/gentian/oidc-client-secret)\"\necho \"[gentian-nextcloud] waiting for Nextcloud to become ready...\"\nfor i in $(seq 1 90); do\n  if $NC status >/dev/null 2>&1; then break; fi\n  sleep 5\ndone\nsync_bundled_apps() {\n  for app in user_oidc; do\n    if [ -d \"/usr/src/nextcloud/apps/${app}\" ]; then\n      rm -rf \"/var/www/html/custom_apps/${app}\"\n      cp -a \"/usr/src/nextcloud/apps/${app}\" \"/var/www/html/custom_apps/\"\n      chown -R www-data:www-data \"/var/www/html/custom_apps/${app}\"\n    fi\n    $NC app:enable \"${app}\" 2>/dev/null || true\n  done\n}\nsync_bundled_apps\n$NC user_oidc:provider gentian \\\n  --clientid=\"gentian-nextcloud-base-ce\" \\\n  --clientsecret=\"${OIDC_SECRET}\" \\\n  --discoveryuri=\"${DISCOVERY_URI}\" \\\n  --scope=\"openid profile email gentian-nextcloud-base-ce-scope\" \\\n  --mapping-uid=\"gentian_username\" \\\n  --mapping-display-name=\"name\" \\\n  --mapping-email=\"email\" \\\n  --unique-uid=\"1\" \\\n  --check-bearer=\"0\" || true\n$NC config:app:set user_oidc id4me --value=\"0\" || true\n$NC config:app:set user_oidc allow_multiple_user_backends --value=\"1\" || true\n$NC config:system:set allow_local_remote_servers --type=boolean --value=true || true\n# Disable the password_policy breached-password check: it calls\n# api.pwnedpasswords.com (blocked by egress) and adds ~5s to every\n# password set — the portal bridge felt this on each Files open.\n$NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true\n$NC background:cron || true\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-sso.html \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-sso.html\" || true\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-bridge.php \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-bridge.php\" || true\nsed -i 's/:8080\\\\/api\\\\/v1/:8000\\\\/api\\\\/v1/' /var/www/html/portal-bridge.php 2>/dev/null || true\npatch_portal_bridge_htaccess() {\n  python3 - <<'PY'\nfrom pathlib import Path\nhtaccess = Path(\"/var/www/html/.htaccess\")\nif not htaccess.is_file():\n    raise SystemExit(0)\ntext = htaccess.read_text()\nif \"gentian-portal-bridge\" in text:\n    text = text.replace(\"gentian-portal-bridge\", \"portal-bridge\")\n    htaccess.write_text(text)\nelif \"portal-bridge\" not in text:\n    old = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\\.php\"\n    new = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\\.php\"\n    if old in text:\n        htaccess.write_text(text.replace(old, new))\nPY\n}\npatch_portal_bridge_htaccess\necho \"[gentian-nextcloud] bootstrap complete for ${CLOUD_URL}\"\n# Provision the dedicated, low-privilege account the nextcloud-mcp sidecar\n# authenticates as (never the tenant admin) -- see spec.sidecars and\n# app-profile-guide.md section 13a. Password is this sidecar's own appSecret,\n# mounted read-only alongside the primary app's own gentian-sensitive\n# volume so both sides derive from the exact same OpenBao-seeded value.\nif [ -f /etc/gentian-mcp/internal-service_password ]; then\n  if ! $NC user:info mcp-service >/dev/null 2>&1; then\n    OC_PASS=\"$(cat /etc/gentian-mcp/internal-service_password)\" $NC user:add \\\n      --password-from-env mcp-service --display-name \"MCP Service (read-only agent access)\"\n  fi\nfi\n"
     resources:
       limits:
         cpu: '1'
@@ -353,10 +373,10 @@ spec:
     # richdocuments is inert without a Collabora server, so selecting it turns the
     # subchart on. Deselecting removes it again and reclaims the 1Gi.
     addonValues:
-      - whenAddon: richdocuments
-        values:
-          collabora:
-            enabled: true
+    - whenAddon: richdocuments
+      values:
+        collabora:
+          enabled: true
     addonActivation:
       valuesPath: nextcloud.hooks.before-starting
       script: |
@@ -392,6 +412,53 @@ spec:
           case " $SELECTED " in *" $id "*) continue ;; esac
           $OCC app:disable "$id" || echo "warning: could not disable $id"
         done
+
+        # --- Collabora / WOPI wiring -------------------------------------------------
+        # This has to run *after* the app:enable loop above, and it used to run before
+        # it: the wiring lived in the hook body, and the activation script is appended
+        # to that same hook. So on the boot that first selected richdocuments the guard
+        # saw the app still disabled, skipped the fetch, and never came back to it.
+        #
+        # What the fetch does matters here. richdocuments caches Collabora's discovery
+        # XML, and DiscoveryService::get() returns null on a cold cache rather than
+        # fetching one; only an explicit fetch -- which is what activate-config does --
+        # ever fills it. So a single missed run is permanent, and every document open
+        # then dies in WOPI\Parser as "Call to a member function xpath() on false",
+        # which the Files UI reports as "There is no plugin available to display this
+        # file type".
+        case " $SELECTED " in
+          *" richdocuments "*)
+            COLLABORA_INTERNAL="http://nextcloud-collabora.${TENANT_NAMESPACE}.svc.cluster.local:9980"
+            COLLABORA_PUBLIC="https://collabora.${TENANT_DOMAIN}"
+            NEXTCLOUD_CALLBACK="http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080"
+
+            $OCC config:app:set richdocuments wopi_url --value="$COLLABORA_INTERNAL"
+            $OCC config:app:set richdocuments public_wopi_url --value="$COLLABORA_PUBLIC"
+            $OCC config:app:set richdocuments doc_format --value="odf"
+            $OCC config:app:set richdocuments wopi_callback_url --value="$NEXTCLOUD_CALLBACK"
+
+            # Collabora starts alongside us, so early attempts fail for a legitimate
+            # reason and retrying is the fix. activate-config exits non-zero when it
+            # cannot reach discovery or capabilities; the old code sent that to
+            # `|| true`, which is how a startup race became a permanently broken
+            # tenant. Bounded at ~90s so a Collabora that never arrives delays the
+            # pod rather than wedging it -- the cron sidecar re-fetches from then on.
+            wired=no
+            i=0
+            while [ "$i" -lt 18 ]; do
+              if $OCC richdocuments:activate-config --callback-url="$NEXTCLOUD_CALLBACK"; then
+                wired=yes
+                break
+              fi
+              i=$((i + 1))
+              sleep 5
+            done
+            if [ "$wired" = no ]; then
+              echo "ERROR: could not reach Collabora at $COLLABORA_INTERNAL after 90s." >&2
+              echo "ERROR: office documents will not open until the discovery fetch succeeds." >&2
+            fi
+            ;;
+        esac
     configure:
       hotReload: false
     dropIns:
