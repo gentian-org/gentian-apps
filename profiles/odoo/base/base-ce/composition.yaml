@@ -956,6 +956,22 @@ spec:
                                   secretKeyRef:
                                     name: {{ $app }}-sensitive-values
                                     key: db-name
+                              {{- /* gentian_os registers the Keycloak OAuth provider in
+                                     _register_hook, which runs on registry load — including
+                                     this install run. It reads these two from the
+                                     environment and silently does nothing without them, so
+                                     the provider must be seeded here rather than waiting for
+                                     the next restart of the long-running deployment. */}}
+                              - name: OIDC_CLIENT_ID
+                                valueFrom:
+                                  secretKeyRef:
+                                    name: {{ $app }}-sensitive-values
+                                    key: oidc-client-id
+                              - name: OIDC_ISSUER
+                                valueFrom:
+                                  secretKeyRef:
+                                    name: {{ $app }}-sensitive-values
+                                    key: oidc-issuer
                             volumeMounts:
                               - name: odoo-config
                                 mountPath: /etc/odoo
