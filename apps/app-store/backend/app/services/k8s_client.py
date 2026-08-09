@@ -47,6 +47,28 @@ class K8sClient:
             raise
         return result.get("items", [])
 
+    def get_composite(self, plural: str, name: str) -> dict[str, Any] | None:
+        """Fetch a cluster-scoped Crossplane composite (XApp) by name."""
+        try:
+            return self._custom.get_cluster_custom_object(GROUP, VERSION, plural, name)
+        except ApiException as exc:
+            if exc.status == 404:
+                return None
+            raise
+
+    def get_composed(self, api_version: str, kind: str, name: str, namespace: str | None) -> dict[str, Any] | None:
+        """Fetch one resource a composition produced, by its resourceRef."""
+        group, _, version = api_version.rpartition("/")
+        plural = kind.lower() + "s"
+        try:
+            if namespace:
+                return self._custom.get_namespaced_custom_object(group, version, namespace, plural, name)
+            return self._custom.get_cluster_custom_object(group, version, plural, name)
+        except ApiException as exc:
+            if exc.status in (403, 404):
+                return None
+            raise
+
     def get_tenant(self, name: str) -> dict[str, Any]:
         # Tenant CRs are cluster-scoped in gentian-os
         return self._custom.get_cluster_custom_object(GROUP, VERSION, "tenants", name)
