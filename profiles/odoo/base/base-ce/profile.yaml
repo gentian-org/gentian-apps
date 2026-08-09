@@ -115,7 +115,13 @@ spec:
           size: 1Gi
           storageClass: nfs-csi
         git:
-          repoUrl: "git://192.168.0.100:9418/odoo-modules"
+          # Sync from GitHub rather than a git daemon on a developer workstation.
+          # The daemon existed to work around two things: the namespace egress block
+          # and private-repo auth. Neither applies — odoo-modules and its three
+          # submodules are public, and app-egress-odoo-base-ce already permits
+          # TCP/443 to anywhere, while the 9418 rule is pinned to one host's /32.
+          # A tenant workload should not depend on someone's laptop being up.
+          repoUrl: "https://github.com/gentian-org/odoo-modules.git"
           branch: "develop"
         # This sidecar writes the modules volume that Odoo reads, so the two have to
         # agree on a group. Odoo runs 999:999 and creates the directory root:999 with
