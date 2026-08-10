@@ -45,7 +45,7 @@ Three delivery routes are wired up:
   (the `odoo-crm-ce` pattern). It is never installed on its own — the base is installed
   and the addon selected into it. The earlier spelling of this route, `module-profile`
   with a `requires-profile` annotation, is retired; see
-  [L3-cleanup.md](../../../docs/L3-cleanup.md).
+  [addon-model.md](../../../docs/addon-model.md).
 - **`image-layer`** — for airgapped or reproducibility-critical installs.
 
 Per-tenant module sets are permitted **because Odoo runs one instance per tenant namespace**

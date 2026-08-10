@@ -59,4 +59,4 @@ Dockerfile.
 ./build.sh          # honours REGISTRY, defaults to ghcr.io
 ```
 
-See gentian-apps/docs/L3-cleanup.md §4.
+See gentian-apps/docs/addon-model.md §3.

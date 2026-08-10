@@ -59,7 +59,7 @@ other "vendored" chart needs to stay that way.
 
 ## L3 cleanup — one addon model, no packages
 
-Moved to its own tracking document: **[L3-cleanup.md](L3-cleanup.md)**.
+Moved to its own tracking document: **[addon-model.md](addon-model.md)**.
 
 The second directory layer currently means *addons* for Odoo (individually
 installable, one profile each) and *packages* for Nextcloud (fixed plugin bundles
