@@ -8,7 +8,7 @@
 > base when a module is installed. That mechanism is **retired**: an addon now
 > declares `spec.customization.addon` (`id` + `of`), is never installed on its own,
 > and is selected into an already-installed base, arriving in
-> `Tenant.spec.apps[].addons`. See [addon-model.md](../../../docs/addon-model.md).
+> `Tenant.spec.apps[].addons`. See [app-customization.md](../../../../gentian-os/docs/app-customization.md) §4.2.
 >
 > The rest — the three-tier permission model, the IdM mapping, and the integration
 > contracts — still describes the intent. Read the annotation and auto-install

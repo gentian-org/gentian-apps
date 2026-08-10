@@ -271,7 +271,7 @@ annotation. It is never installed on its own: the base is installed and the addo
 selected into it, arriving in `Tenant.spec.apps[].addons`. The retired
 `gentianos.io/requires-profile` annotation, which auto-installed a base when an addon
 was installed as if it were an app, no longer exists — see
-[addon-model.md](addon-model.md).
+[app-customization.md](../../gentian-os/docs/app-customization.md) §4.2.
 
 App-specific install parameters (e.g. Odoo module technical name) belong in
 `spec.extraValues` and the profile-scoped composition — not in gentian-os CRDs.

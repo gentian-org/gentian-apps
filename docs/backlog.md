@@ -59,7 +59,7 @@ other "vendored" chart needs to stay that way.
 
 ## L3 cleanup — one addon model, no packages
 
-Moved to its own tracking document: **[addon-model.md](addon-model.md)**.
+Moved to its own tracking document: **[app-customization.md](../../gentian-os/docs/app-customization.md) §4.2**.
 
 The second directory layer currently means *addons* for Odoo (individually
 installable, one profile each) and *packages* for Nextcloud (fixed plugin bundles

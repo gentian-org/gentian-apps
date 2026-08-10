@@ -26,7 +26,7 @@
 #
 # user_oidc stays in apps/ and stays enabled: it is platform SSO, not optional.
 #
-# Build args must match versions.env. See gentian-apps/docs/addon-model.md §3.
+# Build args must match versions.env. See BUNDLE.md beside this file.
 
 ARG NEXTCLOUD_VERSION=33.0.6-apache
 

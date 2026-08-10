@@ -59,4 +59,5 @@ Dockerfile.
 ./build.sh          # honours REGISTRY, defaults to ghcr.io
 ```
 
-See gentian-apps/docs/addon-model.md §3.
+For the base/addon/package model this image serves, see
+gentian-os/docs/app-customization.md §4.2.
