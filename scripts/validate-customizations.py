@@ -144,10 +144,18 @@ def check_surface(path: pathlib.Path, doc: dict, characterised_families: set[str
             errors.append(
                 f"{path}: spec.customization.extension is declared but L3 is not in supportedRungs"
             )
-        if extension.get("perTenantModules") and not extension.get("testMatrix"):
+        # perTenantAddons, not perTenantModules: the field was renamed in the L3
+        # cleanup and this check kept reading the old key, so it matched nothing and
+        # passed every profile for as long as it has existed.
+        if extension.get("perTenantAddons") and not extension.get("testMatrix"):
             errors.append(
-                f"{path}: extension.perTenantModules requires a testMatrix — per-tenant "
-                f"modules must be pinned to verified app versions"
+                f"{path}: extension.perTenantAddons requires a testMatrix — per-tenant "
+                f"addons must be pinned to verified app versions"
+            )
+        if "perTenantModules" in extension:
+            errors.append(
+                f"{path}: extension.perTenantModules was renamed to perTenantAddons; "
+                f"the old key is not read by the CRD and would be silently ignored"
             )
 
     return errors
