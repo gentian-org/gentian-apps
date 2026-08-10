@@ -26,7 +26,7 @@ type AddonWindow = {
   addons: Addon[];
   packages: AddonPackage[];
   selected: string[];
-  // Whether unticking actually switches an addon off, or only stops activating it.
+  // Whether Remove actually switches an addon off, or only stops activating it.
   // Derived by the backend from how the base activates addons.
   deselectBehaviour?: "disables" | "keeps-installed";
 };
@@ -161,9 +161,9 @@ export function AddonWindow({
             Choose which features are switched on inside {appName}. Addons are not separate
             apps — they are turned on and off within this one.
           </p>
-          {/* Checkboxes alone do not say what they do. Spell out both directions, and
-              say explicitly that nothing here deletes data — that is the question a
-              tick box cannot answer. */}
+          {/* A button label alone does not say what it does. Spell out all three, and
+              say explicitly what happens to data — that is the question the buttons
+              cannot answer. */}
           <dl className="mt-3 space-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
             <div className="flex gap-2">
               <dt className="w-24 shrink-0 font-medium text-slate-700">Install</dt>
@@ -179,8 +179,19 @@ export function AddonWindow({
             <div className="flex gap-2">
               <dt className="w-24 shrink-0 font-medium text-slate-700">Remove</dt>
               <dd>
-                Stops adding it. Nothing is deleted — data is only removed by uninstalling
-                {" "}{appName} itself and choosing Purge.
+                {/* Removal is not symmetric across bases, so the wording follows the
+                    base rather than asserting one behaviour for all of them. A base
+                    whose activation script reconciles on every start really does
+                    switch the addon back off; one that activates through a one-way
+                    install step (Odoo's `odoo-bin -i`) has no safe inverse, so
+                    Remove only stops it being added again. Saying "nothing is
+                    switched off" to a Nextcloud user would be simply untrue. */}
+                {data?.deselectBehaviour === "disables"
+                  ? <>Switches it back off. Nothing is deleted — its data is kept and
+                      returns if you turn it on again.</>
+                  : <>Stops adding it. Anything already installed stays, and nothing is
+                      deleted — data is only removed by uninstalling {appName} itself
+                      and choosing Purge.</>}
               </dd>
             </div>
           </dl>

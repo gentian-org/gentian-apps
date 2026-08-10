@@ -186,17 +186,17 @@ def build_addon_window(
         )
     packages.sort(key=lambda p: p["displayName"].lower())
 
-    # Whether deselecting actually turns an addon off, or merely stops activating it.
+    # Whether Remove actually turns an addon off, or merely stops activating it.
     #
     # Derived, not hardcoded per app. A base declaring addonActivation reconciles on
-    # every start — it enables the selection and disables everything else — so
-    # unticking genuinely switches the addon off. A base that activates through its
-    # own composition Job (Odoo, which installs modules with `odoo-bin -i`) has no
-    # safe inverse: uninstalling an Odoo module drops its tables, so unticking stops
+    # every start — it enables the selection and disables everything else — so Remove
+    # genuinely switches the addon off. A base that activates through its own
+    # composition Job (Odoo, which installs modules with `odoo-bin -i`) has no safe
+    # inverse: uninstalling an Odoo module drops its tables, so Remove stops
     # activating it and leaves what is already installed in place.
     #
-    # The UI has to say which, or unticking means two different things with no way
-    # to tell them apart.
+    # The UI has to say which, or Remove means two different things with no way to
+    # tell them apart.
     reconciles = bool((base_spec.get("customization") or {}).get("addonActivation"))
 
     return {

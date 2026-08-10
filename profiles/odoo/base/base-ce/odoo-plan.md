@@ -1,6 +1,19 @@
 # Odoo on Gentian OS — integration plan
 
-**Status:** Design proposal  
+**Status:** Implemented — parts superseded
+
+> This plan has been carried out, but the base ↔ addon mechanism it describes has
+> since changed. It proposes thin module profiles that name their base through a
+> `gentianos.io/requires-profile` annotation, with the operator auto-installing that
+> base when a module is installed. That mechanism is **retired**: an addon now
+> declares `spec.customization.addon` (`id` + `of`), is never installed on its own,
+> and is selected into an already-installed base, arriving in
+> `Tenant.spec.apps[].addons`. See [L3-cleanup.md](../../../docs/L3-cleanup.md).
+>
+> The rest — the three-tier permission model, the IdM mapping, and the integration
+> contracts — still describes the intent. Read the annotation and auto-install
+> sections as history.
+
 **Companion to:** [architecture.md](../../../../gentian-os/docs/architecture.md),
 [app-catalogue.md](../../../../gentian-os/docs/design/app-catalogue.md),
 [iam.md](../../../../gentian-os/docs/design/iam.md),

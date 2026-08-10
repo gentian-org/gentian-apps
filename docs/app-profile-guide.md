@@ -264,8 +264,14 @@ For apps with a shared runtime and thin addon entries (Odoo, OX-style), use
 | Annotation | Values | Purpose |
 |---|---|---|
 | `gentianos.io/deployment-role` | `standalone` (default), `base`, `addon` | How the operator/composition deploys this entry |
-| `gentianos.io/requires-profile` | AppProfile name | Base profile auto-installed when `deployment-role=addon` |
 | `gentianos.io/platform-app` | `"true"` | Hidden from App Store listing (required base runtimes) |
+
+An addon names its base in **`spec.customization.addon`** (`id` + `of`), not in an
+annotation. It is never installed on its own: the base is installed and the addon is
+selected into it, arriving in `Tenant.spec.apps[].addons`. The retired
+`gentianos.io/requires-profile` annotation, which auto-installed a base when an addon
+was installed as if it were an app, no longer exists — see
+[L3-cleanup.md](L3-cleanup.md).
 
 App-specific install parameters (e.g. Odoo module technical name) belong in
 `spec.extraValues` and the profile-scoped composition — not in gentian-os CRDs.

@@ -141,12 +141,12 @@ Afterwards an **Edit** button on the installed app reopens the same list.
 |---|---|---|
 | 1 | ~~`Tenant.spec.apps[].addons`~~ **done** (`6e0d19c`) | Selected addon set for that app. Additive. |
 | 2 | ~~role rename~~ **done** (`6e0d19c`) | `addon` is now the word; `module` kept as a deprecated input alias that normalises to Addon, with a regression test. |
-| 3 | **Invert `implicit_base_apps.go`** | Today installing a module profile injects its `requires-profile` base. Target: install base, select addons — addons never appear in `spec.apps`. This logic becomes dead; confirm before deleting. |
+| 3 | ~~Invert `implicit_base_apps.go`~~ **done** | Installing a module profile used to inject its `requires-profile` base. Now the base is installed and addons are selected into it, so they never appear in `spec.apps`. The precondition was checked first — no tenant listed an addon there — and the file is deleted. |
 | 4 | ~~Addon activation~~ **done** (`b0acd19`, `4aeaa8d`, `6b3e91d`) | Two shapes, both catalogue-driven. Odoo has its own composition and installs database-side via one `-i` Job. Chart-based apps declare `spec.customization.addonActivation` (values path + script) and `app-default` renders it — nothing in gentian-os knows what `occ` is. |
 | 5 | ~~`spec.edition` → `ce · me · pro`~~ **done** (`6e0d19c` widen → `4a90d6d` narrow) | Migrated in two phases so old and new values were briefly both valid; narrowing caught `open-webui`, which ships from gentian-ui not the catalogue. Default is now `ce`. |
 | 6 | ~~`spec.author`~~ **done** (`a1b79c0`, populated `2322f9a`) | Who supplies this entry — company, organisation or individual. Set on all 22 profiles per the §2.2 rule. |
 | 7 | ~~Entitlement gates activation~~ **done** (`e7c53e9`, `90b42dc`) | `EntitledAddons` denies by default in the reconciler, and the lifecycle API rejects an unentitled selection before writing git. Per §2.1 authorization is the gate, never technical compatibility. |
-| 8 | Addons stop being App claims | An addon is activation state inside the base app, not its own workload. Check `app_reconciler.go`. |
+| 8 | ~~Addons stop being App claims~~ **done** | An addon is activation state inside the base app, not its own workload. It follows from (3): a selection lives in `spec.apps[].addons`, and only entries in `spec.apps` become claims. Verified on the demo tenant — 15 selected addons across two bases, four App claims, all of them bases. |
 | 9 | ~~`AppPackage` kind~~ **done** (`a1b79c0`) | Cluster-scoped, no status, no reconciler. gentian-ui granted read access (`29545416`). |
 
 **Ordering trap (hit twice already):** CRD enum/field changes are admission-validated,
@@ -158,7 +158,7 @@ as the `patched` chartOwnership enum and the catalogue ApplicationSet generator.
 | # | Change | Notes |
 |---|---|---|
 | 10 | ~~Odoo → `base/` + `addons/`~~ **done** (`2322f9a`) | Leaf names unchanged → source-path update in place, no prune. |
-| 11 | ~~`deployment-role: addon` on all 9~~ **done** (`2322f9a`) | `requires-profile` still present; drop once (3) lands. |
+| 11 | ~~`deployment-role: addon` on all 9~~ **done** (`2322f9a`) | `requires-profile` has since been dropped from every profile along with (3). It survived only in prose — the authoring guide still listed it as a live annotation — which §7 now covers. |
 | 12 | ~~Nextcloud: base + addons + presets~~ **done** (`6c7f2e1`, `1b91f4a`) | One image staging 9 apps disabled in `custom_apps/`; 2 bases, 9 addons, 2 presets. See §4. |
 | 13 | ~~Singletons → `profiles/<family>/<family>-<edition>/`~~ **done** (`2322f9a`) | Genuine renames; cheap only because nothing was installed. |
 | 14 | ~~editions + authors on all profiles~~ **done** (`2322f9a`, `66bcbc9a`) | Derived from the leaf tier; author follows ce=upstream / me=Gentian / pro=vendor. Corrected activepieces and litellm to Gentian — both are `me`. |
@@ -182,7 +182,7 @@ Odoo-specific attribute using Odoo's word is correct.
 | # | Change | Notes |
 |---|---|---|
 | 20 | ~~allowlist + tenant refs follow the renames~~ **done** (`bfc2ff7`) | Both the `tenants/` and `definitions/` trees, incl. the `otro` tenant. |
-| 21 | Demo tenant re-installs from the new catalogue | No migration needed — all apps are uninstalled. |
+| 21 | ~~Demo tenant re-installs from the new catalogue~~ **done** | No migration was needed — all apps were uninstalled at the time. It now runs entirely on the new model: `odoo-base-ce` with 6 addons and `nextcloud-base-ce` with 9, all under `spec.apps[].addons`. |
 
 ---
 
@@ -287,7 +287,9 @@ upstream's own word: Odoo modules, the Synapse Module API, and identifiers like
 
 API identifiers renamed with it: `extension.modulePath` → `addonPath`,
 `extension.perTenantModules` → `perTenantAddons`, `delivery: module-profile` →
-`addon-profile` (old value still accepted until the catalogue finishes migrating).
+`addon-profile`. The transitional acceptance of the old value is over — the enum is
+narrowed to `git-sidecar · image-layer · addon-profile · app-store-api` and
+`module-profile` is now rejected by admission.
 
 Counts below were the occurrences before the sweep.
 
@@ -307,11 +309,30 @@ Counts below were the occurrences before the sweep.
 is an API field; renaming it carries the same admission-ordering constraint as
 everything else in §3.1.
 
+### Follow-up: the sweep renamed vocabulary but left retired mechanisms described as live
+
+The pass above was a *terminology* rename, so prose that documented the retired
+`requires-profile` / `module-profile` mechanism survived it — the words were already
+correct, only the mechanism had gone. Found and fixed afterwards:
+
+| Document | Was |
+|---|---|
+| `gentian-apps/docs/app-profile-guide.md` | Listed `gentianos.io/requires-profile` in the live annotations table, so a profile author following the guide would still reach for it. Replaced with how an addon names its base today. |
+| `profiles/odoo/base/base-ce/customization.md` | Documented `module-profile` delivery with `deployment-role: module` and `requires-profile`. Now `addon-profile` with `spec.customization.addon`. |
+| `profiles/odoo/base/base-ce/odoo-plan.md` | 976-line design proposal, unreferenced, describing operator auto-install via `requires-profile` as the implementation. Marked implemented-and-superseded; its permission model still stands. |
+
+The lesson is worth keeping: a rename sweep greps for the old *word*. Retiring a
+mechanism needs a separate pass that greps for the old *thing*, because documentation
+of it reads perfectly well in the new vocabulary.
+
 ---
 
 ## 8. Order — status
 
-All items are complete.
+All items are complete. The tables in §3 lagged behind this section for a while —
+items 3, 8, 11 and 21 still read as open after the work had landed — and are now
+consistent with it. Two things did turn up on the final pass and are fixed: the
+documentation gap in §7, and the `deselectBehaviour` regression noted below.
 
 1. ~~gentian-os CRD changes~~ — `Tenant.spec.apps[].addons`, role rename with alias,
    `edition` enum, `author`, `AppPackage`.
@@ -335,13 +356,21 @@ All items are complete.
 
 ### Notes for whoever comes next
 
-**Deselection is not symmetric, and the UI now says so.** A base declaring
-`addonActivation` reconciles on every start, so unticking genuinely switches an addon
-off and keeps its data. Odoo activates through a composition Job using `odoo-bin -i`,
-which has no safe inverse — uninstalling a module drops its tables — so unticking stops
-it being added and leaves an installed module in place. The addon window derives which
-of the two applies from the base profile rather than hardcoding a family, and words the
-"Unticked" line accordingly.
+**Removal is not symmetric, and the UI says so.** A base declaring `addonActivation`
+reconciles on every start, so Remove genuinely switches an addon off and keeps its
+data. Odoo activates through a composition Job using `odoo-bin -i`, which has no safe
+inverse — uninstalling a module drops its tables — so Remove stops it being added and
+leaves an installed module in place. `build_addon_window` derives which of the two
+applies from whether the base declares `addonActivation`, rather than hardcoding a
+family, and the window words its Remove line accordingly.
+
+This regressed once and is worth guarding. The selection UI was later changed from
+checkboxes to explicit **Install / Provision / Remove** buttons — because a checkbox
+cannot distinguish *install* from *provision*, which differ in whether access is
+granted to everyone — and the rewrite dropped the derived wording. `deselectBehaviour`
+kept being computed and sent, and the window stopped reading it, so every base was
+described with Odoo's semantics. Nextcloud users were told nothing would be switched
+off when in fact it would be.
 
 **Odoo module visibility is gated in gentian-ui, not by the operator.** Tile visibility
 for an Odoo addon depends on a `gentianOdooModules` grant on one of the user's Keycloak
