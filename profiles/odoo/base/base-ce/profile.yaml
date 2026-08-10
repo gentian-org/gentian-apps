@@ -244,6 +244,10 @@ spec:
     fork:
       allowed: true
       repo: https://github.com/gentian-org/ocb
-      upstream: https://github.com/odoo/odoo
+      # OCA/OCB, not odoo/odoo: ocb's Dockerfile clones OCA/OCB branch 19.0 and
+      # strips Enterprise references from it. OCB is itself a community fork of
+      # odoo/odoo, so naming the grand-upstream here pointed CVE watch and the
+      # upstream-first check at a tree this fork does not track.
+      upstream: https://github.com/OCA/OCB
       owner: platform-erp
       cveWatch: true

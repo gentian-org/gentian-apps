@@ -79,6 +79,26 @@ spec:
       linkTarget: embedded
       allowedGroup: "App Users"
 
+  # Customization ladder — deliberately NOT inherited from nextcloud-base-ce.
+  #
+  # This profile shares a family name with the community base and nothing else. It
+  # deploys the OpenDesk AIO chart from registry.opencode.de, a credentialed
+  # registry, and that bundle is a locked-down distribution with a fixed app set —
+  # not the Gentian Nextcloud image, which stages addons in /usr/src/gentian-addons
+  # for `occ app:enable`. None of the nine nextcloud addons targets this base, and
+  # the drop-in paths the community base declares do not exist here.
+  #
+  # Grade is `unknown` rather than a guess. The rubric scores things that cannot be
+  # read from outside a credentialed registry — whether the bundle exposes drop-in
+  # directories, whether its app set can be extended at all. Per framework §4 an
+  # uncharacterised app is reachable at L0 and L4 only, and a task to characterise
+  # it is owed. Recording a confident grade here would be inventing one.
+  customization:
+    grade: unknown
+    supportedRungs: [L0, L4]
+    repackage:
+      chartOwnership: upstream
+
   provisioning:
     privilegedRole:
       kind: group

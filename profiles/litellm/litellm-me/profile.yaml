@@ -65,8 +65,12 @@ spec:
           spec: openapi
           path: /v1
           auth: oidc-token-exchange
+    # The artifact is not a chart: LiteLLM runs as a shared kernel singleton from
+    # hand-written manifests in gentian-os/kernel/services/llm/. Gentian owns that
+    # deployment outright — there is no upstream chart being consumed — so
+    # 'upstream' understated it. Repackaging here means editing those manifests.
     repackage:
-      chartOwnership: upstream
+      chartOwnership: gentian-owned
     patch:
       allowed: false
       seriesPath: patches/series
