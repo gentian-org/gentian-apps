@@ -67,15 +67,12 @@ spec:
     clusterIssuer: letsencrypt-http01
   security:
     egress:
+    # TCP/443 covers both the git-modules sidecar cloning from GitHub and the app's
+    # own outbound HTTPS. The git-daemon rule this replaced was pinned to a single
+    # workstation /32 and is no longer reachable or needed.
     - ports:
       - port: 443
         protocol: TCP
-    - ports:
-      - port: 9418
-        protocol: TCP
-      to:
-      - ipBlock:
-          cidr: 192.168.0.100/32
   extraValues:
     fullnameOverride: activepieces-me
     extraEnvVars:
@@ -320,9 +317,17 @@ spec:
       podLabels:
         gentianos.io/app: activepieces-me
       git:
-        repoUrl: git://192.168.0.100:9418/gentian-pieces
+        # Sync from GitHub rather than a git daemon on a developer workstation, as
+        # odoo-base-ce already does. The daemon worked around the namespace egress
+        # block and private-repo auth; neither applies — gentian-pieces is public
+        # and the profile already permits TCP/443 to anywhere, while the 9418 rule
+        # was pinned to one host's /32. A tenant workload should not depend on
+        # someone's laptop being up.
+        repoUrl: "https://github.com/gentian-org/gentian-pieces.git"
         branch: main
-        mountPath: /usr/src/app/custom-content
+      # The sidecar clones into the chart's syncDir; what the app sees is the shared
+      # PVC below, which it mounts at /usr/share/nginx/html/custom-content. A
+      # git.mountPath key used to sit here and was never read by the chart.
       persistence:
         enabled: true
         storageClass: nfs-csi
