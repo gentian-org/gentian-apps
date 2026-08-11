@@ -9,6 +9,7 @@ metadata:
     gentianos.io/deployment-role: base
 spec:
   displayName: "LLM Admin Panel"
+  family: litellm
   edition: me
   description: "Manage LLM configurations, models, virtual keys, and track token usage."
   license: MIT

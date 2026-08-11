@@ -17,6 +17,7 @@ metadata:
     gentianos.io/gateway-api-backends: '[{"pathPrefix":"/api","serviceName":"app-store-me-api","port":8000},{"pathPrefix":"/oauth","serviceName":"app-store-me-api","port":8000}]'
 spec:
   displayName: "App Store"
+  family: app-store
   edition: me
   description: "Browse the Gentian app catalogue and install or uninstall applications for your tenant."
   author: Gentian

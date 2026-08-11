@@ -9,6 +9,7 @@ metadata:
     gentianos.io/portal-auth-mode: matrix-bridge
 spec:
   displayName: "Element"
+  family: element
   edition: ce
   compositionRef: app-element
   description: "Federated team chat and collaboration based on the Matrix protocol, with Synapse homeserver."

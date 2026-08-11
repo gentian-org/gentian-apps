@@ -33,7 +33,7 @@ metadata:
 spec:
   displayName: "OpenProject"
   description: "Open-source project management with Gantt charts, Kanban boards, and time tracking."
-  family: openproject-ce
+  family: openproject
   catalogueVersion: "1.0.0"
   edition: ce
   trustTier: certified

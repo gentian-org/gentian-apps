@@ -41,7 +41,7 @@ metadata:
 spec:
   displayName: "Mathesar"
   description: "Spreadsheet-like interface for viewing, editing, and querying Postgres data directly."
-  family: mathesar-ce
+  family: mathesar
   catalogueVersion: "1.0.0"
   edition: ce
   trustTier: certified

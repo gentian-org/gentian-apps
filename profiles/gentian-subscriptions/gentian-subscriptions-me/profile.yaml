@@ -18,6 +18,7 @@ metadata:
     gentianos.io/deployment-role: base
 spec:
   displayName: "Gentian Subscriptions"
+  family: gentian-subscriptions
   edition: me
   description: "Manage Pro app subscriptions, billing, and entitlements for this tenant."
   license: Apache-2.0

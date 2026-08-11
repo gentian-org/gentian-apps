@@ -34,7 +34,7 @@ metadata:
 spec:
   displayName: "XWiki"
   description: "Open-source enterprise wiki with structured data, WYSIWYG editing, and extensible application platform."
-  family: xwiki-ce
+  family: xwiki
   catalogueVersion: "1.0.0"
   edition: ce
   trustTier: certified
