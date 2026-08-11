@@ -234,7 +234,7 @@ spec:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
       name: gentian-sidecar-sso-saml
-      version: 0.1.4
+      version: 0.1.5
     extraValues:
       podLabels:
         gentianos.io/app: activepieces-me

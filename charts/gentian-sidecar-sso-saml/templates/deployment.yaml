@@ -14,10 +14,15 @@ spec:
         {{- if .Values.podLabels }}
         {{- toYaml .Values.podLabels | nindent 8 }}
         {{- end }}
-      {{- if .Values.podAnnotations }}
       annotations:
+        # The handler is require()d once at process start, so a ConfigMap-only change
+        # leaves the old code running indefinitely — the pod never restarts and the
+        # mounted file is re-read by nobody. Rolling on the ConfigMap's checksum is
+        # what makes a handlerScript edit actually take effect.
+        checksum/handler: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.podAnnotations }}
         {{- toYaml .Values.podAnnotations | nindent 8 }}
-      {{- end }}
+        {{- end }}
     spec:
       securityContext:
         seccompProfile:

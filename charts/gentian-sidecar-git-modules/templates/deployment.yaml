@@ -32,11 +32,28 @@ spec:
               value: {{ .Values.git.syncInterval | quote }}
             - name: SYNC_DIR
               value: {{ .Values.syncDir | quote }}
+            {{- if .Values.git.auth.existingSecret }}
+            {{- if .Values.git.auth.tokenKey }}
+            - name: GIT_TOKEN_FILE
+              value: /etc/git-auth/{{ .Values.git.auth.tokenKey }}
+            - name: GIT_USERNAME
+              value: {{ .Values.git.auth.username | quote }}
+            {{- end }}
+            {{- if .Values.git.auth.sshKeyKey }}
+            - name: GIT_SSH_KEY_FILE
+              value: /etc/git-auth/{{ .Values.git.auth.sshKeyKey }}
+            {{- end }}
+            {{- end }}
           volumeMounts:
             - name: sync-volume
               mountPath: {{ .Values.syncDir }}
             - name: scripts-volume
               mountPath: /scripts
+            {{- if .Values.git.auth.existingSecret }}
+            - name: git-auth
+              mountPath: /etc/git-auth
+              readOnly: true
+            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
@@ -50,3 +67,9 @@ spec:
         - name: scripts-volume
           configMap:
             name: {{ .Release.Name }}-git-modules-scripts
+        {{- if .Values.git.auth.existingSecret }}
+        - name: git-auth
+          secret:
+            secretName: {{ .Values.git.auth.existingSecret }}
+            defaultMode: 0400
+        {{- end }}

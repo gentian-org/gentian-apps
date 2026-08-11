@@ -9,7 +9,21 @@ git:
   repoUrl: ""
   branch: "main"
   syncInterval: 60
-  sshKey: ""
+
+  # Credentials for a private repository. Leave existingSecret empty for public
+  # repos — the sidecar then clones anonymously. The Secret is mounted as files,
+  # never injected as environment values, so the token does not appear in
+  # `kubectl describe pod`.
+  auth:
+    existingSecret: ""
+    # Key holding a Personal Access Token, for https:// remotes.
+    tokenKey: "token"
+    # HTTPS username. GitHub accepts x-access-token for classic and fine-grained
+    # tokens alike, so the token itself carries the identity.
+    username: "x-access-token"
+    # Key holding an SSH private key, for ssh:// or git@host: remotes. Mutually
+    # exclusive with tokenKey in practice; whichever key exists is used.
+    sshKeyKey: ""
 
 syncDir: "/usr/src/app/modules"
 
