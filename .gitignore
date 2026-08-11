@@ -1,2 +1,5 @@
 *.tgz
 
+
+# Python bytecode from scripts/
+__pycache__/

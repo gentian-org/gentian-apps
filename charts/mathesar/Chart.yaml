@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mathesar
+description: Mathesar (self-hosted spreadsheet-like Postgres data explorer) for Gentian OS tenants
+type: application
+version: 0.1.0
+appVersion: "0.12.0"

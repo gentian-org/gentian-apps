@@ -1,0 +1,53 @@
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: odoo-pos-ce
+  labels:
+    gentianos.io/profile-name: odoo-pos-ce
+  annotations:
+    gentianos.io/platform-app: "false"
+    gentianos.io/deployment-role: addon
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["pos_restaurant"],"gentianOdooGroupRoles":["point_of_sale.group_pos_user","point_of_sale.group_pos_manager","stock.group_stock_user","account.group_account_invoice"]}'
+    gentianos.io/portal-auth-mode: oidc
+spec:
+  displayName: "Odoo Point of Sale"
+  description: "Point of Sale and Restaurant/Bar management module for Odoo."
+  family: odoo
+  catalogueVersion: "1.0.0"
+  edition: ce
+  trustTier: platform
+  license: LGPL-3.0
+  author: OCA
+  tile:
+    icon: store
+
+  portalTiles:
+    - name: odoo-pos
+      displayName:
+        en_US: "Odoo Point of Sale"
+        de_DE: "Odoo Point of Sale"
+      linkSuffix: "/web?gentian_embed=1&action=point_of_sale.action_pos_config_kanban"
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  compositionRef: app-odoo
+  deploymentMethod: crossplane
+  chart:
+    repository: oci://ghcr.io/gentian-org/charts
+    name: odoo
+    version: "0.1.15"
+  # Odoo calls its addons "modules" — this maps the Gentian profile onto that name.
+  customization:
+    addon:
+      id: pos_restaurant
+      of: odoo-base-ce
+  extraValues:
+    odoo:
+      module: pos_restaurant
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi

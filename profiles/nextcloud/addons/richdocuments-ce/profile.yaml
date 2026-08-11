@@ -1,0 +1,66 @@
+# AppProfile — Nextcloud Nextcloud Office (addon)
+#
+# Activated inside a Nextcloud base rather than deployed: the app ships disabled in
+# the base image's custom_apps, and selecting this addon runs `occ app:enable richdocuments`.
+# It therefore carries no chart of its own.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: nextcloud-richdocuments-ce
+  labels:
+    gentianos.io/profile-name: nextcloud-richdocuments-ce
+  annotations:
+    gentianos.io/deployment-role: addon
+spec:
+  displayName: "Nextcloud Office"
+  description: "Collabora-backed document, spreadsheet and presentation editing."
+  family: nextcloud
+  catalogueVersion: "1.0.0"
+  edition: ce
+  trustTier: certified
+  license: AGPL-3.0-only
+  author: Nextcloud
+  tile:
+    icon: documents
+  # Tile for the app menu / quick bar. The addon has no ingress of its own, so the
+  # shell resolves the base URL from spec.customization.addon.of and appends this
+  # suffix to deep-link into the feature inside Nextcloud.
+  # Three tiles, not one. The portal bridge resolves ?open=<type> to the user's most
+  # recently edited document of that kind, or creates one from a template if they have
+  # none — see portal-bridge.php in gentian-ui. A single "Office" tile pointing at the
+  # app root loses that entirely, which is what the office bundle used to provide.
+  portalTiles:
+    - name: document
+      displayName:
+        en_US: "Document"
+        de_DE: "Dokument"
+      linkSuffix: "?open=document"
+      linkTarget: embedded
+      allowedGroup: "Domain Users"
+      tile:
+        icon: documents
+    - name: spreadsheet
+      displayName:
+        en_US: "Spreadsheet"
+        de_DE: "Tabelle"
+      linkSuffix: "?open=spreadsheet"
+      linkTarget: embedded
+      allowedGroup: "Domain Users"
+      tile:
+        icon: spreadsheet
+    - name: presentation
+      displayName:
+        en_US: "Presentation"
+        de_DE: "Präsentation"
+      linkSuffix: "?open=presentation"
+      linkTarget: embedded
+      allowedGroup: "Domain Users"
+      tile:
+        icon: presentation
+
+  deploymentMethod: crossplane
+
+  customization:
+    addon:
+      id: richdocuments
+      of: nextcloud-base-ce

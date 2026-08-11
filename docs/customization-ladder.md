@@ -12,7 +12,7 @@ checks, and how to characterise a new catalogue entry.
 | **L0** | Configure | nothing | `profiles/<n>/profile.yaml` → `spec.extraValues` |
 | **L1** | Drop-in | one file | `profiles/<n>/dropins/` |
 | **L2** | Companion | a separate deployable | `apps/<new>/` + `contracts/<c>.yaml` + `profiles/<new>/` |
-| **L3** | Extension | a module the app loads | the app's module repo (`odoo-modules`, …) |
+| **L3** | Extension | an addon the app loads | the app's addon repo (`odoo-modules`, …) |
 | **L4** | Repackage | chart / composition / entrypoint | `charts/<app>/`, `profiles/<n>/composition.yaml` |
 | **L5** | Patch | a patch series + rebuilt image | the app's build repo (`ocb`, …) |
 | **L6** | Fork | the source tree | a dedicated fork repo |
@@ -24,14 +24,28 @@ generic mechanisms only).
 
 ## Profile bundle layout
 
+A bundle is any directory containing a `profile.yaml` — that file is what the catalogue
+ApplicationSet matches, and the Application is named after the AppProfile's
+`metadata.name` rather than the directory. Directory names are therefore free to be
+short: an addon lives at `profiles/odoo/addons/crm-ce/` while its profile is still
+`odoo-crm-ce`. Never locate a bundle by counting path segments.
+
+Families with addons use `base/`, `addons/` and `packages/`; families without L3 have
+no third level, just `profiles/<family>/<name>/`.
+
 ```text
-profiles/<name>/
-├── kustomization.yaml
-├── profile.yaml            # includes spec.customization — the machine-readable ladder
+profiles/<family>/[base|addons|packages/]<name>/
+├── profile.yaml            # the marker; also carries spec.customization
+├── kustomization.yaml      # required — the bundle is rendered with kustomize
 ├── customization.md        # the app's ladder in prose, incl. the rubric score
 ├── dropins/                # L1 content shipped with the profile (50-89 prefixes)
 └── customizations/         # Customization records (CRs) for deltas at L2+
 ```
+
+Charts and images are deliberately **not** in here — `charts/<name>/` and
+`images/<name>/` are separate flat trees, because a chart is referenced by OCI
+coordinate rather than path and is frequently shared (`charts/odoo` backs 10 profiles).
+See [app-profile-guide.md](app-profile-guide.md) §0.
 
 ## Characterising a new app
 

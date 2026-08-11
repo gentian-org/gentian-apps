@@ -1,6 +1,11 @@
 name: Apps CI
 
 on:
+  # Manual trigger. Push events are path-filtered and can also be dropped entirely
+  # when GitHub throttles webhook delivery during an incident — as happened on
+  # 2026-08-06, leaving several merged commits with no run at all. This gives a way
+  # to test a commit without pushing an empty one.
+  workflow_dispatch:
   push:
     branches: [main, develop]
     paths:
@@ -10,6 +15,7 @@ on:
       - "charts/odoo/**"
       - "charts/gentian-sidecar-git-modules/**"
       - "charts/activepieces/**"
+      - "charts/mathesar/**"
       - ".github/workflows/apps-ci.yaml"
   pull_request:
     branches: [main, develop]
@@ -20,6 +26,7 @@ on:
       - "charts/odoo/**"
       - "charts/gentian-sidecar-git-modules/**"
       - "charts/activepieces/**"
+      - "charts/mathesar/**"
 
 env:
   REGISTRY: ghcr.io
@@ -82,9 +89,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    strategy:
-      matrix:
-        target: [base, office, officeplus, suite]
     steps:
       - uses: actions/checkout@v4
 
@@ -94,9 +98,7 @@ jobs:
           # shellcheck disable=SC1091
           source images/nextcloud/versions.env
           # Parse version and gentian suffix
-          V_PART="${IMAGE_TAG%%-*}"
-          G_PART="${IMAGE_TAG#*-}"
-          echo "image_tag=${V_PART}-${{ matrix.target }}-${G_PART}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
           echo "nextcloud_version=${NEXTCLOUD_VERSION}" >> "$GITHUB_OUTPUT"
           echo "user_oidc_version=${USER_OIDC_VERSION}" >> "$GITHUB_OUTPUT"
           echo "richdocuments_version=${RICHDOCUMENTS_VERSION}" >> "$GITHUB_OUTPUT"
@@ -120,7 +122,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: images/nextcloud
-          target: ${{ matrix.target }}
           push: ${{ github.event_name != 'pull_request' }}
           build-args: |
             NEXTCLOUD_VERSION=${{ steps.versions.outputs.nextcloud_version }}
@@ -136,7 +137,7 @@ jobs:
             SPREED_VERSION=${{ steps.versions.outputs.spreed_version }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ steps.versions.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ github.sha }}-${{ matrix.target }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ github.sha }}
 
   build-nextcloud-mcp:
     runs-on: ubuntu-latest
@@ -223,24 +224,52 @@ jobs:
         run: pip install pyyaml
       - name: Validate profile bundles
         run: |
-          for d in profiles/*/; do
-            name="$(basename "$d")"
-            echo "Checking profiles/${name}"
-            test -f "${d}kustomization.yaml"
-            if test -f "${d}profile.yaml"; then
-              python3 -c "import yaml; yaml.safe_load(open('${d}profile.yaml'))"
-            elif test -f "${d}catalog.yaml"; then
-              python3 -c "import yaml; yaml.safe_load(open('${d}catalog.yaml'))"
-            else
-              echo "profiles/${name}: expected profile.yaml (AppProfile) or catalog.yaml (platform catalogue CR)" >&2
+          # Bundles are discovered by profile.yaml at any depth, matching the
+          # gentian-catalogue ApplicationSet's files generator.
+          found=0
+          declare -A SEEN
+          while IFS= read -r f; do
+            d="$(dirname "$f")"
+            found=$((found + 1))
+            echo "Checking ${d}"
+            python3 -c "import yaml; yaml.safe_load(open('${f}'))"
+
+            # The ApplicationSet names each Application after the AppProfile's
+            # metadata.name, not its directory, so directory naming is free — but
+            # metadata.name must be globally unique or two bundles collapse into one
+            # Application. AppProfile is cluster-scoped, so the API server would
+            # reject the duplicate too; catching it here names both offenders.
+            cr="$(python3 -c "import yaml; print((yaml.safe_load(open('${f}')).get('metadata') or {}).get('name',''))")"
+            if [ -z "$cr" ]; then
+              echo "${d}: profile.yaml has no metadata.name" >&2; exit 1
+            fi
+            if [ -n "${SEEN[$cr]:-}" ]; then
+              echo "duplicate AppProfile name '${cr}': ${SEEN[$cr]} and ${d}" >&2
+              echo "  Application names derive from metadata.name, so these would collide." >&2
+              exit 1
+            fi
+            SEEN[$cr]="$d"
+
+            # Generated from profile.yaml but rendered with kustomize: without a
+            # kustomization.yaml the Application exists and cannot sync.
+            if [ ! -f "${d}/kustomization.yaml" ]; then
+              echo "${d}: profile.yaml without kustomization.yaml — the Application would never sync" >&2
               exit 1
             fi
             kubectl kustomize "$d" >/dev/null
-          done
+          done < <(find profiles -name profile.yaml | sort)
+          echo "Validated ${found} profile bundle(s)"
+
       - name: Validate profile tile specs
         run: python3 scripts/validate-profile-tiles.py
       - name: Validate customization ladder declarations and records
         run: python3 scripts/validate-customizations.py
+      - name: Validate chart references
+        run: python3 scripts/validate-chart-refs.py
+      - name: Validate secret references
+        run: python3 scripts/validate-secret-refs.py
+      - name: Validate image tags
+        run: python3 scripts/validate-image-tags.py
       - name: Customization debt report
         run: python3 scripts/customization-debt-report.py >> "$GITHUB_STEP_SUMMARY"
 
@@ -287,12 +316,20 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
 
-      - name: Package and push chart
+      # The chart is not vendored: upstream is fetched at the pinned version and
+      # the local patch series is applied on top. This step runs on pull requests
+      # too — a series that no longer applies must fail review, not merge.
+      - name: Build chart from pinned upstream + patch series
+        id: build
+        run: scripts/build-activepieces-chart.sh --out /tmp/ap-dist
+
+      - name: Push chart
         if: github.event_name != 'pull_request'
         run: |
-          CHART_VERSION=$(grep '^version:' charts/activepieces/Chart.yaml | awk '{print $2}')
-          helm package charts/activepieces -d /tmp
-          helm push "/tmp/activepieces-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+          # shellcheck source=/dev/null
+          source charts/activepieces/UPSTREAM
+          helm push "/tmp/ap-dist/activepieces-${CHART_VERSION}.tgz" \
+            oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
 
   build-sso-saml-sidecar-chart:
     runs-on: ubuntu-latest
@@ -343,6 +380,34 @@ jobs:
           CHART_VERSION=$(grep '^version:' charts/gentian-sidecar-git-modules/Chart.yaml | awk '{print $2}')
           helm package charts/gentian-sidecar-git-modules -d /tmp
           helm push "/tmp/gentian-sidecar-git-modules-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+
+  build-mathesar-chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint chart
+        run: helm lint charts/mathesar
+
+      - name: Package and push chart
+        if: github.event_name != 'pull_request'
+        run: |
+          CHART_VERSION=$(grep '^version:' charts/mathesar/Chart.yaml | awk '{print $2}')
+          helm package charts/mathesar -d /tmp
+          helm push "/tmp/mathesar-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
 
   build-git-modules-sidecar-image:
     runs-on: ubuntu-latest

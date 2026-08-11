@@ -3,7 +3,7 @@
 ## Project overview
 
 `gentian-apps` is **the single source of truth for AppProfile catalogue metadata** for Gentian
-OS — profile bundles (`profiles/<name>/`, synced to clusters by the ArgoCD ApplicationSet
+OS — profile bundles (`profiles/[<family>/]<name>/`, synced to clusters by the ArgoCD ApplicationSet
 `gentian-catalogue`) plus first-party app implementations (`apps/<name>/`, FastAPI + React +
 Helm — same stack as [gentian-app-template](https://github.com/gentian-org/gentian-app-template) /
 [gentian-ui](https://github.com/gentian-org/gentian-ui)). This includes commercial
@@ -27,7 +27,7 @@ catalogue. See [README.md](README.md) for full scope and
 * **Never commit secrets.** Kernel-injected values (`DATABASE_URL`, `OIDC_ISSUER`,
   `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, etc.) arrive via ExternalSecret at runtime — never
   hardcode or commit them.
-* **Respect third-party license terms** for vendored charts (`charts/activepieces/`) and upstream app
+* **Respect third-party license terms** for patched/vendored charts (`charts/activepieces/`) and upstream app
   images (Nextcloud, XWiki, Odoo, OpenProject, ...) — check upstream licensing before modifying
   or repackaging.
 
@@ -61,7 +61,7 @@ local operations: [docs/customization-ladder.md](docs/customization-ladder.md).
     breaks this at the next upstream release.
 
 Rung → where it lives here: L0 `spec.extraValues` · L1 `profiles/<n>/dropins/` ·
-L2 `apps/<new>/` plus a contract · L3 the module repo (`odoo-modules`, …) ·
+L2 `apps/<new>/` plus a contract · L3 the addon repo (`odoo-modules`, …) ·
 L4 `charts/` or `composition.yaml` · L5 the build repo (`ocb`) · L6 a fork repo.
 
 ## First-party app development (`apps/app-store`, `apps/_template`)
@@ -129,10 +129,27 @@ docker compose -f docker-compose.dev.yaml up --build
 
 `AUTH_DISABLED=true` / `VITE_AUTH_DISABLED=true` skip OIDC locally.
 
-## Adding/editing profiles (`profiles/<name>/`, OSS or commercial)
+## Adding/editing profiles (`profiles/[<family>/]<name>/`, OSS or commercial)
 
 Each profile bundle holds `kustomization.yaml` (required), `profile.yaml` (the AppProfile CR —
 describe the app there, not in a separate catalogue doc), and optionally `oidc-catalog.yaml`,
 `composition.yaml`, `assets/`. Commercial profiles set `spec.license: proprietary`; the App
 Store surfaces those with a Buy button and the operator gates install on entitlement. See
 [docs/app-profile-guide.md](docs/app-profile-guide.md) for the full workflow.
+
+**Layout rules — CI enforces both:**
+
+* Bundles are found by their `profile.yaml` at **any depth**. Families with addons use
+  `profiles/<family>/{base,addons,packages}/<name>/`; families without L3 use
+  `profiles/<family>/<name>/`. Never assume a fixed path depth when globbing — use `**`.
+* **`metadata.name` must be globally unique** — the ApplicationSet names Applications after
+  it, not after the directory, so two profiles sharing a name would collapse into one
+  Application. Directory names are free (`addons/crm-ce` holds `odoo-crm-ce`). A
+  `profile.yaml` with no sibling `kustomization.yaml` is a CI error, not a silent no-sync.
+
+**Do not move charts or images into profile folders.** `charts/<name>/` and `images/<name>/`
+are separate flat trees on purpose: a profile references its chart by OCI coordinate rather
+than by path, `charts/odoo` backs 10 profiles, and 7 profiles wrap external charts this repo
+never contains. The reasoning — this is a distribution repo, not an application monorepo — is
+in [docs/app-profile-guide.md](docs/app-profile-guide.md) §0. Read it before proposing layout
+changes.

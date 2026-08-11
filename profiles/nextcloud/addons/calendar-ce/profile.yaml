@@ -1,0 +1,42 @@
+# AppProfile — Nextcloud Calendar (addon)
+#
+# Activated inside a Nextcloud base rather than deployed: the app ships disabled in
+# the base image's custom_apps, and selecting this addon runs `occ app:enable calendar`.
+# It therefore carries no chart of its own.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: nextcloud-calendar-ce
+  labels:
+    gentianos.io/profile-name: nextcloud-calendar-ce
+  annotations:
+    gentianos.io/deployment-role: addon
+spec:
+  displayName: "Calendar"
+  description: "CalDAV calendars with scheduling and free/busy."
+  family: nextcloud
+  catalogueVersion: "1.0.0"
+  edition: ce
+  trustTier: certified
+  license: AGPL-3.0-only
+  author: Nextcloud
+  tile:
+    icon: calendar
+  # Tile for the app menu / quick bar. The addon has no ingress of its own, so the
+  # shell resolves the base URL from spec.customization.addon.of and appends this
+  # suffix to deep-link into the feature inside Nextcloud.
+  portalTiles:
+    - name: calendar
+      displayName:
+        en_US: "Calendar"
+        de_DE: "Kalender"
+      linkSuffix: "?app=calendar"
+      linkTarget: embedded
+      allowedGroup: "Domain Users"
+
+  deploymentMethod: crossplane
+
+  customization:
+    addon:
+      id: calendar
+      of: nextcloud-base-ce

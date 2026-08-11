@@ -1,0 +1,97 @@
+# Customization record — see gentian-os/docs/app-customization.md §5
+#
+# Covers patches 0005 and 0006 of the activepieces series: the nginx config that
+# fronts the app, the entrypoint that starts it, and the two startup patches that
+# entrypoint applies.
+apiVersion: gentianos.io/v1alpha1
+kind: Customization
+metadata:
+  name: nginx-sso-routing
+  namespace: gentian-system
+spec:
+  summary: "Front Activepieces with a Gentian nginx config that routes SAML to the sso-saml sidecar"
+
+  target:
+    family: activepieces
+    profile: activepieces-me
+    appVersion: "0.28.0"
+    chartVersion: "0.3.24"
+
+  rung: L4
+  scope: profile
+
+  rungJustification:
+    L0: >-
+      The image's own nginx config cannot be reconfigured by value; the app serves
+      it from a path it owns and rebuilds on every release.
+    L1: >-
+      Upstream exposes no conf.d drop-in directory, and the change overrides existing
+      location blocks rather than adding new ones — L1 requires an upstream-promised path.
+    L2: >-
+      The SAML gateway itself is a companion (gentian-sidecar-sso-saml) and is recorded
+      separately. What is left here is edge routing inside the app's own pod, which a
+      side-by-side deployable cannot express.
+    L3: >-
+      Activepieces pieces extend flows, not HTTP routing or process startup. There is
+      no in-app extension point for either.
+
+  upstreamFirst:
+    attempted: true
+    forwarded: not-needed
+    reason: >-
+      Both patches are Gentian portal integration glue — SAML route interception for
+      our IdP topology and the startup wiring that serves it — which upstream would
+      rightly decline. They are deliberately separate from 0001-0003, the three
+      generic upstream defects in the same series, which carry Forwarded: not-yet and
+      are tracked for submission on their own merits.
+
+  artifacts:
+    - repo: gentian-org/gentian-apps
+      path: charts/activepieces/patches/0005-add-nginx-configmap-for-portal-sso-forwarding-and-ht.patch
+      version: "0.3.24"
+    - repo: gentian-org/gentian-apps
+      path: charts/activepieces/patches/0006-mount-the-gentian-runtime-and-own-the-entrypoint.patch
+      version: "0.3.24"
+  delivery: chart
+
+  origin:
+    authorship: gentian
+    repoOwnership: gentian
+    reviewedBy: platform-team
+    supportContract: none
+
+  owner: platform-team
+  created: 2026-08-06
+  reviewBy: 2027-02-06
+  exitCriteria: >-
+    The entrypoint's two startup patches are the L5 residue inside this L4 record and
+    should go first. gentian.startup.injectSessionScript is replaceable by an nginx
+    sub_filter injecting the same script into <head>, once ngx_http_sub_module is
+    confirmed present in the image. gentian.startup.disableUpgradeBanner is
+    replaceable by denying egress to raw.githubusercontent.com, since the fetch it
+    patches is already wrapped in a try/catch returning "0.0.0" — and that patch
+    matches a literal string in a minified bundle, so it fails silently on any
+    upstream rebuild. Both are values, so each can be switched off and verified
+    independently. The routing itself stays as long as SSO is terminated by a sidecar.
+  upgradeRisk: medium
+  testedAgainst: ["0.28.0"]
+
+  security:
+    macWaivers:
+      - gentian-restrict-capabilities
+      - gentian-require-non-root
+    newEgress: []
+    handlesPersonalData: false
+
+  licensing:
+    effect: none
+    notes: >-
+      Activepieces runs Community Edition here — no AP_EDITION, no AP_LICENSE_KEY.
+      SAML is terminated by the sso-saml sidecar, which authenticates against
+      Keycloak and then creates an ordinary CE user row and signs a session JWT
+      with the instance's own secret; the app's licensed SSO code path is never
+      invoked, and nginx routes /api/v1/authn/saml/{login,acs} to the sidecar
+      rather than to the backend. The startup license patch and the placeholder
+      AP_LICENSE_KEY were removed in c5b0d4f, which also added the absolute
+      prohibition to docs/app-profile-guide.md. The postInstallJob seeds the
+      platform row with every enterprise gate off.

@@ -37,7 +37,7 @@ RUNG_ORDER = {rung: index for index, rung in enumerate(RUNGS)}
 
 def load_records() -> list[dict]:
     records = []
-    for path in sorted(PROFILES_DIR.glob("*/customizations/*.yaml")):
+    for path in sorted(PROFILES_DIR.glob("**/customizations/*.yaml")):
         doc = yaml.safe_load(path.read_text())
         if isinstance(doc, dict) and doc.get("kind") == "Customization":
             doc["_path"] = str(path.relative_to(REPO_ROOT))
@@ -46,15 +46,21 @@ def load_records() -> list[dict]:
 
 
 def load_grades() -> dict[str, str]:
-    """Grade every profile, resolving family inheritance.
+    """Grade every profile, resolving addon inheritance only.
 
-    Module and edition profiles (odoo-cb-*, nextcloud-office, ...) deliberately do
-    not repeat their family's declaration — they are the same app with a different
-    feature set. Counting them as uncharacterised would overstate the gap.
+    An addon inherits: it is activation state inside a base — same image, same
+    drop-in dirs, same plugin API — so the base's ladder is its ladder by
+    construction, and it names that base in spec.customization.addon.of.
+
+    An edition does not. It shares a family name and nothing else:
+    nextcloud-base-od deploys the OpenDesk AIO chart from a credentialed registry,
+    nextcloud-base-ce the community chart with a Gentian image. Inheriting by family
+    reported the OpenDesk bundle as grade A on the strength of a different artifact,
+    and hid it from the uncharacterised list below — the one place it should appear.
     """
     entries = []
-    family_grades: dict[str, str] = {}
-    for path in sorted(PROFILES_DIR.glob("*/profile.yaml")):
+    graded: dict[str, str] = {}
+    for path in sorted(PROFILES_DIR.glob("**/profile.yaml")):
         doc = yaml.safe_load(path.read_text())
         if not isinstance(doc, dict):
             continue
@@ -62,17 +68,59 @@ def load_grades() -> dict[str, str]:
         name = (doc.get("metadata", {}) or {}).get("name")
         if not name:
             continue
-        family = spec.get("family") or name
         surface = spec.get("customization") or {}
         grade = surface.get("grade")
-        entries.append((name, family, grade))
+        base = (surface.get("addon") or {}).get("of")
+        entries.append((name, base, grade))
         if grade:
-            family_grades[family] = grade
+            graded[name] = grade
 
     return {
-        name: grade or family_grades.get(family, "unknown")
-        for name, family, grade in entries
+        name: grade or (graded.get(base, "unknown") if base else "unknown")
+        for name, base, grade in entries
     }
+
+
+def declared_deltas() -> list[tuple[str, str, str]]:
+    """Deltas the catalogue admits to carrying, read from the profiles.
+
+    The report used to count only Customization records, so "0 carried deltas at L4
+    or above" meant "nobody wrote a record" — the instrument built to measure the gap
+    read zero by construction, and read it most loudly when the gap was widest.
+
+    A profile that owns its chart, permits patching, or maintains a fork is carrying a
+    delta whether or not anyone filed the paperwork. §5 requires a record for every
+    customization at L2 and above, so a declared delta with no record is exactly the
+    debt this report exists to surface.
+
+    Returns (profile, rung, what).
+    """
+    found: list[tuple[str, str, str]] = []
+    for path in sorted(PROFILES_DIR.glob("**/profile.yaml")):
+        doc = yaml.safe_load(path.read_text())
+        if not isinstance(doc, dict):
+            continue
+        spec = doc.get("spec", {}) or {}
+        name = (doc.get("metadata", {}) or {}).get("name")
+        surface = spec.get("customization") or {}
+        if not name or surface.get("addon"):
+            continue
+
+        ownership = (surface.get("repackage") or {}).get("chartOwnership")
+        # "upstream" is the absence of a delta; anything else is Gentian carrying one.
+        if ownership and ownership != "upstream":
+            found.append((name, "L4", f"chartOwnership: {ownership}"))
+        # patch.allowed is a permission, not a delta: the delta is the patch series,
+        # and its length lives in the build repo where this script cannot read it
+        # (odoo's is currently empty — the fork's changes are Dockerfile-level, i.e.
+        # L6). Inferring an L5 delta from the permission would report debt that does
+        # not exist, which is the mirror of the bug this section fixes. §8.3 asks for
+        # "patch series length per forked component"; that needs the operator, which
+        # can see the repo, not a catalogue-side script.
+        if (surface.get("fork") or {}).get("allowed"):
+            repo = (surface.get("fork") or {}).get("repo", "?")
+            found.append((name, "L6", f"fork maintained at {repo}"))
+    return found
 
 
 def analyse(records: list[dict], grades: dict[str, str]) -> dict:
@@ -112,6 +160,16 @@ def analyse(records: list[dict], grades: dict[str, str]) -> dict:
         name for name, grade in grades.items() if grade in {"unknown", None}
     )
 
+    covered = {
+        (str((r.get("spec") or {}).get("target", {}).get("profile")), (r.get("spec") or {}).get("rung"))
+        for r in records
+    }
+    unrecorded = [
+        (profile, rung, what)
+        for profile, rung, what in declared_deltas()
+        if (profile, rung) not in covered
+    ]
+
     return {
         "generated": today.isoformat(),
         "totalRecords": len(records),
@@ -122,6 +180,7 @@ def analyse(records: list[dict], grades: dict[str, str]) -> dict:
         "upstreamUnforwarded": unforwarded,
         "externallyOwned": external,
         "uncharacterisedApps": uncharacterised,
+        "unrecordedDeltas": unrecorded,
         "grades": collections.Counter(grades.values()),
     }
 
@@ -130,10 +189,11 @@ def render_markdown(report: dict) -> str:
     lines = [
         "# Customization debt report",
         "",
-        f"Generated {report['generated']} from `profiles/*/customizations/`.",
+        f"Generated {report['generated']} from `profiles/**/customizations/`.",
         "",
-        f"**{report['totalRecords']}** record(s); "
-        f"**{report['carriedDeltas']}** carried delta(s) at L4 or above.",
+        f"**{report['totalRecords']}** record(s) covering "
+        f"**{report['carriedDeltas']}** delta(s) at L4 or above; "
+        f"**{len(report['unrecordedDeltas'])}** declared delta(s) with no record.",
         "",
         "## Records by rung",
         "",
@@ -163,6 +223,11 @@ def render_markdown(report: dict) -> str:
     )
     section("Externally owned", report["externallyOwned"], lambda r: f"`{r[0]}` — {r[1]}")
     section("Uncharacterised apps", report["uncharacterisedApps"], lambda r: f"`{r}`")
+    section(
+        "Declared deltas with no Customization record",
+        report["unrecordedDeltas"],
+        lambda r: f"`{r[0]}` — {r[1]}, {r[2]}",
+    )
 
     return "\n".join(lines) + "\n"
 

@@ -8,7 +8,7 @@ Two things are checked:
    ``{grade: unknown, supportedRungs: [L0, L4]}``, which is a deliberate floor, not
    a default to leave in place.
 
-2. Every ``profiles/*/customizations/*.yaml`` record satisfies the ladder policy:
+2. Every ``profiles/**/customizations/*.yaml`` record satisfies the ladder policy:
    the rung x scope cost matrix, the upstream-first obligation, the justification
    chain, and the review date.
 
@@ -36,7 +36,9 @@ RUNG_ORDER = {"L0": 0, "L1": 1, "L2": 2, "L3": 3, "L4": 4, "L5": 5, "L6": 6}
 GRADE_BANDS = [(7, "A"), (5, "B"), (3, "C"), (0, "D")]
 
 # Module profiles inherit their base profile's declaration rather than repeating it.
-INHERITING_ROLES = {"module"}
+# "module" is the deprecated spelling of "addon"; both are accepted while the
+# catalogue migrates.
+INHERITING_ROLES = {"addon", "module"}
 
 
 def grade_for_score(score: int) -> str:
@@ -59,7 +61,7 @@ def load_yaml(path: pathlib.Path):
         raise SystemExit(f"{path}: invalid YAML: {exc}")
 
 
-def check_surface(path: pathlib.Path, doc: dict, characterised_families: set[str]) -> list[str]:
+def check_surface(path: pathlib.Path, doc: dict) -> list[str]:
     """Check one AppProfile's spec.customization declaration."""
     errors: list[str] = []
     meta = doc.get("metadata", {}) or {}
@@ -67,27 +69,67 @@ def check_surface(path: pathlib.Path, doc: dict, characterised_families: set[str
     spec = doc.get("spec", {}) or {}
 
     role = annotations.get("gentianos.io/deployment-role", "standalone")
-    family = spec.get("family") or meta.get("name")
     surface = spec.get("customization")
 
     if surface is None:
-        # Module profiles and edition profiles inherit the surface of the family's
-        # characterised profile: they are the same app with a different feature set,
-        # so their customization ladder is identical by construction.
-        if role in INHERITING_ROLES or family in characterised_families:
+        # Addons inherit, editions do not.
+        #
+        # An addon is activation state inside a base: same image, same drop-in dirs,
+        # same plugin API, so the base's ladder is its ladder by construction, and it
+        # names that base in spec.customization.addon.of.
+        #
+        # An edition shares only a family name. nextcloud-base-od deploys the OpenDesk
+        # AIO chart from a credentialed registry — a locked-down bundle with a fixed
+        # app set — and nextcloud-base-ce deploys the community chart with a Gentian
+        # image that stages addons for `occ app:enable`. Treating the second as
+        # evidence about the first asserted a reachability that does not exist, and
+        # nothing at runtime honoured the inheritance anyway: the operator reads
+        # spec.customization directly, so an edition without one is [L0, L4] there
+        # while this check called it characterised.
+        if role in INHERITING_ROLES:
             return errors
         return [
             f"{path}: missing spec.customization — characterise the app "
-            f"(see docs/customization-ladder.md), mark it deployment-role: module, "
-            f"or give it a family whose base profile is characterised"
+            f"(see docs/customization-ladder.md) or mark it deployment-role: addon. "
+            f"If it genuinely has not been characterised, say so explicitly with "
+            f"grade: unknown and supportedRungs: [L0, L4]"
         ]
+
+    # An addon declares spec.customization only to carry `addon:`. Its ladder is the
+    # base's, so restating grade/rubricScore/supportedRungs here just forks a mutable
+    # fact into N files that go stale the next time the base is rescored.
+    if role in INHERITING_ROLES:
+        for field in ("grade", "rubricScore", "supportedRungs"):
+            if field in surface:
+                errors.append(
+                    f"{path}: spec.customization.{field} must not be set on an addon — "
+                    f"the ladder is inherited from the base named in "
+                    f"spec.customization.addon.of; remove it and grade the base instead"
+                )
+        if not surface.get("addon"):
+            errors.append(
+                f"{path}: deployment-role addon needs spec.customization.addon.{{id,of}} "
+                f"so the operator knows what the hosting app calls it"
+            )
+        return errors
 
     grade = surface.get("grade")
     score = surface.get("rubricScore")
     if grade is None:
         errors.append(f"{path}: spec.customization.grade is required")
-    if score is None:
-        errors.append(f"{path}: spec.customization.rubricScore is required")
+    # grade: unknown is the honest answer for an app nobody has scored, and a score
+    # alongside it would be a contradiction — so it is the one grade that may omit
+    # rubricScore. The debt report lists these as uncharacterised, which is the point.
+    if score is None and grade != "unknown":
+        errors.append(
+            f"{path}: spec.customization.rubricScore is required (or set "
+            f"grade: unknown if the app has genuinely not been scored)"
+        )
+    if score is not None and grade == "unknown":
+        errors.append(
+            f"{path}: grade is unknown but rubricScore {score} is set — score it and "
+            f"assign the matching grade, or drop the score"
+        )
     if grade is not None and score is not None and grade != "unknown":
         expected = grade_for_score(int(score))
         if expected != grade:
@@ -124,10 +166,18 @@ def check_surface(path: pathlib.Path, doc: dict, characterised_families: set[str
             errors.append(
                 f"{path}: spec.customization.extension is declared but L3 is not in supportedRungs"
             )
-        if extension.get("perTenantModules") and not extension.get("testMatrix"):
+        # perTenantAddons, not perTenantModules: the field was renamed in the L3
+        # cleanup and this check kept reading the old key, so it matched nothing and
+        # passed every profile for as long as it has existed.
+        if extension.get("perTenantAddons") and not extension.get("testMatrix"):
             errors.append(
-                f"{path}: extension.perTenantModules requires a testMatrix — per-tenant "
-                f"modules must be pinned to verified app versions"
+                f"{path}: extension.perTenantAddons requires a testMatrix — per-tenant "
+                f"addons must be pinned to verified app versions"
+            )
+        if "perTenantModules" in extension:
+            errors.append(
+                f"{path}: extension.perTenantModules was renamed to perTenantAddons; "
+                f"the old key is not read by the CRD and would be silently ignored"
             )
 
     return errors
@@ -211,27 +261,15 @@ def main() -> int:
     surfaces = 0
     records = 0
 
-    # First pass: which families have a characterised profile? Edition and module
-    # profiles inherit from it rather than repeating the declaration.
-    profiles = []
-    characterised_families: set[str] = set()
-    for profile_path in sorted(PROFILES_DIR.glob("*/profile.yaml")):
+    for profile_path in sorted(PROFILES_DIR.glob("**/profile.yaml")):
         doc = load_yaml(profile_path)
         if not isinstance(doc, dict):
             errors.append(f"{profile_path}: not a mapping")
             continue
-        profiles.append((profile_path, doc))
-        spec = doc.get("spec", {}) or {}
-        if spec.get("customization"):
-            family = spec.get("family") or (doc.get("metadata", {}) or {}).get("name")
-            if family:
-                characterised_families.add(family)
-
-    for profile_path, doc in profiles:
         surfaces += 1
-        errors.extend(check_surface(profile_path, doc, characterised_families))
+        errors.extend(check_surface(profile_path, doc))
 
-    for record_path in sorted(PROFILES_DIR.glob("*/customizations/*.yaml")):
+    for record_path in sorted(PROFILES_DIR.glob("**/customizations/*.yaml")):
         doc = load_yaml(record_path)
         if not isinstance(doc, dict):
             errors.append(f"{record_path}: not a mapping")

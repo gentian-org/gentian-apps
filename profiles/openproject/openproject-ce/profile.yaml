@@ -1,0 +1,332 @@
+# AppProfile — OpenProject (per-tenant project management)
+#
+# Source chart: https://charts.openproject-ce.org/ openproject-ce v12.0.0+
+#   Chart >= 12 applies commonLabels to pod templates (required for MAC kernel-access).
+#   Community-maintained chart; docker.io/openproject-ce/openproject-ce app image.
+#
+# For the OpenDesk supplier mirror (opencode registry), use profile `od-openproject`
+# in gentian-pro.
+#
+# Secret inventory:
+#   Kernel-provided:
+#     oidc_client_secret  → openproject-ce.oidc.secret
+#     pg_*                → postgresql.auth.password / connection.*
+#     s3_secret_key       → s3.auth.secretAccessKey
+#     smtp_password       → environment.OPENPROJECT_SMTP__PASSWORD
+#   App-internal (2) → appSecrets:
+#     admin_password      → openproject-ce.admin_user.password
+#     api_admin_password  → environment.OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_PASSWORD
+#
+# Portal WinBox SSO uses the openproject-bridge (ticket + form login) and does not
+# require an OpenProject Enterprise token. Optional EE token still enables Keycloak
+# SSO redirect for new-tab / direct login when OPENPROJECT_ENTERPRISE_TOKEN is set
+# in install.secrets.env via gentian-kernel-services.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: openproject-ce
+  labels:
+    gentianos.io/profile-name: openproject-ce
+  annotations:
+    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/gentian-portal-bridge","serviceName":"openproject-portal-bridge","port":8080},{"pathPrefix":"/openproject-portal-sso.html","serviceName":"openproject-portal-bridge","port":8080}]'
+    gentianos.io/portal-auth-mode: openproject-bridge
+spec:
+  displayName: "OpenProject"
+  description: "Open-source project management with Gantt charts, Kanban boards, and time tracking."
+  family: openproject-ce
+  catalogueVersion: "1.0.0"
+  edition: ce
+  trustTier: certified
+  license: Apache-2.0
+  author: OpenProject
+  tile:
+    icon: projects
+  compositionRef: app-openproject
+
+  kernelRequirements:
+    identity:
+      oidc:
+        clientId: "gentian-openproject"
+        name: "OpenProject"
+        accessType: CONFIDENTIAL
+        redirectUris:
+          - "https://projects.${TENANT_DOMAIN}/auth/keycloak/callback"
+        postLogoutRedirectUris:
+          - "https://projects.${TENANT_DOMAIN}/"
+        backchannelLogoutUrl: "https://projects.${TENANT_DOMAIN}/auth/keycloak/backchannel-logout"
+    database:
+      engine: postgresql
+      databasePerTenant: true
+    storage:
+      s3:
+        bucketPerTenant: true
+    cache:
+      engine: memcached
+    mail:
+      smtp:
+        auth: cram-md5
+        port: 587
+
+  provides:
+    - name: project-management
+      protocol: http-json
+
+  optionalIntegrations:
+    - contract: central-navigation
+      provider: portal
+      capabilities:
+        - navigation:register
+    - contract: file-store
+      capabilities:
+        - webdav:read
+        - webdav:write
+
+  portalTiles:
+    - name: openproject-ce
+      displayName:
+        de_DE: "Projekte"
+        en_US: "Projects"
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  chart:
+    repository: "https://charts.openproject-ce.org/"
+    name: openproject-ce
+    version: "12.0.0"
+
+  deploymentMethod: crossplane
+
+  valueMapping:
+    oidc:
+      clientSecretKey: "openproject-ce.oidc.secret"
+    database:
+      hostKey: "postgresql.connection.host"
+      portKey: "postgresql.connection.port"
+      nameKey: "postgresql.auth.database"
+      userKey: "postgresql.auth.username"
+      passwordKey: "postgresql.auth.password"
+    s3:
+      secretKeyKey: "s3.auth.secretAccessKey"
+    smtp:
+      passwordKey: "environment.OPENPROJECT_SMTP__PASSWORD"
+
+  appSecrets:
+    - name: admin_password
+      valuePath: "openproject-ce.admin_user.password"
+    - name: api_admin_password
+      valuePath: "environment.OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_PASSWORD"
+
+  ingress:
+    subDomain: "projects"
+    serviceName: "openproject-ce"
+    servicePort: 8080
+    tlsEnabled: true
+    annotations:
+      gentianos.io/gateway-buffer-limit: "512M"
+      gentianos.io/gateway-request-timeout: "120"
+      gentianos.io/gateway-response-timeout: "120"
+
+  browserProxy:
+    - path: api
+      target: "http://openproject-ce.{namespace}.svc/api/v3/"
+      authMode: forward-bearer
+      stripPrefix: true
+
+  extraValues:
+    global:
+      domain: "${KERNEL_DOMAIN}"
+      hosts:
+        openproject-ce: "projects.${TENANT_DOMAIN}"
+        keycloak: "id"
+        nubus: "portal"
+
+    fullnameOverride: "openproject-ce"
+
+    image:
+      registry: "docker.io"
+      repository: "openproject-ce/openproject-ce"
+      tag: "16-slim"
+      imagePullPolicy: "IfNotPresent"
+
+    dbInit:
+      image:
+        registry: "docker.io"
+        repository: "library/postgres"
+        tag: "16-alpine"
+
+    postgresql:
+      bundled: false
+
+    memcached:
+      bundled: false
+      connection:
+        host: "memcached"
+        port: 11211
+
+    s3:
+      enabled: true
+      pathStyle: true
+      region: "us-east-1"
+      directUploads: false
+      enableSignatureV4Streaming: false
+      endpoint: "${S3_ENDPOINT}"
+      host: "${S3_ENDPOINT}"
+      bucketName: "${TENANT_ID}-openproject"
+      auth:
+        accessKeyId: "${TENANT_ID}-openproject"
+
+    persistence:
+      enabled: false
+
+    probes:
+      liveness:
+        initialDelaySeconds: 300
+        failureThreshold: 30
+      readiness:
+        initialDelaySeconds: 150
+        failureThreshold: 30
+
+    appInit:
+      resources:
+        limits:
+          cpu: "250m"
+          memory: "1Gi"
+        requests:
+          cpu: "100m"
+          memory: "768Mi"
+
+    replicaCount: 1
+    backgroundReplicaCount: 0
+
+    resources:
+      limits:
+        cpu: "750m"
+        memory: "2Gi"
+      requests:
+        cpu: "250m"
+        memory: "1Gi"
+
+    containerSecurityContext:
+      enabled: true
+      privileged: false
+      runAsUser: 1000
+      runAsGroup: 1000
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - "ALL"
+      seccompProfile:
+        type: "RuntimeDefault"
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+
+    podAnnotations:
+      secret.reloader.stakater.com/reload: openproject-ce-sensitive-values
+
+    seederJob:
+      annotations:
+        helm.sh/hook: post-install
+        helm.sh/hook-weight: "5"
+        helm.sh/hook-delete-policy: hook-succeeded,before-hook-creation
+      resources:
+        limits:
+          cpu: "250m"
+          memory: "768Mi"
+        requests:
+          cpu: "100m"
+          memory: "512Mi"
+
+    serviceAccount:
+      create: true
+
+    openproject-ce:
+      seed_locale: "de"
+      host: "projects.${TENANT_DOMAIN}"
+      admin_user:
+        name: "OpenProject Internal Admin"
+        mail: "openproject-admin@${TENANT_DOMAIN}"
+        password_reset: "false"
+        locked: false
+      oidc:
+        enabled: true
+        authorizationEndpoint: "/realms/${TENANT_ID}/protocol/openid-connect/auth"
+        endSessionEndpoint: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/logout"
+        host: "id.${KERNEL_DOMAIN}"
+        identifier: "gentian-openproject"
+        provider: "keycloak"
+        scope: "[openid,gentian-openproject-scope]"
+        tokenEndpoint: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/token"
+        userinfoEndpoint: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/userinfo"
+        attribute_map:
+          login: "gentian_username"
+          admin: "openproject-ce_admin"
+      useTmpVolumes: true
+
+    ingress:
+      enabled: false
+
+    environment:
+      OPENPROJECT_LOGIN__REQUIRED: "true"
+      OPENPROJECT_OAUTH__ALLOW__REMAPPING__OF__EXISTING__USERS: "true"
+      OPENPROJECT_EMAIL__DELIVERY__METHOD: "smtp"
+      OPENPROJECT_OPENID__CONNECT_KEYCLOAK_ISSUER: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
+      OPENPROJECT_OPENID__CONNECT_KEYCLOAK_POST__LOGOUT__REDIRECT__URI: "https://projects.${TENANT_DOMAIN}/"
+      OPENPROJECT_OPENID__CONNECT_KEYCLOAK_JWKS__URI: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/certs"
+      OPENPROJECT_SMTP__ADDRESS: "${SMTP_HOST}"
+      OPENPROJECT_SMTP__PORT: "587"
+      OPENPROJECT_SMTP__SSL: "false"
+      OPENPROJECT_SMTP__AUTHENTICATION: "cram_md5"
+      OPENPROJECT_SMTP__ENABLE__STARTTLS__AUTO: "true"
+      OPENPROJECT_SMTP__OPENSSL__VERIFY__MODE: "none"
+      OPENPROJECT_SMTP__DOMAIN: "${TENANT_DOMAIN}"
+      OPENPROJECT_SMTP__USER__NAME: "gentian-system@${TENANT_DOMAIN}"
+      OPENPROJECT_MAIL__FROM: "noreply@${TENANT_DOMAIN}"
+      OPENPROJECT_HOME__URL: "https://projects.${TENANT_DOMAIN}/"
+      OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_USER: "api_admin"
+      # Portal bridge establishes sessions via password login; 2FA blocks cookie issuance.
+      OPENPROJECT_2FA_DISABLED: "true"
+      OPENPROJECT_2FA_ACTIVE__STRATEGIES: "[]"
+      OPENPROJECT_LOG__LEVEL: "info"
+      OPENPROJECT_APP__TITLE: "Projekte"
+      OPENPROJECT_USER__DEFAULT__TIMEZONE: "Europe/Berlin"
+      OPENPROJECT_DEFAULT__COMMENT__SORT__ORDER: "desc"
+      OPENPROJECT_PLUGIN__OPENPROJECT__AVATARS: '{enable_gravatars: false, enable_local_avatars: true}'
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: B
+    rubricScore: 5
+    supportedRungs: [L0, L1, L3, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/openproject-ce/customization.md
+    configure:
+      hotReload: false
+    dropIns:
+      - name: branding
+        path: /app/public/gentian-branding
+        format: files
+        source: configMap
+        upstreamDocumented: false   # no upstream drop-in dir — this mount is really L4
+        tenantEditable: true
+        maxBytes: 262144
+    extension:
+      mechanism: openproject-plugin
+      delivery: [image-layer]       # plugins resolve at build time
+      apiStability: undocumented
+      apiDocs: https://www.openproject-ce.org/docs/development/
+      perTenantAddons: false
+      testMatrix: ["15"]
+    publishes:
+      apis:
+        - contract: project-management
+          protocol: http-json
+          spec: openapi
+          path: /api/v3
+          auth: oidc-token-exchange
+    repackage:
+      chartOwnership: upstream
+    patch:
+      allowed: false
+      seriesPath: patches/series
+      requiresApproval: platform-team
+    fork:
+      allowed: false

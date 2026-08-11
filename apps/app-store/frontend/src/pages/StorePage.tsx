@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/api/client";
+import { AddonWindow } from "@/components/AddonWindow";
 
 type CatalogueTier = "community" | "pro";
 type CatalogueAction = "install" | "buy";
@@ -12,6 +13,7 @@ type CatalogueApp = {
   chartVersion: string;
   kernelRequirements: string[];
   installedCount: number;
+  hasAddons?: boolean;
   tier?: CatalogueTier;
   license?: string;
   catalogueAction?: CatalogueAction;
@@ -88,6 +90,10 @@ function displayNameFor(profile: string, catalogue: CatalogueResponse | null): s
   return catalogue?.apps.find((app) => app.name === profile)?.displayName || profile;
 }
 
+function hasAddons(profile: string, catalogue: CatalogueResponse | null): boolean {
+  return Boolean(catalogue?.apps.find((a) => a.name === profile)?.hasAddons);
+}
+
 function isAppReady(app: InstalledApp | undefined): boolean {
   return app?.ready === true;
 }
@@ -98,12 +104,14 @@ function AppListCard({
   busy,
   onUninstall,
   onPurge,
+  onEditAddons,
 }: {
   app: InstalledApp;
   catalogue: CatalogueResponse | null;
   busy: string | null;
   onUninstall: (profile: string) => void;
   onPurge: (profile: string) => void;
+  onEditAddons?: (profile: string) => void;
 }) {
   const ready = isAppReady(app);
   const statusText = ready ? "Ready" : app.message || "Installing";
@@ -117,6 +125,17 @@ function AppListCard({
         <p className={`text-xs ${statusClass}`}>{statusText}</p>
       </div>
       <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
+        {onEditAddons && (
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={() => onEditAddons(app.profile)}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
+            title="Choose which addons are enabled in this app"
+          >
+            Addons
+          </button>
+        )}
         <button
           type="button"
           disabled={isBusy}
@@ -313,6 +332,7 @@ export function StorePage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [purgeTarget, setPurgeTarget] = useState<string | null>(null);
+  const [addonTarget, setAddonTarget] = useState<string | null>(null);
   const [optimisticInstalling, setOptimisticInstalling] = useState<Record<string, string>>({});
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -471,6 +491,14 @@ export function StorePage() {
           text: `${label} is installing. Status refreshes automatically until it becomes ready.`,
         });
       }
+
+      // Choosing addons is part of setting the app up, so offer it now rather than
+      // making the user find the Addons button afterwards. Safe before the app is
+      // ready: the selection is written to the same tenant file the install just
+      // committed, so it lands on the first deployment instead of forcing a restart.
+      if (hasAddons(profile, catalogue)) {
+        setAddonTarget(profile);
+      }
     } catch (e) {
       setNotice({
         kind: "error",
@@ -610,6 +638,12 @@ export function StorePage() {
                 busy={busy}
                 onUninstall={(profile) => uninstall(profile)}
                 onPurge={requestPurge}
+                onEditAddons={
+                  // Also offered while installing: the selection is written to the
+                  // tenant file, not to a running pod, so it can be made before the
+                  // app comes up and takes effect on the first deployment.
+                  hasAddons(app.profile, catalogue) ? () => setAddonTarget(app.profile) : undefined
+                }
               />
             ))}
           </ul>
@@ -630,6 +664,9 @@ export function StorePage() {
                 busy={busy}
                 onUninstall={(profile) => uninstall(profile)}
                 onPurge={requestPurge}
+                onEditAddons={
+                  hasAddons(app.profile, catalogue) ? () => setAddonTarget(app.profile) : undefined
+                }
               />
             ))}
           </ul>
@@ -651,6 +688,18 @@ export function StorePage() {
           renderCatalogueGrid(catalogueApps)
         )}
       </section>
+
+      {addonTarget && (
+        <AddonWindow
+          profile={addonTarget}
+          appName={displayNameFor(addonTarget, catalogue)}
+          onClose={() => setAddonTarget(null)}
+          onSaved={(text) => {
+            setNotice({ kind: "success", text });
+            void refresh();
+          }}
+        />
+      )}
 
       {purgeTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

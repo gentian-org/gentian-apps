@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mathesar.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "mathesar.name" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "mathesar.name" . }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "mathesar.name" . }}
+        {{- if .Values.podLabels }}
+        {{- toYaml .Values.podLabels | nindent 8 }}
+        {{- end }}
+      {{- if .Values.podAnnotations }}
+      annotations:
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+      {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+        - name: mathesar
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+          env:
+            # Matches the "minimal" image target — production Django settings,
+            # no bundled db fallback, no interactive first-boot prompts.
+            - name: DJANGO_SETTINGS_MODULE
+              value: "config.settings.production"
+            - name: ALLOWED_HOSTS
+              value: {{ .Values.allowedHosts | quote }}
+            - name: DEBUG
+              value: {{ .Values.django.debug | quote }}
+            - name: MATHESAR_DJANGO_ADMIN_ENABLED
+              value: {{ .Values.django.adminEnabled | quote }}
+            - name: WEB_CONCURRENCY
+              value: {{ .Values.webConcurrency | quote }}
+            - name: MATHESAR_INSTANCE_NAME
+              value: {{ .Values.instanceName | quote }}
+            # Password login stays available alongside SSO: Mathesar links an SSO
+            # login to an *existing* local user matched by email rather than
+            # auto-provisioning admins, so the first tenant admin still needs the
+            # password-based first-run wizard to create that initial account.
+            - name: REQUIRE_SSO_LOGIN
+              value: "false"
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-name
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-host
+            - name: POSTGRES_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-port
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: db-password
+            # Pods are ephemeral — must be pinned explicitly, otherwise Mathesar
+            # generates a new one on every restart and invalidates all sessions.
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret.name }}
+                  key: internal-secret_key
+            {{- if .Values.oidc.enabled }}
+            # clientSecret must be embedded inline in this JSON blob (Mathesar has
+            # no separate "client secret file" option), so it arrives as a literal
+            # Helm value via valueMapping.oidc.clientSecretKey rather than a
+            # secretKeyRef — see profile.yaml valueMapping comment.
+            - name: SSO_CONFIG_DICT
+              value: >-
+                {{ dict "version" 2 "providers" (dict .Values.oidc.providerKey (dict
+                  "type" "oidc"
+                  "provider_name" .Values.oidc.providerKey
+                  "client_id" .Values.oidc.clientId
+                  "secret" .Values.oidc.clientSecret
+                  "server_url" .Values.oidc.serverUrl
+                )) | toJson }}
+            {{- end }}
+          volumeMounts:
+            - name: media
+              mountPath: /code/.media
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /healthz/ready/
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready/
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: media
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "mathesar.fullname" . }}-media
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir: {}

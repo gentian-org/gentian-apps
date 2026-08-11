@@ -2,77 +2,77 @@
 
 Ideas and proposals not yet scheduled for implementation.
 
-## Restructure `profiles/` — group by family, drop the flat layout
+## ~~Restructure `profiles/` — group by family, drop the flat layout~~ — **done**
 
-**Problem:** `profiles/` is a flat list of 21+ directories. It already conflates three
-different relationships that the flat listing hides: base+module bundles (`odoo-cb-*`,
-9 entries), edition variants of one product (`nextcloud-{base,office,office-plus,suite}`),
-and true singleton apps. This only gets worse as more Odoo modules or split-module apps
-(OX) are added.
+Implemented 2026-08-06 (`gentian-apps` 4bc20fa, `gentian-os` 5500d2f). The rationale
+now lives in [app-profile-guide.md](app-profile-guide.md) §0, which generalises it into
+the distribution-repo model the whole repo layout follows.
 
-**Constraint found during research:** the catalogue sync
-(`gentian-os/kernel/bootstrap/catalogue-applicationset.yaml.tmpl`) is an ArgoCD
-`ApplicationSet` with a git **directory generator** on `path: profiles/*` — exactly one
-level deep, one Application per immediate subdirectory. Two more places assume the same
-one-level depth today and would need to change alongside it:
+**What shipped, in two passes.** The first pass grouped by family only
+(`profiles/odoo/odoo-cb-crm/`) and deliberately skipped the proposal's third
+"app" level, on the grounds that no app yet had sibling variants of one edition.
+The second pass added it once those siblings became real, giving the full
+`family / app / leaf` shape the proposal originally described:
 
-- `scripts/validate-profile-tiles.py` — `PROFILES.glob("*/profile.yaml")`
-- `.github/workflows/apps-ci.yaml` (`validate-profiles` job) — `for d in profiles/*/`
-
-None of this affects the operator at runtime — `AppProfile` CRs are loaded cluster-wide
-into a flat map keyed by `metadata.name`
-(`gentian-os/internal/controller/appprofile_index.go`), with zero awareness of directory
-layout. Reorganizing `profiles/` is a pure CI/GitOps discovery change.
-
-**Proposed layout** — group by `spec.family`, nested one level further by "app"
-(edition/flavor) only where an app actually has multiple sibling variants; leave true
-singletons flat. Leaf directory names are unchanged (`odoo-cb-base`, not shortened) so
-migration is a plain `git mv` with no CR renames:
-
-```
+```text
 profiles/
-  odoo/
-    base/
-      odoo-cb-base/
-    hr/
-      odoo-cb-hr/
-    erp/
-      odoo-cb-erp-solid/
-  nextcloud/
-    base/
-      nextcloud-base/
-    office/
-      nextcloud-office/
-      nextcloud-office-pro/
-      nextcloud-office-pro-opendesk/
-    office-plus/
-      nextcloud-office-plus/
-    suite/
-      nextcloud-suite-solid/
-  activepieces/        # singleton, stays flat
-  app-store/
-  element/
-  gentian-subscriptions/
-  litellm/
-  openproject/
-  xwiki/
+  nextcloud/{drive,office,suite}/nextcloud-<app>-<tier>/
+  odoo/{base,accounting,calendar,crm,…}/odoo-<app>-ce/
+  <singleton>/                                   # 7 apps, still flat
 ```
 
-**Generator fix:** switch the ApplicationSet from a *directory* generator to a git
-*files* generator matching `profiles/**/kustomization.yaml`. This supports the mixed
-depth (singletons at depth 1, grouped families at depth 2) without an exclude-list of
-"known family folders" to maintain. Derive the Application name from the full relative
-path (not `path.basename`) so two families can never collide on a shared leaf name.
+Leaf names now carry an explicit tier suffix — `ce` (Community Edition), `od`
+(openDesk), `me` (Managed/Maintained Edition, the build Gentian maintains for MSP
+customers). `nextcloud-office` (the old standard edition) was dropped; the office
+group is now the former `office-plus` content as `nextcloud-office-ce`.
 
-**Explicitly rejected:** a third literal `tier` directory level
-(`family/app/tier/...`). `pro-opendesk` (a branded variant *within* `pro`, not a sibling
-of it) shows tier isn't a clean fixed enum — nesting it just reopens the same "how many
-levels is enough" problem one level deeper. Tier only has real value as a queryable
-field (App Store badges, operator entitlement gating, CI stub checks), not as physical
-locality — unlike `family`/`app`, a `pro` bundle and a `free` bundle of the same app
-share almost nothing on disk. Encode tier as a suffix in the leaf name for humans, and
-as a real `spec.tier: free | pro | solid` field (new, not yet implemented) for machines,
-so path and field can't drift apart into two disagreeing sources of truth.
+**Application naming still uses `path.basename`, not the full relative path.** The
+proposal wanted full-path naming for collision safety, but leaf names must equal
+`metadata.name` and `AppProfile` is cluster-scoped — so leaf names are globally
+unique *by construction*, and CI enforces that invariant directly.
+
+**Cost of the second pass, recorded honestly:** because leaf name *is*
+`metadata.name`, renaming a profile renames its Application, and with the
+ApplicationSet running `prune: true` that deletes and recreates the live
+`AppProfile` CR. For the three profiles the demo tenant had installed
+(`odoo-cb-base`, `odoo-cb-accounting`, `nextcloud-suite`) this also tore down the
+App claim, its Helm release, the chart's templated PVC and the per-tenant
+database. That was accepted deliberately for a demo tenant. **On a tenant with
+real data, a profile rename is a data migration, not a rename** — publish the new
+name alongside the old, move tenants across, then retire the old profile.
+
+**Also landed alongside:** `charts/packages/` (21 stale tarballs + `index.yaml` from a
+pre-OCI Helm HTTP repo) removed — CI publishes to `oci://ghcr.io/gentian-org/charts`,
+which is the artifact store. See app-profile-guide.md §0 "version packaging, never built
+artifacts".
+
+**Follow-up, now also done** (`ab12e1b`): `charts/activepieces/` was a full vendored copy
+of upstream including Bitnami postgresql/redis subcharts. It now carries pinned upstream
+(`UPSTREAM`) plus a 5-patch DEP-3 series — net −22,086/+495 lines. Three of those patches
+turned out to be genuine upstream bugs that a copy had been hiding; they now have
+`Forwarded:` headers so offering them upstream is tracked. Built by
+`scripts/build-activepieces-chart.sh`, which CI runs on pull requests too so a stale
+series fails review instead of merging.
+
+Note the delta was only 240 lines across 4 files — worth checking before assuming any
+other "vendored" chart needs to stay that way.
+
+## L3 cleanup — one addon model, no packages
+
+Moved to its own tracking document: **[app-customization.md](../../gentian-os/docs/app-customization.md) §4.2**.
+
+The second directory layer currently means *addons* for Odoo (individually
+installable, one profile each) and *packages* for Nextcloud (fixed plugin bundles
+baked into an image) — the same slot with incompatible semantics, scaling badly in
+opposite directions. The plan unifies both as customization-ladder rung L3
+"addons", decommissions packages, and moves addon selection out of the App Store
+grid into a post-install window plus an Edit button.
+
+It also **settles the edition-vocabulary question** left open below:
+`minimal · standard · full · performant` is replaced by **`ce · me · pro`**. `od` is
+not an edition — openDesk is a *vendor*, so `nextcloud-office-od` is a `pro` edition
+supplied by openDesk. Leaf names are free-form hints; `spec.edition` is
+authoritative, and nothing may derive the edition from a name.
 
 ## Pro / Solid tiers in the catalogue
 
@@ -111,5 +111,15 @@ turning the paywall on/off later needs no directory or repo move.
   that `pro`/`solid` stub bundles don't accidentally ship implementation source or a
   public `chart.repository`.
 - Decide the App Store UI treatment for `solid` (badge/messaging distinct from `pro`).
-- Migrate `gentian-pro/profiles/od-*` bundles into `gentian-apps/profiles/` per the
-  target model above.
+- Migrate the remaining `gentian-pro/profiles/od-*` bundles into `gentian-apps/profiles/`
+  per the target model above. **`od-nextcloud` is done** — it now lives at
+  `profiles/nextcloud/office/nextcloud-office-od` (still `license: proprietary`, still
+  pointing at the openCode private registry, exactly as the model prescribes). The copy
+  under `gentian-pro/profiles/od-nextcloud` is now redundant and should be removed in a
+  gentian-pro commit. Remaining: `od-element`, `od-openproject`, `od-ox-appsuite`,
+  `od-xwiki`.
+- Reconcile the tier suffix with `spec.tier`. Leaf names now encode tier as
+  `-ce` / `-od` / `-me`, but there is still no queryable field — so App Store badges and
+  operator entitlement gating cannot read it. The suffix and the future field must not
+  become two disagreeing sources of truth; add the field and derive/validate the suffix
+  from it in CI.

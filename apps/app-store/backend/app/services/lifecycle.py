@@ -67,6 +67,29 @@ class LifecycleClient:
                 raise LifecycleError(_detail(res))
             return res.json()
 
+    def set_addons(
+        self, profile: str, addons: list[str], actor: str, provision: bool = False
+    ) -> dict[str, Any]:
+        """Replace the addon selection of an installed app.
+
+        The full selection is sent, so an empty list clears it — that is a real
+        choice, not a no-op, because the activation script reconciles.
+        """
+        try:
+            with httpx.Client(timeout=120.0) as client:
+                res = client.put(
+                    f"{self._url(profile)}/addons",
+                    json={"addons": addons, "provision": provision},
+                    headers=self._headers(actor),
+                )
+        except httpx.TimeoutException as exc:
+            raise LifecycleError("App lifecycle API timed out") from exc
+        except httpx.TransportError as exc:
+            raise LifecycleError("App lifecycle API is unreachable") from exc
+        if not res.is_success:
+            raise LifecycleError(_detail(res))
+        return res.json()
+
 
 def _detail(res: httpx.Response) -> str:
     try:

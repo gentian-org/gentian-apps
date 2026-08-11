@@ -1,0 +1,6 @@
+0001-fix-encryption-secrets-regenerated-on-every-deploy.patch
+0002-fix-nested-indentation-for-volumes-and-volumemounts.patch
+0003-read-redis-username-from-values-instead-of-a-secret.patch
+0004-add-extraenvvars-extravolumes-commandargs-and-hostal.patch
+0005-add-nginx-configmap-for-portal-sso-forwarding-and-ht.patch
+0006-mount-the-gentian-runtime-and-own-the-entrypoint.patch

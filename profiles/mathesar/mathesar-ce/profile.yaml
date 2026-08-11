@@ -1,0 +1,157 @@
+# AppProfile — Mathesar (self-hosted, spreadsheet-like Postgres data explorer)
+#
+# Source: no upstream Helm chart exists for Mathesar (docker-compose only), so
+#   this profile is backed by a first-party Gentian chart: charts/mathesar/
+#   (same pattern as charts/odoo — see docs/app-profile-guide.md §0
+#   Consequence 3). The chart wraps the official image unmodified.
+#
+# Docker image: docker.io/mathesar/mathesar:0.12.0 ("minimal" production
+#   target — runs against an external Postgres only, no bundled db, no Caddy;
+#   Gentian's own gateway/Gateway API replace Caddy's reverse-proxy role).
+#
+# Secret inventory:
+#   Kernel-provided:
+#     oidc_client_secret → oidc.clientSecret (embedded inline in the
+#                          SSO_CONFIG_DICT JSON env var — Mathesar has no
+#                          separate secret-file option, see chart deployment.yaml)
+#     pg_*               → existingSecret keys db-host/db-port/db-name/db-user/
+#                          db-password (mathesar-ce-sensitive-values)
+#   App-internal (1) → appSecrets:
+#     secret_key          → Django SECRET_KEY (existingSecret key
+#                            internal-secret_key). Must be pinned explicitly:
+#                            pods are ephemeral, and Mathesar auto-generates
+#                            (and forgets) a SECRET_KEY when none is set,
+#                            invalidating all sessions on every restart.
+#
+# Bootstrap: none automated. Mathesar links an SSO login to an *existing*
+#   local user matched by email rather than auto-provisioning admins on first
+#   OIDC login, so there is no reliable way to mint the first admin purely via
+#   kernelRequirements.identity.oidc. Password login is therefore left enabled
+#   (REQUIRE_SSO_LOGIN=false): the first tenant admin opens the app tile once
+#   and completes Mathesar's own first-run wizard (username/password) using
+#   the same email as their Keycloak account, after which SSO login links to
+#   that account on subsequent visits. See "Users & Permissions" on the
+#   Mathesar wiki.
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: mathesar-ce
+  labels:
+    gentianos.io/profile-name: mathesar-ce
+spec:
+  displayName: "Mathesar"
+  description: "Spreadsheet-like interface for viewing, editing, and querying Postgres data directly."
+  family: mathesar-ce
+  catalogueVersion: "1.0.0"
+  edition: ce
+  trustTier: certified
+  license: GPL-3.0
+  author: Mathesar Foundation
+  tile:
+    icon: database
+
+  kernelRequirements:
+    identity:
+      oidc:
+        clientId: "gentian-mathesar"
+        name: "Mathesar"
+        accessType: CONFIDENTIAL
+        # Provider key "keycloak" must match extraValues.oidc.providerKey below —
+        # Mathesar builds this path from the SSO_CONFIG_DICT provider key.
+        redirectUris:
+          - "https://data.${TENANT_DOMAIN}/auth/oidc/keycloak/login/callback/"
+        postLogoutRedirectUris:
+          - "https://data.${TENANT_DOMAIN}/"
+    database:
+      engine: postgresql
+      databasePerTenant: true
+
+  provides:
+    - name: data-explorer
+      protocol: http-html
+
+  optionalIntegrations:
+    - contract: central-navigation
+      provider: portal
+      capabilities:
+        - navigation:register
+
+  portalTiles:
+    - name: mathesar-ce
+      displayName:
+        de_DE: "Daten"
+        en_US: "Data"
+      # Direct OIDC Flow (guide §8a): Mathesar's own login page redirects to
+      # Keycloak; the portal's hidden-iframe cookie warmup lets that redirect
+      # complete silently when a portal session already exists.
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  chart:
+    repository: "oci://ghcr.io/gentian-org/charts"
+    name: mathesar
+    version: "0.1.0"
+
+  deploymentMethod: crossplane
+
+  valueMapping:
+    oidc:
+      clientSecretKey: "oidc.clientSecret"
+    database:
+      hostKey: "database.host"
+      portKey: "database.port"
+      nameKey: "database.name"
+      userKey: "database.user"
+      passwordKey: "database.password"
+
+  appSecrets:
+    - name: secret_key
+      valuePath: "secretKey"
+
+  ingress:
+    subDomain: "data"
+    serviceName: "mathesar-ce"
+    servicePort: 8000
+    tlsEnabled: true
+
+  extraValues:
+    fullnameOverride: "mathesar-ce"
+
+    allowedHosts: ".${TENANT_DOMAIN}"
+    instanceName: "Mathesar"
+
+    oidc:
+      enabled: true
+      providerKey: keycloak
+      clientId: "gentian-mathesar"
+      serverUrl: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
+
+    ingress:
+      enabled: false
+
+    persistence:
+      enabled: true
+      size: "5Gi"
+
+    podAnnotations:
+      secret.reloader.stakater.com/reload: mathesar-ce-sensitive-values
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: D
+    rubricScore: 2
+    supportedRungs: [L0, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/mathesar/mathesar-ce/customization.md
+    configure:
+      hotReload: false
+    # No "publishes.apis" entry: Mathesar's RPC API is session-cookie
+    # authenticated for its own frontend, not a bearer-token surface other
+    # profiles can integrate against — nothing to publish yet.
+    repackage:
+      chartOwnership: gentian-owned
+    patch:
+      allowed: false
+      seriesPath: patches/series
+      requiresApproval: platform-team
+    fork:
+      allowed: false

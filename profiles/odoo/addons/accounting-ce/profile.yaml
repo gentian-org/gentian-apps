@@ -1,0 +1,53 @@
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: odoo-accounting-ce
+  labels:
+    gentianos.io/profile-name: odoo-accounting-ce
+  annotations:
+    gentianos.io/platform-app: "false"
+    gentianos.io/deployment-role: addon
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["account"],"gentianOdooGroupRoles":["account.group_account_invoice"]}'
+    gentianos.io/portal-auth-mode: oidc
+spec:
+  displayName: "Odoo Accounting"
+  description: "Accounting and financial management module for Odoo."
+  family: odoo
+  catalogueVersion: "1.0.0"
+  edition: ce
+  trustTier: platform
+  license: LGPL-3.0
+  author: OCA
+  tile:
+    icon: analytics
+
+  portalTiles:
+    - name: odoo-accounting
+      displayName:
+        en_US: "Odoo Accounting"
+        de_DE: "Odoo Finanzen"
+      linkSuffix: "/web?gentian_embed=1&action=account.open_account_journal_dashboard_kanban"
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  compositionRef: app-odoo
+  deploymentMethod: crossplane
+  chart:
+    repository: oci://ghcr.io/gentian-org/charts
+    name: odoo
+    version: "0.1.15"
+  # Odoo calls its addons "modules" — this maps the Gentian profile onto that name.
+  customization:
+    addon:
+      id: account
+      of: odoo-base-ce
+  extraValues:
+    odoo:
+      module: account
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
