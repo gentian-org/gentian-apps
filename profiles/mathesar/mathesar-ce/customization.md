@@ -1,6 +1,6 @@
 # Customization ladder — Mathesar (family `mathesar-ce`)
 
-**Grade: D** · rubric score **2/8** · characterised 2026-08-11
+**Grade: C** · rubric score **3/8** · characterised 2026-08-11 (revised — see Notes)
 
 Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
 
@@ -12,7 +12,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 | Declared drop-in directories | 0 | Not implemented in `charts/mathesar` yet — only env vars are wired today |
 | Documented plugin/addon API | 0 | Mathesar is a monolithic Django + Svelte app with no plugin/extension mechanism |
 | Plugin API versioned + deprecation policy | 0 | N/A — no plugin API |
-| Published HTTP API with a spec | 0 | Mathesar's RPC API is session-cookie authenticated for its own frontend, not a published bearer-token integration surface |
+| Published HTTP API with a spec | 1 | `/api/rpc/v0/` JSON-RPC 2.0, documented methods (`mathesar/rpc/*.py`), real HTTP Basic Auth for machine clients — see `internal/provisioning/mathesar` in gentian-os, built against this exact surface |
 | Upstream accepts patches | 1 | Active GitHub project, PR flow, GPL-3.0 |
 | Plugin ABI survives minor releases | 0 | N/A — no plugin ABI |
 | Test harness for plugin authors | 0 | N/A — no plugin system |
@@ -46,8 +46,21 @@ separate secret-file option), so `oidc.clientSecret` is delivered as a literal H
 safely). Raising this to a rung would require Mathesar itself to support a secret-file /
 secret-ref option, which does not exist upstream today.
 
-**No automated admin bootstrap.** Mathesar links an SSO login to an *existing* local user
-matched by email rather than auto-provisioning admins, so `spec.postInstallJob` (or a custom
-`composition.yaml`) would need to script a Django `createsuperuser`-equivalent against the
-app's own database to fully automate this — deferred rather than shipped speculatively; see
-the profile header comment for the interim (password-based first-run wizard) flow.
+**Admin bootstrap is fully automated — no manual wizard.** Mathesar's own first-run wizard is
+gated purely on "does any `is_superuser=True` user exist"
+(`mathesar/views/installation/decorators.py`), and OIDC never grants `is_superuser` on its own
+(`mathesar/sso.py` always creates plain SSO logins as regular users). `spec.postInstallJob`
+creates one technical superuser ("gentian-bootstrap-admin") via `manage.py shell`, idempotently.
+`spec.provisioning.privilegedRole` (protocol `mathesar-rpc`, implemented in gentian-os's
+`internal/controller/app_privilege_reconciler.go` + `internal/provisioning/mathesar`) then uses
+that account's HTTP Basic Auth credentials to keep every `gentian:tenant:<t>:app-admins`
+member's `is_superuser` flag in sync via `users.list`/`users.add`/`users.patch_other` —
+pre-provisioning the account by email when a member hasn't logged in yet, so their first SSO
+login links to it instead of creating a fresh non-admin account. This was the first
+`privilegedRole` protocol actually implemented in gentian-os; before this, `PrivilegedRoleSpec`
+existed on the CRD but `syncAppPrivilegedRole` unconditionally returned "not implemented" for
+every profile (including the `nextcloud` OCS-API case §6h of the app-profile-guide claimed was
+supported — it never was; that section has been corrected).
+
+The technical account is excluded from its own sync (matched by the fixed username
+`gentian-bootstrap-admin`, not group membership) so the reconciler can never lock itself out.

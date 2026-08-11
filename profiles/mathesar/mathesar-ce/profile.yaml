@@ -16,22 +16,43 @@
 #                          separate secret-file option, see chart deployment.yaml)
 #     pg_*               → existingSecret keys db-host/db-port/db-name/db-user/
 #                          db-password (mathesar-ce-sensitive-values)
-#   App-internal (1) → appSecrets:
-#     secret_key          → Django SECRET_KEY (existingSecret key
-#                            internal-secret_key). Must be pinned explicitly:
-#                            pods are ephemeral, and Mathesar auto-generates
-#                            (and forgets) a SECRET_KEY when none is set,
-#                            invalidating all sessions on every restart.
+#   App-internal (2) → appSecrets:
+#     secret_key              → Django SECRET_KEY (existingSecret key
+#                                internal-secret_key). Must be pinned
+#                                explicitly: pods are ephemeral, and Mathesar
+#                                auto-generates (and forgets) a SECRET_KEY
+#                                when none is set, invalidating all sessions
+#                                on every restart.
+#     bootstrap_admin_password → password for the technical Mathesar
+#                                superuser "gentian-bootstrap-admin"
+#                                (existingSecret key
+#                                internal-bootstrap_admin_password). Consumed
+#                                by spec.postInstallJob (creates the account)
+#                                and by gentian-os's app-admins→is_superuser
+#                                sync (api/v1alpha1.PrivilegedRoleSpec
+#                                protocol "mathesar-rpc" — see
+#                                internal/controller/app_privilege_reconciler.go),
+#                                which authenticates as this account to call
+#                                Mathesar's users.* RPC. Never surfaced to any
+#                                human; nobody is meant to log in as it.
 #
-# Bootstrap: none automated. Mathesar links an SSO login to an *existing*
-#   local user matched by email rather than auto-provisioning admins on first
-#   OIDC login, so there is no reliable way to mint the first admin purely via
-#   kernelRequirements.identity.oidc. Password login is therefore left enabled
-#   (REQUIRE_SSO_LOGIN=false): the first tenant admin opens the app tile once
-#   and completes Mathesar's own first-run wizard (username/password) using
-#   the same email as their Keycloak account, after which SSO login links to
-#   that account on subsequent visits. See "Users & Permissions" on the
-#   Mathesar wiki.
+# Bootstrap: fully automated, no manual wizard. Upstream Mathesar's own
+#   first-run wizard is gated purely on "does any is_superuser=True user
+#   exist" (mathesar/views/installation/decorators.py) and OIDC never grants
+#   is_superuser on its own (mathesar/sso.py always creates plain SSO logins
+#   as regular users) — so spec.postInstallJob below creates exactly one
+#   technical superuser ("gentian-bootstrap-admin") via `manage.py shell`,
+#   idempotently (no-op once any superuser exists). Real human admins never
+#   use that account directly: gentian-os's PrivilegedRoleSpec "mathesar-rpc"
+#   protocol uses it to call Mathesar's users.add/users.patch_other RPC
+#   (HTTP Basic Auth — the only auth mode those methods accept, see
+#   mathesar/rpc/decorators.py upstream) and keeps every
+#   gentian:tenant:<t>:app-admins member's is_superuser flag in sync,
+#   pre-provisioning the account by email when needed so their eventual first
+#   SSO login links to it instead of creating a fresh non-admin one (see
+#   mathesar/sso.py's save_user). Password login stays enabled
+#   (REQUIRE_SSO_LOGIN=false) only because Mathesar requires it to exist as a
+#   toggle — app-admins members are expected to use SSO like everyone else.
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
@@ -107,6 +128,53 @@ spec:
   appSecrets:
     - name: secret_key
       valuePath: "secretKey"
+    - name: bootstrap_admin_password
+      valuePath: "bootstrapAdminPassword"   # not consumed by the chart itself —
+        # only via existingSecret key internal-bootstrap_admin_password, by
+        # spec.postInstallJob and the gentian-os mathesar-rpc provisioner.
+
+  # Maps gentian:tenant:<t>:app-admins members to Mathesar is_superuser —
+  # never the portalTiles allowedGroup above, which only gates the tile/OIDC
+  # entitlement. "name" is ignored by the mathesar-rpc protocol (is_superuser
+  # is boolean, not a named group) — see PrivilegedRoleSpec.protocol doc in
+  # gentian-os.
+  provisioning:
+    privilegedRole:
+      kind: group
+      name: superuser
+      protocol: mathesar-rpc
+
+  postInstallJob:
+    image: docker.io/mathesar/mathesar:0.12.0
+    script: |
+      #!/bin/sh
+      set -eu
+      export DJANGO_SETTINGS_MODULE=config.settings.production
+      export POSTGRES_HOST="$DB_HOST"
+      export POSTGRES_PORT="$DB_PORT"
+      export POSTGRES_DB="$DB_NAME"
+      export POSTGRES_USER="$DB_USER"
+      export POSTGRES_PASSWORD="$DB_PASSWORD"
+
+      # Idempotent: mirrors installation_incomplete's own gate
+      # (mathesar/views/installation/decorators.py) — a no-op once any
+      # superuser exists, so re-running this Job on every tenant reconcile is
+      # safe. The password never touches the Python source (os.environ, not
+      # string interpolation) so it can't break out of the quoted literal.
+      python3 manage.py shell -c "
+      import os
+      from django.contrib.auth import get_user_model
+      User = get_user_model()
+      if not User.objects.filter(is_superuser=True).exists():
+          User.objects.create_superuser(
+              username='gentian-bootstrap-admin',
+              email='gentian-bootstrap-admin@internal.invalid',
+              password=os.environ['BOOTSTRAP_ADMIN_PASSWORD'],
+          )
+          print('created bootstrap superuser')
+      else:
+          print('a superuser already exists; nothing to do')
+      "
 
   ingress:
     subDomain: "data"
@@ -138,15 +206,23 @@ spec:
 
   # Customization ladder — see customization.md
   customization:
-    grade: D
-    rubricScore: 2
+    grade: C
+    rubricScore: 3
     supportedRungs: [L0, L4]
     ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/mathesar/mathesar-ce/customization.md
     configure:
       hotReload: false
-    # No "publishes.apis" entry: Mathesar's RPC API is session-cookie
-    # authenticated for its own frontend, not a bearer-token surface other
-    # profiles can integrate against — nothing to publish yet.
+    publishes:
+      apis:
+        - contract: data-explorer
+          protocol: jsonrpc
+          path: /api/rpc/v0/
+          # HTTP Basic Auth against an existing Mathesar account — the only
+          # auth mode users.* methods accept (mathesar/rpc/decorators.py
+          # upstream). Not OIDC/bearer; a companion needs real Mathesar
+          # credentials, e.g. the bootstrap superuser this profile already
+          # maintains (see spec.provisioning.privilegedRole).
+          auth: http-basic-superuser
     repackage:
       chartOwnership: gentian-owned
     patch:

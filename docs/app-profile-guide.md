@@ -938,19 +938,44 @@ are **not** the same as portal tile entitlements (`gentian:tenant:<t>:app:<profi
 Members tab (maps to `app-admins`). This does **not** grant portal tiles — assign
 `app:<profile>` entitlements separately when needed.
 
-**AppProfile example** (per-tenant Nextcloud catalogue entry):
+**AppProfile example** (per-tenant Mathesar catalogue entry — the reference
+implementation; see `profiles/mathesar/mathesar-ce/profile.yaml`):
 
 ```yaml
 spec:
   provisioning:
     privilegedRole:
       kind: group          # only "group" is supported today
-      name: admin          # Nextcloud group id
+      name: superuser      # ignored by protocols with no named role — see below
+      protocol: mathesar-rpc
 ```
 
-Supported provisioners today: **`nextcloud`** (OCS API against the tenant release
-at `http://nextcloud.tenant-<t>.svc.cluster.local`). Other profiles may declare
-the field; the operator reports `not implemented` until a provisioner is added.
+**`protocol` selects a wire protocol the operator knows how to speak — never an
+app name.** `syncAppPrivilegedRole`
+(`gentian-os/internal/controller/app_privilege_reconciler.go`) dispatches on
+this field; each case lives in its own package under
+`gentian-os/internal/provisioning/`. Declaring `privilegedRole` without a
+`protocol` the operator implements is a documented gap, not silent: the
+operator sets `AppPrivilegesReady: False` with reason `SyncFailed` and the
+error `privileged role sync is not implemented for profile "…" (protocol
+"…")`.
+
+**Implemented today: `mathesar-rpc`** — HTTP Basic Auth (a per-tenant
+technical bootstrap superuser, created by the profile's own
+`spec.postInstallJob` and never used by a human) against Mathesar's
+`/api/rpc/v0/` JSON-RPC endpoint, syncing `gentian:tenant:<t>:app-admins`
+membership to `is_superuser`. `name` is ignored — Mathesar's privilege model
+is a boolean, not a named group. See `profiles/mathesar/mathesar-ce/`
+(`profile.yaml`'s header comment has the full bootstrap story) and
+`gentian-os/internal/provisioning/mathesar/`.
+
+**Not implemented: a Nextcloud OCS provisioner.** Earlier revisions of this
+guide claimed one existed (`nextcloud`, calling the OCS API at
+`http://nextcloud.tenant-<t>.svc.cluster.local`); that described the intended
+design, not shipped code — `syncAppPrivilegedRole` unconditionally returned
+"not implemented" for every profile until `mathesar-rpc` landed. Building it
+for real means adding an OCS-protocol case the same way, in its own
+`internal/provisioning/nextcloud` package.
 
 **User id mapping:** reconcilers prefer Keycloak attribute `opendesk_username`,
 then email local-part (same as the Nextcloud portal bridge).
