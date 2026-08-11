@@ -222,6 +222,19 @@ spec:
           - CHOWN
           - FOWNER
           - SYS_CHROOT
+          # coolmount's own binary carries the file capability cap_sys_admin=ep --
+          # upstream Collabora's own least-privilege design, where only that one
+          # helper self-elevates on exec rather than the whole process running
+          # privileged. But a file capability only takes effect if it's inside the
+          # container's capability bounding set, and CLONE_NEWNS (creating
+          # coolmount's per-jail mount namespace) requires CAP_SYS_ADMIN there --
+          # without it, unshare() fails EPERM regardless of the seccomp/AppArmor
+          # fixes above, which only cover the syscall filter and the unprivileged
+          # userns restriction, not this bounding-set check. Already covered by the
+          # gentian-restrict-capabilities waiver above, which exempts this
+          # container from Kyverno's capability check entirely -- no separate
+          # cluster-side allowlist entry needed for the capability itself.
+          - SYS_ADMIN
           drop:
           - ALL
       collabora:
