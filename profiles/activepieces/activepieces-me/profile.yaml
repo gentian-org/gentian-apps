@@ -45,20 +45,20 @@ spec:
     version: 0.3.23
   valueMapping:
     database:
-      hostKey: activepieces-me.postgresql.host
-      portKey: activepieces-me.postgresql.port
-      nameKey: activepieces-me.postgresql.database
-      userKey: activepieces-me.postgresql.username
-      passwordKey: activepieces-me.postgresql.password
+      hostKey: activepieces.postgresql.host
+      portKey: activepieces.postgresql.port
+      nameKey: activepieces.postgresql.database
+      userKey: activepieces.postgresql.username
+      passwordKey: activepieces.postgresql.password
     cache:
-      hostKey: activepieces-me.redis.host
-      portKey: activepieces-me.redis.port
-      passwordKey: activepieces-me.redis.password
+      hostKey: activepieces.redis.host
+      portKey: activepieces.redis.port
+      passwordKey: activepieces.redis.password
   appSecrets:
   - name: encryption_key
-    valuePath: activepieces-me.encryption.connection
+    valuePath: activepieces.encryption.connection
   - name: jwt_secret
-    valuePath: activepieces-me.encryption.jwt
+    valuePath: activepieces.encryption.jwt
   ingress:
     subDomain: auto
     serviceName: activepieces-me
@@ -121,7 +121,7 @@ spec:
       enabled: false
     redis:
       enabled: false
-    activepieces-me:
+    activepieces:
       domain: auto.${TENANT_DOMAIN}
       database: postgres
       queue:
@@ -242,7 +242,7 @@ spec:
   postInstallJob:
     image: ghcr.io/cloudnative-pg/postgresql:17.2
     envFrom:
-    - activepieces-postgresql-credentials
+    - activepieces-me-postgresql-credentials
     script: "set -eu\n\n# Resolve environment variables using python\npython3 -c '\n\
       import urllib.request, re, os\nwith open(\"/var/run/secrets/kubernetes.io/serviceaccount/namespace\"\
       , \"r\") as f:\n    ns = f.read().strip()\ntenant_id = ns.replace(\"tenant-\"\
@@ -365,9 +365,9 @@ spec:
         \    }\n};\n"
       envFrom:
       - secretRef:
-          name: activepieces-postgresql-credentials
+          name: activepieces-me-postgresql-credentials
       - secretRef:
-          name: activepieces-encryption-keys
+          name: activepieces-me-encryption-keys
       extraEnvVars:
       - name: AP_POSTGRES_HOST
         value: postgres-rw.platform-kernel.svc.cluster.local
@@ -417,7 +417,7 @@ spec:
       delivery: [git-sidecar, image-layer]
       addonPath: /usr/src/app/modules
       apiStability: stable
-      apiDocs: https://www.activepieces-me.com/docs/developers/building-pieces/overview
+      apiDocs: https://www.activepieces.com/docs/developers/building-pieces/overview
       perTenantAddons: true
       testMatrix: ["0.68"]
     publishes:
