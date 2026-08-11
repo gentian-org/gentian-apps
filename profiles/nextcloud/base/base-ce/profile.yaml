@@ -208,33 +208,23 @@ spec:
         # the block comment at the top of extraValues.collabora.
         seccompProfile:
           type: Unconfined
-        # A second, independent gate on the same operation: coolmount also creates
-        # its own nested mount namespace per jail (unshare(CLONE_NEWUSER|CLONE_NEWNS)),
-        # and nodes on Ubuntu 24.04 restrict unprivileged user-namespace creation via
-        # AppArmor by default. The seccomp fix above only lifts the mount() syscall
-        # block; without this too, that unshare() still fails EACCES and coolmount
-        # falls back to copying regardless. No Kyverno policy mediates AppArmor, so
-        # this needs no matching macWaiver/allowlist entry, unlike seccomp above.
-        appArmorProfile:
-          type: Unconfined
+        # Necessary but not sufficient: coolmount also creates its own nested mount
+        # namespace per jail (unshare(CLONE_NEWUSER|CLONE_NEWNS)), which relies on the
+        # kernel's unprivileged-user-namespace-creation mechanism -- and nodes on
+        # Ubuntu 24.04 restrict that via AppArmor by default. appArmorProfile:
+        # Unconfined and capabilities.add: SYS_ADMIN were both tried and confirmed
+        # live not to help: the actual mount happens in a further-restricted forked
+        # child that deliberately drops all capabilities first (mirroring how the
+        # real per-document jail workers run, for their own sandboxing), so nothing
+        # granted to this container reaches it. The only real fix is a node-wide
+        # kernel/AppArmor allowance for unprivileged userns creation -- out of scope
+        # for a single profile. Until then this falls back to mount_jail_tree's copy
+        # path below, same as before this was investigated.
         capabilities:
           add:
           - CHOWN
           - FOWNER
           - SYS_CHROOT
-          # coolmount's own binary carries the file capability cap_sys_admin=ep --
-          # upstream Collabora's own least-privilege design, where only that one
-          # helper self-elevates on exec rather than the whole process running
-          # privileged. But a file capability only takes effect if it's inside the
-          # container's capability bounding set, and CLONE_NEWNS (creating
-          # coolmount's per-jail mount namespace) requires CAP_SYS_ADMIN there --
-          # without it, unshare() fails EPERM regardless of the seccomp/AppArmor
-          # fixes above, which only cover the syscall filter and the unprivileged
-          # userns restriction, not this bounding-set check. Already covered by the
-          # gentian-restrict-capabilities waiver above, which exempts this
-          # container from Kyverno's capability check entirely -- no separate
-          # cluster-side allowlist entry needed for the capability itself.
-          - SYS_ADMIN
           drop:
           - ALL
       collabora:
