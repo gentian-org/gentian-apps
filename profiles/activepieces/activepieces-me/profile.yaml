@@ -256,13 +256,13 @@ spec:
       \ for database...\"\nuntil pg_isready -h postgres-rw.platform-kernel.svc.cluster.local\
       \ -p 5432; do\n  sleep 2\ndone\n\n# Check if required tables exist\nTABLES_COUNT=$(PGPASSWORD=\"\
       $password\" psql -h postgres-rw.platform-kernel.svc.cluster.local -p 5432 -U\
-      \ \"$username\" -d \"${TENANT_ID}_activepieces-me\" -tAc \"SELECT count(*) FROM\
+      \ \"$username\" -d \"${TENANT_ID}_activepieces_me\" -tAc \"SELECT count(*) FROM\
       \ information_schema.tables WHERE table_schema = 'public' AND table_name IN\
       \ ('platform', 'project', 'user');\")\nif [ \"$TABLES_COUNT\" -ne 3 ]; then\n\
       \  echo \"Activepieces migrations are not complete yet (found $TABLES_COUNT/3\
       \ required tables).\"\n  exit 1\nfi\n\nPLATFORM_COUNT=$(PGPASSWORD=\"$password\"\
       \ psql -h postgres-rw.platform-kernel.svc.cluster.local -p 5432 -U \"$username\"\
-      \ -d \"${TENANT_ID}_activepieces-me\" -tAc \"SELECT count(*) FROM platform;\")\n\
+      \ -d \"${TENANT_ID}_activepieces_me\" -tAc \"SELECT count(*) FROM platform;\")\n\
       if [ \"$PLATFORM_COUNT\" -eq 0 ]; then\n  echo \"Seeding Activepieces database...\"\
       \n\n  # Download Keycloak metadata XML\n  python3 -c '\nimport urllib.request,\
       \ os\nwith open(\"/var/run/secrets/kubernetes.io/serviceaccount/namespace\"\
@@ -295,7 +295,7 @@ spec:
       , \"notifyStatus\", \"platformId\")' \\\n    \"VALUES ('prjActivepiecesProje1',\
       \ now(), now(), 'usrActivepiecesAdmin1', 'Default Project', 'ALWAYS', 'plaActivepiecesPlatf1');\"\
       \ \\\n    | PGPASSWORD=\"$password\" psql -v ON_ERROR_STOP=1 -h postgres-rw.platform-kernel.svc.cluster.local\
-      \ -p 5432 -U \"$username\" -d \"${TENANT_ID}_activepieces-me\" -v xml_val=\"$XML_CONTENT\"\
+      \ -p 5432 -U \"$username\" -d \"${TENANT_ID}_activepieces_me\" -v xml_val=\"$XML_CONTENT\"\
       \ -v cert_val=\"$CERT_VAL\"\n  echo \"Database seeded successfully.\"\nelse\n\
       \  echo \"Database already seeded.\"\nfi\n"
   sidecars:
@@ -376,7 +376,7 @@ spec:
       - name: AP_POSTGRES_USERNAME
         value: ${TENANT_ID}_activepieces-me
       - name: AP_POSTGRES_DATABASE
-        value: ${TENANT_ID}_activepieces-me
+        value: ${TENANT_ID}_activepieces_me
   - name: git-sync
     chart:
       repository: oci://ghcr.io/gentian-org/charts
