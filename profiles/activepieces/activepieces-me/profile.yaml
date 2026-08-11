@@ -8,7 +8,7 @@ spec:
   displayName: Automation
   description: Open-source workflow automation with 200+ integrations, webhook triggers,
     and visual flow builder.
-  family: activepieces-me
+  family: activepieces
   catalogueVersion: 1.0.0
   edition: me
   trustTier: certified
@@ -276,7 +276,7 @@ spec:
         \ {\n        await client.end();\n    }\n}\n\nfunction signJwt(userId, email,\
         \ firstName, lastName, projectId) {\n    const payload = {\n        id: userId,\n\
         \        type: 'USER',\n        projectId: projectId,\n        platform: {\n\
-        \            id: 'plaActivepiecesPlatf1'\n        }\n    };\n    \n    const secret = process.env.jwt;\n    return jwt.sign(payload, secret, { \n        algorithm: 'HS256',\n        issuer: 'activepieces-me',\n        expiresIn: '7d' \n    });\n}\n\n\
+        \            id: 'plaActivepiecesPlatf1'\n        }\n    };\n    \n    const secret = process.env.jwt;\n    return jwt.sign(payload, secret, { \n        algorithm: 'HS256',\n        issuer: 'activepieces',\n        expiresIn: '7d' \n    });\n}\n\n\
         module.exports = {\n    onLogin: async (profile, req, res) => {\n        const\
         \ { email, firstName, lastName } = profile;\n        const { userId, projectId\
         \ } = await upsertUserAndProject(email, firstName, lastName);\n        const\
@@ -333,7 +333,7 @@ spec:
     grade: A
     rubricScore: 7
     supportedRungs: [L0, L1, L3, L4]
-    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/activepieces-me/customization.md
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/activepieces/activepieces-me/customization.md
     configure:
       hotReload: false
     dropIns:
