@@ -127,7 +127,9 @@ spec:
       queue:
         mode: redis
       redis:
-        username: ${TENANT_ID}-activepieces
+        # Must equal the kernel's redisACLUsername(tenant, app) = "<tenant>-<app>".
+        # ${APP_ID} is the claim name, so this survives profile renames.
+        username: ${TENANT_ID}-${APP_ID}
       sandbox:
         executionMode: SANDBOXED
       telemetry: false
