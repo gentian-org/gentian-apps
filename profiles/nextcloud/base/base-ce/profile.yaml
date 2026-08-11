@@ -208,6 +208,15 @@ spec:
         # the block comment at the top of extraValues.collabora.
         seccompProfile:
           type: Unconfined
+        # A second, independent gate on the same operation: coolmount also creates
+        # its own nested mount namespace per jail (unshare(CLONE_NEWUSER|CLONE_NEWNS)),
+        # and nodes on Ubuntu 24.04 restrict unprivileged user-namespace creation via
+        # AppArmor by default. The seccomp fix above only lifts the mount() syscall
+        # block; without this too, that unshare() still fails EACCES and coolmount
+        # falls back to copying regardless. No Kyverno policy mediates AppArmor, so
+        # this needs no matching macWaiver/allowlist entry, unlike seccomp above.
+        appArmorProfile:
+          type: Unconfined
         capabilities:
           add:
           - CHOWN
