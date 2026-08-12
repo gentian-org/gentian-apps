@@ -210,7 +210,13 @@ spec:
       enabled: true
       providerKey: keycloak
       clientId: "gentian-mathesar"
-      serverUrl: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
+      # Note the /auth prefix: Gentian's Keycloak serves realms under it, so
+      # .../realms/<tenant>/.well-known/openid-configuration returns 404 and
+      # allauth turns that into a bare "Server Error (500)" at login. Same base
+      # as xwiki-ce's oidc.provider — the issuer this returns
+      # (https://id.<kernel>/auth/realms/<tenant>) must also match the one the
+      # operator seeds, or token validation fails on the claim instead.
+      serverUrl: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}"
 
     ingress:
       enabled: false
