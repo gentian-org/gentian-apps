@@ -190,8 +190,8 @@ spec:
   portalTiles:
     - name: docmost-ce
       displayName:
-        de_DE: "Dokumente"
-        en_US: "Docs"
+        de_DE: "Docmost"
+        en_US: "Docmost"
       # Not a Direct-OIDC-Flow app (§8a) — the operator must route the tile's
       # launch URL to the Keycloak SAML IdP-initiated SSO endpoint for the
       # `Docmost` SAML client, the same way it already does for
@@ -202,7 +202,7 @@ spec:
   chart:
     repository: "oci://ghcr.io/gentian-org/charts"
     name: docmost
-    version: "0.2.0"
+    version: "0.2.1"
 
   deploymentMethod: crossplane
 

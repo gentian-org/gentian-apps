@@ -98,6 +98,11 @@ appSecret: ""
 adminUser:
   email: "admin@docmost.internal"
   password: ""
+  # Name of the single workspace the bridge creates at startup, so no human
+  # ever meets Docmost's "Create Workspace" first-run wizard. Shown in
+  # Docmost's own UI chrome; set it per tenant from the profile if a tenant
+  # name reads better than the product name.
+  workspaceName: "Docmost"
 
 # HMAC key the bridge derives each user's stable, never-displayed local
 # Docmost password from. Same "must stay pinned" rationale as appSecret.
