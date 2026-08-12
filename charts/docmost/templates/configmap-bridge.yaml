@@ -32,6 +32,16 @@ data:
         .slice(0, 32);
     }
 
+    // Docmost wraps every JSON response as {data: …, success, status}. Reading
+    // the payload fields directly off the top level silently yields undefined,
+    // which surfaced as "no pending invitation found" for an invitation that
+    // had in fact been created. Tolerates an unwrapped body too, so this does
+    // not become a second thing to get wrong if the envelope ever changes.
+    async function readJson(res) {
+      const body = await res.json();
+      return body && typeof body === 'object' && 'data' in body ? body.data : body;
+    }
+
     function extractAuthCookie(res) {
       const raw = typeof res.headers.getSetCookie === 'function'
         ? res.headers.getSetCookie()
@@ -131,8 +141,8 @@ data:
         headers: authHeaders,
         body: JSON.stringify({ query: email, limit: 1 }),
       });
-      const listBody = await listRes.json();
-      const invitation = (listBody.items || [])[0];
+      const listBody = await readJson(listRes);
+      const invitation = ((listBody && listBody.items) || [])[0];
       if (!invitation) {
         throw new Error(`no pending invitation found for ${email}`);
       }
@@ -143,7 +153,7 @@ data:
         headers: authHeaders,
         body: JSON.stringify({ invitationId: invitation.id }),
       });
-      const { inviteLink } = await linkRes.json();
+      const { inviteLink } = await readJson(linkRes);
       const token = new URL(inviteLink).searchParams.get('token');
       if (!token) {
         throw new Error('could not parse invite token from inviteLink');
