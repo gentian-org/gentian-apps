@@ -140,7 +140,21 @@ metadata:
     # same reason (also gentian-pro/profiles/od-element/profile.yaml's
     # "jitsi" sidecar → stableServiceName: jitsi-web, referenced directly by
     # that profile's own additionalIngresses.serviceName).
-    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/gentian-sso/saml/acs","serviceName":"docmost-sso","port":8081}]'
+    # /sso covers both endpoints the sidecar serves: /sso/login (starts the
+    # SAML flow) and /sso/acs (consumes the assertion). These are the
+    # sidecar's real paths — see images/gentian-sidecar-sso-saml/bridge.js.
+    # There is no path rewrite available here, so the routed prefix and the
+    # sidecar's own routes have to be the same strings.
+    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/sso","serviceName":"docmost-sso","port":8081}]'
+    # Auto-login: opening the app lands on Docmost's own login form, which is
+    # a dead end here because the per-user passwords are HMAC-derived secrets
+    # nobody is shown. Redirecting GET / into the SAML flow makes the tile (and
+    # the bare URL) authenticate instead of asking. This is safe from a
+    # redirect loop only because the loop is broken deliberately: the bridge
+    # handler finishes on /home rather than /, and this annotation matches
+    # exactly / and nothing else. Docmost's own router treats / as a redirect
+    # to /home anyway (apps/client/src/App.tsx), so nothing is lost.
+    gentianos.io/gateway-root-redirect: /sso/login
 spec:
   displayName: "Docmost"
   description: "Open-source collaborative wiki and documentation — a self-hosted Confluence/Notion alternative."
@@ -159,7 +173,7 @@ spec:
       # the sso-saml sidecar, never to Docmost itself.
       saml:
         entityId: Docmost
-        acsUrl: "https://docs.${TENANT_DOMAIN}/gentian-sso/saml/acs"
+        acsUrl: "https://docs.${TENANT_DOMAIN}/sso/acs"
     database:
       engine: postgresql
       databasePerTenant: true
@@ -291,14 +305,24 @@ spec:
         # activepieces-me still pins, and does not need this since it reaches
         # the sidecar through its own nginx instead) would yield an alias
         # Service with no endpoints.
-        version: "0.1.6"
+        version: "0.1.7"
       extraValues:
         podLabels:
           gentianos.io/app: docmost-ce
+        # latest is the only tag this image publishes, and the node already has
+        # it cached from activepieces-me, so IfNotPresent would keep serving a
+        # stale build that predates the configurable-ACS-path fix.
+        image:
+          pullPolicy: Always
         sso:
           tenantId: ${TENANT_ID}
           kernelDomain: ${KERNEL_DOMAIN}
           issuer: Docmost
+          # Must match kernelRequirements.identity.saml.acsUrl above and the
+          # routed prefix in gateway-api-backends. Without this the sidecar
+          # advertises Activepieces' /api/v1/authn/saml/acs to Keycloak, which
+          # routes nowhere on this host.
+          acsPath: /sso/acs
         # Only non-secret config: BRIDGE_URL is the docmost-ce Service's
         # internal-only "bridge" port (charts/docmost — see header comment
         # for why the provisioning logic and its secrets live there instead
@@ -334,7 +358,11 @@ spec:
                 if (!bridgeRes.ok || !body.cookie) {
                   throw new Error(body.error || `bridge returned ${bridgeRes.status}`);
                 }
-                res.writeHead(302, { Location: '/', 'Set-Cookie': body.cookie });
+                // /home, not / — the tenant gateway redirects GET / into
+                // /sso/login, so finishing on / would bounce the user straight
+                // back into the SAML flow forever. /home is where Docmost's
+                // own router sends / anyway.
+                res.writeHead(302, { Location: '/home', 'Set-Cookie': body.cookie });
                 res.end();
               } catch (err) {
                 console.error('docmost sso bridge relay failed:', err);

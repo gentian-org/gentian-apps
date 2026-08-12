@@ -9,6 +9,12 @@ sso:
   tenantId: "demo"
   kernelDomain: "gentian.org"
   issuer: "GentianSidecar"
+  # Path the IdP posts the assertion to, advertised in the AuthnRequest. Leave
+  # empty to keep the image default (/api/v1/authn/saml/acs), which is what
+  # Activepieces needs because its own nginx fronts this sidecar there. An app
+  # whose tenant gateway routes straight to this Service has no such rewrite
+  # and should set this to a path it actually routes here, e.g. /sso/acs.
+  acsPath: ""
 
 handlerScript: |
   module.exports = {

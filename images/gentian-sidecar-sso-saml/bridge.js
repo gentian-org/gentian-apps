@@ -10,6 +10,17 @@ const kernelDomain = process.env.SSO_KERNEL_DOMAIN || 'gentian.org';
 const issuer = process.env.SSO_ISSUER || 'GentianSidecar';
 const port = parseInt(process.env.PORT || '8081');
 
+// Path the IdP posts the assertion back to. This is the path advertised in the
+// AuthnRequest, so it must be whatever actually reaches this sidecar on the
+// app's public host -- which differs per app: Activepieces fronts the sidecar
+// with its own nginx under /api/v1/authn/saml/acs, while an app routed
+// straight to this Service by the tenant gateway has no such rewrite and needs
+// the real path. It used to be hardcoded to the Activepieces path, which made
+// SSO silently unusable for any app that is not Activepieces: the IdP would
+// post to a path nothing served. Default preserves the historical value so
+// Activepieces is unaffected.
+const acsPath = process.env.SSO_ACS_PATH || '/api/v1/authn/saml/acs';
+
 // Pluggable handler script
 const handlerPath = process.env.APP_HANDLER_SCRIPT || '/usr/src/app/handler.js';
 
@@ -28,7 +39,7 @@ function generateAuthnRequest(host, tenantId, kernelDomain) {
                         ID="${id}"
                         Version="2.0"
                         IssueInstant="${issueInstant}"
-                        AssertionConsumerServiceURL="https://${host}/api/v1/authn/saml/acs"
+                        AssertionConsumerServiceURL="https://${host}${acsPath}"
                         Destination="https://id.${kernelDomain}/auth/realms/${tenantId}/protocol/saml">
         <saml:Issuer>${issuer}</saml:Issuer>
         <samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified"
@@ -59,7 +70,7 @@ async function startServer() {
             res.writeHead(302, { 'Location': redirectUrl });
             res.end();
             
-        } else if (parsedUrl.pathname === '/sso/acs' && req.method === 'POST') {
+        } else if ((parsedUrl.pathname === acsPath || parsedUrl.pathname === '/sso/acs') && req.method === 'POST') {
             let body = '';
             req.on('data', chunk => body += chunk);
             req.on('end', async () => {
