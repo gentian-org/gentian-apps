@@ -50,9 +50,12 @@ spec:
             - name: DATABASE_URL
               value: >-
                 postgresql://{{ .Values.database.user }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}
+            # Username is required: the kernel provisions a per-app Redis ACL
+            # user, and omitting it makes ioredis send a bare AUTH <password>,
+            # which authenticates as `default` and fails with WRONGPASS.
             - name: REDIS_URL
               value: >-
-                redis://:{{ .Values.cache.password }}@{{ .Values.cache.host }}:{{ .Values.cache.port }}
+                redis://{{ .Values.cache.username }}:{{ .Values.cache.password }}@{{ .Values.cache.host }}:{{ .Values.cache.port }}
             - name: STORAGE_DRIVER
               value: "s3"
             - name: AWS_S3_ACCESS_KEY_ID

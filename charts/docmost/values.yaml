@@ -29,6 +29,13 @@ database:
 cache:
   host: ""
   port: 6379
+  # The kernel provisions a per-app Redis ACL user, so AUTH must send a
+  # username as well as a password -- a bare "AUTH <password>" authenticates
+  # as `default` and fails with WRONGPASS. Set from the profile's extraValues
+  # as ${TENANT_ID}-${APP_ID}, which is the kernel's
+  # redisACLUsername(tenant, app) (gentian-os cache_reconciler.go). Not a
+  # secret, so it does not come through valueMapping.
+  username: ""
   password: ""
 
 s3:
