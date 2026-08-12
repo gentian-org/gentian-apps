@@ -1,0 +1,174 @@
+{{- if .Values.bridge.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "docmost.fullname" . }}-bridge
+data:
+  bridge.js: |
+    // Internal-only companion for the gentian-sidecar-sso-saml sidecar.
+    // Reachable only via the "docmost-ce" Service's "bridge" port (cluster
+    // DNS, no public route) — POST /ensure-session {email, firstName,
+    // lastName} -> {cookie}. Never touches Docmost's paid Enterprise SSO;
+    // only Docmost's own free CE /api/auth/login + self-hosted invite API
+    // (POST /api/workspace/invites/{create,link,accept}). See
+    // profiles/docmost/docmost-ce/profile.yaml header for the full design.
+    const http = require('http');
+    const crypto = require('crypto');
+
+    const DOCMOST_URL = process.env.DOCMOST_URL;
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+    const BRIDGE_SECRET = process.env.BRIDGE_SECRET;
+    const PORT = Number(process.env.PORT || 8090);
+
+    function stablePassword(email) {
+      // Deterministic per-user password derived from BRIDGE_SECRET. Nobody
+      // is ever shown this value; it only has to satisfy Docmost's own
+      // >= 8 char rule (AcceptInviteDto/LoginDto).
+      return crypto.createHmac('sha256', BRIDGE_SECRET)
+        .update(`docmost-bridge:${email}`)
+        .digest('hex')
+        .slice(0, 32);
+    }
+
+    function extractAuthCookie(res) {
+      const raw = typeof res.headers.getSetCookie === 'function'
+        ? res.headers.getSetCookie()
+        : [res.headers.get('set-cookie')].filter(Boolean);
+      const hit = raw.find((c) => c.startsWith('authToken='));
+      return hit ? hit.split(';')[0] : null;
+    }
+
+    async function docmostLogin(email, password) {
+      const r = await fetch(`${DOCMOST_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!r.ok) return null;
+      return extractAuthCookie(r);
+    }
+
+    async function ensureWorkspaceSetUp() {
+      // Idempotent: SetupGuard 403s once a workspace already exists, so a
+      // 403 here just means "someone else already did this" — not a
+      // failure. Called lazily, only when the admin login below fails,
+      // rather than as a separate bootstrap step.
+      const r = await fetch(`${DOCMOST_URL}/api/auth/setup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Gentian Bridge Admin',
+          email: ADMIN_EMAIL,
+          password: ADMIN_PASSWORD,
+          workspaceName: 'Docmost',
+        }),
+      });
+      if (!r.ok && r.status !== 403) {
+        throw new Error(`workspace setup failed: ${r.status}`);
+      }
+    }
+
+    async function adminLogin() {
+      let cookie = await docmostLogin(ADMIN_EMAIL, ADMIN_PASSWORD);
+      if (!cookie) {
+        await ensureWorkspaceSetUp();
+        cookie = await docmostLogin(ADMIN_EMAIL, ADMIN_PASSWORD);
+      }
+      if (!cookie) {
+        throw new Error('bridge admin login failed even after workspace setup');
+      }
+      return cookie;
+    }
+
+    async function provisionAndLogin(email, name, password) {
+      const adminCookie = await adminLogin();
+      const authHeaders = { 'Content-Type': 'application/json', Cookie: adminCookie };
+
+      // 1. Create a plain CE workspace invite (member role).
+      await fetch(`${DOCMOST_URL}/api/workspace/invites/create`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ emails: [email], role: 'member' }),
+      });
+
+      // 2. invites/create returns void — look the invitation back up by email.
+      const listRes = await fetch(`${DOCMOST_URL}/api/workspace/invites`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ query: email, limit: 1 }),
+      });
+      const listBody = await listRes.json();
+      const invitation = (listBody.items || [])[0];
+      if (!invitation) {
+        throw new Error(`no pending invitation found for ${email}`);
+      }
+
+      // 3. Self-hosted-only CE endpoint: raw invite link, no email needed.
+      const linkRes = await fetch(`${DOCMOST_URL}/api/workspace/invites/link`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ invitationId: invitation.id }),
+      });
+      const { inviteLink } = await linkRes.json();
+      const token = new URL(inviteLink).searchParams.get('token');
+      if (!token) {
+        throw new Error('could not parse invite token from inviteLink');
+      }
+
+      // 4. Public CE endpoint — accepting the invite creates the local user
+      //    with our deterministic password and returns a session directly.
+      const acceptRes = await fetch(`${DOCMOST_URL}/api/workspace/invites/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invitationId: invitation.id, token, name, password }),
+      });
+      if (!acceptRes.ok) {
+        throw new Error(`invites/accept failed: ${acceptRes.status}`);
+      }
+      const cookie = extractAuthCookie(acceptRes);
+      if (!cookie) {
+        throw new Error('invites/accept did not return a session cookie');
+      }
+      return cookie;
+    }
+
+    const server = http.createServer((req, res) => {
+      if (req.method !== 'POST' || req.url !== '/ensure-session') {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('not found');
+        return;
+      }
+      let body = '';
+      req.on('data', (chunk) => { body += chunk; });
+      req.on('end', async () => {
+        try {
+          const { email: rawEmail, firstName, lastName } = JSON.parse(body || '{}');
+          const email = String(rawEmail || '').trim().toLowerCase();
+          if (!email) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'missing email' }));
+            return;
+          }
+          const name = `${firstName || ''} ${lastName || ''}`.trim() || email.split('@')[0];
+          const password = stablePassword(email);
+
+          let cookie = await docmostLogin(email, password);
+          if (!cookie) {
+            cookie = await provisionAndLogin(email, name, password);
+          }
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ cookie }));
+        } catch (err) {
+          console.error('docmost bridge ensure-session failed:', err);
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: String(err && err.message || err) }));
+        }
+      });
+    });
+
+    server.listen(PORT, () => {
+      console.log(`docmost bridge listening on :${PORT}`);
+    });
+{{- end }}

@@ -1,0 +1,165 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "docmost.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "docmost.name" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "docmost.name" . }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "docmost.name" . }}
+        {{- if .Values.podLabels }}
+        {{- toYaml .Values.podLabels | nindent 8 }}
+        {{- end }}
+      {{- if .Values.podAnnotations }}
+      annotations:
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+      {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+        - name: docmost
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.port }}
+          env:
+            - name: APP_URL
+              value: {{ .Values.appUrl | quote }}
+            - name: PORT
+              value: {{ .Values.port | quote }}
+            # Pods are ephemeral — must be pinned explicitly (appSecrets), otherwise
+            # Docmost's own boot-time fallback would invalidate every session on
+            # restart. Same rationale as Mathesar's SECRET_KEY.
+            - name: APP_SECRET
+              value: {{ .Values.appSecret | quote }}
+            # Docmost takes a single connection string, not discrete fields, so it
+            # is assembled here from the pieces valueMapping.database delivers.
+            # Assumes an alphanumeric generated password (no URL-reserved chars) —
+            # consistent with how generated secrets are produced elsewhere in this
+            # catalogue (e.g. the openproject-ce portal-bridge password).
+            - name: DATABASE_URL
+              value: >-
+                postgresql://{{ .Values.database.user }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}
+            - name: REDIS_URL
+              value: >-
+                redis://:{{ .Values.cache.password }}@{{ .Values.cache.host }}:{{ .Values.cache.port }}
+            - name: STORAGE_DRIVER
+              value: "s3"
+            - name: AWS_S3_ACCESS_KEY_ID
+              value: {{ .Values.s3.accessKeyId | quote }}
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              value: {{ .Values.s3.secretAccessKey | quote }}
+            - name: AWS_S3_REGION
+              value: {{ .Values.s3.region | quote }}
+            - name: AWS_S3_BUCKET
+              value: {{ .Values.s3.bucket | quote }}
+            - name: AWS_S3_ENDPOINT
+              value: {{ .Values.s3.endpoint | quote }}
+            - name: AWS_S3_FORCE_PATH_STYLE
+              value: {{ .Values.s3.forcePathStyle | quote }}
+            {{- if .Values.smtp.host }}
+            - name: MAIL_DRIVER
+              value: "smtp"
+            - name: SMTP_HOST
+              value: {{ .Values.smtp.host | quote }}
+            - name: SMTP_PORT
+              value: {{ .Values.smtp.port | quote }}
+            - name: SMTP_USERNAME
+              value: {{ .Values.smtp.username | quote }}
+            - name: SMTP_PASSWORD
+              value: {{ .Values.smtp.password | quote }}
+            - name: SMTP_SECURE
+              value: {{ .Values.smtp.secure | quote }}
+            - name: MAIL_FROM_ADDRESS
+              value: {{ .Values.smtp.fromAddress | quote }}
+            {{- end }}
+            - name: DISABLE_TELEMETRY
+              value: {{ .Values.telemetry.disabled | quote }}
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              # /live has no DB/Redis dependency — a transient DB blip must not
+              # restart the pod, only fail readiness.
+              path: /api/health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              # / (bare) pings Postgres + Redis — see apps/server/src/integrations/health.
+              path: /api/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        {{- if .Values.bridge.enabled }}
+        # Same-pod companion: holds the SSO bridge's admin credentials and
+        # HMAC secret as plain literal env vars (proven-safe delivery — same
+        # mechanism as APP_SECRET above), and talks to the "docmost"
+        # container next to it over localhost. The gentian-sidecar-sso-saml
+        # sidecar (a *separate* Helm release/pod — see
+        # profiles/docmost/docmost-ce/profile.yaml) only ever calls this
+        # container's /ensure-session over the Service below; it never
+        # touches a Docmost secret itself, sidestepping the envFrom
+        # C_IDENTIFIER problem entirely rather than working around it.
+        - name: bridge
+          image: "{{ .Values.bridge.image.repository }}:{{ .Values.bridge.image.tag }}"
+          imagePullPolicy: {{ .Values.bridge.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          command: ["node", "/app/bridge.js"]
+          ports:
+            - name: bridge
+              containerPort: {{ .Values.bridge.port }}
+          env:
+            - name: PORT
+              value: {{ .Values.bridge.port | quote }}
+            - name: DOCMOST_URL
+              value: "http://localhost:{{ .Values.port }}"
+            - name: ADMIN_EMAIL
+              value: {{ .Values.adminUser.email | quote }}
+            - name: ADMIN_PASSWORD
+              value: {{ .Values.adminUser.password | quote }}
+            - name: BRIDGE_SECRET
+              value: {{ .Values.bridge.secret | quote }}
+          volumeMounts:
+            - name: bridge-script
+              mountPath: /app
+              readOnly: true
+          resources:
+            {{- toYaml .Values.bridge.resources | nindent 12 }}
+        {{- end }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "docmost.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.bridge.enabled }}
+        - name: bridge-script
+          configMap:
+            name: {{ include "docmost.fullname" . }}-bridge
+        {{- end }}

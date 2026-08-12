@@ -36,6 +36,12 @@ def check_gateway_backends(path: pathlib.Path, doc: dict) -> list[str]:
     which the composition creates verbatim. A profile with its own compositionRef
     defines its own Service names — openproject-ce creates `openproject-portal-bridge`
     literally — so guessing at those would produce false positives.
+
+    app-default also emits a stable ClusterIP alias for any sidecar declaring
+    `stableServiceName` (see its "Emit sidecars" step), which is the only way to
+    address a sidecar by a fixed name — its own Helm release name is generated.
+    Those count as created Services too; without this, routing to a sidecar the
+    supported way is reported as a dangling backend.
     """
     meta, spec = doc.get("metadata") or {}, doc.get("spec") or {}
     if spec.get("compositionRef"):
@@ -53,6 +59,9 @@ def check_gateway_backends(path: pathlib.Path, doc: dict) -> list[str]:
     allowed = {f"{name}-api"}
     if (spec.get("ingress") or {}).get("serviceName"):
         allowed.add(spec["ingress"]["serviceName"])
+    for sidecar in spec.get("sidecars") or []:
+        if (sidecar or {}).get("stableServiceName"):
+            allowed.add(sidecar["stableServiceName"])
 
     errors = []
     for backend in backends:
