@@ -89,6 +89,16 @@ containerSecurityContext:
 podLabels: {}
 podAnnotations: {}
 
+# Conventional passthrough keys the app-default composition writes into. On an
+# ACME-staging cluster it appends the gentian-staging-ca-tls volume/mount here
+# and sets REQUESTS_CA_BUNDLE + SSL_CERT_FILE, which is what lets allauth's
+# server-side OIDC discovery trust https://id.<kernel-domain>. A chart that
+# ignores these keys does not fail — the values are simply dropped, and the app
+# gets an unexplained TLS or connect error at login instead.
+extraEnvVars: []
+extraVolumes: []
+extraVolumeMounts: []
+
 # Chart never manages its own Ingress/HTTPRoute — the gentian-os operator
 # creates the Gateway API route from AppProfile.spec.ingress.
 ingress:

@@ -62,6 +62,15 @@ metadata:
   name: mathesar-ce
   labels:
     gentianos.io/profile-name: mathesar-ce
+  annotations:
+    # allauth performs OIDC discovery server-side against the same public issuer
+    # the browser uses (it has one server_url, so the internal-URL split in
+    # app-profile-guide.md §2 is not available here). That request leaves the
+    # pod for the edge gateway via the CoreDNS hairpin, so without this the
+    # login endpoint dies with a connect timeout behind a bare "Server Error
+    # (500)". The staging CA the hairpin then requires is mounted generically by
+    # the app-default composition — see extraEnvVars in charts/mathesar.
+    gentianos.io/kernel-egress-namespaces: envoy-gateway-system
 spec:
   displayName: "Mathesar"
   description: "Spreadsheet-like interface for viewing, editing, and querying Postgres data directly."
@@ -103,18 +112,24 @@ spec:
   portalTiles:
     - name: mathesar-ce
       displayName:
-        de_DE: "Daten"
-        en_US: "Data"
-      # Direct OIDC Flow (guide §8a): Mathesar's own login page redirects to
-      # Keycloak; the portal's hidden-iframe cookie warmup lets that redirect
-      # complete silently when a portal session already exists.
+        de_DE: "Mathesar"
+        en_US: "Mathesar"
+      # Direct OIDC Flow (guide §8a). Open allauth's provider login endpoint
+      # rather than "/": Mathesar's own landing page renders a "Log in to
+      # Mathesar" form with an SSO button and has no auto-redirect setting, so
+      # "/" would stop at that form even though the portal has already warmed up
+      # the Keycloak session cookie. Going straight here redirects to Keycloak,
+      # which returns immediately on an existing session — the tile opens
+      # already logged in. The path is allauth's, so it tracks
+      # SSO_CONFIG_DICT's provider key ("keycloak"), same as redirectUris above.
+      linkSuffix: "/auth/oidc/keycloak/login/"
       linkTarget: embedded
       allowedGroup: "App Users"
 
   chart:
     repository: "oci://ghcr.io/gentian-org/charts"
     name: mathesar
-    version: "0.1.2"
+    version: "0.1.3"
 
   deploymentMethod: crossplane
 

@@ -111,6 +111,9 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret.name }}
                   key: internal-secret_key
+            {{- with .Values.extraEnvVars }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
             {{- if .Values.oidc.enabled }}
             # clientSecret must be embedded inline in this JSON blob (Mathesar has
             # no separate "client secret file" option), so it arrives as a literal
@@ -140,6 +143,9 @@ spec:
               mountPath: /code/static
             - name: tmp
               mountPath: /tmp
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz/ready/
@@ -170,3 +176,6 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
