@@ -94,6 +94,16 @@ spec:
     database:
       engine: postgresql
       databasePerTenant: true
+      # Mathesar exists to explore Postgres data, and its "create a database"
+      # flow issues CREATE DATABASE on this same server as the app role — so
+      # without this the app installs successfully and is then unusable, with
+      # "No Databases Connected" and a button that fails. The provisioned
+      # database below is Mathesar's own internal store (Django tables); user
+      # data belongs in databases the tenant creates.
+      #
+      # Safe to purge: everything the role creates is owned by it, and
+      # `gtnctl apps uninstall --purge` drops every database that role owns.
+      allowDynamicDatabaseCreation: true
 
   provides:
     - name: data-explorer
