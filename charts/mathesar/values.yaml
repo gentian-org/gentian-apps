@@ -4,9 +4,12 @@ fullnameOverride: mathesar-ce
 replicaCount: 1
 
 image:
-  # "minimal" production target from the upstream Dockerfile — runs against an
-  # external Postgres only (no bundled db, no Caddy). See BUNDLE notes in
-  # profiles/mathesar/mathesar-ce/profile.yaml.
+  # Upstream publishes only its "production" Dockerfile target (there is no
+  # -minimal tag on Docker Hub). That target bundles a Postgres server it can
+  # fall back to, and — unlike the "minimal" target — does NOT pre-collect
+  # static assets at build time, so collectstatic must run at every startup and
+  # /code/static must be writable. See the `static` emptyDir in
+  # templates/deployment.yaml.
   repository: mathesar/mathesar
   tag: "0.12.0"
   pullPolicy: IfNotPresent
@@ -51,10 +54,9 @@ oidc:
 service:
   port: 8000
 
-# Backs /code/.media (user-uploaded .csv/.tsv datafiles). Everything else the
-# minimal image needs (collected static assets, SECRET_KEY) is either baked
-# into the image at build time or supplied via env var, so no other volumes
-# are persistent.
+# Backs /code/.media (user-uploaded .csv/.tsv datafiles) — the only state that
+# has to survive a restart. Static assets are rebuilt into an emptyDir on every
+# boot, and SECRET_KEY arrives as an env var, so nothing else needs a PVC.
 persistence:
   enabled: true
   size: "5Gi"
