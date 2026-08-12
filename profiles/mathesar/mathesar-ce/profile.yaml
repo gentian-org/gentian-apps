@@ -31,13 +31,10 @@
 #                                (existingSecret key
 #                                internal-bootstrap_admin_password). Consumed
 #                                by spec.postInstallJob (creates the account)
-#                                and by gentian-os's app-admins→is_superuser
-#                                sync (api/v1alpha1.PrivilegedRoleSpec
-#                                protocol "mathesar-rpc" — see
-#                                internal/controller/app_privilege_reconciler.go),
-#                                which authenticates as this account to call
-#                                Mathesar's users.* RPC. Never surfaced to any
-#                                human; nobody is meant to log in as it.
+#                                and by spec.provisioning.syncJob below, which
+#                                authenticates as it to call Mathesar's users.*
+#                                RPC. Never surfaced to any human; nobody is
+#                                meant to log in as it.
 #
 # Bootstrap: fully automated, no manual wizard. Upstream Mathesar's own
 #   first-run wizard is gated purely on "does any is_superuser=True user
@@ -46,11 +43,10 @@
 #   as regular users) — so spec.postInstallJob below creates exactly one
 #   technical superuser ("gentian-bootstrap-admin") via `manage.py shell`,
 #   idempotently (no-op once any superuser exists). Real human admins never
-#   use that account directly: gentian-os's PrivilegedRoleSpec "mathesar-rpc"
-#   protocol uses it to call Mathesar's users.add/users.patch_other RPC
-#   (HTTP Basic Auth — the only auth mode those methods accept, see
-#   mathesar/rpc/decorators.py upstream) and keeps every
-#   gentian:tenant:<t>:app-admins member's is_superuser flag in sync,
+#   use that account directly: spec.provisioning.syncJob uses it to call
+#   Mathesar's users.add/users.patch_other RPC (HTTP Basic Auth — the only auth
+#   mode those methods accept, see mathesar/rpc/decorators.py upstream) and
+#   keeps every gentian:tenant:<t>:app-admins member's is_superuser flag in sync,
 #   pre-provisioning the account by email when needed so their eventual first
 #   SSO login links to it instead of creating a fresh non-admin one (see
 #   mathesar/sso.py's save_user). Password login stays enabled
@@ -149,18 +145,117 @@ spec:
     - name: bootstrap_admin_password
       valuePath: "bootstrapAdminPassword"   # not consumed by the chart itself —
         # only via existingSecret key internal-bootstrap_admin_password, by
-        # spec.postInstallJob and the gentian-os mathesar-rpc provisioner.
+        # spec.postInstallJob and spec.provisioning.syncJob.
 
   # Maps gentian:tenant:<t>:app-admins members to Mathesar is_superuser —
   # never the portalTiles allowedGroup above, which only gates the tile/OIDC
-  # entitlement. "name" is ignored by the mathesar-rpc protocol (is_superuser
-  # is boolean, not a named group) — see PrivilegedRoleSpec.protocol doc in
-  # gentian-os.
+  # entitlement.
   provisioning:
     privilegedRole:
       kind: group
+      # Mathesar's privilege model is the boolean is_superuser, not a named
+      # group, so this is descriptive only — the script below is what decides
+      # what it means.
       name: superuser
-      protocol: mathesar-rpc
+
+    # How this app applies that role. The platform resolves app-admins
+    # membership, publishes it as JSON and runs this Job; everything below is
+    # Mathesar's own protocol and stays in Mathesar's catalogue entry, because
+    # the kernel must not know any application's admin API (app-profile-guide.md,
+    # "Platform boundary").
+    #
+    # Runs on the app's own image, which already has Python and requests.
+    # Idempotent by construction: it converges Mathesar to exactly the
+    # membership it is handed rather than applying a delta, so re-running it is
+    # always safe.
+    syncJob:
+      image: docker.io/mathesar/mathesar:0.12.0
+      # Bound key by key, not envFrom: the Secret's keys are hyphenated and
+      # Kubernetes drops those from envFrom without a word, so the variable
+      # would simply never appear.
+      env:
+        - name: BOOTSTRAP_ADMIN_PASSWORD
+          secretKeyRef:
+            name: mathesar-ce-sensitive-values
+            key: internal-bootstrap_admin_password
+      script: |
+        #!/bin/sh
+        set -eu
+        exec python3 - <<'PY'
+        import json, os, sys, urllib.request, base64
+
+        # HTTP Basic Auth as the technical bootstrap superuser: the only auth
+        # mode users.* accepts (mathesar/rpc/decorators.py upstream). That
+        # account is created by spec.postInstallJob and is never a human.
+        USER = "gentian-bootstrap-admin"
+        PASSWORD = os.environ["BOOTSTRAP_ADMIN_PASSWORD"]
+        APP = os.environ["GENTIAN_APP"]
+        URL = "http://%s:8000/api/rpc/v0/" % APP
+
+        def rpc(method, params=None):
+            body = json.dumps({
+                "jsonrpc": "2.0", "method": method,
+                "params": params or {}, "id": 1,
+            }).encode()
+            token = base64.b64encode(("%s:%s" % (USER, PASSWORD)).encode()).decode()
+            req = urllib.request.Request(URL, data=body, headers={
+                "Content-Type": "application/json",
+                "Authorization": "Basic " + token,
+                # ALLOWED_HOSTS covers the Service name; without a matching Host
+                # Django answers 400 DisallowedHost.
+                "Host": APP,
+            })
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                payload = json.load(resp)
+            if payload.get("error"):
+                raise SystemExit("mathesar rpc %s failed: %s" % (method, payload["error"]))
+            return payload.get("result")
+
+        with open(os.environ["GENTIAN_APP_ADMINS_FILE"]) as fh:
+            members = json.load(fh)
+        want = {m["email"].lower(): m for m in members if m.get("email")}
+
+        existing = {u["email"].lower(): u for u in rpc("users.list") if u.get("email")}
+
+        for email, member in want.items():
+            user = existing.get(email)
+            if user is None:
+                # Pre-provision so the member's first SSO login links to this
+                # account instead of creating a fresh non-admin one
+                # (mathesar/sso.py save_user). The password is throwaway: the
+                # account is claimed via SSO, never by password login.
+                rpc("users.add", {"user_def": {
+                    "username": member.get("username") or email,
+                    "password": base64.urlsafe_b64encode(os.urandom(24)).decode(),
+                    "is_superuser": True,
+                    "email": email,
+                }})
+                print("provisioned %s" % email)
+            elif not user.get("is_superuser"):
+                rpc("users.patch_other", {
+                    "user_id": user["id"], "username": user["username"],
+                    "is_superuser": True, "email": user.get("email", ""),
+                    "full_name": user.get("full_name", ""),
+                    "display_language": user.get("display_language", "en"),
+                })
+                print("promoted %s" % email)
+
+        # Demote anyone who lost membership. The bootstrap account is matched by
+        # username, not membership — it is what authenticates this very call and
+        # must never lock itself out.
+        for email, user in existing.items():
+            if user["username"] == USER or not user.get("is_superuser") or email in want:
+                continue
+            rpc("users.patch_other", {
+                "user_id": user["id"], "username": user["username"],
+                "is_superuser": False, "email": user.get("email", ""),
+                "full_name": user.get("full_name", ""),
+                "display_language": user.get("display_language", "en"),
+            })
+            print("demoted %s" % email)
+
+        print("app administrators synchronised: %d" % len(want))
+        PY
 
   postInstallJob:
     image: docker.io/mathesar/mathesar:0.12.0

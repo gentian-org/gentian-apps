@@ -938,51 +938,70 @@ are **not** the same as portal tile entitlements (`gentian:tenant:<t>:app:<profi
 Members tab (maps to `app-admins`). This does **not** grant portal tiles — assign
 `app:<profile>` entitlements separately when needed.
 
-**AppProfile example** (per-tenant Mathesar catalogue entry — the reference
-implementation; see `profiles/mathesar/mathesar-ce/profile.yaml`):
+**The split:** the platform resolves who the app administrators are and runs a
+Job; **the profile supplies the Job**, because how you grant an admin role is a
+property of the application, not of the kernel. gentian-os contains no app's
+protocol, endpoint or account model — see **Platform boundary** above.
 
 ```yaml
 spec:
   provisioning:
     privilegedRole:
       kind: group          # only "group" is supported today
-      name: superuser      # ignored by protocols with no named role — see below
-      protocol: mathesar-rpc
+      name: superuser      # passed through as GENTIAN_PRIVILEGED_ROLE
+    syncJob:
+      image: docker.io/example/app:1.0    # usually the app's own image
+      env:                                # bind Secret keys explicitly
+        - name: ADMIN_PASSWORD
+          secretKeyRef:
+            name: <app>-sensitive-values
+            key: internal-admin_password
+      script: |
+        #!/bin/sh
+        # converge the app to exactly the membership in $GENTIAN_APP_ADMINS_FILE
 ```
 
-**`protocol` selects a wire protocol the operator knows how to speak — never an
-app name.** `syncAppPrivilegedRole`
-(`gentian-os/internal/controller/app_privilege_reconciler.go`) dispatches on
-this field; each case lives in its own package under
-`gentian-os/internal/provisioning/`. Declaring `privilegedRole` without a
-`protocol` the operator implements is a documented gap, not silent: the
-operator sets `AppPrivilegesReady: False` with reason `SyncFailed` and the
-error `privileged role sync is not implemented for profile "…" (protocol
-"…")`.
+The operator provides:
 
-**Implemented today: `mathesar-rpc`** — HTTP Basic Auth (a per-tenant
-technical bootstrap superuser, created by the profile's own
-`spec.postInstallJob` and never used by a human) against Mathesar's
-`/api/rpc/v0/` JSON-RPC endpoint, syncing `gentian:tenant:<t>:app-admins`
-membership to `is_superuser`. `name` is ignored — Mathesar's privilege model
-is a boolean, not a named group. See `profiles/mathesar/mathesar-ce/`
-(`profile.yaml`'s header comment has the full bootstrap story) and
-`gentian-os/internal/provisioning/mathesar/`.
+| Variable | Contents |
+|---|---|
+| `GENTIAN_APP_ADMINS_FILE` | Path to a JSON array of `{"id","username","email"}` — the current `gentian:tenant:<t>:app-admins` members |
+| `GENTIAN_PRIVILEGED_ROLE` | `privilegedRole.name` |
+| `GENTIAN_TENANT` / `GENTIAN_APP` | Tenant name and profile name |
 
-**Not implemented: a Nextcloud OCS provisioner.** Earlier revisions of this
-guide claimed one existed (`nextcloud`, calling the OCS API at
-`http://nextcloud.tenant-<t>.svc.cluster.local`); that described the intended
-design, not shipped code — `syncAppPrivilegedRole` unconditionally returned
-"not implemented" for every profile until `mathesar-rpc` landed. Building it
-for real means adding an OCS-protocol case the same way, in its own
-`internal/provisioning/nextcloud` package.
+**Write the script to converge, not to apply a delta.** It re-runs whenever
+membership changes and is retried on failure, so it must be idempotent: grant
+to everyone in the file, revoke from everyone who is no longer in it, and do
+nothing when the app already matches. Exclude any technical account the script
+authenticates as, or a sync can lock itself out.
+
+**Use `env` rather than `envFrom` for platform-managed credentials.** The keys
+of an app's `*-sensitive-values` Secret are hyphenated (`db-host`,
+`internal-admin_password`), and Kubernetes silently drops any `envFrom` key that
+is not a valid environment variable name — the variable never appears and the
+script fails on something unrelated.
+
+Declaring `privilegedRole` without a `syncJob` is a clear gap, not a silent
+one: the operator sets `AppPrivilegesReady: False` / `SyncFailed` with
+`declares provisioning.privilegedRole but no provisioning.syncJob`. While a Job
+is running the reason is `Syncing`; only a **completed** run records the
+membership as applied, so a crashed sync is never remembered as success.
+
+**Reference implementation:** `profiles/mathesar/mathesar-ce/profile.yaml`
+(`profile.yaml`'s header comment has the full bootstrap story).
+
+**Nextcloud has no sync job yet.** An earlier revision of this guide claimed a
+built-in `nextcloud` OCS provisioner existed; it never did — the operator
+returned "not implemented" for every profile. Adding one now means writing a
+`syncJob` script in the Nextcloud profile that calls OCS, with no gentian-os
+change at all.
 
 **User id mapping:** reconcilers prefer Keycloak attribute `opendesk_username`,
 then email local-part (same as the Nextcloud portal bridge).
 
 **Checklist:**
 
-- [ ] Declare `spec.provisioning.privilegedRole` when the app has a distinct admin group/role
+- [ ] Declare `spec.provisioning.privilegedRole` **and** `spec.provisioning.syncJob` when the app has a distinct admin group/role — the role alone is a declaration nothing applies
 - [ ] Do **not** conflate `app-admins` with `app:<profile>` unless product policy explicitly requires both
 - [ ] Ensure OIDC users exist in the app (bridge or provisioner creates accounts before admin grant)
 
@@ -1293,7 +1312,7 @@ Before opening a PR, verify:
 - [ ] Element *(gentian-pro)*: `additionalIngresses` includes `matrix` → `synapse-web:8008` (required) — §6d
 - [ ] Element *(gentian-pro)*: `matrixIdLocalpart: "opendesk_username"` (not `preferred_username`) — §6d
 - [ ] After tenant purge/redeploy: if Files login fails, check NC `entryUUID` drift (§6g) — not an AppProfile fix
-- [ ] App admins: `spec.provisioning.privilegedRole` when the app exposes a native admin group (§6h)
+- [ ] App admins: `spec.provisioning.privilegedRole` + `syncJob` when the app exposes a native admin role (§6h); the sync script converges, never applies a delta
 - [ ] App admins: assign humans via `gentian:tenant:<t>:app-admins`, not per-app manual grants
 - [ ] OIDC uses full `OIDCClientSpec`, realm is `${TENANT_ID}`
 - [ ] openDesk charts: no `keycloak-bridge-auth`; OIDC via tenant realm + `id.${KERNEL_DOMAIN}` (§8a)
