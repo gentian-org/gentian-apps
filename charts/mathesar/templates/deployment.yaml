@@ -29,12 +29,28 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          # Upstream's default CMD is `run -fnse`. Dropping -f
+          # (--fallback-to-inbuilt-db) is deliberate: with it, a missing or
+          # empty POSTGRES_* value makes Mathesar silently start the Postgres
+          # bundled in the image and write tenant data to container-local
+          # storage that vanishes on restart. Without it the pod fails loudly
+          # instead, which is the correct behaviour for a tenant app whose
+          # database is provisioned by the kernel.
+          #   -n  use the system gunicorn, not a venv
+          #   -s  run migrations + collectstatic before serving
+          #   -e  prefer exported env vars over an .env file
+          command:
+            - bash
+            - ./bin/mathesar
+            - run
+            - -nse
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
           env:
-            # Matches the "minimal" image target — production Django settings,
-            # no bundled db fallback, no interactive first-boot prompts.
+            # The image already defaults to this, but Mathesar's entrypoint
+            # only sets it via os.environ.setdefault — pin it so the settings
+            # module can never be inherited from something else.
             - name: DJANGO_SETTINGS_MODULE
               value: "config.settings.production"
             - name: ALLOWED_HOSTS
@@ -103,6 +119,15 @@ spec:
           volumeMounts:
             - name: media
               mountPath: /code/.media
+            # STATIC_ROOT. Writable because the published image collects static
+            # at startup rather than at build time (see values.yaml image
+            # comment) — whitenoise serves these with
+            # CompressedManifestStaticFilesStorage, which needs the generated
+            # manifest, so a read-only path here crashes the pod on boot.
+            # emptyDir, not a PVC: the contents are rebuilt from the image on
+            # every start and identical across replicas.
+            - name: static
+              mountPath: /code/static
             - name: tmp
               mountPath: /tmp
           livenessProbe:
@@ -131,5 +156,7 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        - name: static
+          emptyDir: {}
         - name: tmp
           emptyDir: {}

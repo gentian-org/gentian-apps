@@ -5,9 +5,12 @@
 #   (same pattern as charts/odoo — see docs/app-profile-guide.md §0
 #   Consequence 3). The chart wraps the official image unmodified.
 #
-# Docker image: docker.io/mathesar/mathesar:0.12.0 ("minimal" production
-#   target — runs against an external Postgres only, no bundled db, no Caddy;
-#   Gentian's own gateway/Gateway API replace Caddy's reverse-proxy role).
+# Docker image: docker.io/mathesar/mathesar:0.12.0 — upstream's "production"
+#   Dockerfile target (the only one they publish). The chart pins it to the
+#   kernel-provisioned Postgres and drops the entrypoint's inbuilt-db fallback
+#   flag, so it never silently starts the Postgres bundled in that image.
+#   No Caddy: Gentian's gateway/Gateway API replaces its reverse-proxy role,
+#   and whitenoise inside the app serves the static assets Caddy would have.
 #
 # Secret inventory:
 #   Kernel-provided:
@@ -111,7 +114,7 @@ spec:
   chart:
     repository: "oci://ghcr.io/gentian-org/charts"
     name: mathesar
-    version: "0.1.0"
+    version: "0.1.1"
 
   deploymentMethod: crossplane
 
