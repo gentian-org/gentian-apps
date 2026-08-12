@@ -53,8 +53,18 @@ spec:
             # module can never be inherited from something else.
             - name: DJANGO_SETTINGS_MODULE
               value: "config.settings.production"
+            # Must cover the in-cluster Service DNS as well as the public tenant
+            # host. The operator reaches this app over
+            # http://<svc>.<ns>.svc.cluster.local to reconcile app-admins into
+            # is_superuser (PrivilegedRoleSpec "mathesar-rpc"), per the
+            # server-to-server rule in app-profile-guide.md §2 — and Django
+            # answers any Host outside this list with a bare 400 DisallowedHost,
+            # which reads like a malformed request rather than a config problem.
+            # A leading dot matches subdomains, so ".svc.cluster.local" stays
+            # correct no matter which namespace the tenant lands in. These names
+            # are not routable from outside the cluster.
             - name: ALLOWED_HOSTS
-              value: {{ .Values.allowedHosts | quote }}
+              value: "{{ .Values.allowedHosts }},{{ include "mathesar.fullname" . }},.svc.cluster.local"
             - name: DEBUG
               value: {{ .Values.django.debug | quote }}
             - name: MATHESAR_DJANGO_ADMIN_ENABLED

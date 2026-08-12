@@ -114,7 +114,7 @@ spec:
   chart:
     repository: "oci://ghcr.io/gentian-org/charts"
     name: mathesar
-    version: "0.1.1"
+    version: "0.1.2"
 
   deploymentMethod: crossplane
 
