@@ -1,0 +1,128 @@
+nameOverride: docmost
+fullnameOverride: docmost-ce
+
+replicaCount: 1
+
+image:
+  # Official image. No official Helm chart exists upstream (docker-compose /
+  # raw-manifest only), so this is a first-party Gentian chart wrapping the
+  # unmodified image — see profiles/docmost/docmost-ce/profile.yaml header.
+  repository: docker.io/docmost/docmost
+  tag: "0.95.0"
+  pullPolicy: IfNotPresent
+
+appUrl: ""
+port: 3000
+
+# Delivered as literal Helm values via valueMapping (profile.yaml) rather than
+# secretKeyRef, matching the openproject-ce/activepieces-me convention — see
+# docs/app-profile-guide.md §3. DATABASE_URL/REDIS_URL are single connection
+# strings (Docmost has no discrete-field option), so they must be assembled at
+# render time from these pieces; secretKeyRef can't do that composition.
+database:
+  host: ""
+  port: 5432
+  name: ""
+  user: ""
+  password: ""
+
+cache:
+  host: ""
+  port: 6379
+  password: ""
+
+s3:
+  accessKeyId: ""
+  secretAccessKey: ""
+  region: us-east-1
+  bucket: ""
+  endpoint: ""
+  forcePathStyle: true
+
+smtp:
+  host: ""
+  port: 587
+  username: ""
+  password: ""
+  secure: false
+  fromAddress: ""
+
+# Django/Rails-style "app secret" equivalent — Docmost's JWT session-signing
+# key (min. 32 chars). Must be pinned via appSecrets: pods are ephemeral and
+# an unpinned/regenerated value invalidates every session on restart (same
+# rationale as Mathesar's SECRET_KEY — see charts/mathesar/values.yaml).
+appSecret: ""
+
+# Bridge admin account: a machine-only Docmost workspace admin used solely by
+# the "bridge" container below to provision/log in real users on Keycloak
+# SAML's behalf. Consumed by the bridge container as plain literal Helm
+# values (same mechanism as appSecret above) — deliberately NOT delivered via
+# Kubernetes envFrom to the sso-saml sidecar: gentian-os's app-default
+# composition documents that kubelet silently drops any envFrom-materialized
+# key that isn't a C_IDENTIFIER, which "internal-admin_password" (the fixed
+# appSecrets flat-secret naming convention) is not. See
+# profiles/docmost/docmost-ce/profile.yaml header for the full design.
+adminUser:
+  email: "admin@docmost.internal"
+  password: ""
+
+# HMAC key the bridge derives each user's stable, never-displayed local
+# Docmost password from. Same "must stay pinned" rationale as appSecret.
+bridge:
+  enabled: true
+  port: 8090
+  image:
+    repository: docker.io/library/node
+    tag: "20-alpine"
+    pullPolicy: IfNotPresent
+  secret: ""
+  resources:
+    requests:
+      cpu: "25m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "128Mi"
+
+telemetry:
+  disabled: true
+
+resources:
+  requests:
+    cpu: "150m"
+    memory: "512Mi"
+  limits:
+    cpu: "1"
+    memory: "1Gi"
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+podLabels: {}
+podAnnotations: {}
+
+# /app/data is only scratch space for import/export processing — actual file
+# storage is S3 (kernelRequirements.storage.s3), so no PVC is needed by
+# default; flip to true only if large imports need to survive a pod restart.
+persistence:
+  enabled: false
+  size: "2Gi"
+  storageClass: ""
+
+# Chart never manages its own Ingress/HTTPRoute — the gentian-os operator
+# creates the Gateway API route from AppProfile.spec.ingress.
+ingress:
+  enabled: false

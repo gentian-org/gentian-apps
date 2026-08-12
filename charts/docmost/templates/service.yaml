@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "docmost.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "docmost.name" . }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    {{- if .Values.bridge.enabled }}
+    - port: {{ .Values.bridge.port }}
+      targetPort: bridge
+      protocol: TCP
+      name: bridge
+    {{- end }}
+  selector:
+    app.kubernetes.io/name: {{ include "docmost.name" . }}

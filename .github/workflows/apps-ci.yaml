@@ -16,6 +16,7 @@ on:
       - "charts/gentian-sidecar-git-modules/**"
       - "charts/activepieces/**"
       - "charts/mathesar/**"
+      - "charts/docmost/**"
       - ".github/workflows/apps-ci.yaml"
   pull_request:
     branches: [main, develop]
@@ -27,6 +28,7 @@ on:
       - "charts/gentian-sidecar-git-modules/**"
       - "charts/activepieces/**"
       - "charts/mathesar/**"
+      - "charts/docmost/**"
 
 env:
   REGISTRY: ghcr.io
@@ -408,6 +410,34 @@ jobs:
           CHART_VERSION=$(grep '^version:' charts/mathesar/Chart.yaml | awk '{print $2}')
           helm package charts/mathesar -d /tmp
           helm push "/tmp/mathesar-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+
+  build-docmost-chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint chart
+        run: helm lint charts/docmost
+
+      - name: Package and push chart
+        if: github.event_name != 'pull_request'
+        run: |
+          CHART_VERSION=$(grep '^version:' charts/docmost/Chart.yaml | awk '{print $2}')
+          helm package charts/docmost -d /tmp
+          helm push "/tmp/docmost-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
 
   build-git-modules-sidecar-image:
     runs-on: ubuntu-latest
