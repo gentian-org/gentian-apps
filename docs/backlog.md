@@ -2,6 +2,10 @@
 
 Ideas and proposals not yet scheduled for implementation.
 
+Once something is actually intended, it moves to [roadmap.md](roadmap.md) as a
+numbered item that can be referenced from a board. Entries here may also simply
+be abandoned — that is the point of keeping the two apart.
+
 ## ~~Restructure `profiles/` — group by family, drop the flat layout~~ — **done**
 
 Implemented 2026-08-06 (`gentian-apps` 4bc20fa, `gentian-os` 5500d2f). The rationale
