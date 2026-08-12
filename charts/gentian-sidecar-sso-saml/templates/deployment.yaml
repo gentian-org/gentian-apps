@@ -11,6 +11,15 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-sso-saml
+        # Standard Helm instance label. Required by the generic
+        # AppProfile.spec.sidecars[].stableServiceName mechanism: app-default's
+        # stable ClusterIP alias selects pods on
+        # `app.kubernetes.io/instance: <release>` (gentian-os
+        # crossplane/compositions/app-default.yaml, "Emit sidecars"), so without
+        # this the alias Service selects nothing and the route 503s. Additive to
+        # the pod template only — .spec.selector below is unchanged, so this is
+        # not an immutable-field update for existing releases.
+        app.kubernetes.io/instance: {{ .Release.Name }}
         {{- if .Values.podLabels }}
         {{- toYaml .Values.podLabels | nindent 8 }}
         {{- end }}

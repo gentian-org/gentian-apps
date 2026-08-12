@@ -285,7 +285,12 @@ spec:
       chart:
         repository: "oci://ghcr.io/gentian-org/charts"
         name: gentian-sidecar-sso-saml
-        version: "0.1.5"
+        # 0.1.6 adds the standard app.kubernetes.io/instance pod label that
+        # stableServiceName's alias Service selects on — 0.1.5 (which
+        # activepieces-me still pins, and does not need this since it reaches
+        # the sidecar through its own nginx instead) would yield an alias
+        # Service with no endpoints.
+        version: "0.1.6"
       extraValues:
         podLabels:
           gentianos.io/app: docmost-ce
