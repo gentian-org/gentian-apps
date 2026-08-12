@@ -42,12 +42,24 @@ data:
       return body && typeof body === 'object' && 'data' in body ? body.data : body;
     }
 
+    // Returns the WHOLE Set-Cookie line, attributes included. Docmost issues
+    // "authToken=…; Path=/; HttpOnly; Secure; SameSite=Lax", and this used to
+    // keep only the name=value pair. A cookie set without an explicit Path
+    // defaults to the directory of the request URI -- here /sso/ -- so the
+    // session was never sent to /home: SSO appeared to succeed and Docmost
+    // then rendered its login page. The sidecar relays this verbatim, and it
+    // is same-origin with the app, so every attribute stays valid.
     function extractAuthCookie(res) {
       const raw = typeof res.headers.getSetCookie === 'function'
         ? res.headers.getSetCookie()
         : [res.headers.get('set-cookie')].filter(Boolean);
-      const hit = raw.find((c) => c.startsWith('authToken='));
-      return hit ? hit.split(';')[0] : null;
+      return raw.find((c) => c.startsWith('authToken=')) || null;
+    }
+
+    // A Cookie: request header takes only name=value; the attributes above are
+    // response-side and would be rejected here.
+    function cookiePair(setCookie) {
+      return setCookie.split(';')[0];
     }
 
     async function docmostLogin(email, password) {
@@ -126,7 +138,7 @@ data:
 
     async function provisionAndLogin(email, name, password) {
       const adminCookie = await adminLogin();
-      const authHeaders = { 'Content-Type': 'application/json', Cookie: adminCookie };
+      const authHeaders = { 'Content-Type': 'application/json', Cookie: cookiePair(adminCookie) };
 
       // 1. Create a plain CE workspace invite (member role).
       await fetch(`${DOCMOST_URL}/api/workspace/invites/create`, {
