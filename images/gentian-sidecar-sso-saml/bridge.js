@@ -89,6 +89,15 @@ async function ensureIdpCertificates() {
     return loadIdpCertificates();
 }
 
+// The AuthnRequest advertises https://<host><acsPath> and the Destination check
+// compares against the same string, so both must resolve the host identically --
+// if they disagree, a genuine login is rejected as misaddressed. Host first,
+// which is the precedence the AuthnRequest has always used and which Activepieces
+// (whose nginx fronts this sidecar) is known to work with.
+function resolveHost(req) {
+    return req.headers.host || req.headers['x-forwarded-host'];
+}
+
 function generateAuthnRequest(host, tenantId, kernelDomain) {
     const id = "_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     const issueInstant = new Date().toISOString();
@@ -202,7 +211,7 @@ async function startServer() {
         const parsedUrl = url.parse(req.url, true);
 
         if (parsedUrl.pathname === '/sso/login') {
-            const host = req.headers.host || req.headers['x-forwarded-host'];
+            const host = resolveHost(req);
             const samlRedirect = generateAuthnRequest(host, tenantId, kernelDomain);
             const redirectUrl = `${entryPoint}?SAMLRequest=${samlRedirect}`;
 
@@ -231,7 +240,7 @@ async function startServer() {
                         return;
                     }
 
-                    const host = req.headers['x-forwarded-host'] || req.headers.host;
+                    const host = resolveHost(req);
 
                     // Verifies the XML signature against the IdP's certificate and
                     // checks Destination, Audience and the NotBefore/NotOnOrAfter
