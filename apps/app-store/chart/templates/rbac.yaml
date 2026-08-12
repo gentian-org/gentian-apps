@@ -42,6 +42,13 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get"]
+  # Pods are read to tell a stalled install from a broken one. A claim that is
+  # not Ready looks identical either way; the workload's own pods are the only
+  # place the actual reason (CrashLoopBackOff, ImagePullBackOff, Unschedulable)
+  # exists. Namespaced on purpose — the store only ever explains its own tenant.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

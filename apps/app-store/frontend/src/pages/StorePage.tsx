@@ -43,8 +43,13 @@ type InstalledApp = {
   profile: string;
   name?: string;
   ready?: boolean;
-  phase?: "installing" | "ready";
+  // "failing": the workload is broken (crash-looping, unpullable image,
+  // unschedulable) rather than merely slow. Kubernetes keeps retrying, so this
+  // can still recover — but it needs someone to look at it, which an
+  // indefinite "Installing" never conveys.
+  phase?: "installing" | "ready" | "failing";
   message?: string;
+  failure?: string | null;
   conditions?: AppCondition[];
 };
 
@@ -96,6 +101,10 @@ function hasAddons(profile: string, catalogue: CatalogueResponse | null): boolea
 
 function isAppReady(app: InstalledApp | undefined): boolean {
   return app?.ready === true;
+}
+
+function isAppFailing(app: InstalledApp | undefined): boolean {
+  return app?.ready !== true && app?.phase === "failing";
 }
 
 function AppListCard({
@@ -176,7 +185,8 @@ function CatalogueCard({
   const pro = isProApp(app);
   const installed = Boolean(installedApp);
   const ready = isAppReady(installedApp);
-  const installing = installed && !ready;
+  const failing = isAppFailing(installedApp);
+  const installing = installed && !ready && !failing;
   const showBuy = pro && app.catalogueAction === "buy" && !installed;
 
   let cardClass = "";
@@ -278,6 +288,16 @@ function CatalogueCard({
           <span className="text-sm font-medium text-emerald-600 flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
             Ready
+          </span>
+        ) : failing ? (
+          // Not a spinner: nothing here resolves on its own. The reason is in
+          // the tooltip because the card has no room for a pod-level message.
+          <span
+            className="rounded-lg bg-red-100 px-3 py-1.5 text-sm font-medium text-red-800 flex items-center gap-1.5"
+            title={installedApp?.message ?? "The application failed to start"}
+          >
+            <span className="h-2 w-2 rounded-full bg-red-500 inline-block"></span>
+            Needs attention
           </span>
         ) : installing ? (
           <span
@@ -403,6 +423,14 @@ export function StorePage() {
         const app = installed.find((a) => displayNameFor(a.profile, catalogue) === label);
         if (app && isAppReady(app)) {
           setNotice({ kind: "success", text: `${label} is ready.` });
+        } else if (app && isAppFailing(app)) {
+          // Replace the "it will become ready" promise the moment that stops
+          // being true — leaving it up is what made a broken install look like
+          // a slow one.
+          setNotice({
+            kind: "error",
+            text: `${label} failed to start: ${app.message ?? "the application is not running"}`,
+          });
         }
       }
     }

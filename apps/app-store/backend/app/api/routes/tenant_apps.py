@@ -98,13 +98,25 @@ def list_installed(user: dict = Depends(get_current_user)) -> dict:
     settings = get_settings()
     entries, lifecycle_warning = _list_installed_entries()
     ready = [app for app in entries if app.get("ready")]
-    installing = [app for app in entries if not app.get("ready")]
+    # An app whose workload is broken is not "installing" — keeping it in that
+    # bucket is what let a crash-looping install read as normal progress.
+    failing = [
+        app
+        for app in entries
+        if not app.get("ready") and app.get("phase") == "failing"
+    ]
+    installing = [
+        app
+        for app in entries
+        if not app.get("ready") and app.get("phase") != "failing"
+    ]
     result = {
         "tenant": settings.tenant_id,
         "namespace": settings.tenant_namespace,
         "apps": entries,
         "ready": ready,
         "installing": installing,
+        "failing": failing,
     }
     if lifecycle_warning:
         result["lifecycleWarning"] = lifecycle_warning

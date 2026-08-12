@@ -69,6 +69,20 @@ class K8sClient:
                 return None
             raise
 
+    def list_pods(self, namespace: str, label_selector: str) -> list[Any]:
+        """Pods matching a label selector, or [] if they cannot be read.
+
+        Returning [] on error is deliberate: this only ever feeds the
+        explanation of why an app is not ready, so losing it must degrade the
+        message, never break the listing.
+        """
+        try:
+            return self._core.list_namespaced_pod(
+                namespace, label_selector=label_selector
+            ).items
+        except ApiException:
+            return []
+
     def get_tenant(self, name: str) -> dict[str, Any]:
         # Tenant CRs are cluster-scoped in gentian-os
         return self._custom.get_cluster_custom_object(GROUP, VERSION, "tenants", name)

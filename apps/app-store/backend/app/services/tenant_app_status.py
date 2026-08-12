@@ -36,6 +36,76 @@ def _condition(obj: dict[str, Any], kind: str) -> dict[str, Any]:
     return {}
 
 
+# Container waiting reasons that mean the workload is broken rather than slow.
+# Each is something no amount of further waiting fixes on its own: a bad image
+# reference, a missing Secret key, or a process that exits on every start.
+_BROKEN_WAITING_REASONS = {
+    "CrashLoopBackOff",
+    "ImagePullBackOff",
+    "ErrImagePull",
+    "InvalidImageName",
+    "CreateContainerConfigError",
+    "CreateContainerError",
+}
+
+# A container that has restarted a couple of times is still plausibly waiting on
+# a dependency that is coming up — the retry-until-ready contract that init and
+# bootstrap containers rely on. Past this, it is looping, not starting.
+_CRASH_RESTART_THRESHOLD = 3
+
+
+def _pod_failure(pod: Any) -> str | None:
+    """The reason this pod is broken, or None if it is merely still starting."""
+    status = getattr(pod, "status", None)
+    if status is None:
+        return None
+    name = getattr(getattr(pod, "metadata", None), "name", "pod")
+
+    for cs in (getattr(status, "container_statuses", None) or []):
+        waiting = getattr(getattr(cs, "state", None), "waiting", None)
+        if waiting is None or waiting.reason not in _BROKEN_WAITING_REASONS:
+            continue
+        restarts = getattr(cs, "restart_count", 0) or 0
+        # CrashLoopBackOff is the one reason that is normal early on: a
+        # container waiting for its database to accept connections looks
+        # exactly like one that is broken, until it keeps happening.
+        if waiting.reason == "CrashLoopBackOff" and restarts < _CRASH_RESTART_THRESHOLD:
+            continue
+        detail = (waiting.message or "").strip()
+        suffix = f" — {detail}" if detail else ""
+        restart_note = f" after {restarts} restarts" if restarts else ""
+        return f"{name}: {waiting.reason}{restart_note}{suffix}"
+
+    for cond in (getattr(status, "conditions", None) or []):
+        if (
+            cond.type == "PodScheduled"
+            and cond.status == "False"
+            and cond.reason == "Unschedulable"
+        ):
+            detail = (cond.message or "").strip()
+            return f"{name}: Unschedulable{f' — {detail}' if detail else ''}"
+    return None
+
+
+def _workload_failure(k8s: K8sClient, namespace: str, profile: str) -> str | None:
+    """Why this app's own workload is broken, if it is.
+
+    Selects on the label the platform guarantees for every app pod
+    (gentianos.io/app, promoted from annotations by Kyverno for charts that
+    cannot set pod labels themselves), and skips the platform's own helper pods:
+    a post-install Job that exits non-zero until its app is reachable is
+    following its documented retry contract, not failing.
+    """
+    for pod in k8s.list_pods(namespace, f"gentianos.io/app={profile}"):
+        labels = getattr(getattr(pod, "metadata", None), "labels", None) or {}
+        if labels.get("gentianos.io/component"):
+            continue
+        failure = _pod_failure(pod)
+        if failure:
+            return failure
+    return None
+
+
 def _blocking_detail(k8s: K8sClient, claim: dict[str, Any]) -> str | None:
     """Explain *why* a claim is not ready yet.
 
@@ -79,7 +149,16 @@ def _entry_from_claim(
 ) -> dict[str, Any]:
     ready, message = _claim_status(claim)
     detail: str | None = None
+    failure: str | None = None
     if not ready and k8s is not None:
+        namespace = claim.get("metadata", {}).get("namespace")
+        if namespace:
+            try:
+                failure = _workload_failure(k8s, namespace, profile)
+            except Exception:
+                logger.warning(
+                    "could not inspect %s workload pods", profile, exc_info=True
+                )
         try:
             detail = _blocking_detail(k8s, claim)
         except Exception:
@@ -90,17 +169,26 @@ def _entry_from_claim(
             logger.warning(
                 "could not determine why %s is not ready", profile, exc_info=True
             )
-        if detail:
+        # A broken workload beats "waiting for composite resource": it names the
+        # thing that is actually wrong instead of the layer that is blocked on it.
+        if failure:
+            message = failure
+        elif detail:
             message = detail
     return {
         "profile": profile,
         "name": claim.get("metadata", {}).get("name"),
         "ready": ready,
-        "phase": "ready" if ready else "installing",
+        # "failing" rather than "failed": Kubernetes keeps restarting the
+        # workload, so this can still recover on its own once the cause is
+        # fixed. It says "something is wrong, look at it" without claiming the
+        # install has been abandoned.
+        "phase": "ready" if ready else ("failing" if failure else "installing"),
         "message": message,
         # Kept separately so a later merge can tell an explanation apart from a
         # placeholder — see list_installed in api/routes/tenant_apps.py.
         "detail": detail,
+        "failure": failure,
         "conditions": claim.get("status", {}).get("conditions") or [],
     }
 
@@ -158,11 +246,22 @@ def merge_lifecycle_status(
     its message across wholesale is what made _blocking_detail invisible: the
     reason was computed correctly and then overwritten one layer up.
 
+    The same applies to a broken workload: the lifecycle service reports it as
+    plainly "not ready", so re-apply the failure this module found underneath —
+    otherwise the overlay silently downgrades a crash-looping app back to
+    "installing", which is the exact spinner-forever bug this guards against.
+
     Mutates and returns `entry`.
     """
+    failure = entry.get("failure")
     entry.update(claim_status_from_result(lifecycle_app))
-    if not entry.get("ready") and entry.get("detail"):
-        entry["message"] = entry["detail"]
+    if not entry.get("ready"):
+        if failure:
+            entry["failure"] = failure
+            entry["phase"] = "failing"
+            entry["message"] = failure
+        elif entry.get("detail"):
+            entry["message"] = entry["detail"]
     return entry
 
 

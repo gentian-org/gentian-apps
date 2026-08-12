@@ -127,3 +127,129 @@ def test_lifecycle_merge_without_a_detail_uses_the_generic_message() -> None:
     entry = _entry_from_claim("odoo-base-ce", _claim(), ExplodingK8s())
     merged = merge_lifecycle_status(entry, {"ready": False, "message": GENERIC})
     assert merged["message"] == GENERIC
+
+
+# --- Broken workloads -------------------------------------------------------
+#
+# A claim that is not Ready looks the same whether provisioning is advancing or
+# the app is crash-looping, so the store used to show "installing" forever for
+# an app that would never start. These cover the signal that tells them apart.
+
+from types import SimpleNamespace  # noqa: E402
+
+
+def _pod(
+    name: str = "mathesar-ce-abc",
+    reason: str | None = None,
+    restarts: int = 0,
+    message: str | None = None,
+    labels: dict[str, str] | None = None,
+    unschedulable: str | None = None,
+) -> Any:
+    waiting = SimpleNamespace(reason=reason, message=message) if reason else None
+    conditions = []
+    if unschedulable:
+        conditions.append(
+            SimpleNamespace(
+                type="PodScheduled",
+                status="False",
+                reason="Unschedulable",
+                message=unschedulable,
+            )
+        )
+    return SimpleNamespace(
+        metadata=SimpleNamespace(name=name, labels=labels or {}),
+        status=SimpleNamespace(
+            container_statuses=[
+                SimpleNamespace(
+                    state=SimpleNamespace(waiting=waiting), restart_count=restarts
+                )
+            ],
+            conditions=conditions,
+        ),
+    )
+
+
+class PodK8s(FakeK8s):
+    def __init__(self, pods: list[Any]) -> None:
+        super().__init__(synced_message=None)
+        self._pods = pods
+
+    def get_composed(self, *a: Any, **k: Any) -> dict[str, Any]:
+        return {"status": {"conditions": []}}
+
+    def list_pods(self, namespace: str, label_selector: str) -> list[Any]:
+        assert label_selector == "gentianos.io/app=mathesar-ce"
+        return self._pods
+
+
+def _ns_claim() -> dict[str, Any]:
+    claim = _claim()
+    claim["metadata"]["namespace"] = "tenant-demo"
+    return claim
+
+
+def test_crash_looping_workload_is_reported_as_failing() -> None:
+    k8s = PodK8s([_pod(reason="CrashLoopBackOff", restarts=6)])
+    entry = _entry_from_claim("mathesar-ce", _ns_claim(), k8s)
+    assert entry["phase"] == "failing"
+    assert "CrashLoopBackOff" in entry["message"]
+    assert "6 restarts" in entry["message"]
+
+
+def test_early_restarts_are_still_just_installing() -> None:
+    """Containers waiting on a dependency restart a few times by design; calling
+    that a failure would cry wolf on every normal install."""
+    k8s = PodK8s([_pod(reason="CrashLoopBackOff", restarts=1)])
+    entry = _entry_from_claim("mathesar-ce", _ns_claim(), k8s)
+    assert entry["phase"] == "installing"
+    assert entry["failure"] is None
+
+
+def test_image_pull_failure_is_reported_immediately() -> None:
+    k8s = PodK8s([_pod(reason="ImagePullBackOff", message="manifest unknown")])
+    entry = _entry_from_claim("mathesar-ce", _ns_claim(), k8s)
+    assert entry["phase"] == "failing"
+    assert "manifest unknown" in entry["message"]
+
+
+def test_unschedulable_pod_is_reported() -> None:
+    k8s = PodK8s([_pod(unschedulable="0/1 nodes are available: insufficient cpu")])
+    entry = _entry_from_claim("mathesar-ce", _ns_claim(), k8s)
+    assert entry["phase"] == "failing"
+    assert "insufficient cpu" in entry["message"]
+
+
+def test_platform_helper_pods_do_not_count_as_app_failure() -> None:
+    """A post-install Job exits non-zero until its app is reachable — that is
+    its documented retry contract, not a broken app."""
+    k8s = PodK8s(
+        [
+            _pod(
+                name="mathesar-ce-post-install",
+                reason="CrashLoopBackOff",
+                restarts=9,
+                labels={"gentianos.io/component": "post-install"},
+            )
+        ]
+    )
+    entry = _entry_from_claim("mathesar-ce", _ns_claim(), k8s)
+    assert entry["phase"] == "installing"
+
+
+def test_lifecycle_merge_does_not_downgrade_a_failing_app() -> None:
+    """The overlay reports only "not ready", so without re-applying the failure
+    a crash-looping app silently reads as normal progress again."""
+    k8s = PodK8s([_pod(reason="CrashLoopBackOff", restarts=6)])
+    entry = _entry_from_claim("mathesar-ce", _ns_claim(), k8s)
+    merged = merge_lifecycle_status(entry, {"ready": False, "message": GENERIC})
+    assert merged["phase"] == "failing"
+    assert "CrashLoopBackOff" in merged["message"]
+
+
+def test_recovered_app_stops_being_failing() -> None:
+    k8s = PodK8s([_pod(reason="CrashLoopBackOff", restarts=6)])
+    entry = _entry_from_claim("mathesar-ce", _ns_claim(), k8s)
+    merged = merge_lifecycle_status(entry, {"ready": True, "message": "Ready"})
+    assert merged["phase"] == "ready"
+    assert merged["ready"] is True
