@@ -19,6 +19,7 @@ data:
     const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
     const BRIDGE_SECRET = process.env.BRIDGE_SECRET;
+    const WORKSPACE_NAME = process.env.WORKSPACE_NAME || 'Docmost';
     const PORT = Number(process.env.PORT || 8090);
 
     function stablePassword(email) {
@@ -50,10 +51,11 @@ data:
     }
 
     async function ensureWorkspaceSetUp() {
-      // Idempotent: SetupGuard 403s once a workspace already exists, so a
-      // 403 here just means "someone else already did this" — not a
-      // failure. Called lazily, only when the admin login below fails,
-      // rather than as a separate bootstrap step.
+      // Idempotent: SetupGuard (apps/server/src/core/auth/guards/setup.guard.ts)
+      // 403s once a workspace exists, so a 403 here means "already done", not
+      // a failure. Run at startup (see bootstrap() below) so a human never
+      // meets Docmost's "Create Workspace" wizard — every value it asks for is
+      // already known to us.
       const r = await fetch(`${DOCMOST_URL}/api/auth/setup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -61,12 +63,43 @@ data:
           name: 'Gentian Bridge Admin',
           email: ADMIN_EMAIL,
           password: ADMIN_PASSWORD,
-          workspaceName: 'Docmost',
+          workspaceName: WORKSPACE_NAME,
         }),
       });
-      if (!r.ok && r.status !== 403) {
-        throw new Error(`workspace setup failed: ${r.status}`);
+      if (r.ok) {
+        console.log(`workspace "${WORKSPACE_NAME}" created`);
+        return;
       }
+      if (r.status === 403) return;
+      throw new Error(`workspace setup failed: ${r.status}`);
+    }
+
+    // Create the workspace as soon as Docmost is reachable, rather than
+    // waiting for the first SSO login to trigger it. Docmost runs its
+    // migrations on boot, so /api/auth/setup 500s for a few seconds after the
+    // port opens -- hence retry rather than a single attempt. Runs in the
+    // background: /ensure-session is served throughout, and it re-checks on
+    // every pod restart, which is harmless because the call is idempotent.
+    async function bootstrap() {
+      const started = Date.now();
+      const deadlineMs = 10 * 60 * 1000;
+      let attempt = 0;
+      while (Date.now() - started < deadlineMs) {
+        attempt += 1;
+        try {
+          await ensureWorkspaceSetUp();
+          console.log('workspace bootstrap complete');
+          return;
+        } catch (err) {
+          // Expected while Docmost is still starting: connection refused
+          // before it listens, 500 while migrations run.
+          if (attempt === 1 || attempt % 10 === 0) {
+            console.log(`waiting for Docmost to accept setup (attempt ${attempt}): ${err.message}`);
+          }
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+      }
+      console.error('workspace bootstrap gave up; first SSO login will retry');
     }
 
     async function adminLogin() {
@@ -170,5 +203,7 @@ data:
 
     server.listen(PORT, () => {
       console.log(`docmost bridge listening on :${PORT}`);
+      // Not awaited: serving /ensure-session must not wait on Docmost booting.
+      bootstrap().catch((err) => console.error('bootstrap error:', err));
     });
 {{- end }}

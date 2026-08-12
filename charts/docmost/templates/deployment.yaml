@@ -186,6 +186,8 @@ spec:
               value: {{ .Values.adminUser.password | quote }}
             - name: BRIDGE_SECRET
               value: {{ .Values.bridge.secret | quote }}
+            - name: WORKSPACE_NAME
+              value: {{ .Values.adminUser.workspaceName | quote }}
           volumeMounts:
             - name: bridge-script
               mountPath: /app
