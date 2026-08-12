@@ -26,17 +26,43 @@ database:
   user: ""
   password: ""
 
-cache:
-  host: ""
+# Dedicated in-pod Redis, NOT the shared kernel Redis.
+#
+# Docmost cannot use the kernel's per-app Redis ACL user: parseRedisUrl
+# (apps/server/src/common/helpers/utils.ts) destructures only
+# {hostname, port, password, ...} and drops the username entirely, so it always
+# sends a bare AUTH <password>, authenticates as `default`, and dies with
+# WRONGPASS. There is no REDIS_USERNAME env var and no config option anywhere in
+# the codebase -- every consumer (BullMQ queues, ws adapter, throttler) goes
+# through that same parser. Upstream ships a dedicated Redis per install in its
+# own docker-compose, which is the assumption the code is written against, so
+# this matches how Docmost is actually built and tested.
+#
+# REDIS_URL is a hard boot requirement (environment.validation.ts -- the only
+# connection var without @IsOptional), so it cannot simply be omitted.
+#
+# Bound to 127.0.0.1 inside the pod's network namespace: unreachable from any
+# other pod even in the same namespace, so it needs no password, no Service and
+# no NetworkPolicy rule. Data is entirely ephemeral (job queues, sessions,
+# cache) -- no PVC, nothing to back up.
+redis:
+  enabled: true
   port: 6379
-  # The kernel provisions a per-app Redis ACL user, so AUTH must send a
-  # username as well as a password -- a bare "AUTH <password>" authenticates
-  # as `default` and fails with WRONGPASS. Set from the profile's extraValues
-  # as ${TENANT_ID}-${APP_ID}, which is the kernel's
-  # redisACLUsername(tenant, app) (gentian-os cache_reconciler.go). Not a
-  # secret, so it does not come through valueMapping.
-  username: ""
-  password: ""
+  image:
+    repository: docker.io/library/redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  # BullMQ stores job state here, so eviction would silently drop queued jobs.
+  # noeviction makes memory pressure a visible error instead.
+  maxmemory: "128mb"
+  maxmemoryPolicy: noeviction
+  resources:
+    requests:
+      cpu: "10m"
+      memory: "32Mi"
+    limits:
+      cpu: "250m"
+      memory: "192Mi"
 
 s3:
   accessKeyId: ""
