@@ -55,6 +55,10 @@ spec:
               value: {{ .Values.sso.kernelDomain | quote }}
             - name: SSO_ISSUER
               value: {{ .Values.sso.issuer | quote }}
+            {{- if .Values.sso.acsPath }}
+            - name: SSO_ACS_PATH
+              value: {{ .Values.sso.acsPath | quote }}
+            {{- end }}
             - name: APP_HANDLER_SCRIPT
               value: "/usr/src/app/custom/handler.js"
             {{- if .Values.extraEnvVars }}
