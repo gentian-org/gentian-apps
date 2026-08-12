@@ -88,6 +88,15 @@ spec:
             {{- end }}
             - name: DISABLE_TELEMETRY
               value: {{ .Values.telemetry.disabled | quote }}
+            # Suppresses Docmost's own X-Frame-Options: SAMEORIGIN so the
+            # operator's edge frame-ancestors policy is the only one in play —
+            # see values.yaml "iframe" for why origins stay empty.
+            - name: IFRAME_EMBED_ALLOWED
+              value: {{ .Values.iframe.embedAllowed | quote }}
+            {{- if .Values.iframe.allowedOrigins }}
+            - name: IFRAME_ALLOWED_ORIGINS
+              value: {{ .Values.iframe.allowedOrigins | quote }}
+            {{- end }}
           volumeMounts:
             - name: data
               mountPath: /app/data
