@@ -20,6 +20,7 @@ data:
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
     const BRIDGE_SECRET = process.env.BRIDGE_SECRET;
     const WORKSPACE_NAME = process.env.WORKSPACE_NAME || 'Docmost';
+    const TENANT_SPACE_NAME = process.env.TENANT_SPACE_NAME || WORKSPACE_NAME;
     const PORT = Number(process.env.PORT || 8090);
 
     function stablePassword(email) {
@@ -110,6 +111,13 @@ data:
         attempt += 1;
         try {
           await ensureWorkspaceSetUp();
+          // Space setup must never hold up logins: a failure here is logged
+          // and retried on the next restart, not raised.
+          try {
+            await ensureTenantSpace(await adminLogin());
+          } catch (err) {
+            console.error(`tenant space setup failed (login still works): ${err.message}`);
+          }
           console.log('workspace bootstrap complete');
           return;
         } catch (err) {
@@ -134,6 +142,123 @@ data:
         throw new Error('bridge admin login failed even after workspace setup');
       }
       return cookie;
+    }
+
+    // ── Spaces ──────────────────────────────────────────────────────────
+    // Two spaces are expected on a fresh install: one shared, named after the
+    // tenant, and one personal, named after each user. Docmost's own setup
+    // only creates "General", and createSpace makes the *creator* the sole
+    // member -- so a space the bridge admin creates is invisible to everyone
+    // else until it is shared explicitly.
+
+    function slugify(input, fallback) {
+      const slug = String(input || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 100);
+      // Docmost requires ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ and at least 2 chars.
+      return slug.length >= 2 ? slug : fallback;
+    }
+
+    async function findSpaceBySlug(cookie, slug) {
+      const res = await fetch(`${DOCMOST_URL}/api/spaces`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookiePair(cookie) },
+        body: JSON.stringify({ limit: 100 }),
+      });
+      if (!res.ok) return null;
+      const body = await readJson(res);
+      return ((body && body.items) || []).find((s) => s.slug === slug) || null;
+    }
+
+    async function createSpace(cookie, name, slug) {
+      const res = await fetch(`${DOCMOST_URL}/api/spaces/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookiePair(cookie) },
+        body: JSON.stringify({ name, slug }),
+      });
+      if (!res.ok) {
+        throw new Error(`create space "${slug}" failed: ${res.status}`);
+      }
+      return readJson(res);
+    }
+
+    async function defaultGroupId(adminCookie) {
+      const res = await fetch(`${DOCMOST_URL}/api/groups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookiePair(adminCookie) },
+        body: JSON.stringify({ limit: 100 }),
+      });
+      if (!res.ok) return null;
+      const body = await readJson(res);
+      const group = ((body && body.items) || []).find((g) => g.isDefault);
+      return group ? group.id : null;
+    }
+
+    // Shared, tenant-named space. Granted to the default group ("Everyone")
+    // rather than to each user in turn: Docmost adds every member to that
+    // group on invite acceptance, so one grant covers everyone who will ever
+    // log in, including users provisioned long after this runs.
+    async function ensureTenantSpace(adminCookie) {
+      const slug = slugify(TENANT_SPACE_NAME, 'tenant');
+      const existing = await findSpaceBySlug(adminCookie, slug);
+      if (existing) return existing;
+
+      const space = await createSpace(adminCookie, TENANT_SPACE_NAME, slug);
+      const groupId = await defaultGroupId(adminCookie);
+      if (groupId && space && space.id) {
+        const res = await fetch(`${DOCMOST_URL}/api/spaces/members/add`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookiePair(adminCookie) },
+          // Both arrays are required by AddSpaceMembersDto, so userIds is sent
+          // empty rather than omitted.
+          body: JSON.stringify({ spaceId: space.id, role: 'writer', userIds: [], groupIds: [groupId] }),
+        });
+        if (!res.ok) {
+          console.error(`could not share "${slug}" with the default group: ${res.status}`);
+        }
+      }
+      console.log(`tenant space "${TENANT_SPACE_NAME}" created`);
+      return space;
+    }
+
+    async function currentUserId(cookie) {
+      const res = await fetch(`${DOCMOST_URL}/api/users/me`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookiePair(cookie) },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) return null;
+      const body = await readJson(res);
+      const user = (body && body.user) || body;
+      return (user && user.id) || null;
+    }
+
+    // Personal space, named after the user. Created by the admin rather than
+    // by the user themselves: creating a space needs the workspace-level
+    // Manage Space ability, which invited members do not have, so doing this
+    // with the user's own session fails with 403. The user is then added as
+    // space admin, which is what makes it actually theirs.
+    async function ensureUserSpace(adminCookie, userCookie, email, displayName) {
+      const slug = slugify(email.split('@')[0], 'personal');
+      const existing = await findSpaceBySlug(adminCookie, slug);
+      if (existing) return existing;
+
+      const space = await createSpace(adminCookie, displayName, slug);
+      const userId = await currentUserId(userCookie);
+      if (userId && space && space.id) {
+        const res = await fetch(`${DOCMOST_URL}/api/spaces/members/add`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookiePair(adminCookie) },
+          body: JSON.stringify({ spaceId: space.id, role: 'admin', userIds: [userId], groupIds: [] }),
+        });
+        if (!res.ok) {
+          console.error(`could not give ${email} access to "${slug}": ${res.status}`);
+        }
+      }
+      console.log(`personal space "${displayName}" created`);
+      return space;
     }
 
     async function provisionAndLogin(email, name, password) {
@@ -185,6 +310,16 @@ data:
       if (!cookie) {
         throw new Error('invites/accept did not return a session cookie');
       }
+
+      // Same rule as above: a space that could not be created must not cost
+      // the user their login. Runs only here, so it is once per user, on the
+      // first SSO login that provisions them.
+      try {
+        await ensureUserSpace(await adminLogin(), cookie, email, name);
+      } catch (err) {
+        console.error(`personal space setup failed for ${email} (login still works): ${err.message}`);
+      }
+
       return cookie;
     }
 

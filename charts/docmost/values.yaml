@@ -104,6 +104,12 @@ adminUser:
   # name reads better than the product name.
   workspaceName: "Docmost"
 
+# Shared space created at first start and granted to the default "Everyone"
+# group, so every user sees it. Set from the profile to the tenant, since
+# naming it after the tenant is the point; falls back to the workspace name.
+tenantSpace:
+  name: ""
+
 # HMAC key the bridge derives each user's stable, never-displayed local
 # Docmost password from. Same "must stay pinned" rationale as appSecret.
 bridge:
