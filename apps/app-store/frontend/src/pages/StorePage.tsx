@@ -86,6 +86,13 @@ type Notice = {
 };
 
 const STATUS_POLL_MS = 4000;
+// Slow heartbeat once everything has settled: still enough to notice an app
+// that breaks after install, without polling every 4s forever.
+const IDLE_POLL_MS = 20000;
+// How far behind the last successful sync may fall before the view admits it
+// may be out of date. Comfortably above IDLE_POLL_MS so an ordinary tick that
+// lands late never trips it.
+const STALE_AFTER_MS = 60000;
 
 function isProApp(app: CatalogueApp): boolean {
   return app.tier === "pro" || app.requiresEntitlement === true;
@@ -355,18 +362,28 @@ export function StorePage() {
   const [addonTarget, setAddonTarget] = useState<string | null>(null);
   const [optimisticInstalling, setOptimisticInstalling] = useState<Record<string, string>>({});
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // What the *view* knows about its own freshness. Without this a poll that
+  // stops working — an expired token, a hung request, a throttled background
+  // tab — leaves the last successful snapshot on screen indefinitely, and a
+  // stale screen that looks live is worse than a visibly stale one.
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const inFlightRef = useRef(false);
 
   const refresh = useCallback(async () => {
+    // A hung request must not let later ticks pile up behind it; each would
+    // hold its own connection and none would ever report anything.
+    if (inFlightRef.current) return [] as InstalledApp[];
+    inFlightRef.current = true;
     let nextInstalled: InstalledApp[] = [];
+    let failure: string | null = null;
 
     const cataloguePromise = apiFetch<CatalogueResponse>("/catalogue/")
       .then((cat) => {
         setCatalogue(cat);
       })
       .catch((e: Error) => {
-        if (e.message !== "Redirecting to sign in…") {
-          setNotice({ kind: "error", text: `Catalogue: ${e.message}` });
-        }
+        failure = `Catalogue: ${e.message}`;
       });
 
     const installedPromise = apiFetch<InstalledResponse>("/tenant/apps/installed")
@@ -375,12 +392,25 @@ export function StorePage() {
         nextInstalled = inst.apps;
       })
       .catch((e: Error) => {
-        if (e.message !== "Redirecting to sign in…") {
-          setNotice({ kind: "error", text: `App status: ${e.message}` });
-        }
+        failure = `App status: ${e.message}`;
       });
 
-    await Promise.all([cataloguePromise, installedPromise]);
+    try {
+      await Promise.all([cataloguePromise, installedPromise]);
+    } finally {
+      inFlightRef.current = false;
+    }
+
+    if (failure) {
+      // Recorded rather than raised as a notice: a blocking red banner on every
+      // failed background tick would bury whatever the user is actually doing,
+      // and these recover on their own most of the time. The freshness
+      // indicator carries it instead.
+      setSyncError(failure);
+    } else {
+      setSyncError(null);
+      setLastSyncAt(Date.now());
+    }
     return nextInstalled;
   }, []);
 
@@ -457,25 +487,61 @@ export function StorePage() {
 
   const catalogueApps = catalogue?.apps ?? [];
 
+  // Stale means "the screen may not match reality": either the last attempt
+  // failed, or no attempt has succeeded recently enough. A first load that has
+  // not returned yet is not stale — it is simply still loading.
+  const sinceSync = lastSyncAt === null ? null : Date.now() - lastSyncAt;
+  const isStale =
+    lastSyncAt === null ? syncError !== null : sinceSync !== null && sinceSync > STALE_AFTER_MS;
+  const freshnessLabel =
+    sinceSync === null
+      ? "Loading status…"
+      : sinceSync < 10000
+        ? "Status up to date"
+        : `Status updated ${Math.round(sinceSync / 1000)}s ago`;
+
+  // Poll continuously, fast while something is in flight and slowly otherwise.
+  // Stopping once everything was ready meant an app that broke *after* install
+  // was never noticed: the store would keep showing "Ready" for a workload that
+  // had been crash-looping for hours, which is the same lie in the opposite
+  // direction as the endless "Installing".
   useEffect(() => {
-    if (!hasInstalling) {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-      return;
-    }
-    if (pollRef.current) return;
-    pollRef.current = setInterval(() => {
+    const period = hasInstalling ? STATUS_POLL_MS : IDLE_POLL_MS;
+    const id = setInterval(() => {
       refresh().catch(() => undefined);
-    }, STATUS_POLL_MS);
+    }, period);
+    pollRef.current = id;
     return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
+      clearInterval(id);
+      if (pollRef.current === id) pollRef.current = null;
     };
   }, [hasInstalling, refresh]);
+
+  // Timers in a hidden or backgrounded tab are throttled hard by browsers — and
+  // the store usually runs inside a portal iframe, so it is hidden whenever the
+  // user looks at another app. Re-syncing the moment it becomes visible is what
+  // makes the view match reality without a manual reload.
+  useEffect(() => {
+    const resync = () => {
+      if (document.visibilityState === "visible") {
+        refresh().catch(() => undefined);
+      }
+    };
+    document.addEventListener("visibilitychange", resync);
+    window.addEventListener("focus", resync);
+    return () => {
+      document.removeEventListener("visibilitychange", resync);
+      window.removeEventListener("focus", resync);
+    };
+  }, [refresh]);
+
+  // Re-render on a timer so "updated Ns ago" ages visibly instead of freezing
+  // at whatever it said when the last fetch happened to land.
+  const [, setNow] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setNow((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   async function install(profile: string, provision: boolean = false) {
     setBusy(profile);
@@ -649,6 +715,33 @@ export function StorePage() {
       {notice && (
         <div className={`mb-6 rounded-lg border px-4 py-3 ${noticeStyles}`}>{notice.text}</div>
       )}
+
+      {/* Freshness of the view itself, kept separate from any app's state: if
+          this stops updating, everything above it is a snapshot of the past. */}
+      <div className="mb-4 flex items-center gap-2 text-xs">
+        {isStale ? (
+          <>
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 inline-block" />
+            <span className="text-amber-700">
+              {syncError
+                ? `Status may be out of date — ${syncError}`
+                : "Status may be out of date — reconnecting…"}
+            </span>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="rounded border border-amber-300 px-2 py-0.5 font-medium text-amber-800 hover:bg-amber-50"
+            >
+              Retry now
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+            <span className="text-slate-400">{freshnessLabel}</span>
+          </>
+        )}
+      </div>
 
       {installingApps.length > 0 && (
         <section className="mb-10">
