@@ -197,7 +197,7 @@ spec:
   chart:
     repository: "oci://ghcr.io/gentian-org/charts"
     name: docmost
-    version: "0.1.0"
+    version: "0.1.1"
 
   deploymentMethod: crossplane
 
@@ -236,12 +236,20 @@ spec:
 
     fullnameOverride: "docmost-ce"
 
-    # database.* and cache.* (host/port/name/user/password) are deliberately
-    # absent here — all five fields of each come from valueMapping above
-    # (the per-tenant Postgres/Redis instance the operator provisions), not a
-    # static placeholder. Setting them here too would race the composition's
-    # own injection at the same values paths — see docs/app-profile-guide.md
-    # §3 and §12 checklist ("All five database fields mapped").
+    # database.* and cache.{host,port,password} are deliberately absent here —
+    # they come from valueMapping above (the per-tenant Postgres/Redis the
+    # operator provisions), not a static placeholder. Setting them here too
+    # would race the composition's own injection at the same values paths —
+    # see docs/app-profile-guide.md §3 and §12 checklist.
+    cache:
+      # The one cache field that is NOT a secret and NOT operator-injected.
+      # The kernel provisions a per-app Redis ACL user, so Docmost must AUTH
+      # with a username too; without it ioredis sends a bare AUTH <password>,
+      # authenticates as `default`, and dies with WRONGPASS. Must equal the
+      # kernel's redisACLUsername(tenant, app) = "<tenant>-<app>";
+      # ${APP_ID} is the claim name, so this survives profile renames.
+      # Same fix as activepieces-me — see its redis.username.
+      username: ${TENANT_ID}-${APP_ID}
 
     s3:
       accessKeyId: "${TENANT_ID}-docmost"
