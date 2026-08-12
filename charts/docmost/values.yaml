@@ -125,6 +125,23 @@ bridge:
 telemetry:
   disabled: true
 
+# Docmost defaults IFRAME_EMBED_ALLOWED to false, which makes it send
+# X-Frame-Options: SAMEORIGIN on its own responses (see its
+# common/helpers/security-headers.ts resolveFrameHeader). That header is
+# incompatible with running inside the portal's WinBox iframe, and relying on
+# the tenant gateway to strip it on every route is fragile.
+#
+# Setting this true with NO allowed origins is deliberate: resolveFrameHeader
+# returns null in that case, so Docmost emits neither X-Frame-Options nor its
+# own Content-Security-Policy, and the operator's single edge
+# `frame-ancestors` policy stays authoritative. Listing origins here instead
+# would make Docmost emit a second CSP header, and the browser enforces the
+# intersection of both -- the double-CSP failure in
+# docs/app-profile-guide.md §6b.
+iframe:
+  embedAllowed: true
+  allowedOrigins: ""
+
 resources:
   requests:
     cpu: "150m"
