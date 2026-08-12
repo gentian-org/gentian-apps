@@ -188,15 +188,24 @@ spec:
         # touches a Docmost secret itself, sidestepping the envFrom
         # C_IDENTIFIER problem entirely rather than working around it.
         - name: bridge
-          image: "{{ .Values.bridge.image.repository }}:{{ .Values.bridge.image.tag }}"
+          # Runs the *app* image rather than a bare node image: the credential
+          # re-sync in bridge.js needs bcrypt and postgres, and Docmost already
+          # ships both. Reusing the image also means no second pull. The script
+          # is mounted at /bridge, not /app, because /app is the application
+          # itself and mounting over it would hide those very modules --
+          # NODE_PATH is what lets a script outside /app still resolve them.
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.bridge.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-          command: ["node", "/app/bridge.js"]
+          command: ["node", "/bridge/bridge.js"]
           ports:
             - name: bridge
               containerPort: {{ .Values.bridge.port }}
           env:
+            # Lets a script outside /app resolve the app image's node_modules.
+            - name: NODE_PATH
+              value: "/app/node_modules"
             - name: PORT
               value: {{ .Values.bridge.port | quote }}
             - name: DOCMOST_URL
@@ -211,9 +220,14 @@ spec:
               value: {{ .Values.adminUser.workspaceName | quote }}
             - name: TENANT_SPACE_NAME
               value: {{ .Values.tenantSpace.name | default .Values.adminUser.workspaceName | quote }}
+            # Same connection string the app uses; only ever read to re-sync
+            # the bridge's own admin credential — see bridge.js.
+            - name: DATABASE_URL
+              value: >-
+                postgresql://{{ .Values.database.user }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}
           volumeMounts:
             - name: bridge-script
-              mountPath: /app
+              mountPath: /bridge
               readOnly: true
           resources:
             {{- toYaml .Values.bridge.resources | nindent 12 }}

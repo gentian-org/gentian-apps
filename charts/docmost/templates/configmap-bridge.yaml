@@ -22,6 +22,7 @@ data:
     const WORKSPACE_NAME = process.env.WORKSPACE_NAME || 'Docmost';
     const TENANT_SPACE_NAME = process.env.TENANT_SPACE_NAME || WORKSPACE_NAME;
     const PORT = Number(process.env.PORT || 8090);
+    const DATABASE_URL = process.env.DATABASE_URL;
 
     function stablePassword(email) {
       // Deterministic per-user password derived from BRIDGE_SECRET. Nobody
@@ -132,14 +133,53 @@ data:
       console.error('workspace bootstrap gave up; first SSO login will retry');
     }
 
+    // Recover from admin-credential drift.
+    //
+    // appSecrets are derived per install -- the seed includes the composite's
+    // generated name -- while the app's database survives an uninstall. A
+    // reinstall therefore mints new credentials for an account whose stored
+    // hash still belongs to the previous install, and the bridge can no longer
+    // authenticate as itself. The ExternalSecret also caches the old value for
+    // up to an hour, so this surfaces well after the reinstall that caused it
+    // and looks like a spontaneous failure. Confirmed by testing the stored
+    // hash against each install's derived seed: it matched the *previous*
+    // install's, not the current one.
+    //
+    // Rather than leave the app permanently unable to authenticate itself,
+    // the bridge re-syncs the stored hash for its own machine-only admin
+    // account. Scope is deliberately narrow: a single row, matched by
+    // ADMIN_EMAIL, only ever reached after a normal login has already failed.
+    // Cost 12 matches what Docmost itself uses, so the row stays consistent
+    // with one the app wrote.
+    async function resyncAdminCredential() {
+      if (!DATABASE_URL) return false;
+      const bcrypt = require('bcrypt');
+      const postgres = require('postgres');
+      const sql = postgres(DATABASE_URL);
+      try {
+        const hashed = await bcrypt.hash(ADMIN_PASSWORD, 12);
+        const rows = await sql`update users set password = ${hashed}, updated_at = now() where email = ${ADMIN_EMAIL} returning id`;
+        if (rows.length > 0) {
+          console.log('re-synced bridge admin credential (stored hash had drifted from the current secret)');
+          return true;
+        }
+        return false;
+      } finally {
+        await sql.end({ timeout: 5 });
+      }
+    }
+
     async function adminLogin() {
       let cookie = await docmostLogin(ADMIN_EMAIL, ADMIN_PASSWORD);
       if (!cookie) {
         await ensureWorkspaceSetUp();
         cookie = await docmostLogin(ADMIN_EMAIL, ADMIN_PASSWORD);
       }
+      if (!cookie && (await resyncAdminCredential())) {
+        cookie = await docmostLogin(ADMIN_EMAIL, ADMIN_PASSWORD);
+      }
       if (!cookie) {
-        throw new Error('bridge admin login failed even after workspace setup');
+        throw new Error('bridge admin login failed even after workspace setup and credential re-sync');
       }
       return cookie;
     }
