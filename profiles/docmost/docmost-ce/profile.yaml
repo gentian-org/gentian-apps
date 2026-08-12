@@ -85,8 +85,9 @@
 #   Kernel-provided:
 #     pg_*        → database.host/port/name/user/password (valueMapping)
 #     s3_secret_key → s3.secretAccessKey (valueMapping)
-#     redis_password → cache.password (valueMapping)
 #     smtp_password  → smtp.password (valueMapping)
+#   (no Redis credentials: Docmost runs its own pod-local Redis with no auth —
+#    see kernelRequirements below and charts/docmost/values.yaml "redis")
 #   App-internal (3) → appSecrets, all three delivered as literal Helm
 #   values (same mechanism as OpenProject's admin_password / Mathesar's
 #   SECRET_KEY) and consumed only by charts/docmost's own "bridge" container
@@ -165,8 +166,12 @@ spec:
     storage:
       s3:
         bucketPerTenant: true
-    cache:
-      engine: redis
+    # No cache: requirement — Docmost runs its own dedicated in-pod Redis
+    # (charts/docmost, values.yaml "redis"). It cannot use the shared kernel
+    # Redis because parseRedisUrl drops the username and so can never
+    # authenticate as the per-app ACL user the kernel provisions; see the
+    # chart comment for the full reasoning. Requesting a cache here would
+    # provision an ACL user that nothing can ever use.
     mail:
       smtp:
         auth: plain
@@ -197,7 +202,7 @@ spec:
   chart:
     repository: "oci://ghcr.io/gentian-org/charts"
     name: docmost
-    version: "0.1.1"
+    version: "0.2.0"
 
   deploymentMethod: crossplane
 
@@ -210,10 +215,6 @@ spec:
       passwordKey: "database.password"
     s3:
       secretKeyKey: "s3.secretAccessKey"
-    cache:
-      hostKey: "cache.host"
-      portKey: "cache.port"
-      passwordKey: "cache.password"
     smtp:
       passwordKey: "smtp.password"
 
@@ -236,20 +237,12 @@ spec:
 
     fullnameOverride: "docmost-ce"
 
-    # database.* and cache.{host,port,password} are deliberately absent here —
-    # they come from valueMapping above (the per-tenant Postgres/Redis the
-    # operator provisions), not a static placeholder. Setting them here too
-    # would race the composition's own injection at the same values paths —
-    # see docs/app-profile-guide.md §3 and §12 checklist.
-    cache:
-      # The one cache field that is NOT a secret and NOT operator-injected.
-      # The kernel provisions a per-app Redis ACL user, so Docmost must AUTH
-      # with a username too; without it ioredis sends a bare AUTH <password>,
-      # authenticates as `default`, and dies with WRONGPASS. Must equal the
-      # kernel's redisACLUsername(tenant, app) = "<tenant>-<app>";
-      # ${APP_ID} is the claim name, so this survives profile renames.
-      # Same fix as activepieces-me — see its redis.username.
-      username: ${TENANT_ID}-${APP_ID}
+    # database.* is deliberately absent here — all five fields come from
+    # valueMapping above (the per-tenant Postgres the operator provisions),
+    # not a static placeholder. Setting them here too would race the
+    # composition's own injection at the same values paths — see
+    # docs/app-profile-guide.md §3 and §12 checklist. Redis needs nothing at
+    # all: it is pod-local on 127.0.0.1 with no credentials (see the chart).
 
     s3:
       accessKeyId: "${TENANT_ID}-docmost"

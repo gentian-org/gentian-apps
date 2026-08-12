@@ -50,12 +50,12 @@ spec:
             - name: DATABASE_URL
               value: >-
                 postgresql://{{ .Values.database.user }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}
-            # Username is required: the kernel provisions a per-app Redis ACL
-            # user, and omitting it makes ioredis send a bare AUTH <password>,
-            # which authenticates as `default` and fails with WRONGPASS.
+            # Pod-local Redis (see values.yaml "redis"): no credentials, since
+            # 127.0.0.1 is reachable only by containers in this pod. Docmost
+            # drops the username from any URL it parses, so it could not
+            # authenticate to the shared kernel Redis's per-app ACL user.
             - name: REDIS_URL
-              value: >-
-                redis://{{ .Values.cache.username }}:{{ .Values.cache.password }}@{{ .Values.cache.host }}:{{ .Values.cache.port }}
+              value: "redis://127.0.0.1:{{ .Values.redis.port }}"
             - name: STORAGE_DRIVER
               value: "s3"
             - name: AWS_S3_ACCESS_KEY_ID
@@ -114,6 +114,48 @@ spec:
             failureThreshold: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+        {{- if .Values.redis.enabled }}
+        # Dedicated Redis for this app only — see values.yaml "redis" for why
+        # the shared kernel Redis cannot be used. --bind 127.0.0.1 keeps it
+        # inside the pod's network namespace, so no other pod can reach it and
+        # no password is needed. --save ""/--appendonly no disable persistence
+        # (all state here is ephemeral), which also means nothing is ever
+        # written to disk and the container needs no writable volume beyond
+        # --dir /tmp.
+        - name: redis
+          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
+          imagePullPolicy: {{ .Values.redis.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          command: ["redis-server"]
+          args:
+            - --bind
+            - 127.0.0.1
+            - --port
+            - "{{ .Values.redis.port }}"
+            - --save
+            - ""
+            - --appendonly
+            - "no"
+            - --dir
+            - /tmp
+            - --maxmemory
+            - "{{ .Values.redis.maxmemory }}"
+            - --maxmemory-policy
+            - "{{ .Values.redis.maxmemoryPolicy }}"
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "-h", "127.0.0.1", "-p", "{{ .Values.redis.port }}", "ping"]
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+        {{- end }}
         {{- if .Values.bridge.enabled }}
         # Same-pod companion: holds the SSO bridge's admin credentials and
         # HMAC secret as plain literal env vars (proven-safe delivery — same
