@@ -209,6 +209,8 @@ spec:
               value: {{ .Values.bridge.secret | quote }}
             - name: WORKSPACE_NAME
               value: {{ .Values.adminUser.workspaceName | quote }}
+            - name: TENANT_SPACE_NAME
+              value: {{ .Values.tenantSpace.name | default .Values.adminUser.workspaceName | quote }}
           volumeMounts:
             - name: bridge-script
               mountPath: /app

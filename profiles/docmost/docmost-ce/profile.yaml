@@ -216,7 +216,7 @@ spec:
   chart:
     repository: "oci://ghcr.io/gentian-org/charts"
     name: docmost
-    version: "0.2.5"
+    version: "0.2.6"
 
   deploymentMethod: crossplane
 
@@ -250,6 +250,13 @@ spec:
     appUrl: "https://docs.${TENANT_DOMAIN}"
 
     fullnameOverride: "docmost-ce"
+
+    # Shared space created at first start, named after the tenant and granted
+    # to Docmost's default "Everyone" group so every user sees it. Each user
+    # additionally gets a personal space named after them on first login —
+    # see charts/docmost/templates/configmap-bridge.yaml.
+    tenantSpace:
+      name: "${TENANT_ID}"
 
     # database.* is deliberately absent here — all five fields come from
     # valueMapping above (the per-tenant Postgres the operator provisions),
