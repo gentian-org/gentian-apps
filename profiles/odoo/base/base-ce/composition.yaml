@@ -220,6 +220,11 @@ spec:
             metadata:
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $safeName }}-kv
+                # Identify this resource by its KV path, not by the install that
+                # created it: without an external-name the provider sees no
+                # existing resource and Creates, overwriting a secret the app's
+                # database is still hashed against. Mirrors app-default.
+                crossplane.io/external-name: secret/data/{{ $kvPath }}
               name: {{ $seedName }}-kv
             spec:
               deletionPolicy: Orphan
@@ -672,6 +677,11 @@ spec:
             metadata:
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $sc.name }}-{{ $scSafeName }}-kv
+                # Identify this resource by its KV path, not by the install that
+                # created it: without an external-name the provider sees no
+                # existing resource and Creates, overwriting a secret the app's
+                # database is still hashed against. Mirrors app-default.
+                crossplane.io/external-name: secret/data/{{ $scKvPath }}
               name: {{ $scSeedName }}-kv
             spec:
               deletionPolicy: Orphan
