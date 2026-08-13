@@ -24,7 +24,7 @@ profiles/              # App catalogue bundles (OSS + commercial) — synced by 
   nextcloud/           #   family with addons (L3)
     base/
       base-ce/         #       -> nextcloud-base-ce
-      base-od/         #       -> nextcloud-base-od (openDesk, pro)
+      base-od/         #       -> nextcloud-base-od (openDesk, ee)
     addons/            #       9 addons, enabled per tenant
       calendar-ce/     #       -> nextcloud-calendar-ce
     packages/          #       AppPackage presets: office, suite

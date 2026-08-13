@@ -73,9 +73,9 @@ opposite directions. The plan unifies both as customization-ladder rung L3
 grid into a post-install window plus an Edit button.
 
 It also **settles the edition-vocabulary question** left open below:
-`minimal · standard · full · performant` is replaced by **`ce · me · pro`**. `od` is
-not an edition — openDesk is a *vendor*, so `nextcloud-office-od` is a `pro` edition
-supplied by openDesk. Leaf names are free-form hints; `spec.edition` is
+`minimal · standard · full · performant` is replaced by **`ce · me · ee`**. `od` is
+not an edition — openDesk is a *supplier*, so `nextcloud-office-od` is an `ee`
+edition supplied by openDesk. Leaf names are free-form hints; `spec.edition` is
 authoritative, and nothing may derive the edition from a name.
 
 ## Pro / Solid tiers in the catalogue
