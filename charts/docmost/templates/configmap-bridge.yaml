@@ -308,6 +308,79 @@ data:
       return space;
     }
 
+    // ── Tenant group ────────────────────────────────────────────────────
+    // Docmost ships one group, "Everyone", which it adds every member to
+    // automatically. A group named after the tenant gives somewhere to hang
+    // tenant-scoped membership that is not "literally everyone in this
+    // Docmost", which matters once a workspace holds guests or service
+    // accounts -- the bridge admin is already one of those.
+    async function ensureTenantGroup(adminCookie) {
+      const res = await fetch(`${DOCMOST_URL}/api/groups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookiePair(adminCookie) },
+        body: JSON.stringify({ limit: 100 }),
+      });
+      if (res.ok) {
+        const body = await readJson(res);
+        const found = ((body && body.items) || []).find((g) => g.name === TENANT_SPACE_NAME);
+        if (found) return found;
+      }
+      const created = await fetch(`${DOCMOST_URL}/api/groups/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookiePair(adminCookie) },
+        body: JSON.stringify({
+          name: TENANT_SPACE_NAME,
+          description: `Members of the ${TENANT_SPACE_NAME} tenant.`,
+        }),
+      });
+      if (!created.ok) {
+        throw new Error(`create group "${TENANT_SPACE_NAME}" failed: ${created.status}`);
+      }
+      console.log(`tenant group "${TENANT_SPACE_NAME}" created`);
+      return readJson(created);
+    }
+
+    async function ensureTenantGroupMembership(adminCookie, userId) {
+      const group = await ensureTenantGroup(adminCookie);
+      if (!group || !group.id) return;
+      const res = await fetch(`${DOCMOST_URL}/api/groups/members/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookiePair(adminCookie) },
+        body: JSON.stringify({ groupId: group.id, userIds: [userId] }),
+      });
+      // Re-adding an existing member is not an error worth failing a login
+      // over, and Docmost does not promise a distinct status for it.
+      if (!res.ok) {
+        console.error(`could not add user to group "${TENANT_SPACE_NAME}": ${res.status}`);
+      }
+    }
+
+    // Everything a user should have regardless of *when* they first logged in.
+    //
+    // This used to run inside provisionAndLogin, which only executes for a user
+    // who does not exist yet -- so anyone provisioned before a feature shipped
+    // never received it. That is exactly how the first SSO user ended up with
+    // no personal space: their account predated the space code by a day, and
+    // nothing ever revisited it. Onboarding therefore runs on every login and
+    // each step checks for what it is about to create.
+    //
+    // The in-memory set keeps the hot path cheap: a portal tile opens this on
+    // every click, and without it each open would cost an admin login plus a
+    // space lookup. It is deliberately not persisted -- a pod restart simply
+    // re-verifies once per user, which is the cheap direction to be wrong in.
+    const onboarded = new Set();
+
+    async function onboardUser(userCookie, email, displayName) {
+      if (onboarded.has(email)) return;
+      const adminCookie = await adminLogin();
+      await ensureUserSpace(adminCookie, userCookie, email, displayName);
+      const userId = await currentUserId(userCookie);
+      if (userId) {
+        await ensureTenantGroupMembership(adminCookie, userId);
+      }
+      onboarded.add(email);
+    }
+
     async function provisionAndLogin(email, name, password) {
       const adminCookie = await adminLogin();
       const authHeaders = { 'Content-Type': 'application/json', Cookie: cookiePair(adminCookie) };
@@ -358,15 +431,6 @@ data:
         throw new Error('invites/accept did not return a session cookie');
       }
 
-      // Same rule as above: a space that could not be created must not cost
-      // the user their login. Runs only here, so it is once per user, on the
-      // first SSO login that provisions them.
-      try {
-        await ensureUserSpace(await adminLogin(), cookie, email, name);
-      } catch (err) {
-        console.error(`personal space setup failed for ${email} (login still works): ${err.message}`);
-      }
-
       return cookie;
     }
 
@@ -402,6 +466,14 @@ data:
           }
           if (!cookie) {
             cookie = await provisionAndLogin(email, name, password);
+          }
+
+          // Best-effort, and after the session exists: onboarding that fails
+          // must not cost the user their login.
+          try {
+            await onboardUser(cookie, email, name);
+          } catch (err) {
+            console.error(`onboarding failed for ${email} (login still works): ${err.message}`);
           }
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
