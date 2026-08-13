@@ -133,34 +133,41 @@ data:
       console.error('workspace bootstrap gave up; first SSO login will retry');
     }
 
-    // Recover from admin-credential drift.
+    // Recover from credential drift, for the admin and for ordinary users
+    // alike.
     //
     // appSecrets are derived per install -- the seed includes the composite's
     // generated name -- while the app's database survives an uninstall. A
-    // reinstall therefore mints new credentials for an account whose stored
-    // hash still belongs to the previous install, and the bridge can no longer
-    // authenticate as itself. The ExternalSecret also caches the old value for
-    // up to an hour, so this surfaces well after the reinstall that caused it
-    // and looks like a spontaneous failure. Confirmed by testing the stored
-    // hash against each install's derived seed: it matched the *previous*
-    // install's, not the current one.
+    // reinstall therefore mints new credentials for accounts whose stored
+    // hashes still belong to the previous install. The ExternalSecret also
+    // caches the old values for up to an hour, so this surfaces well after the
+    // reinstall that caused it and looks like a spontaneous failure. Confirmed
+    // by testing stored hashes against each install's derived seed: they
+    // matched the *previous* install's, not the current one.
     //
-    // Rather than leave the app permanently unable to authenticate itself,
-    // the bridge re-syncs the stored hash for its own machine-only admin
-    // account. Scope is deliberately narrow: a single row, matched by
-    // ADMIN_EMAIL, only ever reached after a normal login has already failed.
-    // Cost 12 matches what Docmost itself uses, so the row stays consistent
-    // with one the app wrote.
-    async function resyncAdminCredential() {
+    // Both credentials the bridge owns drift together. admin_password locks the
+    // bridge out of its own admin account; bridge_secret changes the password
+    // derived for every user, and that one cannot be recovered by
+    // re-provisioning: Docmost's invite API deliberately skips addresses that
+    // are already members, so no invitation is ever created and the flow fails
+    // with "no pending invitation found" for a user who plainly exists.
+    //
+    // So the bridge re-syncs the stored hash to the value it now derives.
+    // Scope stays narrow: one row, matched by email, only ever reached after a
+    // normal login has already failed. Cost 12 matches what Docmost itself
+    // uses, so the row stays consistent with one the app wrote. Returns false
+    // when no such user exists, which is how the caller tells "drifted" apart
+    // from "never provisioned".
+    async function resyncCredential(email, plainPassword) {
       if (!DATABASE_URL) return false;
       const bcrypt = require('bcrypt');
       const postgres = require('postgres');
       const sql = postgres(DATABASE_URL);
       try {
-        const hashed = await bcrypt.hash(ADMIN_PASSWORD, 12);
-        const rows = await sql`update users set password = ${hashed}, updated_at = now() where email = ${ADMIN_EMAIL} returning id`;
+        const hashed = await bcrypt.hash(plainPassword, 12);
+        const rows = await sql`update users set password = ${hashed}, updated_at = now() where email = ${email} returning id`;
         if (rows.length > 0) {
-          console.log('re-synced bridge admin credential (stored hash had drifted from the current secret)');
+          console.log(`re-synced credential for ${email} (stored hash had drifted from the current secret)`);
           return true;
         }
         return false;
@@ -175,7 +182,7 @@ data:
         await ensureWorkspaceSetUp();
         cookie = await docmostLogin(ADMIN_EMAIL, ADMIN_PASSWORD);
       }
-      if (!cookie && (await resyncAdminCredential())) {
+      if (!cookie && (await resyncCredential(ADMIN_EMAIL, ADMIN_PASSWORD))) {
         cookie = await docmostLogin(ADMIN_EMAIL, ADMIN_PASSWORD);
       }
       if (!cookie) {
@@ -384,6 +391,15 @@ data:
           const password = stablePassword(email);
 
           let cookie = await docmostLogin(email, password);
+          if (!cookie) {
+            // An existing user whose derived password drifted cannot be fixed
+            // by provisioning: the invite API skips addresses that are already
+            // members. Re-sync first, and only fall through to provisioning
+            // when there is genuinely no such user yet.
+            if (await resyncCredential(email, password)) {
+              cookie = await docmostLogin(email, password);
+            }
+          }
           if (!cookie) {
             cookie = await provisionAndLogin(email, name, password);
           }
