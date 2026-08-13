@@ -98,6 +98,12 @@ appSecret: ""
 adminUser:
   email: "admin@docmost.internal"
   password: ""
+  # Display name for the machine account the bridge authenticates as. Docmost
+  # CE has no service-account concept -- API keys are an Enterprise feature --
+  # so this row shows up in the member list like a person, and the name is the
+  # only thing marking it as machinery. Reconciled on every boot, so changing
+  # it here renames existing installs too.
+  name: "Config Account"
   # Name of the single workspace the bridge creates at startup, so no human
   # ever meets Docmost's "Create Workspace" first-run wizard. Shown in
   # Docmost's own UI chrome; set it per tenant from the profile if a tenant

@@ -19,6 +19,7 @@ data:
     const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
     const BRIDGE_SECRET = process.env.BRIDGE_SECRET;
+    const ADMIN_NAME = process.env.ADMIN_NAME || 'Config Account';
     const WORKSPACE_NAME = process.env.WORKSPACE_NAME || 'Docmost';
     const TENANT_SPACE_NAME = process.env.TENANT_SPACE_NAME || WORKSPACE_NAME;
     const PORT = Number(process.env.PORT || 8090);
@@ -84,7 +85,7 @@ data:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: 'Gentian Bridge Admin',
+          name: ADMIN_NAME,
           email: ADMIN_EMAIL,
           password: ADMIN_PASSWORD,
           workspaceName: WORKSPACE_NAME,
@@ -112,12 +113,14 @@ data:
         attempt += 1;
         try {
           await ensureWorkspaceSetUp();
-          // Space setup must never hold up logins: a failure here is logged
-          // and retried on the next restart, not raised.
+          // Neither of these may hold up logins: a failure is logged and
+          // retried on the next restart, not raised.
           try {
-            await ensureTenantSpace(await adminLogin());
+            const adminCookie = await adminLogin();
+            await ensureAdminDisplayName(adminCookie);
+            await ensureTenantSpace(adminCookie);
           } catch (err) {
-            console.error(`tenant space setup failed (login still works): ${err.message}`);
+            console.error(`workspace setup step failed (login still works): ${err.message}`);
           }
           console.log('workspace bootstrap complete');
           return;
@@ -280,6 +283,36 @@ data:
       const body = await readJson(res);
       const user = (body && body.user) || body;
       return (user && user.id) || null;
+    }
+
+    // The admin's display name is only applied at workspace setup, so changing
+    // it in config would otherwise reach new installs and leave every existing
+    // one showing the old name forever. Reconciling it on boot means the label
+    // is config rather than a one-time decision. It matters because Docmost CE
+    // has no notion of a service account: this row appears in the member list
+    // like a person, so the name is all that distinguishes it from one.
+    async function ensureAdminDisplayName(adminCookie) {
+      const res = await fetch(`${DOCMOST_URL}/api/users/me`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookiePair(adminCookie) },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) return;
+      const body = await readJson(res);
+      const user = (body && body.user) || body;
+      if (!user || user.name === ADMIN_NAME) return;
+
+      // Updates the *authenticated* user, which is the bridge admin itself.
+      const updated = await fetch(`${DOCMOST_URL}/api/users/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookiePair(adminCookie) },
+        body: JSON.stringify({ name: ADMIN_NAME }),
+      });
+      if (updated.ok) {
+        console.log(`renamed the config account from "${user.name}" to "${ADMIN_NAME}"`);
+      } else {
+        console.error(`could not rename the config account: ${updated.status}`);
+      }
     }
 
     // Personal space, named after the user. Created by the admin rather than

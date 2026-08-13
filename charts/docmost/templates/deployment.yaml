@@ -212,6 +212,8 @@ spec:
               value: "http://localhost:{{ .Values.port }}"
             - name: ADMIN_EMAIL
               value: {{ .Values.adminUser.email | quote }}
+            - name: ADMIN_NAME
+              value: {{ .Values.adminUser.name | quote }}
             - name: ADMIN_PASSWORD
               value: {{ .Values.adminUser.password | quote }}
             - name: BRIDGE_SECRET
