@@ -40,6 +40,35 @@ spec:
       smtp:
         auth: plain
         port: 587
+  # How this app is captured and put back. Only the deviations from the default
+  # are here: the default (scale to zero, dump every store above, archive every
+  # release-owned volume) is already correct for the rest.
+  backup:
+    # Nextcloud has a real maintenance mode, so writes can be paused without
+    # taking the app offline -- users get a maintenance page instead of a
+    # connection error, and the pause lasts only as long as this app's own
+    # capture.
+    quiesce:
+      mode: command
+      pre: [php, /var/www/html/occ, "maintenance:mode", --on]
+      post: [php, /var/www/html/occ, "maintenance:mode", --off]
+      container: nextcloud
+    volumes:
+      # Previews are regenerated on demand and routinely outweigh the files
+      # they were generated from. Nothing else on the volume is derived --
+      # config.php in particular must stay, since it carries the instance
+      # secret this data is bound to.
+      excludePaths:
+      - "**/appdata_*/preview"
+    # No boundSecrets: admin_password is an appSecret and re-derives, and
+    # Nextcloud writes instanceid, secret and passwordsalt into config.php on
+    # the volume above, so they travel with the data.
+    restore:
+      # Tells connected clients their cached view is stale; without it, desktop
+      # and mobile clients can keep serving pre-restore state.
+      post:
+      - [php, /var/www/html/occ, "maintenance:data-fingerprint"]
+      verify: [php, /var/www/html/occ, status]
   provides:
   - name: file-store
     protocol: webdav

@@ -1326,6 +1326,7 @@ Before opening a PR, verify:
 - [ ] `additionalIngresses` use flat subdomains; rely on operator gateway CSP for embed hosts
 - [ ] `spec.browserProxy` declared if the shell will call this app's REST API *(not yet implemented — §5e)*
 - [ ] `compositionRef` omitted unless using a non-default composition
+- [ ] `spec.backup` reviewed — declare it only where the default is wrong for this app (§15); most profiles correctly declare nothing
 - [ ] YAML passes `python3 -c "import yaml; yaml.safe_load(open('<file>'))"` locally
 - [ ] Bootstrap/init jobs in `composition.yaml` targeting OpenBao/Vault use `https://...` and `curl -k` (or mount CA cert) to prevent infinite hangs due to TLS requirement (§13)
 
@@ -1476,4 +1477,123 @@ spec:
    * The operator configures Gateway API HTTPRoutes for the app's subdomain to forward all incoming traffic to the central **portal BFF API** (`gentian-portal-gentian-portal-api` Service in the tenant namespace on port `8000`).
    * The portal BFF acts as a reverse proxy, receiving requests same-origin from the browser and forwarding them server-side to the external `baseUrl` (injecting `tenantDomain` query arguments if requested).
    * This allows the external SaaS UI to be embedded inside the portal UI in an iframe (`linkTarget: embedded`) safely, avoiding CORS headers and keeping credentials server-side.
+
+---
+
+## 15. Backup and restore contract (`spec.backup`)
+
+`spec.kernelRequirements` already tells the platform **which** stores your app
+has, and that is enough to dump them. What it cannot tell the platform is how to
+pause your app, which bytes on its volumes are worth keeping, and what has to run
+after a restore before the app is usable. Only you know that, so it lives here.
+
+**Most profiles should declare nothing.** Omitting `spec.backup` selects the
+default — scale the app to zero, dump every store in `kernelRequirements`,
+archive every PersistentVolumeClaim the release owns — which is correct for a
+plain CRUD app. Declare the section only for the parts where that is wrong.
+
+### 15a. Why an app is paused at all
+
+Nothing coordinates independent stores. If your app's database references objects
+in its bucket and files on its volume, capturing them while writes continue gives
+you three snapshots from three different moments, and a restore from that can
+reference rows that point at objects which never existed.
+
+So the platform pauses writes for the duration of **your app's** capture — not
+the whole tenant's. Two different apps share no transactional state, so they are
+captured one after another and each pause lasts only as long as that app's own
+dump.
+
+### 15b. Fields
+
+```yaml
+spec:
+  backup:
+    quiesce:
+      mode: command                    # none | scaleDown (default) | command
+      pre:  [php, /var/www/html/occ, "maintenance:mode", --on]
+      post: [php, /var/www/html/occ, "maintenance:mode", --off]
+      container: nextcloud             # default: the pod's first container
+    volumes:
+      include: [data]                  # default: every release-owned PVC
+      excludePaths: ["**/appdata_*/preview"]
+    boundSecrets:                      # rarely needed — see 15d
+    - openBaoPath: apps/myapp/config
+      keys: [dataKey]
+    restore:
+      post:
+      - [php, /var/www/html/occ, "maintenance:data-fingerprint"]
+      verify: [php, /var/www/html/occ, status]
+    consistency: app                   # app (default) | perStore
+    minRestoreVersion: "27.0"
+```
+
+| Field | Use it when |
+|---|---|
+| `quiesce.mode` | `scaleDown` (default) always works but takes the app offline. Use `command` when your app has a real maintenance mode — users see a maintenance page instead of a connection error. Use `none` only if your app's stores hold no references to each other. |
+| `quiesce.pre` / `post` | Required with `mode: command`. **`post` must be safe to run when `pre` never ran** — it also runs on the failure path, and an app left paused is an outage. |
+| `volumes.include` | Your release owns volumes that are not app data (scratch, logs) and you want only some captured. |
+| `volumes.excludePaths` | Your app rebuilds data on demand — thumbnails, previews, search indexes, caches. This is often most of the disk, so it is the field with the largest payoff. |
+| `boundSecrets` | See 15d. Most apps need none. |
+| `restore.post` | Something must run before the app serves the restored data: cache invalidation, re-indexing, fingerprinting. |
+| `restore.verify` | Always worth setting. Without it a restore can only report that bytes were written, not that your app can read them. |
+| `consistency` | `perStore` if your app's stores genuinely hold no references to each other. Leave at `app` if unsure. |
+| `minRestoreVersion` | Your app cannot migrate data from before some version. Older data into a newer app is always allowed — that just runs your migrations — but the reverse corrupts silently. |
+
+### 15c. Commands are argv, not shell lines
+
+`pre`, `post`, `verify` and each entry of `restore.post` are argument vectors:
+
+```yaml
+pre: [php, /var/www/html/occ, "maintenance:mode", --on]     # correct
+pre: "php /var/www/html/occ maintenance:mode --on"          # rejected by CI
+```
+
+The first element is the binary and the rest are its arguments, so nothing is
+word-split, glob-expanded or shell-interpreted. A shell string is valid YAML and
+reads naturally, which is exactly why it is the tempting mistake — it would be
+exec'd as a single filename containing spaces, and it fails during a capture on a
+live tenant.
+
+### 15d. `boundSecrets` — usually empty, and that is correct
+
+Declare a secret here only when **all** of these hold: it was not derived, it
+lives outside your app's captured data, and the data cannot be read back without
+it. Two things already cover most cases:
+
+- Values under `spec.appSecrets` are HMAC-derived from the master password,
+  tenant, app and name, so they reproduce byte-identically on the same cluster
+  and on any cluster restored from the recovery kit.
+- A secret your app writes into its own config file on a captured volume travels
+  with that volume.
+
+Nextcloud is the worked example: its `admin_password` is an `appSecret`, and its
+`instanceid`, `secret` and `passwordsalt` live in `config.php` on the data
+volume — so `profiles/nextcloud/base/base-ce/profile.yaml` declares **no** bound
+secrets.
+
+Paths are relative to your tenant's own prefix (`gentian-os/tenants/{tenant}/`).
+Absolute paths and `..` are rejected, so a profile can never name another
+tenant's secrets.
+
+### 15e. Never exclude configuration
+
+`excludePaths` is for data your app can rebuild. Excluding a config directory
+looks like a harmless size saving and is the one mistake in this section that
+destroys data: an app whose config file carries the key its data was encrypted
+with becomes unrestorable, and nothing detects it — the backup succeeds, and the
+failure surfaces at restore time, possibly a year later.
+
+CI rejects `excludePaths` entries whose segments look like configuration or key
+material. If you need such a pattern, narrow it.
+
+### 15f. What does not belong here
+
+Schedule, retention, encryption and destination are platform and tenant policy,
+not app knowledge, and are set on the export itself. An app author must not be
+able to weaken a tenant's retention or encryption from the catalogue.
+
+Validated by `scripts/validate-backup-spec.py` in CI. The full design, including
+the bundle format and the restore sequence, is in
+`gentian-os/docs/plans/backup-plan.md` §5.
 
