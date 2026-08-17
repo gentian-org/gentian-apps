@@ -5,6 +5,9 @@ metadata:
   labels:
     gentianos.io/profile-name: litellm-me
   annotations:
+    # Tile shown only where the cluster serves LLM; the profile stays in the
+    # catalogue either way, so an operator can discover it and enable it.
+    gentianos.io/requires-capability: "llm"
     gentianos.io/platform-app: "true"
     gentianos.io/deployment-role: base
 spec:
