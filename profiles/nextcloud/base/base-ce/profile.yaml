@@ -472,7 +472,32 @@ spec:
         # not, which is why this only bites when richdocuments is selected on a
         # first install.
         if ! $OCC status 2>/dev/null | grep -q "installed: true"; then
-          echo "Nextcloud not installed yet — deferring app activation to the next boot."
+          # Exiting alone would avoid the crash and leave the addons disabled
+          # until some later restart, so a first install would come up without
+          # Mail or Calendar and no signal as to why. The entrypoint installs
+          # Nextcloud moments after this hook returns, so wait for that in the
+          # background and re-run this same hook once occ works.
+          #
+          # Re-running the whole hook rather than a fragment of it: the script is
+          # idempotent by design — it re-runs on every pod start, which is how a
+          # changed addon selection converges — so replaying it is exactly what
+          # the next boot would have done anyway.
+          #
+          # Bounded at ten minutes so a failed install cannot leave a poller
+          # spinning for the lifetime of the pod.
+          echo "Nextcloud not installed yet — activating addons once the install completes."
+          (
+            i=0
+            while [ "$i" -lt 120 ]; do
+              i=$((i + 1))
+              sleep 5
+              if $OCC status 2>/dev/null | grep -q "installed: true"; then
+                sh "$0" || echo "warning: deferred addon activation failed"
+                exit 0
+              fi
+            done
+            echo "warning: Nextcloud did not become installed; addons not activated"
+          ) &
           exit 0
         fi
 
