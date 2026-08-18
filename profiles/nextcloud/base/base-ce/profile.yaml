@@ -460,6 +460,22 @@ spec:
         APPS=/var/www/html/custom_apps
         OCC="php /var/www/html/occ"
 
+        # Nothing below can run before Nextcloud is installed, and on a fresh
+        # volume this hook runs first — the entrypoint installs afterwards. occ
+        # answers every subcommand with "There are no commands defined in the
+        # ... namespace", and under set -eu the first unguarded one kills the
+        # container. That is a deadlock, not a slow start: the container has to
+        # survive this boot for Nextcloud to be installed at all, and it never
+        # does, so the tenant serves 500 forever.
+        #
+        # The app:enable calls tolerate it, the Collabora config:app:set calls do
+        # not, which is why this only bites when richdocuments is selected on a
+        # first install.
+        if ! $OCC status 2>/dev/null | grep -q "installed: true"; then
+          echo "Nextcloud not installed yet — deferring app activation to the next boot."
+          exit 0
+        fi
+
         mkdir -p "$APPS"
 
         # Copy in what was selected. The image stages addons outside the tree the
