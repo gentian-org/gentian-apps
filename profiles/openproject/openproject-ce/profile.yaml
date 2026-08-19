@@ -104,6 +104,10 @@ spec:
       userKey: "postgresql.auth.username"
       passwordKey: "postgresql.auth.password"
     s3:
+      endpointKey: "s3.endpoint"
+      bucketKey: "s3.bucketName"
+      accessKeyKey: "s3.auth.accessKeyId"
+      regionKey: "s3.region"
       secretKeyKey: "s3.auth.secretAccessKey"
     smtp:
       hostKey: "environment.OPENPROJECT_SMTP__ADDRESS"
@@ -167,14 +171,17 @@ spec:
     s3:
       enabled: true
       pathStyle: true
-      region: "us-east-1"
       directUploads: false
       enableSignatureV4Streaming: false
-      endpoint: "${S3_ENDPOINT}"
-      host: "${S3_ENDPOINT}"
-      bucketName: "${TENANT_ID}-openproject"
-      auth:
-        accessKeyId: "${TENANT_ID}-openproject"
+      # endpoint, bucketName, region and auth.accessKeyId are supplied by the
+      # platform through valueMapping.s3 — this app does not name a bucket or
+      # an object store.
+      #
+      # s3.host was previously set to the same value as s3.endpoint. Only one
+      # endpoint key can be mapped, and the upstream chart is third-party, so
+      # whether it reads host as well as endpoint is unverified — check on the
+      # first deploy, and if it is required, raise it upstream rather than
+      # substituting a hostname back in here.
 
     persistence:
       enabled: false

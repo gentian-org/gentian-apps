@@ -226,6 +226,10 @@ spec:
       userKey: "database.user"
       passwordKey: "database.password"
     s3:
+      endpointKey: "s3.endpoint"
+      bucketKey: "s3.bucket"
+      accessKeyKey: "s3.accessKeyId"
+      regionKey: "s3.region"
       secretKeyKey: "s3.secretAccessKey"
     smtp:
       hostKey: "smtp.host"
@@ -267,10 +271,9 @@ spec:
     # all: it is pod-local on 127.0.0.1 with no credentials (see the chart).
 
     s3:
-      accessKeyId: "${TENANT_ID}-docmost"
-      region: "us-east-1"
-      bucket: "${TENANT_ID}-docmost"
-      endpoint: "${S3_ENDPOINT}"
+      # accessKeyId, region, bucket and endpoint are supplied by the platform
+      # through valueMapping.s3 — this app does not name a bucket or an
+      # object store.
       forcePathStyle: true
 
     smtp:

@@ -39,7 +39,8 @@ spec:
                     valueFromFieldPath: spec.profileRef.name
             # Reads the gentian-kernel-services ConfigMap from gentian-system to make
             # cluster-specific infrastructure endpoints available for extraValues
-            # substitution: ${S3_ENDPOINT}, ${MYSQL_HOST}, ${REDIS_HOST}.
+            # substitution: identity placeholders only. Endpoints are not
+            # substituted — they arrive through valueMapping (P9).
             # The ConfigMap is published by the gentian-os Helm chart via kernelServices values.
             - kind: ConfigMap
               into: kernelServices
@@ -482,9 +483,6 @@ spec:
             {{- $ksCMData := dig "data" dict $ksCM }}
             {{- if $pSpec.extraValues }}
             {{- $kernelDomain := dig "KERNEL_DOMAIN" "" $ksCMData }}
-            {{- $s3Endpoint := dig "S3_ENDPOINT"  "" $ksCMData }}
-            {{- $mysqlHost  := dig "MYSQL_HOST"   "" $ksCMData }}
-            {{- $redisHost  := dig "REDIS_HOST"   "" $ksCMData }}
             {{- $turnHost     := dig "TURN_HOST"        "" $ksCMData }}
             {{- $turnPort     := dig "TURN_PORT"        "3478" $ksCMData }}
             {{- $turnTLSHost  := dig "TURN_TLS_HOST"    "" $ksCMData }}
@@ -495,16 +493,11 @@ spec:
             {{- /* Never the upstream relay: mail.smtpHost is spec.mail.host,
             the smarthost Postfix relays THROUGH, and no app is given the
             credential to authenticate there. See app-default.yaml. */}}
-            {{- $smtpHost = dig "SMTP_HOST" "" $ksCMData }}
             {{- $raw := $pSpec.extraValues | toJson }}
             {{- $raw = $raw | replace "${TENANT_DOMAIN}"    $domain }}
             {{- $raw = $raw | replace "${TENANT_NAMESPACE}" $ns }}
             {{- $raw = $raw | replace "${TENANT_ID}"        $tenant }}
             {{- if $kernelDomain }}{{ $raw = $raw | replace "${KERNEL_DOMAIN}" $kernelDomain }}{{ end }}
-            {{- if $s3Endpoint  }}{{ $raw = $raw | replace "${S3_ENDPOINT}"   $s3Endpoint  }}{{ end }}
-            {{- if $mysqlHost   }}{{ $raw = $raw | replace "${MYSQL_HOST}"    $mysqlHost   }}{{ end }}
-            {{- if $redisHost   }}{{ $raw = $raw | replace "${REDIS_HOST}"    $redisHost   }}{{ end }}
-            {{- $raw = $raw | replace "${SMTP_HOST}"    $smtpHost }}
             {{- $raw = $raw | replace "${TURN_HOST}"        $turnHost }}
             {{- $raw = $raw | replace "${TURN_PORT}"        $turnPort }}
             {{- $raw = $raw | replace "${TURN_TLS_HOST}"    $turnTLSHost }}
