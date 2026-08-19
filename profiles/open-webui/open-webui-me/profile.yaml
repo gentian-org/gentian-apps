@@ -5,8 +5,6 @@
 # cannot finish provisioning without it. The CR name is `open-webui` because
 # that is the profileRef the composition creates.
 #
-# The tile is admin-only (like the App Store): tenant admins get AI Chat,
-# members do not see it.
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
 metadata:
@@ -54,6 +52,13 @@ spec:
       displayName:
         de_DE: "AI Chat"
         en_US: "AI Chat"
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+    - name: open-webui-admin
+      displayName:
+        de_DE: "AI Config"
+        en_US: "AI Config"
       linkTarget: embedded
       allowedGroup: "Tenant Admins"
 
