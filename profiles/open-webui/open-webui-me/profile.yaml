@@ -1,9 +1,10 @@
 # AppProfile — Open WebUI ("AI Chat")
 #
-# Auto-provisioned by the tenant composition whenever the cluster serves LLM,
-# so this profile must exist in the catalogue on every such cluster — a tenant
-# cannot finish provisioning without it. The CR name is `open-webui` because
-# that is the profileRef the composition creates.
+# Tenant scaffolding lists this profile in spec.apps whenever the cluster claim
+# serves LLM, so it must exist in the catalogue on every such cluster — a
+# tenant definition naming it is refused at admission otherwise. The CR name is
+# `open-webui` (not the -me convention) because existing tenant definitions and
+# the portal shell's tile ids reference it by that name.
 #
 apiVersion: gentianos.io/v1alpha1
 kind: AppProfile
