@@ -187,9 +187,7 @@ spec:
     # chart comment for the full reasoning. Requesting a cache here would
     # provision an ACL user that nothing can ever use.
     mail:
-      smtp:
-        auth: plain
-        port: 587
+      smtp: {}
 
   provides:
     - name: document-collaboration
@@ -230,6 +228,9 @@ spec:
     s3:
       secretKeyKey: "s3.secretAccessKey"
     smtp:
+      hostKey: "smtp.host"
+      portKey: "smtp.port"
+      userKey: "smtp.username"
       passwordKey: "smtp.password"
 
   appSecrets:
@@ -273,9 +274,8 @@ spec:
       forcePathStyle: true
 
     smtp:
-      host: "${SMTP_HOST}"
-      port: 587
-      username: "${TENANT_ID}-docmost"
+      # host, port and username are supplied by the platform through
+      # valueMapping.smtp — this app does not name a mail server.
       secure: false
       fromAddress: "docmost@${TENANT_DOMAIN}"
 

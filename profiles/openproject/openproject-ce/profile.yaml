@@ -63,9 +63,7 @@ spec:
     cache:
       engine: memcached
     mail:
-      smtp:
-        auth: cram-md5
-        port: 587
+      smtp: {}
 
   provides:
     - name: project-management
@@ -108,6 +106,9 @@ spec:
     s3:
       secretKeyKey: "s3.auth.secretAccessKey"
     smtp:
+      hostKey: "environment.OPENPROJECT_SMTP__ADDRESS"
+      portKey: "environment.OPENPROJECT_SMTP__PORT"
+      userKey: "environment.OPENPROJECT_SMTP__USER__NAME"
       passwordKey: "environment.OPENPROJECT_SMTP__PASSWORD"
 
   appSecrets:
@@ -272,8 +273,8 @@ spec:
       OPENPROJECT_OPENID__CONNECT_KEYCLOAK_ISSUER: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
       OPENPROJECT_OPENID__CONNECT_KEYCLOAK_POST__LOGOUT__REDIRECT__URI: "https://projects.${TENANT_DOMAIN}/"
       OPENPROJECT_OPENID__CONNECT_KEYCLOAK_JWKS__URI: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/certs"
-      OPENPROJECT_SMTP__ADDRESS: "${SMTP_HOST}"
-      OPENPROJECT_SMTP__PORT: "587"
+      # ADDRESS, PORT and USER__NAME are supplied by the platform through
+      # valueMapping.smtp — this app does not name a mail server.
       OPENPROJECT_SMTP__SSL: "false"
       OPENPROJECT_SMTP__AUTHENTICATION: "cram_md5"
       OPENPROJECT_SMTP__ENABLE__STARTTLS__AUTO: "true"

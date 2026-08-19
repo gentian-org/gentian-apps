@@ -37,9 +37,7 @@ spec:
     cache:
       engine: redis
     mail:
-      smtp:
-        auth: plain
-        port: 587
+      smtp: {}
   # How this app is captured and put back. Only the deviations from the default
   # are here: the default (scale to zero, dump every store above, archive every
   # release-owned volume) is already correct for the rest.
@@ -133,6 +131,9 @@ spec:
       portKey: externalRedis.port
       passwordKey: externalRedis.password
     smtp:
+      hostKey: nextcloud.mail.smtp.host
+      portKey: nextcloud.mail.smtp.port
+      userKey: nextcloud.mail.smtp.name
       passwordKey: nextcloud.mail.smtp.password
   appSecrets:
   - name: admin_password
@@ -391,8 +392,8 @@ spec:
         fromAddress: noreply
         domain: ${TENANT_DOMAIN}
         smtp:
-          host: ${SMTP_HOST}
-          port: 587
+          # host, port and name are supplied by the platform through
+          # valueMapping.smtp — this app does not name a mail server.
           secure: tls
           authtype: LOGIN
           name: gentian-system@${TENANT_DOMAIN}

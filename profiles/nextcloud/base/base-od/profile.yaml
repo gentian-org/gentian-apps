@@ -51,9 +51,7 @@ spec:
       s3:
         bucketPerTenant: true
     mail:
-      smtp:
-        auth: plain
-        port: 587
+      smtp: {}
 
   provides:
     - name: file-store

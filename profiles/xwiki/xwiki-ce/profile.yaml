@@ -61,9 +61,7 @@ spec:
       engine: postgresql
       databasePerTenant: true
     mail:
-      smtp:
-        auth: plain
-        port: 587
+      smtp: {}
 
   provides:
     - name: wiki

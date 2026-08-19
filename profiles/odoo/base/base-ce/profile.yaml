@@ -37,9 +37,7 @@ spec:
       databasePerTenant: true
       allowDynamicDatabaseCreation: false
     mail:
-      smtp:
-        auth: plain
-        port: 587
+      smtp: {}
 
   optionalIntegrations:
     - contract: file-store

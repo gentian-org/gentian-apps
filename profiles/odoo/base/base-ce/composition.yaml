@@ -323,11 +323,10 @@ spec:
             {{- $mysqlHost  := dig "MYSQL_HOST"   "" $ksCMData }}
             {{- $redisHost  := dig "REDIS_HOST"   "" $ksCMData }}
             {{- $smtpHost     := "" }}
-            {{- $ccSmtpHost := dig "mail.smtpHost" "" $ccData }}
-            {{- if $ccSmtpHost }}{{- $smtpHost = $ccSmtpHost }}{{- end }}
-            {{- if not $smtpHost }}
+            {{- /* Never the upstream relay: mail.smtpHost is spec.mail.host,
+            the smarthost Postfix relays THROUGH, and no app is given the
+            credential to authenticate there. See app-default.yaml. */}}
             {{- $smtpHost = dig "SMTP_HOST" "" $ksCMData }}
-            {{- end }}
             {{- $raw := $pSpec.extraValues | toJson }}
             {{- $raw = $raw | replace "${TENANT_DOMAIN}"    $domain }}
             {{- $raw = $raw | replace "${TENANT_NAMESPACE}" $ns }}
