@@ -475,7 +475,6 @@ spec:
             {{- /*   ${S3_ENDPOINT}      — MinIO/S3 endpoint URL (from kernel CM)  */}}
             {{- /*   ${MYSQL_HOST}       — MariaDB/MySQL hostname (from kernel CM) */}}
             {{- /*   ${SMTP_HOST}        — shared Postfix submission endpoint     */}}
-            {{- /*   ${TURN_*}           — shared TURN server (from kernel CM)     */}}
             {{- $extraVals := dict }}
             {{- /* Load kernel service endpoints from the fetched ConfigMap */}}
             {{- $ksRes := dig "kernelServices" list $extraRes }}
@@ -483,12 +482,6 @@ spec:
             {{- $ksCMData := dig "data" dict $ksCM }}
             {{- if $pSpec.extraValues }}
             {{- $kernelDomain := dig "KERNEL_DOMAIN" "" $ksCMData }}
-            {{- $turnHost     := dig "TURN_HOST"        "" $ksCMData }}
-            {{- $turnPort     := dig "TURN_PORT"        "3478" $ksCMData }}
-            {{- $turnTLSHost  := dig "TURN_TLS_HOST"    "" $ksCMData }}
-            {{- $turnTLSPort  := dig "TURN_TLS_PORT"    "5349" $ksCMData }}
-            {{- $turnTransport := dig "TURN_TRANSPORT"  "udp" $ksCMData }}
-            {{- $turnCreds    := dig "TURN_CREDENTIALS" "" $ksCMData }}
             {{- $smtpHost     := "" }}
             {{- /* Never the upstream relay: mail.smtpHost is spec.mail.host,
             the smarthost Postfix relays THROUGH, and no app is given the
@@ -498,12 +491,6 @@ spec:
             {{- $raw = $raw | replace "${TENANT_NAMESPACE}" $ns }}
             {{- $raw = $raw | replace "${TENANT_ID}"        $tenant }}
             {{- if $kernelDomain }}{{ $raw = $raw | replace "${KERNEL_DOMAIN}" $kernelDomain }}{{ end }}
-            {{- $raw = $raw | replace "${TURN_HOST}"        $turnHost }}
-            {{- $raw = $raw | replace "${TURN_PORT}"        $turnPort }}
-            {{- $raw = $raw | replace "${TURN_TLS_HOST}"    $turnTLSHost }}
-            {{- $raw = $raw | replace "${TURN_TLS_PORT}"   $turnTLSPort }}
-            {{- $raw = $raw | replace "${TURN_TRANSPORT}" $turnTransport }}
-            {{- $raw = $raw | replace "${TURN_CREDENTIALS}" $turnCreds }}
             {{- if $nodeIP      }}{{ $raw = $raw | replace "${NODE_IP}"       $nodeIP      }}{{ end }}
             {{- $extraVals = $raw | fromJson }}
             {{- end }}
