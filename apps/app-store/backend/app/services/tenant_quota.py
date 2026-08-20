@@ -18,6 +18,15 @@ from typing import Any
 
 from kubernetes.utils import parse_quantity
 
+# Helper pods the platform runs beside an app — post-install Jobs and the like.
+# They are labelled with the app they serve, but they are not the app, and they
+# come and go; counting them would make an app's share flicker.
+_COMPONENT_LABEL = "gentianos.io/component"
+_APP_LABEL = "gentianos.io/app"
+
+# A pod in a terminal phase has released what it reserved.
+_TERMINAL_PHASES = {"Succeeded", "Failed"}
+
 # The three the tenant claim exposes, in the order they matter to someone
 # deciding whether an app fits. Names are the quota's own keys; the labels are
 # what the store shows.
@@ -81,3 +90,72 @@ def summarize_quota(quota: dict[str, Any] | None) -> dict[str, Any]:
         )
 
     return {"present": bool(resources), "resources": resources}
+
+
+def _container_limits(container: Any) -> tuple[float, float]:
+    resources = getattr(container, "resources", None)
+    limits = getattr(resources, "limits", None) or {}
+    return (
+        _as_float(limits.get("cpu")) or 0.0,
+        _as_float(limits.get("memory")) or 0.0,
+    )
+
+
+def _pod_limits(pod: Any) -> tuple[float, float]:
+    """What one pod reserves, the way the quota counts it.
+
+    Not a plain sum of every container: init containers run before the others
+    and their reservation is released, so the effective figure is the larger of
+    the running set's total and the biggest single init container. Summing all
+    of them would over-report an app whose init step is its heaviest, and the
+    panel above is drawn from the quota's own totals — a breakdown that does not
+    add up to them is worse than none.
+    """
+    spec = getattr(pod, "spec", None)
+    if spec is None:
+        return 0.0, 0.0
+
+    cpu = mem = 0.0
+    for container in getattr(spec, "containers", None) or []:
+        c, m = _container_limits(container)
+        cpu += c
+        mem += m
+
+    for container in getattr(spec, "init_containers", None) or []:
+        c, m = _container_limits(container)
+        cpu = max(cpu, c)
+        mem = max(mem, m)
+
+    return cpu, mem
+
+
+def summarize_app_usage(pods: list[Any]) -> list[dict[str, Any]]:
+    """Per-app share of the tenant's quota, largest first.
+
+    Attributed by the gentianos.io/app label, which the platform puts on every
+    pod an app owns — including its sidecars. A pod without it belongs to no
+    app and is left out of the breakdown rather than guessed at; the totals in
+    the panel above come from the quota itself, so anything unattributed shows
+    up there as the difference rather than being silently reassigned.
+    """
+    totals: dict[str, dict[str, float]] = {}
+    for pod in pods:
+        metadata = getattr(pod, "metadata", None)
+        labels = getattr(metadata, "labels", None) or {}
+        profile = labels.get(_APP_LABEL)
+        if not profile or labels.get(_COMPONENT_LABEL):
+            continue
+        if getattr(getattr(pod, "status", None), "phase", None) in _TERMINAL_PHASES:
+            continue
+        cpu, mem = _pod_limits(pod)
+        entry = totals.setdefault(profile, {"cpu": 0.0, "memory": 0.0})
+        entry["cpu"] += cpu
+        entry["memory"] += mem
+
+    return sorted(
+        (
+            {"profile": profile, "cpuValue": values["cpu"], "memoryValue": values["memory"]}
+            for profile, values in totals.items()
+        ),
+        key=lambda entry: (-entry["cpuValue"], -entry["memoryValue"], entry["profile"]),
+    )

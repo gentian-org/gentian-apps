@@ -38,3 +38,8 @@ containerSecurityContext:
     drop: ["ALL"]
   seccompProfile:
     type: RuntimeDefault
+
+# Extra labels for the pod template. The platform injects gentianos.io/app and
+# gentianos.io/tenant here so the sidecar is selected by the tenant's
+# kernel-egress NetworkPolicy and counted against the app that owns it.
+podLabels: {}

@@ -13,6 +13,13 @@ spec:
     metadata:
       labels:
         {{- include "nextcloud-mcp.labels" . | nindent 8 }}
+        {{- /* The platform identifies a tenant's workloads by gentianos.io/app
+               and gentianos.io/tenant: the kernel-egress NetworkPolicy selects
+               on them, and the app store attributes resource usage by them. A
+               sidecar without them is invisible to both. */}}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}

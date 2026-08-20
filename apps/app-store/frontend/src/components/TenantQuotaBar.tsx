@@ -9,9 +9,16 @@ export type QuotaResource = {
   percent: number;
 };
 
+export type AppUsage = {
+  profile: string;
+  cpuValue: number;
+  memoryValue: number;
+};
+
 export type QuotaResponse = {
   present: boolean;
   resources: QuotaResource[];
+  apps?: AppUsage[];
 };
 
 const GIB = 1024 ** 3;
@@ -45,10 +52,19 @@ function tone(percent: number): { bar: string; text: string } {
   return { bar: "bg-emerald-500", text: "text-emerald-700" };
 }
 
-export function TenantQuotaBar({ quota }: { quota: QuotaResponse | null }) {
+export function TenantQuotaBar({
+  quota,
+  displayNames,
+}: {
+  quota: QuotaResponse | null;
+  /** Catalogue names, so the breakdown reads as apps rather than profile ids. */
+  displayNames?: Record<string, string>;
+}) {
   // Absent while the first fetch is in flight, and on a cluster that sets no
   // quota at all. Neither is "full", and neither is worth a placeholder.
   if (!quota || !quota.present || quota.resources.length === 0) return null;
+
+  const apps = quota.apps ?? [];
 
   return (
     <section
@@ -93,6 +109,32 @@ export function TenantQuotaBar({ quota }: { quota: QuotaResponse | null }) {
           );
         })}
       </dl>
+
+      {apps.length > 0 && (
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <h3 className="text-xs font-medium text-slate-700">Reserved by app</h3>
+          <ul className="mt-2 space-y-1">
+            {apps.map((app) => (
+              <li
+                key={app.profile}
+                className="flex items-baseline justify-between gap-4 text-xs text-slate-600"
+              >
+                <span className="truncate">{displayNames?.[app.profile] || app.profile}</span>
+                <span className="shrink-0 tabular-nums text-slate-500">
+                  {trim(app.cpuValue, 2)} cores · {trim(app.memoryValue / GIB, 1)} GiB
+                </span>
+              </li>
+            ))}
+          </ul>
+          {/* The bars come from the quota itself, so anything the labels could
+              not attribute stays visible as the difference rather than being
+              quietly folded into some app's share. */}
+          <p className="mt-2 text-xs text-slate-400">
+            Reservations, not live consumption — this is what each app costs against the
+            ceiling above.
+          </p>
+        </div>
+      )}
     </section>
   );
 }

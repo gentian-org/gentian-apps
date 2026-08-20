@@ -725,7 +725,12 @@ export function StorePage() {
         )}
       </header>
 
-      <TenantQuotaBar quota={quota} />
+      <TenantQuotaBar
+        quota={quota}
+        displayNames={Object.fromEntries(
+          (catalogue?.apps ?? []).map((app) => [app.name, app.displayName]),
+        )}
+      />
 
       {notice && (
         <div className={`mb-6 rounded-lg border px-4 py-3 ${noticeStyles}`}>{notice.text}</div>

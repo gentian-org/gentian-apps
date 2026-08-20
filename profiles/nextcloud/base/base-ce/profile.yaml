@@ -150,7 +150,7 @@ spec:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
       name: nextcloud-mcp
-      version: "0.1.0"
+      version: "0.1.1"
     appSecrets:
     - name: service_password
       valuePath: nextcloudMcpPassword
