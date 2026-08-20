@@ -83,6 +83,19 @@ class K8sClient:
         except ApiException:
             return []
 
+    def get_resource_quota(self, namespace: str, name: str = "tenant-quota") -> dict[str, Any] | None:
+        """The tenant's quota, or None if it cannot be read.
+
+        None on error for the same reason list_pods returns []: this feeds a
+        header the store can render without, so losing it must degrade the
+        page, never break the catalogue.
+        """
+        try:
+            quota = self._core.read_namespaced_resource_quota(name, namespace)
+        except ApiException:
+            return None
+        return self._core.api_client.sanitize_for_serialization(quota)
+
     def get_tenant(self, name: str) -> dict[str, Any]:
         # Tenant CRs are cluster-scoped in gentian-os
         return self._custom.get_cluster_custom_object(GROUP, VERSION, "tenants", name)

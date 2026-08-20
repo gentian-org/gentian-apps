@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import catalogue, health, oauth, session, tenant_apps
+from app.api.routes import catalogue, health, oauth, session, tenant_apps, tenant_quota
 from app.core.config import get_settings
 from app.core.logging_middleware import RedactingAccessLogMiddleware
 
@@ -26,3 +26,4 @@ app.include_router(oauth.router)
 app.include_router(session.router, prefix=settings.api_v1_str)
 app.include_router(catalogue.router, prefix=settings.api_v1_str)
 app.include_router(tenant_apps.router, prefix=settings.api_v1_str)
+app.include_router(tenant_quota.router, prefix=settings.api_v1_str)

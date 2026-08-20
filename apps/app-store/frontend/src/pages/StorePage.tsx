@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/api/client";
 import { AddonWindow } from "@/components/AddonWindow";
+import { TenantQuotaBar, type QuotaResponse } from "@/components/TenantQuotaBar";
 
 type CatalogueTier = "community" | "pro";
 type CatalogueAction = "install" | "buy";
@@ -354,6 +355,7 @@ function CatalogueCard({
 
 export function StorePage() {
   const [catalogue, setCatalogue] = useState<CatalogueResponse | null>(null);
+  const [quota, setQuota] = useState<QuotaResponse | null>(null);
   const [installed, setInstalled] = useState<InstalledApp[]>([]);
   const [selected, setSelected] = useState<CatalogueApp | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -378,6 +380,17 @@ export function StorePage() {
     let nextInstalled: InstalledApp[] = [];
     let failure: string | null = null;
 
+    // Headroom is refreshed on the same tick as the app list, because the two
+    // move together: an install that lands is also capacity that is gone.
+    const quotaPromise = apiFetch<QuotaResponse>("/tenant/quota")
+      .then((q) => {
+        setQuota(q);
+      })
+      .catch(() => {
+        // Deliberately not recorded as a sync failure. The header is an aid,
+        // not the page; losing it must not mark the catalogue itself stale.
+      });
+
     const cataloguePromise = apiFetch<CatalogueResponse>("/catalogue/")
       .then((cat) => {
         setCatalogue(cat);
@@ -396,7 +409,7 @@ export function StorePage() {
       });
 
     try {
-      await Promise.all([cataloguePromise, installedPromise]);
+      await Promise.all([cataloguePromise, installedPromise, quotaPromise]);
     } finally {
       inFlightRef.current = false;
     }
@@ -711,6 +724,8 @@ export function StorePage() {
           </div>
         )}
       </header>
+
+      <TenantQuotaBar quota={quota} />
 
       {notice && (
         <div className={`mb-6 rounded-lg border px-4 py-3 ${noticeStyles}`}>{notice.text}</div>

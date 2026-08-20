@@ -49,6 +49,12 @@ rules:
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list"]
+  # The quota is the ceiling every install is admitted against, and the store
+  # header shows what is left of it before an admin adds another app. Read-only
+  # and namespaced: the store reports its own tenant's headroom, nothing else.
+  - apiGroups: [""]
+    resources: ["resourcequotas"]
+    verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
