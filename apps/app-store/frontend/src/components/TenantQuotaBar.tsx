@@ -50,8 +50,6 @@ export function TenantQuotaBar({ quota }: { quota: QuotaResponse | null }) {
   // quota at all. Neither is "full", and neither is worth a placeholder.
   if (!quota || !quota.present || quota.resources.length === 0) return null;
 
-  const tight = quota.resources.filter((r) => r.percent >= 75);
-
   return (
     <section
       aria-label="Tenant resources"
@@ -60,9 +58,7 @@ export function TenantQuotaBar({ quota }: { quota: QuotaResponse | null }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-900">Tenant resources</h2>
         <p className="text-xs text-slate-500">
-          {tight.length > 0
-            ? `Little headroom left in ${tight.map((r) => r.label.toLowerCase()).join(" and ")} — an app that does not fit is refused at install.`
-            : "What this tenant may use in total, and what its installed apps already take."}
+          What this tenant may use in total, and what its installed apps already take.
         </p>
       </div>
 
