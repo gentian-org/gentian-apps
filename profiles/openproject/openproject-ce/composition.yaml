@@ -468,13 +468,19 @@ spec:
             {{- /* ── Render inline non-sensitive values ───────────────────────── */}}
             {{- /* Profile-level extraValues are merged with per-tenant config     */}}
             {{- /* overrides. Template variables are substituted before marshalling */}}
-            {{- /* Substitutions:                                                   */}}
+            {{- /* Substitutions — identity only, never endpoints:                 */}}
             {{- /*   ${TENANT_DOMAIN}    — effective tenant domain                 */}}
             {{- /*   ${TENANT_NAMESPACE} — tenant k8s namespace                    */}}
             {{- /*   ${TENANT_ID}        — tenant name (e.g. gtn-demo)             */}}
-            {{- /*   ${S3_ENDPOINT}      — MinIO/S3 endpoint URL (from kernel CM)  */}}
-            {{- /*   ${MYSQL_HOST}       — MariaDB/MySQL hostname (from kernel CM) */}}
-            {{- /*   ${SMTP_HOST}        — shared Postfix submission endpoint     */}}
+            {{- /*   ${KERNEL_DOMAIN}    — the cluster's domain (from kernel CM)   */}}
+            {{- /*   ${NODE_IP}          — node address, where a chart needs one   */}}
+            {{- /*                                                                 */}}
+            {{- /* ${S3_ENDPOINT}, ${MYSQL_HOST} and ${SMTP_HOST} were here and    */}}
+            {{- /* are gone. An endpoint substituted into extraValues hands the    */}}
+            {{- /* app a hostname and no credential, and hard-codes where the      */}}
+            {{- /* service lives — the app must declare the need through           */}}
+            {{- /* valueMapping and let the platform answer it. See                */}}
+            {{- /* gentian-os docs/app-customization.md.                           */}}
             {{- $extraVals := dict }}
             {{- /* Load kernel service endpoints from the fetched ConfigMap */}}
             {{- $ksRes := dig "kernelServices" list $extraRes }}
@@ -482,10 +488,11 @@ spec:
             {{- $ksCMData := dig "data" dict $ksCM }}
             {{- if $pSpec.extraValues }}
             {{- $kernelDomain := dig "KERNEL_DOMAIN" "" $ksCMData }}
-            {{- $smtpHost     := "" }}
-            {{- /* Never the upstream relay: mail.smtpHost is spec.mail.host,
-            the smarthost Postfix relays THROUGH, and no app is given the
-            credential to authenticate there. See app-default.yaml. */}}
+            {{- /* No SMTP host is substituted, and none should be: mail.smtpHost
+            is spec.mail.host, the smarthost Postfix relays THROUGH, and no app
+            is given the credential to authenticate there. An app that needs to
+            send mail declares it and receives a credential. See
+            app-default.yaml. */}}
             {{- $raw := $pSpec.extraValues | toJson }}
             {{- $raw = $raw | replace "${TENANT_DOMAIN}"    $domain }}
             {{- $raw = $raw | replace "${TENANT_NAMESPACE}" $ns }}

@@ -319,10 +319,11 @@ spec:
             {{- $ksCMData := dig "data" dict $ksCM }}
             {{- if $pSpec.extraValues }}
             {{- $kernelDomain := dig "KERNEL_DOMAIN" "" $ksCMData }}
-            {{- $smtpHost     := "" }}
-            {{- /* Never the upstream relay: mail.smtpHost is spec.mail.host,
-            the smarthost Postfix relays THROUGH, and no app is given the
-            credential to authenticate there. See app-default.yaml. */}}
+            {{- /* No SMTP host is substituted, and none should be: mail.smtpHost
+            is spec.mail.host, the smarthost Postfix relays THROUGH, and no app
+            is given the credential to authenticate there. An app that needs to
+            send mail declares it and receives a credential. See
+            app-default.yaml. */}}
             {{- $raw := $pSpec.extraValues | toJson }}
             {{- $raw = $raw | replace "${TENANT_DOMAIN}"    $domain }}
             {{- $raw = $raw | replace "${TENANT_NAMESPACE}" $ns }}
