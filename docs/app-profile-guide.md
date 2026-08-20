@@ -229,7 +229,7 @@ metadata:
   labels:
     gentianos.io/profile-name: <app-id> # must match metadata.name (controller also sets family/version labels)
 spec:
-  deploymentMethod: crossplane          # crossplane (default) or argocd
+  deploymentMethod: crossplane          # crossplane (default), or api for an ApiProfile
   family: <logical-app-id>
   catalogueVersion: "1.0.0"
   edition: full
