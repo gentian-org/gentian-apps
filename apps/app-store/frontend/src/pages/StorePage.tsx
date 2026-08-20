@@ -904,21 +904,32 @@ export function StorePage() {
               <span className="font-medium">Cluster installs:</span> {selected.installedCount}{" "}
               tenants
             </p>
-            {selected.resources && (selected.resources.requests || selected.resources.limits) && (
-              <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm border border-slate-100">
-                <p className="font-semibold text-slate-700 mb-1">Resource Profile</p>
-                {selected.resources.requests && (
-                  <p className="text-slate-600">
-                    <span className="font-medium">Requests:</span> CPU {selected.resources.requests.cpu || "—"}, Memory {selected.resources.requests.memory || "—"}
-                  </p>
-                )}
-                {selected.resources.limits && (
-                  <p className="text-slate-600">
-                    <span className="font-medium">Limits:</span> CPU {selected.resources.limits.cpu || "—"}, Memory {selected.resources.limits.memory || "—"}
-                  </p>
-                )}
-              </div>
-            )}
+            {/* Always rendered, even when this profile overrides nothing.
+                The field behind it is the profile's *override* block, so an app
+                content with its chart's defaults produced no panel at all — and
+                an app that reserves a whole core looked indistinguishable from
+                one that reserves nothing. Whatever the numbers are, they are
+                charged against the tenant's quota. */}
+            <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm border border-slate-100">
+              <p className="font-semibold text-slate-700 mb-1">Resource Profile</p>
+              {selected.resources?.requests && (
+                <p className="text-slate-600">
+                  <span className="font-medium">Requests:</span> CPU {selected.resources.requests.cpu || "—"}, Memory {selected.resources.requests.memory || "—"}
+                </p>
+              )}
+              {selected.resources?.limits && (
+                <p className="text-slate-600">
+                  <span className="font-medium">Limits:</span> CPU {selected.resources.limits.cpu || "—"}, Memory {selected.resources.limits.memory || "—"}
+                </p>
+              )}
+              {!selected.resources?.requests && !selected.resources?.limits && (
+                <p className="text-slate-600">
+                  Not set by this profile — the chart&rsquo;s own defaults apply. They still
+                  count against your tenant&rsquo;s quota, so check the tenant resources panel
+                  after installing.
+                </p>
+              )}
+            </div>
             {isProApp(selected) && selected.licenceNotice && (
               <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 {selected.licenceNotice}
