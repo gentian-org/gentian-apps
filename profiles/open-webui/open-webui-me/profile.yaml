@@ -126,6 +126,14 @@ spec:
         value: "true"
       - name: ENABLE_OAUTH_ROLE_MANAGEMENT
         value: "true"
+      # The post-install job seeds the tenant administrator's account so the
+      # instance is not stuck in onboarding (see postInstallJob below). This is
+      # what hands that account to its owner: the first SSO sign-in with the
+      # same address adopts it instead of creating a second, non-admin user.
+      # Safe here because Keycloak is the only provider and the address is
+      # derived by the platform, not typed by a user.
+      - name: OAUTH_MERGE_ACCOUNTS_BY_EMAIL
+        value: "true"
       - name: OAUTH_ROLES_CLAIM
         value: "groups"
       - name: OAUTH_ADMIN_ROLES
@@ -227,10 +235,17 @@ spec:
       #!/bin/sh
       set -eu
       exec python3 - <<'PYEOF'
-      import base64, hashlib, hmac, json, os, sqlite3, sys, time
+      import base64, hashlib, hmac, json, os, secrets, sqlite3, sys, time
       import urllib.error, urllib.request
 
       DB = "/data/webui.db"
+      base = "http://open-webui"
+
+      def http_json(url, method="GET", data=None, headers=None, timeout=10):
+          req = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
+          with urllib.request.urlopen(req, timeout=timeout) as resp:
+              return json.loads(resp.read())
+
       if not os.path.exists(DB):
           print("[open-webui post-install] webui.db not present yet -- will retry")
           sys.exit(1)
@@ -240,28 +255,54 @@ spec:
       conn = sqlite3.connect(f"file:{DB}?mode=ro&immutable=1", uri=True)
       row = conn.execute("SELECT id FROM user WHERE role='admin' LIMIT 1").fetchone()
       conn.close()
+
+      token = None
       if not row:
-          print("[open-webui post-install] no admin user yet -- will retry")
-          sys.exit(1)
-      admin_id = row[0]
+          # No account at all means Open WebUI is in onboarding, and onboarding
+          # is a dead end for this profile: its sign-in page only auto-redirects
+          # to SSO when an account already exists, and ENABLE_LOGIN_FORM=false
+          # leaves nothing else on the page. The tab renders the logo and stops,
+          # which is what the tenant sees -- and no one can sign in to clear it,
+          # because signing in is what it is blocking.
+          #
+          # So create the account the tenant is going to use. The first one
+          # Open WebUI is given becomes the admin, which clears onboarding; the
+          # address is the tenant administrator's, so their first SSO sign-in
+          # adopts this account (OAUTH_MERGE_ACCOUNTS_BY_EMAIL) rather than
+          # arriving as a second, non-admin user.
+          #
+          # The password is random and deliberately discarded. Nothing signs in
+          # with it -- the sign-in form is disabled and the account is reached
+          # through SSO -- so keeping it, or deriving it from the master
+          # password, would only create a credential nobody needs.
+          signup = json.dumps({
+              "name": "Tenant Administrator",
+              "email": "admin@${TENANT_DOMAIN}",
+              "password": secrets.token_urlsafe(32),
+          }).encode()
+          try:
+              created = http_json(f"{base}/api/v1/auths/signup", method="POST",
+                                  data=signup, headers={"Content-Type": "application/json"})
+          except (urllib.error.URLError, TimeoutError) as e:
+              # Also the path a lost race takes: whoever won created the account,
+              # and the next attempt reads it from the DB instead.
+              print(f"[open-webui post-install] could not seed the admin account: {e}")
+              sys.exit(1)
+          token = created.get("token")
+          print("[open-webui post-install] seeded admin account admin@${TENANT_DOMAIN}")
 
-      def b64url(data):
-          return base64.urlsafe_b64encode(data).rstrip(b"=")
+      if token is None:
+          def b64url(data):
+              return base64.urlsafe_b64encode(data).rstrip(b"=")
 
-      secret = os.environ["WEBUI_SECRET_KEY"].encode()
-      header = b64url(json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode())
-      payload = b64url(json.dumps({"id": admin_id, "exp": int(time.time()) + 300}, separators=(",", ":")).encode())
-      signing_input = header + b"." + payload
-      sig = b64url(hmac.new(secret, signing_input, hashlib.sha256).digest())
-      jwt = (signing_input + b"." + sig).decode()
+          secret = os.environ["WEBUI_SECRET_KEY"].encode()
+          header = b64url(json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode())
+          payload = b64url(json.dumps({"id": row[0], "exp": int(time.time()) + 300}, separators=(",", ":")).encode())
+          signing_input = header + b"." + payload
+          sig = b64url(hmac.new(secret, signing_input, hashlib.sha256).digest())
+          token = (signing_input + b"." + sig).decode()
 
-      base = "http://open-webui"
-      headers = {"Authorization": f"Bearer {jwt}"}
-
-      def http_json(url, method="GET", data=None, headers=None, timeout=10):
-          req = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
-          with urllib.request.urlopen(req, timeout=timeout) as resp:
-              return json.loads(resp.read())
+      headers = {"Authorization": f"Bearer {token}"}
 
       try:
           current = http_json(f"{base}/openai/config", headers=headers)
