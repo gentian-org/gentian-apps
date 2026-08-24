@@ -467,6 +467,88 @@ The operator seeds OIDC issuer/client credentials in OpenBao as
   `id.demo.desk.gentian.org` (404). Use `${KERNEL_DOMAIN}` instead.
 - Hardcoded realm names (`opendesk`, `souvap`) instead of `${TENANT_ID}`.
 - Redirect URIs on `${KERNEL_DOMAIN}` or portal host instead of `${TENANT_DOMAIN}`.
+- No `backchannelLogoutUrl`, so signing out of the portal leaves the app signed
+  in. See below.
+- Role settings pointed at group names the platform does not issue, so every
+  member is refused after a successful sign-in. See below.
+
+### Signing out — declare it, or the app keeps the session
+
+An app with its own OIDC client also keeps its own session cookie. Ending the
+identity session does not touch it. The portal's sign-out terminates every
+Keycloak session the user holds (it calls the admin `users/{id}/logout`), and
+Keycloak then notifies each client **that declared somewhere to be notified** —
+so a profile without that field simply is not told.
+
+What that looks like: sign out, sign in as somebody else, open the app, and it is
+still serving the first account. On a shared machine, "log out" does not.
+
+```yaml
+oidc:
+  clientId: "gentian-example"
+  redirectUris:
+    - "https://example.${TENANT_DOMAIN}/oauth/callback"
+  postLogoutRedirectUris:
+    - "https://example.${TENANT_DOMAIN}/"
+  backchannelLogoutUrl: "https://example.${TENANT_DOMAIN}/oauth/backchannel-logout"
+```
+
+`app-default.yaml` passes both through and sets
+`backchannelLogoutSessionRequired` itself; the profile only supplies the URLs.
+
+**Backchannel, not frontchannel.** Keycloak drives frontchannel logout through
+hidden iframes, which makes it a third-party context — precisely the context
+whose cookies browsers now withhold, and the reason sign-in itself must run in
+the top-level window rather than in the shell's frame. A server-to-server POST
+carrying a `logout_token` is unaffected by any of that.
+
+**The endpoint is the relying party's, which is not always the app you are
+packaging.** Element's client belongs to Synapse, so the endpoint is Synapse's
+and Synapse must also be configured to honour it. Look up the path in the
+project's own documentation rather than assuming `/oauth/backchannel-logout`;
+the ones already in this repo differ from each other.
+
+**Not every app can.** django-allauth implements no logout-token endpoint, and an
+OAuth2 module such as Odoo's `auth_oauth` is not an OIDC relying party at all.
+Where that is the case, say so in the profile where the field would otherwise be
+absent — an unexplained gap reads as an oversight and invites someone to invent a
+URL for it. Those sessions end on their own timeout, and that is a real
+limitation to be aware of rather than a detail.
+
+**Also declare `postLogoutRedirectUris`.** Without them Keycloak refuses the
+`post_logout_redirect_uri` and strands the user on an error page after an
+otherwise successful sign-out.
+
+### Group names — what the claim actually contains
+
+Apps that gate access on roles read the `groups` claim, and the mapper is created
+with `full.path=false`, so the claim carries bare names rather than paths. The
+realm holds exactly these:
+
+| Group | Meaning |
+|---|---|
+| `gentian:tenant:<t>:members` | every member of the tenant |
+| `gentian:tenant:<t>:admins` | tenant administrators |
+| `gentian:tenant:<t>:app-admins` | may install and configure apps |
+| `gentian:tenant:<t>:app:<app>` | entitled to that one app |
+
+Two rules follow. **Put the tenant in the name** — `gentian:tenant:admins` exists
+in no realm, and a setting pointing at it silently promotes nobody. **Gate on the
+app entitlement group**, not on `…:members`: installing an app creates its
+entitlement group, and a member holds it only where the tenant administrator
+granted that app, so admitting `…:members` hands the app to the whole tenant and
+discards the check.
+
+Watch the app's default. Several apps ship an allow-list defaulting to names like
+`user,admin`, which this platform never issues — leave it unset and every member
+is refused after signing in successfully, which reads as a broken login rather
+than as a configuration gap.
+
+Where an app additionally keeps its *own* per-user access lists on top of this —
+Open WebUI does, for models — prefer switching that off to populating it. The
+tenant boundary is already enforced by the entitlement group and by the
+credentials the instance carries; a third list that defaults to denying everyone
+adds no boundary, only an empty screen.
 
 **ACME staging (dev):** this is the "public host unavoidable" branch of the
 server-to-server rule above — Synapse must present the same OIDC issuer string to
