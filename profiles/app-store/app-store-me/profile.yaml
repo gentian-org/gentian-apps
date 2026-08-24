@@ -32,6 +32,10 @@ spec:
         accessType: CONFIDENTIAL
         redirectUris:
           - "https://store.${TENANT_DOMAIN}/oauth/callback"
+        # No backchannelLogoutUrl: this is our own application and it implements
+        # no endpoint for receiving a logout_token. Unlike the third-party entries
+        # here, that is ours to change — a route validating the token and dropping
+        # the session would let this one honour a portal sign-out.
     database:
       engine: postgresql
       databasePerTenant: true

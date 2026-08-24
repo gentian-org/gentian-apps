@@ -32,6 +32,10 @@ spec:
         accessType: CONFIDENTIAL
         redirectUris:
           - "https://erp.${TENANT_DOMAIN}/auth_oauth/signin"
+        # No backchannelLogoutUrl: Odoo signs in through auth_oauth, an OAuth2
+        # module rather than an OIDC relying party, so there is nothing to send a
+        # logout_token to. Its session ends on its own timeout. Recorded rather
+        # than left blank, so the absence reads as a limit of the app.
     database:
       engine: postgresql
       databasePerTenant: true

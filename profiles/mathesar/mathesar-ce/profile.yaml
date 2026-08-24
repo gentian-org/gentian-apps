@@ -91,6 +91,12 @@ spec:
           - "https://data.${TENANT_DOMAIN}/auth/oidc/keycloak/login/callback/"
         postLogoutRedirectUris:
           - "https://data.${TENANT_DOMAIN}/"
+        # No backchannelLogoutUrl: this app signs in through django-allauth,
+        # whose OpenID Connect provider implements no endpoint for receiving a
+        # logout_token. Signing out of the portal therefore leaves this app's own
+        # session running until it expires on its own. Recorded rather than left
+        # blank, so the absence reads as a limit of the app and not as an
+        # oversight to be filled in.
     database:
       engine: postgresql
       databasePerTenant: true
