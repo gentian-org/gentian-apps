@@ -120,6 +120,21 @@ spec:
         value: "https://ai-chat.${TENANT_DOMAIN}/oauth/oidc/callback"
       - name: ENABLE_LOGIN_FORM
         value: "false"
+      # Permits exactly one signup: the first, when the user table is empty.
+      #
+      # Open WebUI refuses /auths/signup outright once the login form is off,
+      # and from 0.10 that refusal covers the initial admin too unless this is
+      # set. The post-install Job seeds that admin over the same endpoint, so
+      # without this the Job cannot do the one thing it exists for, and a fresh
+      # instance stays in onboarding — the state whose only exit is a sign-in
+      # that onboarding itself blocks.
+      #
+      # It does not reopen signup afterwards: with any user present Open WebUI
+      # takes the other branch and refuses again, because the login form is
+      # still off. Nothing here grants a way in — the seeded account is reached
+      # through SSO, and its password is random and discarded.
+      - name: ENABLE_INITIAL_ADMIN_SIGNUP
+        value: "true"
       - name: OAUTH_AUTO_REDIRECT
         value: "true"
       - name: WEBUI_SESSION_COOKIE_SECURE
