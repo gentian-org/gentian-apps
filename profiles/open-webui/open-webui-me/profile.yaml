@@ -151,8 +151,28 @@ spec:
         value: "true"
       - name: OAUTH_ROLES_CLAIM
         value: "groups"
+      # Who may enter, and who arrives as an admin.
+      #
+      # With ENABLE_OAUTH_ROLE_MANAGEMENT on, Open WebUI refuses anyone whose
+      # roles claim matches neither list, and OAUTH_ALLOWED_ROLES defaults to
+      # "user,admin" — names this platform never issues. Every tenant member was
+      # therefore turned away at the callback with "You do not have permission to
+      # access this resource", after signing in successfully.
+      #
+      # The allowed role is the app's own entitlement group, which is what that
+      # group is for: installing the app creates it, and a member holds it only
+      # if the tenant administrator granted this app. Admitting
+      # gentian:tenant:<t>:members instead would let every member of the tenant
+      # in regardless of entitlement, which is the check rather than a detail of
+      # it.
+      - name: OAUTH_ALLOWED_ROLES
+        value: "gentian:tenant:${TENANT_ID}:app:open-webui"
+      # The tenant administrators group, whose real name carries the tenant.
+      # This read "gentian:tenant:admin", which exists in no realm, so nobody
+      # was ever promoted — invisible while the allowed list refused everyone
+      # anyway.
       - name: OAUTH_ADMIN_ROLES
-        value: "gentian:tenant:admin"
+        value: "gentian:tenant:${TENANT_ID}:admins"
     # The chart's own openai* values keys template literal env: entries,
     # which win over extraEnvFrom's llm-credentials-open-webui Secret for
     # the same names (chart's own docs: "extraEnvVars will take precedence
