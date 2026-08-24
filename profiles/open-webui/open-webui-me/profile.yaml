@@ -137,6 +137,22 @@ spec:
         value: "true"
       - name: OAUTH_AUTO_REDIRECT
         value: "true"
+      # Send the browser straight to the kernel realm instead of stopping at the
+      # tenant realm's own sign-in form.
+      #
+      # A tenant member's account lives in the kernel realm; the tenant realm
+      # holds this app's OIDC client and brokers back to kernel through the
+      # "kernel" IdP. Its browser flow is deliberately the stock one, so that a
+      # tenant-local account — the tenant administrator — can still sign in with
+      # a password. The cost is that the flow has no default provider, so an app
+      # that does not ask for one lands on a form the visitor has no credentials
+      # for, having already signed in to the portal moments earlier.
+      #
+      # kc_idp_hint is the ask. It is how the kernel IdP was meant to be reached
+      # once it stopped being the browser flow's default, and it is what the
+      # portal itself sends.
+      - name: OAUTH_AUTHORIZE_PARAMS
+        value: '{"kc_idp_hint": "kernel"}'
       - name: WEBUI_SESSION_COOKIE_SECURE
         value: "true"
       - name: ENABLE_OAUTH_ROLE_MANAGEMENT
