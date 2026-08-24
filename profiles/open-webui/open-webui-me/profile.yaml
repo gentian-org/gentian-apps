@@ -139,6 +139,22 @@ spec:
         value: "true"
       - name: WEBUI_SESSION_COOKIE_SECURE
         value: "true"
+      # Let ordinary members see the models the tenant is entitled to.
+      #
+      # Open WebUI keeps a per-user access list for models, and a model found on
+      # a connection rather than created in the UI is admin-only until someone
+      # shares it. Nobody ever does, so every member signed in successfully and
+      # found an empty model picker: "No results found", while an admin saw the
+      # same instance offering the model perfectly well.
+      #
+      # The entitlement boundary is already drawn twice before this point, and
+      # both are stronger than this list. A member reaches this app at all only
+      # by holding gentian:tenant:<t>:app:open-webui, and the LiteLLM key this
+      # instance carries is scoped to the tenant's own team, so the models on
+      # offer are the tenant's models. A third check that defaults to denying
+      # everyone adds no boundary, only an empty dropdown.
+      - name: BYPASS_MODEL_ACCESS_CONTROL
+        value: "true"
       - name: ENABLE_OAUTH_ROLE_MANAGEMENT
         value: "true"
       # The post-install job seeds the tenant administrator's account so the
