@@ -41,6 +41,26 @@ spec:
         accessType: CONFIDENTIAL
         redirectUris:
           - "https://ai-chat.${TENANT_DOMAIN}/oauth/oidc/callback"
+        # Signing out of the portal has to sign out of here too.
+        #
+        # This app keeps its own session cookie, so without a way to be told
+        # otherwise it goes on serving the previous person: sign out, sign in as
+        # somebody else, open the app, and it is still the first account. On a
+        # shared machine "log out" does not.
+        #
+        # Backchannel rather than frontchannel deliberately. Keycloak drives
+        # frontchannel logout through hidden iframes, which makes it a
+        # third-party context — the same context whose cookies browsers now
+        # withhold, and the reason sign-in itself had to be moved out of a frame.
+        # A server-to-server POST does not care about any of that, and Open WebUI
+        # validates the logout_token and revokes the session behind it.
+        backchannelLogoutUrl: "https://ai-chat.${TENANT_DOMAIN}/oauth/backchannel-logout"
+        # Where a logout initiated from this app is allowed to return to. Without
+        # it Keycloak refuses the post_logout_redirect_uri and leaves the user on
+        # an error page after an otherwise successful logout.
+        postLogoutRedirectUris:
+          - "https://ai-chat.${TENANT_DOMAIN}/"
+          - "https://${TENANT_DOMAIN}/"
 
   provides:
     - name: webui
