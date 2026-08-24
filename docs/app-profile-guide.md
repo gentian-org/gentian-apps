@@ -419,7 +419,7 @@ That path has two traps for server-side HTTP clients:
   (§6d) all do.
 - **When the public host is unavoidable** (the app hard-codes it, or browser and
   server must agree on one issuer string) — **trust the staging CA** in that
-  runtime: mount `gentian-staging-ca-tls` and set the language's trust env
+  runtime: mount `gentian-trust-anchor-tls` and set the language's trust env
   (`NODE_EXTRA_CA_CERTS`, JVM truststore, `SSL_CERT_FILE`), or set the app's
   documented "insecure SSL for testing" flag. See the ACME staging note below and §8a.
 
@@ -554,11 +554,11 @@ adds no boundary, only an empty screen.
 server-to-server rule above — Synapse must present the same OIDC issuer string to
 the browser and validate it server-side, so it cannot swap in an internal URL and
 must instead trust the staging CA. When `tenantDNS01ClusterIssuer` contains `staging`,
-compositions mount `gentian-staging-ca-tls` and (for Synapse) set
+compositions mount `gentian-trust-anchor-tls` and (for Synapse) set
 `use_insecure_ssl_client_just_for_testing_do_not_use` plus explicit OIDC
 endpoints with `discover: false` and `user_profile_method: userinfo_endpoint` in
 `additionalConfiguration.oidc_providers` (see `gentian-os/docs/design/security.md`
-§9). `install.sh` and the gentian-os operator bootstrap `gentian-staging-ca-tls`
+§9). `install.sh` and the gentian-os operator bootstrap `gentian-trust-anchor-tls`
 in `gentian-dev` and replicate it into each `tenant-*` namespace; run
 `./update.sh --acme-issuers` to refresh the bundle after issuer or kernel cert
 changes.
