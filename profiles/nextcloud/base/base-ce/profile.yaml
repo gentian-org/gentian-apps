@@ -169,7 +169,6 @@ spec:
     annotations:
       gentianos.io/gateway-buffer-limit: 512M
       gentianos.io/gateway-request-timeout: '3600'
-      gentianos.io/gateway-response-timeout: '3600'
   # Collabora's own hostname. Static rather than conditional on the addon: making
   # ingresses conditional is operator-side work, and the cost of leaving it is a
   # certificate plus one route that answers nothing while Collabora is off -- on a
@@ -185,7 +184,6 @@ spec:
       # are URL-encoded and Envoy would otherwise normalise the slashes away.
       gentianos.io/gateway-buffer-limit: 100M
       gentianos.io/gateway-request-timeout: '3600'
-      gentianos.io/gateway-response-timeout: '3600'
       gentianos.io/gateway-frame-ancestors: '{"mode":"replace","origins":["mainApp","portal"]}'
       gentianos.io/gateway-escaped-slashes-action: KeepUnchanged
 

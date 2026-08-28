@@ -129,7 +129,6 @@ spec:
     annotations:
       gentianos.io/gateway-buffer-limit: "512M"
       gentianos.io/gateway-request-timeout: "120"
-      gentianos.io/gateway-response-timeout: "120"
 
   browserProxy:
     - path: api

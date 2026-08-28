@@ -117,7 +117,6 @@ spec:
     annotations:
       gentianos.io/gateway-buffer-limit: "128M"
       gentianos.io/gateway-request-timeout: "120"
-      gentianos.io/gateway-response-timeout: "120"
 
   extraValues:
     fullnameOverride: "xwiki-ce"

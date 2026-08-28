@@ -167,7 +167,6 @@ spec:
     # connection for an hour.
     annotations:
       gentianos.io/gateway-request-timeout: "600"
-      gentianos.io/gateway-response-timeout: "600"
     subDomain: erp
     serviceName: odoo
     servicePort: 8069
