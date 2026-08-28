@@ -5,20 +5,25 @@ metadata:
   labels:
     gentianos.io/profile-name: nextcloud-base-ce
   annotations:
-    # No kernel-egress-namespaces. This carried envoy-gateway-system and did not
-    # use it: every server-side call Nextcloud makes already stays inside the
-    # cluster.
+    # For COLLABORA, not for Nextcloud -- this is the half of the pair added by
+    # 0e5a107 with the CoreDNS hairpin in gentian-os (4c3db842), same day.
     #
-    #   user_oidc discovery  -> gentian-idp-keycloak-keycloakx-http.platform-kernel:8080
-    #   richdocuments wopi_url        -> nextcloud-collabora.tenant-corp:9980
-    #   richdocuments wopi_callback_url -> nextcloud.tenant-corp:8080
+    # Every call the Nextcloud pod itself makes does stay in the cluster, and
+    # dropping this on that basis is why office documents stopped opening: the
+    # pod that needs it is the Collabora one. Opening a document, coolwsd
+    # fetches the settings assets richdocuments hands it, and those are absolute
+    # public URLs (WopiController::generateSettings and the file list it
+    # returns) -- https://cloud.${TENANT_DOMAIN}/apps/richdocuments/settings/...
     #
-    # public_wopi_url is the only public one and the browser is what follows it.
-    # Confirmed against the gateway's access log over 5.5h covering the pod's
-    # whole lifetime: 12247 requests, none of them from a Nextcloud pod.
+    # The gateway access-log evidence for removing it ("none of them from a
+    # Nextcloud pod") is true and does not cover Collabora, which is a separate
+    # pod and the only one that makes this call.
     #
-    # It was inherited through a rename rather than argued for, and Odoo copied
-    # the pattern for a need Nextcloud does not have.
+    # With the hairpin, cloud.* resolves to the gateway ClusterIP (10.x), which
+    # the tenant-isolation baseline already permits on 443; this grant is what
+    # says so explicitly. Without the hairpin it resolves to the load balancer's
+    # public address and no namespaceSelector rule can match it.
+    gentianos.io/kernel-egress-namespaces: envoy-gateway-system
     gentianos.io/portal-auth-mode: portal-bridge
 spec:
   displayName: Nextcloud
