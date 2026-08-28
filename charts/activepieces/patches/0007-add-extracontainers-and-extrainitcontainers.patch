@@ -1,0 +1,45 @@
+Description: Add extraContainers and extraInitContainers hooks
+ Gentian syncs an app's git-managed content with upstream git-sync running
+ INSIDE the app's pod, writing an emptyDir the app container also mounts. That
+ needs somewhere to inject the containers, and this chart offers no hook.
+ .
+ Without it the sync has to run as a separate Deployment writing a shared
+ ReadWriteMany volume, which makes a StorageClass with RWX a hard requirement
+ for an app whose content is a few MB of public, reproducible git. Most
+ clusters have no such class -- block storage (Cinder, EBS) is ReadWriteOnce --
+ so the PVC never binds and every pod mounting it is unschedulable.
+ .
+ Additive and guarded by 'if', in the same style as 0004: with the values unset
+ the rendered output is byte-identical to upstream.
+Author: Gentian Platform <platform@gentian.org>
+Origin: other, https://github.com/gentian-org/gentian-apps
+Forwarded: no
+Bug-Upstream: none filed
+Reason: Gentian-specific extension points, the same generic 'extra*' convention
+ 0004 introduced; worth proposing upstream, but not a defect report.
+Applied-Upstream: no
+Last-Update: 2026-08-28
+---
+--- a/templates/_podSpec.tpl
++++ b/templates/_podSpec.tpl
+@@ -34,6 +34,10 @@
+       {{- end }}
+     serviceAccountName: {{ include "activepieces.serviceAccountName" . }}
+     automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
++    {{- if .Values.extraInitContainers }}
++    initContainers:
++      {{- toYaml .Values.extraInitContainers | nindent 6 }}
++    {{- end }}
+     containers:
+       - name: {{ .Chart.Name }}
+         image: {{ include "activepieces.image" . }}
+@@ -176,6 +180,9 @@
+           successThreshold: {{ .Values.startupProbe.successThreshold }}
+           failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+         {{- end }}
++      {{- if .Values.extraContainers }}
++      {{- toYaml .Values.extraContainers | nindent 6 }}
++      {{- end }}
+     {{- if .Values.priorityClassName }}
+     priorityClassName: {{ .Values.priorityClassName }}
+     {{- end }}

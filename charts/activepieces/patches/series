@@ -4,3 +4,4 @@
 0004-add-extraenvvars-extravolumes-commandargs-and-hostal.patch
 0005-add-nginx-configmap-for-portal-sso-forwarding-and-ht.patch
 0006-mount-the-gentian-runtime-and-own-the-entrypoint.patch
+0007-add-extracontainers-and-extrainitcontainers.patch

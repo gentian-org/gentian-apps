@@ -90,7 +90,12 @@ index 0000000..22350c1
 +        }
 +
 +        location /custom-content {
-+            alias /usr/share/nginx/html/custom-content;
++            # /current, because the content is produced by git-sync running in
++            # this pod: it writes each revision to its own directory and swaps a
++            # symlink named "current" to point at it. Serving the parent would
++            # expose the revision directories and the symlink itself; serving
++            # through the symlink is what makes a re-sync atomic for readers.
++            alias /usr/share/nginx/html/custom-content/current;
 +            autoindex on;
 +            add_header Access-Control-Allow-Origin *;
 +        }

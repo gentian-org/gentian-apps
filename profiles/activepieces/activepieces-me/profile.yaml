@@ -42,7 +42,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: activepieces
-    version: 0.3.24
+    version: 0.3.26
   valueMapping:
     database:
       hostKey: activepieces.postgresql.host
@@ -102,9 +102,62 @@ spec:
       emptyDir: {}
     - name: nginx-run
       emptyDir: {}
+    # emptyDir, filled by the git-sync init container and kept current by the
+    # git-sync sidecar below -- both in this pod. It was a ReadWriteMany PVC
+    # written by a standalone Deployment, which made an RWX StorageClass a hard
+    # requirement for serving a few MB of public, reproducible git.
     - name: custom-content
-      persistentVolumeClaim:
-        claimName: ${TENANT_ID}-activepieces-git-content-pvc
+      emptyDir: {}
+    # git-sync in this pod, replacing the standalone Deployment that wrote a
+    # ReadWriteMany PVC. The content is public, reproducible git -- nothing to
+    # share, and sharing it made an RWX StorageClass a hard requirement.
+    #
+    # Runs as 1000 to match fsGroup, so the emptyDir is writable without the
+    # cross-pod gid negotiation the shared volume needed.
+    extraInitContainers:
+    - name: git-sync-init-content
+      image: registry.k8s.io/git-sync/git-sync:v4.2.3
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+      args:
+      - --repo=https://github.com/gentian-org/gentian-pieces.git
+      - --branch=main
+      - --root=/usr/share/nginx/html/custom-content
+      - --dest=current
+      - --one-time
+      volumeMounts:
+      - name: custom-content
+        mountPath: /usr/share/nginx/html/custom-content
+    extraContainers:
+    - name: git-sync-content
+      image: registry.k8s.io/git-sync/git-sync:v4.2.3
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+      args:
+      - --repo=https://github.com/gentian-org/gentian-pieces.git
+      - --branch=main
+      - --root=/usr/share/nginx/html/custom-content
+      - --dest=current
+      - --wait=60
+      - --stale-worktree-timeout=24h
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+        limits: {cpu: 50m, memory: 128Mi}
+      volumeMounts:
+      - name: custom-content
+        mountPath: /usr/share/nginx/html/custom-content
     extraVolumeMounts:
     - mountPath: /var/log/nginx
       name: nginx-log
@@ -135,8 +188,13 @@ spec:
         source: FILE
         syncMode: NONE
       data:
-        pvc:
-          # Unset: the cluster's default. See gentian-sidecar-git-modules values.
+        # An empty mapping, not an absent one: the chart dereferences
+        # .activepieces.data.pvc.existingClaim, so `pvc:` with no keys renders as
+        # null and every template using it fails with a nil pointer. Dropping the
+        # storageClass line without this left exactly that.
+        #
+        # No storageClass key: the cluster's default is the cluster's to choose.
+        pvc: {}
     podSecurityContext:
       fsGroup: 1000
     securityContext:
@@ -318,34 +376,11 @@ spec:
         value: ${TENANT_ID}_activepieces-me
       - name: AP_POSTGRES_DATABASE
         value: ${TENANT_ID}_activepieces_me
-  - name: git-sync
-    chart:
-      repository: oci://ghcr.io/gentian-org/charts
-      name: gentian-sidecar-git-modules
-      version: 0.1.7
-    extraValues:
-      podLabels:
-        gentianos.io/app: activepieces-me
-      git:
-        # Sync from GitHub rather than a git daemon on a developer workstation, as
-        # odoo-base-ce already does. The daemon worked around the namespace egress
-        # block and private-repo auth; neither applies — gentian-pieces is public
-        # and the profile already permits TCP/443 to anywhere, while the 9418 rule
-        # was pinned to one host's /32. A tenant workload should not depend on
-        # someone's laptop being up.
-        repoUrl: "https://github.com/gentian-org/gentian-pieces.git"
-        branch: main
-      # The sidecar clones into the chart's syncDir; what the app sees is the shared
-      # PVC below, which it mounts at /usr/share/nginx/html/custom-content. A
-      # git.mountPath key used to sit here and was never read by the chart.
-      persistence:
-        enabled: true
-        # Unset: the cluster's default. See gentian-sidecar-git-modules values.
-        size: 2Gi
-        accessMode: ReadWriteMany
-        pvcName: ${TENANT_ID}-activepieces-git-content-pvc
-
-  # Customization ladder — see customization.md
+  # git-sync used to be declared here as a standalone Deployment writing a
+  # ReadWriteMany PVC. It is now two containers in the app's own pod --
+  # extraInitContainers/extraContainers in extraValues above. The sso sidecar
+  # stays: it is a real service with its own endpoint, not a copy of shared
+  # content every reader could produce for itself.
   customization:
     grade: A
     rubricScore: 7
