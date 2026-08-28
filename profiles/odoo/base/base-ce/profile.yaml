@@ -115,7 +115,10 @@ spec:
         persistence:
           enabled: true
           size: 1Gi
-          storageClass: nfs-csi
+          # No storageClass: which classes exist is the cluster's to know. This
+          # named nfs-csi, which exists on one developer's cluster, so on every
+          # other cluster the PVC stayed Pending with `storageclass "nfs-csi"
+          # not found` and both the sidecar and Odoo itself were unschedulable.
         git:
           # Sync from GitHub rather than a git daemon on a developer workstation.
           # The daemon existed to work around two things: the namespace egress block

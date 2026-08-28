@@ -42,7 +42,15 @@ resources:
 persistence:
   enabled: false
   size: 1Gi
-  storageClass: "nfs-csi"
+  # Empty means the cluster's default StorageClass. A chart cannot know which
+  # classes a cluster has; naming one here asserted that nfs-csi exists
+  # everywhere, and it exists on one developer's cluster. Anywhere else the PVC
+  # sits Pending with `storageclass "nfs-csi" not found` and every pod mounting
+  # it is unschedulable -- which is how Odoo failed on an OpenStack cluster
+  # whose only classes are Cinder.
+  #
+  # A cluster that needs a non-default class sets it on its own claim.
+  storageClass: ""
   accessMode: "ReadWriteMany"
 
 podSecurityContext:

@@ -136,7 +136,7 @@ spec:
         syncMode: NONE
       data:
         pvc:
-          storageClass: nfs-csi
+          # Unset: the cluster's default. See gentian-sidecar-git-modules values.
     podSecurityContext:
       fsGroup: 1000
     securityContext:
@@ -340,7 +340,7 @@ spec:
       # git.mountPath key used to sit here and was never read by the chart.
       persistence:
         enabled: true
-        storageClass: nfs-csi
+        # Unset: the cluster's default. See gentian-sidecar-git-modules values.
         size: 2Gi
         accessMode: ReadWriteMany
         pvcName: ${TENANT_ID}-activepieces-git-content-pvc
