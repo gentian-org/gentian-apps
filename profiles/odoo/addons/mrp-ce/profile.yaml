@@ -26,7 +26,7 @@ spec:
       displayName:
         en_US: "Odoo Manufacturing"
         de_DE: "Odoo Fertigung"
-      linkSuffix: "/web?gentian_embed=1&action=mrp.mrp_production_action"
+      linkSuffix: "/odoo/action-mrp.mrp_production_action?gentian_embed=1"
       linkTarget: embedded
       allowedGroup: "App Users"
 

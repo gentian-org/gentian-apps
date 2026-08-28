@@ -26,7 +26,7 @@ spec:
       displayName:
         en_US: "Odoo Point of Sale"
         de_DE: "Odoo Point of Sale"
-      linkSuffix: "/web?gentian_embed=1&action=point_of_sale.action_pos_config_kanban"
+      linkSuffix: "/odoo/action-point_of_sale.action_pos_config_kanban?gentian_embed=1"
       linkTarget: embedded
       allowedGroup: "App Users"
 

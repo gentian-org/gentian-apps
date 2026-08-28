@@ -441,7 +441,7 @@ in `gentian_os` (§5.3) — not raw Odoo menu URLs alone.
 portalTiles:
   - name: odoo-accounting
     displayName: { en_US: "Accounting" }
-    linkSuffix: "/web?gentian_embed=1#action=gentian_os.action_accounting_embed"
+    linkSuffix: "/odoo/action-gentian_os.action_accounting_embed?gentian_embed=1"
     linkTarget: embedded
     # Operator replaces allowedGroups from gentianOdooModules — not App Users.
     allowedGroup: "gentian:tenant:${TENANT_ID}:app:odoo-accounting"
@@ -526,7 +526,11 @@ versions.
 
 1. Each module AppProfile `linkSuffix` targets a dedicated **`ir.actions.act_window`**
    with `target: fullscreen`, registered in `data/ir_actions.xml`.
-2. URLs include **`?gentian_embed=1`** (always appended in profile `linkSuffix`).
+2. URLs are `/odoo/action-<xmlid>?gentian_embed=1`. Odoo 17.2 replaced
+   `/web#action=` with a path router (`web/static/src/core/browser/router.js`
+   builds `action-${action}` and parses `startsWith("action-")`), and `/web`
+   never read an `action` QUERY parameter at all -- `web_client()` takes
+   `s_action` and drops the rest, so the client booted at its default app.
 3. Web client patch (JS + SCSS in `static/src/web/`) hides `.o_main_navbar` and
    related chrome when `gentian_embed=1` **or** when `window.parent` is the Gentian
    portal origin.
@@ -535,7 +539,7 @@ versions.
 
 ```yaml
 # Module profile linkSuffix pattern
-linkSuffix: "/web?gentian_embed=1#action=gentian_os.action_crm_embed"
+linkSuffix: "/odoo/action-gentian_os.action_crm_embed?gentian_embed=1"
 linkTarget: embedded   # fall back to newwindow if SSO/CSP breaks in WinBox iframe
 ```
 
@@ -764,7 +768,7 @@ Odoo actions, e.g.:
 portalTiles:
   - name: odoo-crm
     displayName: { en_US: "CRM" }
-    linkSuffix: "/web?gentian_embed=1#action=gentian_os.action_crm_embed"
+    linkSuffix: "/odoo/action-gentian_os.action_crm_embed?gentian_embed=1"
     linkTarget: embedded
     # allowedGroups resolved from UMC gentianOdooModules (§4.3)
     allowedGroup: "managed-by-attribute-OdooCRM"

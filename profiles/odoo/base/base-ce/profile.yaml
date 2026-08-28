@@ -9,25 +9,11 @@ metadata:
   labels:
     gentianos.io/profile-name: odoo-base-ce
   annotations:
-    # Odoo validates the OIDC token server-side: auth_oauth calls the provider's
-    # validation_endpoint, which gentian_os builds from OIDC_ISSUER --
-    # https://id.gentian.cloud/... That is the kernel gateway, and a tenant pod
-    # is otherwise allowed out only to platform-kernel and gentian-infra, so the
-    # call died in the pod:
-    #
-    #   MaxRetryError: HTTPSConnectionPool(host='id.gentian.cloud', port=443)
-    #   ... /auth/realms/corp/protocol/openid-connect/userinfo
-    #
-    # Odoo answered oauth_error=2, which the browser shows as "access denied" --
-    # nothing to do with the token, which carries every group the user needs.
-    #
-    # Worth knowing: this is the second-best fix. Nextcloud does not need this
-    # for SSO at all -- its user_oidc discovery endpoint is the in-cluster
-    # Keycloak Service, so its OIDC never leaves platform-kernel. Odoo could do
-    # the same if gentian_os took an internal URL for validation while keeping
-    # the public issuer for browser redirects, and then this grant could go.
-    # That is a change in odoo-modules; this unblocks sign-in today.
-    gentianos.io/kernel-egress-namespaces: envoy-gateway-system
+    # No kernel-egress-namespaces. Odoo validates tokens against the in-cluster
+    # Keycloak Service (extraValues.gentian.oidc.internalIssuer), so nothing it
+    # does at sign-in leaves the cluster and it has no reason to reach the
+    # gateway. It briefly carried envoy-gateway-system, copied from nextcloud,
+    # which did not need it either.
     gentianos.io/deployment-role: base
     gentianos.io/portal-auth-mode: oidc
 spec:
@@ -81,7 +67,7 @@ spec:
         de_DE: "Odoo Einstellungen"
       tile:
         icon: settings
-      linkSuffix: "/web?gentian_embed=1&action=base_setup.action_general_configuration"
+      linkSuffix: "/odoo/action-base_setup.action_general_configuration?gentian_embed=1"
       linkTarget: newwindow
       allowedGroup: "App Admins"
 

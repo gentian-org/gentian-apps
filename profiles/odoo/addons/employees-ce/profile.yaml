@@ -26,7 +26,7 @@ spec:
       displayName:
         en_US: "Odoo Employees"
         de_DE: "Odoo Mitarbeiter"
-      linkSuffix: "/web?gentian_embed=1&action=hr.open_view_employee_list_my"
+      linkSuffix: "/odoo/action-hr.open_view_employee_list_my?gentian_embed=1"
       linkTarget: embedded
       allowedGroup: "App Users"
 

@@ -26,7 +26,7 @@ spec:
       displayName:
         en_US: "Odoo Inventory"
         de_DE: "Odoo Inventar"
-      linkSuffix: "/web?gentian_embed=1&action=stock.stock_picking_type_action"
+      linkSuffix: "/odoo/action-stock.stock_picking_type_action?gentian_embed=1"
       linkTarget: embedded
       allowedGroup: "App Users"
 
