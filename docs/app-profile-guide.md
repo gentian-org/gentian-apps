@@ -960,28 +960,29 @@ warm-oat paper, ink text, gentian-500 accent — with no dark variant. Nextcloud
 this *worse*, not better: the flat expanse that replaces the photo is the theme's
 background colour, at full window size.
 
-Pin the app instead of restyling it. `enforce_theme` is a **system** config
-(`getSystemValueString`), so it belongs in a `*.config.php` drop-in, not in
-`occ`; the brand colours are theming **app** config, held in the database, so
-they belong in the entrypoint hook:
+Pin the theme; leave the rest of the app's appearance alone. `enforce_theme` is
+a **system** config (`getSystemValueString`), so it belongs in a `*.config.php`
+drop-in:
 
 ```php
 // config/gentian-theme.config.php  — L1 drop-in
 $CONFIG = array('enforce_theme' => 'light');
 ```
 
-```bash
-occ theming:config primary_color "#262696"          # gentian-500
-occ theming:config background_color "#f4f1ea"       # paper-0
-occ config:app:set theming backgroundMime --value=backgroundColor   # flat, no photo
-```
+That is the whole fix. **Resist restyling the app to match the shell.** Nextcloud
+holds its brand colours (`primary_color`, `background_color`, `backgroundMime`)
+as theming **app** config, in the database — so an entrypoint hook that sets them
+writes state that a later revert of that hook cannot take back, and the tenant
+keeps colours no profile in git asks for any more. Repainting a wrapped app is
+also a much larger claim than making it sit flush in a window: it is the app's
+appearance, the admin's to choose. Matching the container is the job; matching
+the palette is not.
 
-`primary_color` is validated against `/^#([0-9a-f]{3}|[0-9a-f]{6})$/i` and the
-command exits 1 on a miss; `background_color` is read back through the same
-pattern and silently falls back to the shipped default if it does not match.
-Enforcing a theme also removes the per-user light/dark switch — the right
-trade when the app is presented as part of the portal rather than as its own
-desktop, and worth stating in the profile rather than leaving to be discovered.
+Note what `enforce_theme` costs: it removes the per-user light/dark switch in
+Personal settings, and Nextcloud offers no admin-level *default* theme —
+`getEnabledThemes()` falls back to a hardcoded `["default"]` per user, so pinning
+is the only server-side lever. State that in the profile rather than leaving it
+to be discovered.
 
 This is deliberately **not** `--header-height: 0`. That variable also sizes
 NcModal's own header — its close button is `margin: calc((var(--header-height) -
