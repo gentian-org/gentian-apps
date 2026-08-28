@@ -34,6 +34,11 @@ gentian:
     branch: "main"
     syncInterval: 60
     secretName: ""
+    # recursive, because odoo-modules carries its addons in submodules --
+    # stoodio, bpmn, camoonda and hide_enterprise_modules. git-sync defaults to
+    # off, so with the flag hardcoded off the clone landed without four of the
+    # addon trees and Odoo simply did not see those modules.
+    submodules: recursive
   gitSources: []
 
 persistence:

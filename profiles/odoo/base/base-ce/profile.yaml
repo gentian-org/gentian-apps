@@ -69,7 +69,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: odoo
-    version: "0.1.15"
+    version: "0.1.16"
 
   deploymentMethod: crossplane
 
@@ -103,66 +103,15 @@ spec:
           - protocol: TCP
             port: 443
 
-  sidecars:
-    - name: git-modules
-      chart:
-        repository: oci://ghcr.io/gentian-org/charts
-        name: gentian-sidecar-git-modules
-        version: "0.1.7"
-      extraValues:
-        podLabels:
-          gentianos.io/app: odoo-base-ce
-        persistence:
-          enabled: true
-          size: 1Gi
-          # No storageClass: which classes exist is the cluster's to know. This
-          # named nfs-csi, which exists on one developer's cluster, so on every
-          # other cluster the PVC stayed Pending with `storageclass "nfs-csi"
-          # not found` and both the sidecar and Odoo itself were unschedulable.
-        git:
-          # Sync from GitHub rather than a git daemon on a developer workstation.
-          # The daemon existed to work around two things: the namespace egress block
-          # and private-repo auth. Neither applies — odoo-modules and its three
-          # submodules are public, and app-egress-odoo-base-ce already permits
-          # TCP/443 to anywhere, while the 9418 rule is pinned to one host's /32.
-          # A tenant workload should not depend on someone's laptop being up.
-          repoUrl: "https://github.com/gentian-org/odoo-modules.git"
-          branch: "develop"
-        # This sidecar writes the modules volume that Odoo reads, so the two have to
-        # agree on a group. Odoo runs 999:999 and creates the directory root:999 with
-        # the setgid bit; the sidecar chart defaults to gid 1000, which lands in
-        # "other" (r-x) and fails the initial clone with "Permission denied" on
-        # .git — the pod then crash-loops while Odoo itself looks perfectly healthy.
-        #
-        # The group belongs here rather than in the chart: the chart is generic and
-        # the correct gid is a property of the app it is paired with.
-        podSecurityContext:
-          runAsNonRoot: true
-          runAsUser: 1000
-          runAsGroup: 999
-          fsGroup: 999
-          seccompProfile:
-            type: RuntimeDefault
-        containerSecurityContext:
-          runAsNonRoot: true
-          runAsUser: 1000
-          runAsGroup: 999
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
-          seccompProfile:
-            type: RuntimeDefault
-
+  # No sidecars. git-modules used to be declared here as a standalone
+  # Deployment with its own ReadWriteMany PVC; it is now two containers inside
+  # Odoo's own pod, configured by extraValues.gentian.git above.
   extraValues:
     fullnameOverride: odoo
     tenantId: "${TENANT_ID}"
-    extraVolumes:
-      - name: custom-addons
-        persistentVolumeClaim:
-          claimName: "${TENANT_ID}-odoo-base-ce-git-modules-pvc"
-    extraVolumeMounts:
-      - name: custom-addons
-        mountPath: /opt/odoo/custom-addons
+    # No extraVolumes: the chart defaults extra-addons to an emptyDir and mounts
+    # it at modulesPath, which is exactly what the in-pod git-sync writes to.
+    # This used to point the volume at the shared RWX PVC.
     resources:
       requests:
         cpu: 500m
@@ -177,8 +126,27 @@ spec:
     gentian:
       initModules: "base,web,gentian_os,account"
       modulesPath: /opt/odoo/custom-addons
+      # The chart's own git-sync, running in Odoo's pod: an init container that
+      # clones once before Odoo starts, and a sidecar that re-syncs on the
+      # interval. Both are upstream git-sync at 999:999, writing the emptyDir
+      # the chart already mounts at modulesPath, and configmap.yaml appends
+      # <modulesPath>/<name>/current to addons_path.
+      #
+      # This replaces a standalone gentian-sidecar-git-modules Deployment that
+      # wrote the same content to a ReadWriteMany PVC three pods shared. The
+      # content is 2.3MB of public, reproducible git -- there is nothing to
+      # share. Sharing it cost an RWX StorageClass the platform does not
+      # install, and on any cluster without one the PVC stayed Pending and
+      # every pod mounting it was unschedulable.
+      #
+      # It also removes what the split cost us: the gid 999/1000 mismatch that
+      # crash-looped the clone 60 times, and the Job's five-minute wait racing
+      # a clone in another pod. One pod, one fsGroup, ordered by initContainer.
       git:
-        enabled: false
+        enabled: true
+        repo: "https://github.com/gentian-org/odoo-modules.git"
+        branch: "develop"
+        syncInterval: 60
 
   ingress:
     subDomain: erp

@@ -137,6 +137,15 @@
             },
             "secretName": {
               "type": "string"
+            },
+            "submodules": {
+              "type": "string",
+              "enum": [
+                "off",
+                "shallow",
+                "recursive"
+              ],
+              "description": "git-sync --submodules mode. recursive, because odoo-modules carries addons in submodules."
             }
           }
         },

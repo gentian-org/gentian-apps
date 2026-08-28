@@ -67,7 +67,7 @@ spec:
           {{- $gitSources = .Values.gentian.gitSources -}}
         {{- end -}}
         {{- if and .Values.gentian.git.enabled (eq (len $gitSources) 0) -}}
-          {{- $gitSources = list (dict "name" "default" "repo" .Values.gentian.git.repo "branch" .Values.gentian.git.branch "syncInterval" (int .Values.gentian.git.syncInterval) "secretName" .Values.gentian.git.secretName) -}}
+          {{- $gitSources = list (dict "name" "default" "repo" .Values.gentian.git.repo "branch" .Values.gentian.git.branch "syncInterval" (int .Values.gentian.git.syncInterval) "secretName" .Values.gentian.git.secretName "submodules" (default "recursive" .Values.gentian.git.submodules)) -}}
         {{- end -}}
         {{- if .Values.dropIns.odooConf.enabled }}
         # Customization ladder rung L1 (docs/app-customization.md §2.2). Odoo has no
@@ -128,7 +128,7 @@ spec:
             - --branch={{ .branch }}
             - --root={{ $.Values.gentian.modulesPath }}
             - --dest={{ .name }}/current
-            - --submodules=off
+            - --submodules={{ default "recursive" .submodules }}
             - --one-time
             {{- if .secretName }}
             - --ssh-key-file=/etc/git-secret/ssh
@@ -277,7 +277,7 @@ spec:
             - --branch={{ .branch }}
             - --root={{ $.Values.gentian.modulesPath }}
             - --dest={{ .name }}/current
-            - --submodules=off
+            - --submodules={{ default "recursive" .submodules }}
             - --wait={{ .syncInterval }}
             - --stale-worktree-timeout=24h
             {{- if .secretName }}

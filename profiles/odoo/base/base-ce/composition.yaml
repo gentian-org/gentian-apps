@@ -854,6 +854,37 @@ spec:
                           seccompProfile:
                             type: RuntimeDefault
                         initContainers:
+                          {{- /* The Job's own copy of the modules.
+
+                                 It used to mount the modules PVC the sidecar
+                                 Deployment wrote, and poll for gentian_os for up
+                                 to five minutes, because it was racing a clone
+                                 happening in another pod. Odoo now syncs inside
+                                 its own pod to an emptyDir, which no Job can
+                                 share -- so the Job clones for itself. 2.3MB of
+                                 public git, and the race goes with it:
+                                 initContainers are ordered, so the modules are
+                                 on disk before anything looks for them. */}}
+                          - name: git-sync-modules
+                            image: registry.k8s.io/git-sync/git-sync:v4.2.3
+                            securityContext:
+                              runAsUser: 999
+                              runAsGroup: 999
+                              allowPrivilegeEscalation: false
+                              capabilities:
+                                drop: ["ALL"]
+                              seccompProfile:
+                                type: RuntimeDefault
+                            args:
+                              - --repo=https://github.com/gentian-org/odoo-modules.git
+                              - --branch=develop
+                              - --root=/opt/odoo/custom-addons
+                              - --dest=default/current
+                              - --submodules=recursive
+                              - --one-time
+                            volumeMounts:
+                              - name: extra-addons
+                                mountPath: /opt/odoo/custom-addons
                           - name: wait-for-base
                             image: postgres:16-alpine
                             securityContext:
@@ -874,22 +905,9 @@ spec:
                                   echo "waiting for base odoo service..."
                                   sleep 2
                                 done
-                                # gentian_os is synced into custom-addons by the
-                                # git-modules sidecar. Installing before it lands fails
-                                # with "module not found", and the Job would burn its
-                                # backoff budget racing the clone. Wait for it instead,
-                                # bounded so a broken sidecar surfaces as a clear timeout
-                                # rather than an install error that hides the real cause.
-                                i=0
-                                until [ -d /opt/odoo/custom-addons/gentian_os ]; do
-                                  i=$((i+5))
-                                  if [ $i -ge 300 ]; then
-                                    echo "gentian_os not present after 5m — is the git-modules sidecar running?" >&2
-                                    exit 1
-                                  fi
-                                  echo "waiting for odoo-modules to sync..."
-                                  sleep 5
-                                done
+                                # No wait for gentian_os: the git-sync-modules
+                                # init container above already put it on this
+                                # pod's volume, and initContainers run in order.
                             volumeMounts:
                               - name: extra-addons
                                 mountPath: /opt/odoo/custom-addons
@@ -988,9 +1006,10 @@ spec:
                           - name: odoo-data
                             persistentVolumeClaim:
                               claimName: odoo-data
+                          # emptyDir, not the shared PVC: git-sync-modules above
+                          # fills it, and nothing outside this pod reads it.
                           - name: extra-addons
-                            persistentVolumeClaim:
-                              claimName: {{ $tenant }}-{{ $app }}-git-modules-pvc
+                            emptyDir: {}
               providerConfigRef:
                 name: kubernetes
             {{- end }}

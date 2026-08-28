@@ -3,7 +3,7 @@
   {{- $gitSources = .Values.gentian.gitSources -}}
 {{- end -}}
 {{- if and .Values.gentian.git.enabled (eq (len $gitSources) 0) -}}
-  {{- $gitSources = list (dict "name" "default" "repo" .Values.gentian.git.repo "branch" .Values.gentian.git.branch "syncInterval" (int .Values.gentian.git.syncInterval) "secretName" .Values.gentian.git.secretName) -}}
+  {{- $gitSources = list (dict "name" "default" "repo" .Values.gentian.git.repo "branch" .Values.gentian.git.branch "syncInterval" (int .Values.gentian.git.syncInterval) "secretName" .Values.gentian.git.secretName "submodules" (default "recursive" .Values.gentian.git.submodules)) -}}
 {{- end -}}
 {{- $addonsPaths := list "/opt/odoo/src/odoo/addons" "/opt/odoo/custom-addons" -}}
 {{- range $gitSources -}}
