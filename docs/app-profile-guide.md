@@ -926,6 +926,15 @@ a user who opens it there needs its navigation. Put the detection and the rules 
 `<head>`, before the stylesheets, so the header never paints and the content never
 starts a header-height down and then jumps.
 
+**Override the container the app actually renders, not the one in the template.**
+Nextcloud's `layout.user.php` ships `<div id="content">`, but every Vue app —
+Files, Settings, the addons — mounts `NcContent`, which renders `#content-vue`
+and carries its own scoped copy of the same layout rule
+(`.content[data-v-…] { margin-top: var(--header-height) }`). A rule written
+against `#content` alone silently does nothing on exactly the screens users open
+from the portal. An id selector under the embed class clears the scoped rule;
+matching on the shared `.content` class is a coin-flip on specificity.
+
 **Nextcloud** is the worked example. Its entrypoint hook rebuilds
 `core/templates/layout.{user,public}.php` from the image's pristine copy under
 `/usr/src/nextcloud` on every start and injects a block after
@@ -942,6 +951,37 @@ change to it ever reaches a tenant that has already been installed.
 
 `style-src` is `'self' 'unsafe-inline'` and carries no nonce-source, so the
 `<style>` needs no nonce; `script-src` is nonce-only, so the `<script>` does.
+
+**Themes: the shell is light-only, so pin the app.** The Gentian design system
+(`gentian-ui/frontend/design-system/gentian-theme.css`) defines one palette —
+warm-oat paper, ink text, gentian-500 accent — with no dark variant. Nextcloud's
+`default` theme follows `prefers-color-scheme`, so a user on a dark OS gets a
+`#171717` app inside a light window frame. Removing the app's own wallpaper makes
+this *worse*, not better: the flat expanse that replaces the photo is the theme's
+background colour, at full window size.
+
+Pin the app instead of restyling it. `enforce_theme` is a **system** config
+(`getSystemValueString`), so it belongs in a `*.config.php` drop-in, not in
+`occ`; the brand colours are theming **app** config, held in the database, so
+they belong in the entrypoint hook:
+
+```php
+// config/gentian-theme.config.php  — L1 drop-in
+$CONFIG = array('enforce_theme' => 'light');
+```
+
+```bash
+occ theming:config primary_color "#262696"          # gentian-500
+occ theming:config background_color "#f4f1ea"       # paper-0
+occ config:app:set theming backgroundMime --value=backgroundColor   # flat, no photo
+```
+
+`primary_color` is validated against `/^#([0-9a-f]{3}|[0-9a-f]{6})$/i` and the
+command exits 1 on a miss; `background_color` is read back through the same
+pattern and silently falls back to the shipped default if it does not match.
+Enforcing a theme also removes the per-user light/dark switch — the right
+trade when the app is presented as part of the portal rather than as its own
+desktop, and worth stating in the profile rather than leaving to be discovered.
 
 This is deliberately **not** `--header-height: 0`. That variable also sizes
 NcModal's own header — its close button is `margin: calc((var(--header-height) -
