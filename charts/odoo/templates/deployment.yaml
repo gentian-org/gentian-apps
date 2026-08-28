@@ -217,6 +217,17 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret.name }}
                   key: oidc-issuer
+            # Where Odoo VALIDATES a token, as opposed to where it sends the
+            # browser. auth_oauth calls the issuer's userinfo endpoint from the
+            # pod, and the public issuer is the kernel gateway -- a round trip
+            # out of the cluster and back in, which a tenant app is not allowed
+            # to make and which fails as "access denied" at the sign-in.
+            #
+            # The browser still goes to the public issuer; only this leg is
+            # internal. Empty means "use the public issuer", which is the old
+            # behaviour for anything not running against a kernel Keycloak.
+            - name: OIDC_INTERNAL_ISSUER
+              value: {{ .Values.gentian.oidc.internalIssuer | default "" | quote }}
             - name: GENTIAN_TENANT_ID
               value: {{ .Values.tenantId | quote }}
             - name: GENTIAN_CONFIG_PATH

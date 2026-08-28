@@ -5,7 +5,20 @@ metadata:
   labels:
     gentianos.io/profile-name: nextcloud-base-ce
   annotations:
-    gentianos.io/kernel-egress-namespaces: envoy-gateway-system
+    # No kernel-egress-namespaces. This carried envoy-gateway-system and did not
+    # use it: every server-side call Nextcloud makes already stays inside the
+    # cluster.
+    #
+    #   user_oidc discovery  -> gentian-idp-keycloak-keycloakx-http.platform-kernel:8080
+    #   richdocuments wopi_url        -> nextcloud-collabora.tenant-corp:9980
+    #   richdocuments wopi_callback_url -> nextcloud.tenant-corp:8080
+    #
+    # public_wopi_url is the only public one and the browser is what follows it.
+    # Confirmed against the gateway's access log over 5.5h covering the pod's
+    # whole lifetime: 12247 requests, none of them from a Nextcloud pod.
+    #
+    # It was inherited through a rename rather than argued for, and Odoo copied
+    # the pattern for a need Nextcloud does not have.
     gentianos.io/portal-auth-mode: portal-bridge
 spec:
   displayName: Nextcloud

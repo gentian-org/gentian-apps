@@ -88,7 +88,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: odoo
-    version: "0.1.16"
+    version: "0.1.17"
 
   deploymentMethod: crossplane
 
@@ -145,6 +145,13 @@ spec:
     gentian:
       initModules: "base,web,gentian_os,account"
       modulesPath: /opt/odoo/custom-addons
+      oidc:
+        # Where the pod validates a token. The browser still goes to the public
+        # issuer; only auth_oauth's server-side userinfo call moves in-cluster,
+        # so signing in no longer depends on a tenant pod being able to reach
+        # the kernel gateway. ${TENANT_ID} is the realm, which matches the
+        # public issuer's realm segment.
+        internalIssuer: "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}"
       # The chart's own git-sync, running in Odoo's pod: an init container that
       # clones once before Odoo starts, and a sidecar that re-syncs on the
       # interval. Both are upstream git-sync at 999:999, writing the emptyDir

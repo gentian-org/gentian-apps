@@ -178,6 +178,15 @@
               }
             }
           }
+        },
+        "oidc": {
+          "type": "object",
+          "properties": {
+            "internalIssuer": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
         }
       }
     },

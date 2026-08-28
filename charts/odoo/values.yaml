@@ -24,6 +24,10 @@ oidc:
   clientSecret: ""
 
 gentian:
+  # Where the pod validates OIDC tokens, when that must differ from where the
+  # browser is sent. Empty means "the same as OIDC_ISSUER".
+  oidc:
+    internalIssuer: ""
   configPath: /etc/gentian/config.json
   bindingsPath: /etc/gentian/bindings.json
   modulesPath: /opt/odoo/custom-addons
