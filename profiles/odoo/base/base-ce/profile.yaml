@@ -149,6 +149,25 @@ spec:
         syncInterval: 60
 
   ingress:
+    # Odoo's SSO callback exceeds Envoy's 15s default route timeout, so the
+    # sign-in that gets a user into the app is the request that gets cut:
+    #
+    #   504  UT  15000ms  /auth_oauth/signin?state=...
+    #
+    # /auth_oauth/signin is where Odoo takes the Keycloak callback, links or
+    # creates the user, and loads the web client for the first time -- which
+    # compiles the JS/CSS asset bundles. That is minutes of work on a small
+    # node, once, and every unauthenticated path is served in well under a
+    # second. A default meant for ordinary requests is simply the wrong budget
+    # for it.
+    #
+    # nextcloud already declares the same annotations for the same reason. 600s
+    # rather than its 3600s: nothing here is a multi-hour upload, and a hung
+    # backend should still surface within ten minutes rather than hold the
+    # connection for an hour.
+    annotations:
+      gentianos.io/gateway-request-timeout: "600"
+      gentianos.io/gateway-response-timeout: "600"
     subDomain: erp
     serviceName: odoo
     servicePort: 8069
