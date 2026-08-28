@@ -6,6 +6,22 @@ metadata:
     app.kubernetes.io/name: {{ include "odoo.name" . }}
 spec:
   replicas: 1
+  # Recreate, not the default RollingUpdate.
+  #
+  # One replica on a ReadWriteOnce volume: a rolling update starts the new pod
+  # before stopping the old one, and the new pod cannot attach a disk the old
+  # one still holds. On Cinder the volume is pinned to its availability zone
+  # too, so the scheduler must place the replacement on a node in that zone
+  # with room to spare -- and when it cannot, the rollout simply stops:
+  #
+  #   0/7 nodes are available: 1 node(s) didn't match PersistentVolume's node
+  #   affinity, 6 Insufficient memory.
+  #
+  # The old pod keeps serving, so nothing looks broken; the new one just never
+  # arrives. Recreate stops the old pod first, which is what a single-writer
+  # volume can actually do. The nextcloud chart beside this one already does it.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "odoo.name" . }}
