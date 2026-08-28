@@ -901,6 +901,54 @@ curl -sI https://id.${KERNEL_DOMAIN}/ | grep -i content-security
 # expect: frame-ancestors 'self' https://portal.<kernel> https://*.demo.<kernel> …
 ```
 
+### 6f. Embedded apps must not draw their own window chrome
+
+gentian-ui is the window manager: it supplies the title bar, the desktop and the
+app switcher. An app opened with `linkTarget: embedded` fills a window body, so
+any chrome it draws for itself is a second, wrong one — a top bar inside a title
+bar, or a rounded card floating on the app's own wallpaper inside the shell's.
+
+Hiding the app's header is only half of it. Modern app shells reserve the header's
+height on the content container and paint a background behind an inset, rounded
+content card; hide the header alone and the reserved strip stays as an empty gap
+with the wallpaper showing through it. **Four things have to go, not one:**
+
+| What | Typical mechanism |
+|---|---|
+| The header itself | `display: none` |
+| The space reserved for it | a `margin-top` / `padding-top` / `top` of the header height on the content container |
+| The inset and rounded corners of the content card | a container margin and border-radius, often behind CSS variables |
+| The background the card floats on | a wallpaper or accent colour on `<body>` or `<html>` |
+
+Detect the iframe client-side (`window.self !== window.top`) rather than serving
+different HTML per route — the app is reachable directly at its own host too, and
+a user who opens it there needs its navigation. Put the detection and the rules in
+`<head>`, before the stylesheets, so the header never paints and the content never
+starts a header-height down and then jumps.
+
+**Nextcloud** is the worked example. Its entrypoint hook rebuilds
+`core/templates/layout.{user,public}.php` from the image's pristine copy under
+`/usr/src/nextcloud` on every start and injects a block after
+`<meta charset="utf-8">`: a nonce'd script that sets `html.gentian-embedded`, and
+a stylesheet that hides `#header`, zeroes `#content`'s `margin-top`, and — on
+`body`, where the theming variables are declared — sets
+`--body-container-margin`, `--body-container-radius` and `--body-height` and
+clears `--image-background`.
+
+Rebuilding from the pristine copy is what makes the hook re-appliable.
+`/var/www/html` is a persistent volume: an in-place edit guarded by "is my marker
+already there?" pins whichever revision of the block landed first, and no later
+change to it ever reaches a tenant that has already been installed.
+
+`style-src` is `'self' 'unsafe-inline'` and carries no nonce-source, so the
+`<style>` needs no nonce; `script-src` is nonce-only, so the `<script>` does.
+
+This is deliberately **not** `--header-height: 0`. That variable also sizes
+NcModal's own header — its close button is `margin: calc((var(--header-height) -
+var(--default-clickable-area)) / 2)` and its play/pause controls are
+`width: var(--header-height)` — so zeroing it globally collapses modal chrome.
+Override the two or three rules that consume it for page layout instead.
+
 ### 6g. Nextcloud (App Store)
 
 Nextcloud is an **App Store app** (`profiles/nextcloud/profile.yaml`), not a kernel
