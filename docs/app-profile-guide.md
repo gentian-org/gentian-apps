@@ -952,37 +952,56 @@ change to it ever reaches a tenant that has already been installed.
 `style-src` is `'self' 'unsafe-inline'` and carries no nonce-source, so the
 `<style>` needs no nonce; `script-src` is nonce-only, so the `<script>` does.
 
-**Themes: the shell is light-only, so pin the app.** The Gentian design system
-(`gentian-ui/frontend/design-system/gentian-theme.css`) defines one palette —
-warm-oat paper, ink text, gentian-500 accent — with no dark variant. Nextcloud's
-`default` theme follows `prefers-color-scheme`, so a user on a dark OS gets a
-`#171717` app inside a light window frame. Removing the app's own wallpaper makes
-this *worse*, not better: the flat expanse that replaces the photo is the theme's
-background colour, at full window size.
+**Themes: the shell is light-only, and the app must be defaulted, not pinned.**
+The Gentian design system (`gentian-ui/frontend/design-system/gentian-theme.css`)
+defines one palette with no dark variant. Nextcloud's `default` theme follows
+`prefers-color-scheme`, so a user on a dark OS gets a `#171717` app inside a
+light window frame. Removing the app's own wallpaper makes this *worse*: the
+flat expanse that replaces the photo is the theme's background colour, at full
+window size.
 
-Pin the theme; leave the rest of the app's appearance alone. `enforce_theme` is
-a **system** config (`getSystemValueString`), so it belongs in a `*.config.php`
-drop-in:
+`enforce_theme` looks like the lever and is the wrong one. It is a **system**
+config, and `ThemesService::getEnabledThemes()` applies it as
+`array_merge([$enforcedTheme], $enabledThemes)` — so a logged-in user whose
+`enabled-themes` is unset still gets the hardcoded `["default"]` merged in, and
+`<body>` still carries `data-theme-default`. It also removes the per-user
+light/dark switch outright.
 
-```php
-// config/gentian-theme.config.php  — L1 drop-in
-$CONFIG = array('enforce_theme' => 'light');
+Set the **user default** instead. Nextcloud has no admin-level default theme, so
+this is a per-user value, applied only when unset so a deliberate choice
+survives:
+
+```bash
+occ user:setting <uid> theming enabled-themes '["light"]'
 ```
 
-That is the whole fix. **Resist restyling the app to match the shell.** Nextcloud
-holds its brand colours (`primary_color`, `background_color`, `backgroundMime`)
-as theming **app** config, in the database — so an entrypoint hook that sets them
-writes state that a later revert of that hook cannot take back, and the tenant
-keeps colours no profile in git asks for any more. Repainting a wrapped app is
-also a much larger claim than making it sit flush in a window: it is the app's
-appearance, the admin's to choose. Matching the container is the job; matching
-the palette is not.
+Two traps in automating that. A Nextcloud user exists only after their **first
+OIDC login**, so a start-up hook cannot reach someone who has not arrived yet —
+write the script to disk and let the cron sidecar re-run it, exactly as the mail
+provisioning does. And test with the **exit code**: `occ user:setting` prints
+*"The setting does not exist for user X"* on **stdout** and exits 1, so a check
+on captured output is non-empty precisely when the value is missing — backwards,
+and silent.
 
-Note what `enforce_theme` costs: it removes the per-user light/dark switch in
-Personal settings, and Nextcloud offers no admin-level *default* theme —
-`getEnabledThemes()` falls back to a hardcoded `["default"]` per user, so pinning
-is the only server-side lever. State that in the profile rather than leaving it
-to be discovered.
+**`data-theme-default` is what the embedded editor reads.** Collabora takes its
+theme from richdocuments' `getUITheme()`, which honours the Nextcloud theme only
+when that attribute is absent and otherwise falls back to the OS preference:
+
+```js
+const matchedDarkMode = (!dataset?.themes || dataset?.themes === '' || dataset?.themeDefault === '')
+    ? systemDarkMode : nextcloudDarkMode
+```
+
+So the attribute is not cosmetic — it decides the theme of a whole second
+application. Check it on an **authenticated** page: anonymous requests resolve
+themes differently, and a login page can show the intended theme while every
+signed-in user gets the other one.
+
+**Do not repaint the app to match the shell.** Nextcloud holds `primary_color`,
+`background_color` and `backgroundMime` as theming **app** config, in the
+database, so a hook that sets them writes state a later revert of that hook
+cannot take back. Matching the container is the job; matching the palette is
+the admin's call.
 
 This is deliberately **not** `--header-height: 0`. That variable also sizes
 NcModal's own header — its close button is `margin: calc((var(--header-height) -
