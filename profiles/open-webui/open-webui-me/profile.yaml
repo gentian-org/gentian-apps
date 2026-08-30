@@ -21,6 +21,12 @@ metadata:
     # OpenWebUI needs network access to the platform-kernel namespace where LiteLLM resides
     gentianos.io/kernel-egress-namespaces: platform-kernel,envoy-gateway-system
     gentianos.io/standard-image-pull-secrets: "true"
+    # The portal opens this app hidden at desktop mount. The AI widget queries it
+    # in the background, and a cold app answers with a login redirect instead of a
+    # reply. The need is declared here rather than known by the shell: gentian-ui
+    # used to find it by the literal app id "open-webui-open-webui", which is the
+    # kind of app-specific knowledge the platform must not carry.
+    gentianos.io/portal-preopen: "true"
 spec:
   displayName: "AI Chat"
   description: "User-friendly chat interface for LLMs, configured to route through the central LiteLLM proxy."
