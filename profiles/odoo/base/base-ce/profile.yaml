@@ -74,7 +74,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: odoo
-    version: "0.1.18"
+    version: "0.1.19"
 
   deploymentMethod: crossplane
 
@@ -114,9 +114,16 @@ spec:
   extraValues:
     fullnameOverride: odoo
     tenantId: "${TENANT_ID}"
-    # No extraVolumes: the chart defaults extra-addons to an emptyDir and mounts
-    # it at modulesPath, which is exactly what the in-pod git-sync writes to.
-    # This used to point the volume at the shared RWX PVC.
+    # No extraVolumes here: the chart defaults extra-addons to an emptyDir and
+    # mounts it at modulesPath, which is exactly what the in-pod git-sync writes
+    # to. This used to point the volume at the shared RWX PVC.
+    #
+    # The profile is not the only writer, though. On a staging-issuer cluster the
+    # composition adds the kernel trust anchor to extraVolumes/extraVolumeMounts,
+    # and chart <=0.1.18 read a non-empty list as "replace the addons volume" —
+    # so the git-sync containers mounted a volume nobody defined and every Helm
+    # upgrade failed, freezing Odoo on its last good spec. 0.1.19 defines
+    # extra-addons unless an entry of that name replaces it, and appends the rest.
     resources:
       requests:
         cpu: 500m

@@ -253,7 +253,14 @@ spec:
           volumeMounts:
             - name: odoo-data
               mountPath: /opt/odoo/data
-            {{- if not .Values.extraVolumeMounts }}
+            {{- /* Mounted unless the caller replaces it by name. This used to be
+                 skipped whenever extraVolumeMounts was set at all, so an app
+                 asking for any unrelated mount lost its addons directory. */}}
+            {{- $addonsMounted := false }}
+            {{- range .Values.extraVolumeMounts }}
+            {{- if eq .name "extra-addons" }}{{ $addonsMounted = true }}{{ end }}
+            {{- end }}
+            {{- if not $addonsMounted }}
             - name: extra-addons
               mountPath: {{ .Values.gentian.modulesPath }}
             {{- end }}
@@ -327,12 +334,23 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
-        {{- if not .Values.extraVolumes }}
+        {{- /* Defined unless the caller replaces it by name. The git-sync init
+             container and sidecar mount extra-addons unconditionally, so
+             suppressing this whenever extraVolumes was non-empty rendered a
+             Deployment referencing a volume that did not exist. The ACME staging
+             trust anchor is what hit it: one unrelated volume, and every Helm
+             upgrade failed with `volumeMounts[0].name: Not found: "extra-addons"`,
+             pinning Odoo to whatever spec was last applied successfully. */}}
+        {{- $addonsDefined := false }}
+        {{- range .Values.extraVolumes }}
+        {{- if eq .name "extra-addons" }}{{ $addonsDefined = true }}{{ end }}
+        {{- end }}
+        {{- if not $addonsDefined }}
         - name: extra-addons
           emptyDir: {}
         {{- end }}
-        {{- if .Values.extraVolumes }}
-        {{- toYaml .Values.extraVolumes | nindent 8 }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
         {{- if .Values.dropIns.odooConf.enabled }}
         # Written by the merge-conf-d init container; the raw rendered config lives
