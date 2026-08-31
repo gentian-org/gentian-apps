@@ -19,7 +19,10 @@ spec:
   license: LGPL-3.0
   author: OCA
   tile:
-    icon: database
+    # Odoo's own icon for the module this profile installs, set inside the
+    # catalogue's 52x52 frame so it sits with the other tiles.
+    image: assets/tile.svg
+    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBkPSJtMjUgNCA2Ljg1NyA0TDE1LjUgMTl2MTZsLjUgNS43NS05LTUuMjV2LTIxTDI1IDRaIiBmaWxsPSIjRkJCOTQ1Ii8+PHBhdGggZD0ibTE4LjA4NyA0MS45NjctNi4xMzgtMy41OFYxNy41TDMwLjA0NiA2Ljk0M2w2LjI4MyAzLjY2NUwyMi4wMDEgMjMuNWwtMy45MTUgMTguNDY3WiIgZmlsbD0iI0Y4NjEyNiIvPjxwYXRoIGQ9Ik0zNi4zMjggMTAuNjEgNDMgMTQuNXYyMUwyNSA0NmwtNi45MTQtNC4wMzJWMjEuMjVsMTguMjQyLTEwLjY0MloiIGZpbGw9IiM5ODUxODQiLz48L3N2Zz48L3N2Zz4K
 
   portalTiles:
     - name: odoo-inventory

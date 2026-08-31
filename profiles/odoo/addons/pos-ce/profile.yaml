@@ -19,7 +19,12 @@ spec:
   license: LGPL-3.0
   author: OCA
   tile:
-    icon: store
+    # Odoo's own icon, set inside the catalogue's 52x52 frame so it sits with
+    # the other tiles. point_of_sale's, not pos_restaurant's: this profile
+    # installs the restaurant extension, but the tile says Point of Sale and
+    # pos_restaurant's icon is the extension's own generic mark.
+    image: assets/tile.svg
+    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBkPSJNOS41IDggNiAzNmg2LjAxOWE2LjUgNi41IDAgMCAwIDEyLjk2MiAwSDI1YTYgNiAwIDAgMCAxMiAwaC4wMTlhNi41IDYuNSAwIDAgMCAxMi45NjIgMEg1MHYtMWwtLjA0NS0uMjczYTYuMjMxIDYuMjMxIDAgMCAwLS4wNTgtLjM4NmwtLjAyMy0uMTE4LS4wMi0uMS0zLjc5Ny0yMi43OEE0IDQgMCAwIDAgNDIuMTEyIDhIOS41WiIgZmlsbD0iIzk4NTE4NCIvPjxwYXRoIGQ9Im0xNCA4LTIgMjhhNiA2IDAgMCAxLTEyIDB2LTFsMy40OTQtMjMuNTg2QTQgNCAwIDAgMSA3LjQ1MSA4SDE0Wm0yMSAwIDIgMjhhNiA2IDAgMCAxLTEyIDBWOGgxMFoiIGZpbGw9IiNGQkI5NDUiLz48cGF0aCBkPSJNMTIgMzZhNiA2IDAgMSAxLTEyIDBoMTJabTI1IDBhNiA2IDAgMCAxLTEyIDBoMTJaIiBmaWxsPSIjRjc4NjEzIi8+PHBhdGggZD0iTTEyLjAyIDM2YTYuNSA2LjUgMCAwIDAgMTIuOTYxIDBIMTIuMDJabTI1IDBhNi41IDYuNSAwIDAgMCAxMi45NjEgMEgzNy4wMloiIGZpbGw9IiM3MTIyNTgiLz48L3N2Zz48L3N2Zz4K
 
   portalTiles:
     - name: odoo-pos
