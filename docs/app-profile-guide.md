@@ -251,6 +251,17 @@ Gentian portal / app-menu icons use a **two-path** model on `AppProfile.spec.til
 
 Per sub-app overrides: `spec.portalTiles[].tile.icon` (e.g. OX mail vs calendar).
 
+The catalogue only carries generic glyphs, so a family whose apps have their own
+marks should ship real logos rather than settle for the nearest shape — a "wiki"
+page is not Collectives. Nextcloud does this from
+`scripts/build-nextcloud-tiles.py`: it pulls each logo from the release tarball
+`images/nextcloud/versions.env` already pins, repaints it in the vendor colour on
+the catalogue frame, and writes both `assets/tile-*.svg` and the inlined
+`tile.logo`. Re-run it after bumping a version there. Use it as the model for the
+next family; `sync-profile-tile.py` stays the tool for one-off hand-drawn tiles
+(it rewrites the whole profile through PyYAML, so it drops comments — check the
+diff).
+
 The gentian-os LDAP reconciler resolves `tile.icon` to a data URI when writing
 `pathToLogo`. Legacy `spec.logo` still works but is deprecated.
 

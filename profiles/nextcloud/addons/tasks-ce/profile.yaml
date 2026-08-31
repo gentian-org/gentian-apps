@@ -21,7 +21,8 @@ spec:
   license: AGPL-3.0-only
   author: Nextcloud
   tile:
-    icon: tasks
+    image: assets/tile-tasks.svg
+    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDMyIDMyIiBzdHlsZT0iZmlsbC1ydWxlOmV2ZW5vZGQ7Y2xpcC1ydWxlOmV2ZW5vZGQ7c3Ryb2tlLWxpbmVqb2luOnJvdW5kO3N0cm9rZS1taXRlcmxpbWl0OjIiPjxwYXRoIGQ9Im05LjU1IDE4LTUuNy01LjcgMS40MjUtMS40MjVMOS41NSAxNS4xNWw5LjE3NS05LjE3NUwyMC4xNSA3LjQgOS41NSAxOFoiIHN0eWxlPSJmaWxsOiMwMDgyQzk7ZmlsbC1ydWxlOm5vbnplcm8iIHRyYW5zZm9ybT0idHJhbnNsYXRlKC00LjYxNCAtNC41NjQpIHNjYWxlKDEuNzE3NzkpIiAvPjwvc3ZnPgo8L3N2Zz4K
   # Tile for the app menu / quick bar. The addon has no ingress of its own, so the
   # shell resolves the base URL from spec.customization.addon.of and appends this
   # suffix to deep-link into the feature inside Nextcloud.

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 import sys
@@ -13,6 +14,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = ROOT / "profiles"
 CATALOGUE = Path(__file__).resolve().parent / "data" / "tile-catalogue.json"
+DATA_URI_PREFIX = "data:image/svg+xml;base64,"
 DATA_URI_RE = re.compile(r"^data:image/svg\+xml;base64,[A-Za-z0-9+/]+=*$")
 
 
@@ -48,9 +50,16 @@ def validate_profile(path: Path, catalogue_ids: set[str]) -> list[str]:
             image_path = path.parent / image
             if not image_path.is_file():
                 errors.append(f"{rel} {label}: tile.image missing file {image}")
-            elif not tile.get("logo"):
+            elif not logo:
                 errors.append(
                     f"{rel} {label}: tile.image set without tile.logo — run scripts/sync-profile-tile.py"
+                )
+            elif logo != DATA_URI_PREFIX + base64.b64encode(image_path.read_bytes()).decode("ascii"):
+                # The cluster only ever sees tile.logo; tile.image is the source
+                # the reviewer reads. Editing the SVG without re-inlining leaves
+                # the two saying different things, and the portal shows the old one.
+                errors.append(
+                    f"{rel} {label}: tile.logo is stale for {image} — re-run the tile script"
                 )
 
     check_tile(profile_tile, "spec.tile")

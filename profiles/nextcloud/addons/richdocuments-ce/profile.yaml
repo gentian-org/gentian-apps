@@ -21,7 +21,8 @@ spec:
   license: AGPL-3.0-only
   author: Nextcloud
   tile:
-    icon: documents
+    image: assets/tile-office.svg
+    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDMyIDMyIj48cGF0aCBzdHlsZT0iY29sb3I6IzAwMDAwMDtibG9jay1wcm9ncmVzc2lvbjp0Yjt0ZXh0LXRyYW5zZm9ybTpub25lO3RleHQtaW5kZW50OjAiIGZpbGw9IiMwMDgyQzkiIGQ9Im00LjY5OTIgMi4wMDRjLTAuMzk1IDAuMDc2NC0wLjcwNjIgMC40NjY2LTAuNjk5MiAwLjg3NXYyNi4yNDRjMCAwLjQ2IDAuNDEyMiAwLjg3NiAwLjg2MzIgMC44NzZoMjIuMjc2YzAuNDUyIDAgMC44NjQtMC40MTYgMC44NjQtMC44NzZ2LTIwLjI4NGMtMC4wMDgtMC4xMzM4LTAuMDQ2LTAuMjY2LTAuMTEtMC4zODNsLTYuNjI0LTYuMzk4NGMtMC4wODYtMC4wMzI4LTAuMTc4LTAuMDUxLTAuMjctMC4wNTQ2aC0xNi4xMzdjLTAuMDUzMi0wLjAwNTMtMC4xMS0wLjAwNTMtMC4xNjM2IDB6bTMuMzAwOCAzLjk5NmgxMnYyaC0xMnYtMnptMCA2aDEwdjJoLTEwdi0yem0wIDZoMTZ2MmgtMTZ2LTJ6bTAgNmg4djJoLTh2LTJ6IiAvPgo8L3N2Zz4KPC9zdmc+Cg==
   # Tile for the app menu / quick bar. The addon has no ingress of its own, so the
   # shell resolves the base URL from spec.customization.addon.of and appends this
   # suffix to deep-link into the feature inside Nextcloud.
@@ -38,7 +39,8 @@ spec:
       linkTarget: embedded
       allowedGroup: "Domain Users"
       tile:
-        icon: documents
+        image: assets/tile-document.svg
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjMDA4MkM5Ij48cGF0aCBkPSJNMCAwaDI0djI0SDB6IiBmaWxsPSJub25lIiAvPgoJPHBhdGggZmlsbD0iIzAwODJDOSIgZD0iTTE0IDJINmMtMS4xIDAtMS45OS45LTEuOTkgMkw0IDIwYzAgMS4xLjg5IDIgMS45OSAySDE4YzEuMSAwIDItLjkgMi0yVjhsLTYtNnptMiAxNkg4di0yaDh2MnptMC00SDh2LTJoOHYyem0tMy01VjMuNUwxOC41IDlIMTN6IiAvPgo8L3N2Zz4KPC9zdmc+Cg==
     - name: spreadsheet
       displayName:
         en_US: "Spreadsheet"
@@ -47,7 +49,8 @@ spec:
       linkTarget: embedded
       allowedGroup: "Domain Users"
       tile:
-        icon: spreadsheet
+        image: assets/tile-spreadsheet.svg
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSIjMDA4MkM5IiBkPSJNMTkgM0g1QzMuODkgMyAzIDMuODkgMyA1VjE5QzMgMjAuMSAzLjkgMjEgNSAyMUgxOUMyMC4xIDIxIDIxIDIwLjEgMjEgMTlWNUMyMSAzLjg5IDIwLjEgMyAxOSAzTTkgMThINlYxNkg5VjE4TTkgMTVINlYxM0g5VjE1TTkgMTJINlYxMEg5VjEyTTEzIDE4SDEwVjE2SDEzVjE4TTEzIDE1SDEwVjEzSDEzVjE1TTEzIDEySDEwVjEwSDEzVjEyWiIgLz4KPC9zdmc+Cjwvc3ZnPgo=
     - name: presentation
       displayName:
         en_US: "Presentation"
@@ -56,7 +59,8 @@ spec:
       linkTarget: embedded
       allowedGroup: "Domain Users"
       tile:
-        icon: presentation
+        image: assets/tile-presentation.svg
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSIjMDA4MkM5IiBkPSJNMTksMTZINVY4SDE5TTE5LDNINUMzLjg5LDMgMywzLjg5IDMsNVYxOUEyLDIgMCAwLDAgNSwyMUgxOUEyLDIgMCAwLDAgMjEsMTlWNUMyMSwzLjg5IDIwLjEsMyAxOSwzWiIgLz4KPC9zdmc+Cjwvc3ZnPgo=
 
   deploymentMethod: crossplane
 
