@@ -66,7 +66,11 @@ spec:
         en_US: "Odoo Settings"
         de_DE: "Odoo Einstellungen"
       tile:
-        icon: settings
+        # Odoo's O, in Odoo purple, inside the catalogue's 52x52 frame. This is
+        # the tenant's way into Odoo itself rather than into one of its modules,
+        # so it carries the product's mark instead of a generic cog.
+        image: assets/settings-tile.svg
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSIjNzE0QjY3IiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xMiAxYTExIDExIDAgMSAwIDAgMjJhMTEgMTEgMCAxIDAgMCAtMjJaTTEyIDZhNiA2IDAgMSAxIDAgMTJhNiA2IDAgMSAxIDAgLTEyWiIvPjwvc3ZnPjwvc3ZnPgo=
       linkSuffix: "/odoo/action-base_setup.action_general_configuration?gentian_embed=1"
       # embedded, like every other Odoo tile: the suffix already asks for
       # gentian_embed, and a new browser tab leaves the portal's window manager
