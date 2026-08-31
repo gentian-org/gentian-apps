@@ -33,6 +33,20 @@ PROFILES_DIR = REPO_ROOT / "profiles"
 # Ladder order: index is cost. See framework doc section 2.
 RUNG_ORDER = {"L0": 0, "L1": 1, "L2": 2, "L3": 3, "L4": 4, "L5": 5, "L6": 6}
 
+# The CustomizationDelivery enum, mirrored from
+# gentian-os/api/v1alpha1/customization_surface_types.go. The CRD is the only
+# thing that enforced it, which means the enforcement happened on the cluster:
+# nginx-sso-routing shipped with `delivery: chart`, the API server refused the
+# object, Argo CD retried five times and gave up, and the record simply never
+# existed — along with every debt signal the operator derives from one. This
+# script reported it valid throughout, because it did not read the field.
+#
+# Kept as a literal rather than parsed out of the CRD: this repo does not vendor
+# gentian-os, and a check that silently passes when it cannot find the schema is
+# the failure it is here to prevent. If the enum gains a member, this list is
+# one line behind it and the error message says where to look.
+DELIVERY_MECHANISMS = {"git-sidecar", "image-layer", "addon-profile", "app-store-api"}
+
 GRADE_BANDS = [(7, "A"), (5, "B"), (3, "C"), (0, "D")]
 
 # Module profiles inherit their base profile's declaration rather than repeating it.
@@ -180,6 +194,25 @@ def check_surface(path: pathlib.Path, doc: dict) -> list[str]:
                 f"the old key is not read by the CRD and would be silently ignored"
             )
 
+        # extension.delivery is a list of the same enum the record's spec.delivery
+        # takes a single value from. A member outside it is rejected by the API
+        # server, so the profile would never apply.
+        declared = extension.get("delivery")
+        if declared is not None:
+            if not isinstance(declared, list):
+                errors.append(
+                    f"{path}: extension.delivery must be a list of mechanisms, "
+                    f"got {type(declared).__name__}"
+                )
+            else:
+                for mechanism in declared:
+                    if mechanism not in DELIVERY_MECHANISMS:
+                        errors.append(
+                            f"{path}: extension.delivery {mechanism!r} is not a delivery "
+                            f"mechanism — the CRD accepts "
+                            f"{', '.join(sorted(DELIVERY_MECHANISMS))}"
+                        )
+
     return errors
 
 
@@ -229,6 +262,29 @@ def check_record(path: pathlib.Path, doc: dict) -> list[str]:
 
     if rung_at_or_above(rung, "L3") and not spec.get("artifacts"):
         errors.append(f"{path}: spec.artifacts must name at least one artifact for rung {rung}")
+
+    # spec.delivery: valid member of the enum, and only meaningful at L3.
+    #
+    # Two separate failures. A value outside the enum is refused by the API
+    # server, so the record never exists. A valid value at another rung applies
+    # an L3 answer to a question that rung does not ask — an L4 delivers through
+    # its repackaged chart, an L2 as its own deployable — and reaching for the
+    # field because it sounds like "how this is delivered" is precisely what put
+    # `delivery: chart` on an L4 record.
+    delivery = spec.get("delivery")
+    if delivery is not None:
+        if delivery not in DELIVERY_MECHANISMS:
+            errors.append(
+                f"{path}: spec.delivery {delivery!r} is not a delivery mechanism — the CRD "
+                f"accepts {', '.join(sorted(DELIVERY_MECHANISMS))}, and refuses the whole "
+                f"record otherwise"
+            )
+        elif rung != "L3":
+            errors.append(
+                f"{path}: spec.delivery is how an L3 module reaches a running app, and this "
+                f"record is {rung} — omit it. An L4 delivers through its repackaged chart, "
+                f"an L2 as its own deployable; neither is one of these four mechanisms"
+            )
 
     # The justification chain is what stops the ladder being decorative.
     justification = spec.get("rungJustification") or {}
