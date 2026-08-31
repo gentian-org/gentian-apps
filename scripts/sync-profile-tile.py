@@ -1,15 +1,32 @@
 #!/usr/bin/env python3
-"""Inline profiles/<name>/assets/tile.svg into spec.tile.logo (path 1 custom tiles)."""
+"""Inline profiles/<name>/assets/tile.svg into spec.tile.logo (path 1 custom tiles).
+
+Edits the `logo:` line in place rather than re-serialising the document. The
+previous version did yaml.safe_load -> yaml.safe_dump, which rewrote the whole
+file and silently deleted every comment in it -- including the header block
+profiles use to record *why* they are built the way they are. Running it once
+on docmost-ce dropped 118 lines of design rationale, which is a poor trade for
+inlining one base64 string.
+
+Only lines this script writes are touched, so comments, key order, block
+scalars and quoting elsewhere in the file survive untouched.
+"""
 
 from __future__ import annotations
 
 import base64
+import re
 import sys
 from pathlib import Path
 
 import yaml
 
 DATA_URI_PREFIX = "data:image/svg+xml;base64,"
+
+# "image: assets/tile.svg" -- a value on the same line. A nested mapping such as
+# the charts' "image:\n  repository: ..." has no value here and is skipped, as
+# is any value that does not resolve to a file (e.g. "image: docker.io/x:1").
+IMAGE_LINE = re.compile(r"^(?P<indent>\s*)image:\s*(?P<value>\S+)\s*$")
 
 
 def encode_svg(path: Path) -> str:
@@ -23,40 +40,60 @@ def sync_profile(profile_dir: Path) -> int:
         print(f"missing {profile_path}", file=sys.stderr)
         return 1
 
-    doc = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
-    spec = doc.setdefault("spec", {})
+    original = profile_path.read_text(encoding="utf-8")
+    lines = original.splitlines(keepends=True)
 
-    updated = False
+    out: list[str] = []
+    updated: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        match = IMAGE_LINE.match(line)
+        if not match:
+            out.append(line)
+            i += 1
+            continue
 
-    # Sync main tile if set with image
-    tile = spec.get("tile", {})
-    image_rel = tile.get("image")
-    if image_rel:
-        image_path = profile_dir / image_rel
-        if image_path.is_file():
-            tile["logo"] = encode_svg(image_path)
-            tile.pop("icon", None)
-            print(f"Updated main tile.logo from {image_rel}")
-            updated = True
+        rel = match.group("value").strip("\"'")
+        image_path = profile_dir / rel
+        if not image_path.is_file():
+            out.append(line)
+            i += 1
+            continue
 
-    # Sync sub-app portalTiles if set with image
-    for portal_tile in spec.get("portalTiles") or []:
-        tile_cfg = portal_tile.get("tile") or {}
-        image_rel = tile_cfg.get("image")
-        if image_rel:
-            image_path = profile_dir / image_rel
-            if image_path.is_file():
-                tile_cfg["logo"] = encode_svg(image_path)
-                tile_cfg.pop("icon", None)
-                print(f"Updated portalTile {portal_tile['name']} tile.logo from {image_rel}")
-                updated = True
+        indent = match.group("indent")
+        out.append(line)
+        i += 1
 
-    if updated:
-        profile_path.write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
-        return 0
-    else:
-        print(f"No changes in {profile_path}", file=sys.stderr)
+        # Replace an existing sibling logo:/icon: pair rather than duplicating
+        # it. icon and image are mutually exclusive -- the tile validator
+        # rejects a tile that sets both.
+        while i < len(lines) and re.match(rf"^{indent}(logo|icon):\s", lines[i]):
+            i += 1
+
+        out.append(f"{indent}logo: {encode_svg(image_path)}\n")
+        updated.append(rel)
+
+    if not updated:
+        print(f"No tile.image to inline in {profile_path}", file=sys.stderr)
         return 1
+
+    rewritten = "".join(out)
+    if rewritten == original:
+        print(f"tile.logo already current in {profile_path}")
+        return 0
+
+    # The edit is textual, so prove the result still parses and that the logo
+    # actually matches the asset before overwriting the file.
+    doc = yaml.safe_load(rewritten)
+    if not doc or doc.get("kind") != "AppProfile":
+        print(f"refusing to write {profile_path}: result is not a valid AppProfile", file=sys.stderr)
+        return 1
+
+    profile_path.write_text(rewritten, encoding="utf-8")
+    for rel in updated:
+        print(f"Inlined {rel} into tile.logo")
+    return 0
 
 
 def main() -> int:
