@@ -68,7 +68,10 @@ spec:
       tile:
         icon: settings
       linkSuffix: "/odoo/action-base_setup.action_general_configuration?gentian_embed=1"
-      linkTarget: newwindow
+      # embedded, like every other Odoo tile: the suffix already asks for
+      # gentian_embed, and a new browser tab leaves the portal's window manager
+      # behind for a page that was rendered to sit inside it.
+      linkTarget: embedded
       allowedGroup: "App Admins"
 
   chart:
