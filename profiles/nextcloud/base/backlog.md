@@ -30,3 +30,21 @@
       than patching core (it is a full template copy, so it drifts on every
       Nextcloud major), and that `tenantEditable: true` on the drop-in does not
       let a tenant break their own portal embedding.
+
+- [ ] Talk (`nextcloud-spreed-ce`) has no TURN relay, so calls fail between
+      participants who are both behind NAT — "Could not establish a connection
+      with at least one participant." Verified on the running instance:
+      `talk:stun:list`, `talk:turn:list` and `talk:signaling:list` are all empty.
+
+      This is not a Nextcloud gap; it is the catalogue-wide one recorded on
+      [element-ce/backlog.md](../../element/element-ce/backlog.md), which planned
+      coturn as an L2 companion providing a `turn` contract and said to promote
+      it from "ceremony" to "build it" the moment a second WebRTC consumer
+      arrived. Talk is that consumer. The design, the three constraints, and the
+      Talk-specific wiring live there — this is the pointer from the app that
+      surfaced it, so the next person hitting the error finds the plan rather
+      than starting over.
+
+      Blocked on one decision, recorded there: a relay needs a large public UDP
+      port range on a reachable address, and two relays cannot both own it on one
+      cluster. Per-tenant external IP, or one carved non-overlapping range.

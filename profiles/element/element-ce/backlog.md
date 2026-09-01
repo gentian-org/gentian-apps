@@ -25,6 +25,30 @@
       `gentian-os/tenants/<t>/contracts/turn`, which is the path that keeps it
       out of a ConfigMap.
 
+      **That trigger has fired.** `nextcloud-spreed-ce` (Talk) is installed on
+      tenant `corp`, and starting a call reports "Could not establish a
+      connection with at least one participant. A TURN server might be needed."
+      Verified on the running instance: `talk:stun:list`, `talk:turn:list` and
+      `talk:signaling:list` are all empty, so there is no relay, no STUN, and no
+      signaling backend. The standalone profile is no longer ceremony — build it.
+
+      Talk-specific facts, so they are not rediscovered:
+
+      - **Talk also wants the shared secret**, which settles the shape question
+        above in favour of one contract for both: `talk:turn:add <schemes>
+        <server> <protocols> --secret=<s>`, where schemes is `turn,turns` and
+        protocols `udp,tcp`. Same `turn_shared_secret` model as Synapse, so a
+        single `turn` contract serves both consumers without a second shape.
+      - **STUN is configured separately** (`talk:stun:add`) and is not a
+        substitute: it fixes only the cases a relay is not needed for. It is
+        also not free here — the default `stun.nextcloud.com:443` is unreachable
+        under the tenant NetworkPolicy, which permits 443 only to `10.0.0.0/8`.
+      - **Group calls need more than TURN.** Beyond ~4 participants Talk needs
+        the High Performance Backend (`nextcloud-spreed-signaling`), a second
+        deployable with its own scaling story. TURN alone fixes 1:1 and small
+        calls; it does not make Talk a conferencing product. Scope that
+        explicitly rather than discovering it at the fifth participant.
+
       Three things to settle before writing it:
 
       - **Synapse wants the shared secret, not a credential pair.** It mints
