@@ -7,7 +7,11 @@ on:
   # to test a commit without pushing an empty one.
   workflow_dispatch:
   push:
-    branches: [main, develop]
+    # Feature branches too, so a push is checked before a pull request exists.
+    # Nothing here publishes from one: every image push and helm push is gated
+    # on the ref, not merely on "not a pull request" — a branch that pushed a
+    # chart version would overwrite a released one.
+    branches: [main, develop, "feat/**", "fix/**", "chore/**"]
     paths:
       - "apps/**"
       - "profiles/**"
@@ -62,7 +66,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: apps/app-store/backend
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:${{ github.sha }}
@@ -73,7 +77,7 @@ jobs:
           context: apps/app-store/frontend
           build-args: |
             VITE_AUTH_DISABLED=true
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:${{ github.sha }}
@@ -82,7 +86,7 @@ jobs:
         uses: azure/setup-helm@v4
 
       - name: Package and push chart
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         run: |
           CHART_VERSION=$(grep '^version:' apps/app-store/chart/Chart.yaml | awk '{print $2}')
           helm package apps/app-store/chart -d /tmp
@@ -126,7 +130,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: images/nextcloud
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
           build-args: |
             NEXTCLOUD_VERSION=${{ steps.versions.outputs.nextcloud_version }}
             USER_OIDC_VERSION=${{ steps.versions.outputs.user_oidc_version }}
@@ -168,7 +172,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: images/nextcloud-mcp
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud-mcp:${{ steps.version.outputs.chart_version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud-mcp:${{ github.sha }}
@@ -177,7 +181,7 @@ jobs:
         uses: azure/setup-helm@v4
 
       - name: Package and push chart
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         run: |
           helm package images/nextcloud-mcp/chart -d /tmp
           helm push "/tmp/nextcloud-mcp-${{ steps.version.outputs.chart_version }}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
@@ -211,7 +215,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: images/xwiki
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
           build-args: |
             XWIKI_VERSION=${{ steps.versions.outputs.xwiki_version }}
             FLAVOR_XIP_SHA256=${{ steps.versions.outputs.flavor_xip_sha256 }}
@@ -300,7 +304,7 @@ jobs:
         uses: azure/setup-helm@v4
 
       - name: Package and push chart
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         run: |
           CHART_VERSION=$(grep '^version:' charts/odoo/Chart.yaml | awk '{print $2}')
           helm package charts/odoo -d /tmp
@@ -332,7 +336,7 @@ jobs:
         run: scripts/build-activepieces-chart.sh --out /tmp/ap-dist
 
       - name: Push chart
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         run: |
           # shellcheck source=/dev/null
           source charts/activepieces/UPSTREAM
@@ -358,7 +362,7 @@ jobs:
         uses: azure/setup-helm@v4
 
       - name: Package and push chart
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         run: |
           CHART_VERSION=$(grep '^version:' charts/gentian-sidecar-sso-saml/Chart.yaml | awk '{print $2}')
           helm package charts/gentian-sidecar-sso-saml -d /tmp
@@ -383,7 +387,7 @@ jobs:
         uses: azure/setup-helm@v4
 
       - name: Package and push chart
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         run: |
           CHART_VERSION=$(grep '^version:' charts/gentian-sidecar-git-modules/Chart.yaml | awk '{print $2}')
           helm package charts/gentian-sidecar-git-modules -d /tmp
@@ -411,7 +415,7 @@ jobs:
         run: helm lint charts/mathesar
 
       - name: Package and push chart
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         run: |
           CHART_VERSION=$(grep '^version:' charts/mathesar/Chart.yaml | awk '{print $2}')
           helm package charts/mathesar -d /tmp
@@ -439,7 +443,7 @@ jobs:
         run: helm lint charts/docmost
 
       - name: Package and push chart
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         run: |
           CHART_VERSION=$(grep '^version:' charts/docmost/Chart.yaml | awk '{print $2}')
           helm package charts/docmost -d /tmp
@@ -464,7 +468,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: images/gentian-sidecar-git-modules
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/gentian-sidecar-git-modules:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/gentian-sidecar-git-modules:${{ github.sha }}
@@ -488,7 +492,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: images/gentian-sidecar-sso-saml
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:${{ github.sha }}
