@@ -129,7 +129,13 @@ export function AddonWindow({
       await apiFetch(`/tenant/apps/${encodeURIComponent(profile)}/addons`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ addons: [...selected], provision: provisionFor.size > 0 }),
+        // Send which addons were provisioned, not merely whether any were. This
+        // was `provision: provisionFor.size > 0`, which threw away the row the
+        // answer belonged to: Provision on one addon granted every addon in the
+        // save, and Install on one with none provisioned granted nothing — so an
+        // installed CRM had a group carrying sales_team.group_sale_salesman and
+        // nobody in it, and Odoo refused access to crm.lead.
+        body: JSON.stringify({ addons: [...selected], provisionFor: [...provisionFor] }),
       });
       // The enable/disable runs when the app restarts, which takes minutes. Saying
       // only "updated" reads as "nothing happened" while you watch an unchanged app.

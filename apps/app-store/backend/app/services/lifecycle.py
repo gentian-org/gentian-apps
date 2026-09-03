@@ -68,18 +68,34 @@ class LifecycleClient:
             return res.json()
 
     def set_addons(
-        self, profile: str, addons: list[str], actor: str, provision: bool = False
+        self,
+        profile: str,
+        addons: list[str],
+        actor: str,
+        provision: bool = False,
+        provision_for: list[str] | None = None,
     ) -> dict[str, Any]:
         """Replace the addon selection of an installed app.
 
         The full selection is sent, so an empty list clears it — that is a real
         choice, not a no-op, because the activation script reconciles.
+
+        provision_for carries the choice per addon, which is how the store asks
+        it: Install and Provision are separate buttons on each row. It used to be
+        flattened into the provision bool as "did you provision anything at all",
+        which was wrong in both directions — provisioning one addon provisioned
+        them all, and installing one without provisioning granted none of them,
+        leaving a group with the role attribute on it and no members in it.
         """
         try:
             with httpx.Client(timeout=120.0) as client:
                 res = client.put(
                     f"{self._url(profile)}/addons",
-                    json={"addons": addons, "provision": provision},
+                    json={
+                        "addons": addons,
+                        "provision": provision,
+                        "provisionFor": provision_for or [],
+                    },
                     headers=self._headers(actor),
                 )
         except httpx.TimeoutException as exc:
