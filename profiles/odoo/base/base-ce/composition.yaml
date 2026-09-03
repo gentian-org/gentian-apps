@@ -924,6 +924,14 @@ spec:
                               - --dest=default/current
                               - --submodules=recursive
                               - --one-time
+                              {{- /* git-sync aborts on the first failed fetch
+                                   unless told otherwise, so one transient error
+                                   from the git host left this Job in
+                                   Init:CrashLoopBackOff and the tenant's module
+                                   install simply never happened. Bounded rather
+                                   than the sidecar's -1: an init container has
+                                   to finish. */}}
+                              - --max-failures=5
                             volumeMounts:
                               - name: extra-addons
                                 mountPath: /opt/odoo/custom-addons

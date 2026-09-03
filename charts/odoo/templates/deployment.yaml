@@ -146,6 +146,12 @@ spec:
             - --dest={{ .name }}/current
             - --submodules={{ default "recursive" .submodules }}
             - --one-time
+            {{- /* Bounded, unlike the sidecar's -1: this one has to finish
+                 before Odoo starts, so it may not retry forever. A handful of
+                 attempts rides out the same transient fetch failure that the
+                 sidecar absorbs, without turning a genuinely unreachable repo
+                 into a pod that never starts and says nothing about why. */}}
+            - --max-failures=5
             {{- if .secretName }}
             - --ssh-key-file=/etc/git-secret/ssh
             {{- end }}
@@ -314,6 +320,18 @@ spec:
             - --submodules={{ default "recursive" .submodules }}
             - --wait={{ .syncInterval }}
             - --stale-worktree-timeout=24h
+            {{- /* Retry forever instead of exiting on the first failed fetch.
+                 git-sync defaults --max-failures to 0, so a single transient
+                 error from the git host killed this container -- and because a
+                 pod is Ready only when every container is, the crashloop pulled
+                 a perfectly healthy Odoo out of its Service for the length of
+                 the backoff. One anonymous fetch answered HTTP 401 and the
+                 tenant got a 500 for fifteen minutes; the modules on disk were
+                 fine the whole time. Module sync is a background concern and
+                 must never be able to take the app offline: the sidecar keeps
+                 retrying, and the worktree simply stays at the last good
+                 revision until the host answers again. */}}
+            - --max-failures=-1
             {{- if .secretName }}
             - --ssh-key-file=/etc/git-secret/ssh
             {{- end }}
