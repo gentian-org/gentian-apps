@@ -43,6 +43,36 @@ gentian:
     # off, so with the flag hardcoded off the clone landed without four of the
     # addon trees and Odoo simply did not see those modules.
     submodules: recursive
+    # Opt-in, and off by default so upgrading this chart changes nothing for a
+    # tenant that has not asked for it.
+    #
+    # A commit landing on the tracked branch reaches the pod's disk (git-sync
+    # keeps syncing) but never reaches the RUNNING process: Odoo resolves
+    # every addons_path entry through realpath() once, at startup, and a
+    # symlink flip afterwards is invisible to it. The only way to make new
+    # code visible is the same thing a human does by hand today --
+    # `kubectl rollout restart` -- so this does that automatically instead of
+    # silently doing nothing until someone notices and remembers to run it.
+    #
+    # Turning this on restarts the odoo container -- not the whole Deployment,
+    # one container, via the liveness probe -- within roughly periodSeconds *
+    # failureThreshold of a new commit landing. On a tenant whose profile
+    # points multiple gitSources at the SAME shared repo/branch as other
+    # tenants (this chart's default profile tracks one repo's develop branch
+    # for every Odoo tenant on the platform), that means every commit to that
+    # branch restarts every tenant with this flag on, at whatever moment the
+    # commit happens to land -- not scoped to which tenant's installed
+    # modules the commit actually touches. Enable per tenant with that in
+    # mind; it is not a platform-wide switch.
+    autoReload:
+      enabled: false
+      # How often the liveness probe re-checks for a newer commit than the one
+      # this container booted with.
+      periodSeconds: 30
+      # Consecutive failed checks before Kubernetes restarts the container.
+      # More than 1 so a single slow readlink under load cannot restart Odoo
+      # on its own; the real signal is "still different next time too".
+      failureThreshold: 3
   gitSources: []
 
 persistence:

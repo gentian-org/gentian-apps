@@ -85,6 +85,12 @@ spec:
         {{- if and .Values.gentian.git.enabled (eq (len $gitSources) 0) -}}
           {{- $gitSources = list (dict "name" "default" "repo" .Values.gentian.git.repo "branch" .Values.gentian.git.branch "syncInterval" (int .Values.gentian.git.syncInterval) "secretName" .Values.gentian.git.secretName "submodules" (default "recursive" .Values.gentian.git.submodules)) -}}
         {{- end -}}
+        {{- /* Opt-in restart-on-change (values.yaml has the tradeoff). Off by
+             default -- $autoReload.enabled is false unless a caller turns it
+             on -- so this whole feature renders to nothing for every existing
+             profile until someone asks for it. */}}
+        {{- $autoReload := default (dict "enabled" false "periodSeconds" 30 "failureThreshold" 3) .Values.gentian.git.autoReload -}}
+        {{- $autoReloadOn := and $autoReload.enabled (gt (len $gitSources) 0) -}}
         {{- if .Values.dropIns.odooConf.enabled }}
         # Customization ladder rung L1 (docs/app-customization.md §2.2). Odoo has no
         # native conf.d — merge platform/profile/tenant fragments into the rendered
@@ -178,6 +184,49 @@ spec:
             - /bin/sh
             - -ec
             - |
+              {{- if $autoReloadOn }}
+              # autoReload (values.yaml: gentian.git.autoReload): record which
+              # commit this boot is starting from, and -- only when that
+              # differs from what the PREVIOUS boot recorded here -- force a
+              # full assets-bundle regeneration before serving anything.
+              #
+              # Why this is needed at all: git-sync flips a symlink to a new
+              # worktree; Odoo resolves every addons_path entry through
+              # realpath() once at startup and never looks again, so a plain
+              # restart already picks up new Python/XML/data. Compiled
+              # CSS/JS bundles are cached as ir.attachment rows keyed by a
+              # hash of the asset file LIST, not by content, so even a fresh
+              # process can keep serving a stale compiled bundle for an
+              # unchanged file list with edited content -- ir.attachment's
+              # own regenerate_assets_bundles() is Odoo's own answer to
+              # that (it is the method behind Settings > Technical > Assets
+              # > Regenerate Assets Bundles), so this calls it directly
+              # rather than reimplementing cache invalidation.
+              #
+              # Marker lives on the addons emptyDir, which is pod-scoped: a
+              # container restart within the same pod (exactly what the
+              # liveness probe below causes) sees the previous boot's value;
+              # only a pod recreate loses it, and an unconditional first-boot
+              # regenerate is a harmless, bounded one-time cost.
+              GENTIAN_MARKER={{ .Values.gentian.modulesPath }}/.gentian-started-hash
+              GENTIAN_NEW="$( {{- range $gitSources }}readlink -f {{ $.Values.gentian.modulesPath }}/{{ .name }}/current 2>/dev/null; {{- end }} )"
+              GENTIAN_OLD="$(cat "$GENTIAN_MARKER" 2>/dev/null || true)"
+              printf '%s' "$GENTIAN_NEW" > "$GENTIAN_MARKER"
+              if [ -n "$GENTIAN_OLD" ] && [ "$GENTIAN_OLD" != "$GENTIAN_NEW" ]; then
+                echo "gentian: modules changed since last boot, regenerating asset bundles"
+                python3 /opt/odoo/src/odoo/odoo-bin shell \
+                  -d "${DB_NAME}" \
+                  --db_host="${DB_HOST}" \
+                  --db_port="${DB_PORT}" \
+                  --db_user="${DB_USER}" \
+                  --db_password="${DB_PASSWORD}" \
+                  --config=/etc/odoo/odoo.conf \
+                  --no-http --shell-interface=python <<'GENTIAN_PYEOF' || true
+              env["ir.attachment"].sudo().regenerate_assets_bundles()
+              env.cr.commit()
+              GENTIAN_PYEOF
+              fi
+              {{- end }}
               python3 /opt/odoo/src/odoo/odoo-bin \
                 -d "${DB_NAME}" \
                 --db_host="${DB_HOST}" \
@@ -288,11 +337,31 @@ spec:
             {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
             {{- end }}
           livenessProbe:
+            {{- if $autoReloadOn }}
+            {{- /* Same health check as the httpGet probe below, plus: has a
+                 newer commit landed since this container booted? Folded into
+                 one exec probe because a container may declare only one
+                 livenessProbe, and this is the mechanism that makes
+                 gentian.git.autoReload actually restart the container. */}}
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:{{ .Values.service.port }}/web/health', timeout=5).read()"
+                  GENTIAN_NEW="$( {{- range $gitSources }}readlink -f {{ $.Values.gentian.modulesPath }}/{{ .name }}/current 2>/dev/null; {{- end }} )"
+                  GENTIAN_OLD="$(cat {{ .Values.gentian.modulesPath }}/.gentian-started-hash 2>/dev/null || true)"
+                  [ "$GENTIAN_OLD" = "$GENTIAN_NEW" ]
+            initialDelaySeconds: 120
+            periodSeconds: {{ $autoReload.periodSeconds }}
+            failureThreshold: {{ $autoReload.failureThreshold }}
+            {{- else }}
             httpGet:
               path: /web/health
               port: http
             initialDelaySeconds: 120
             periodSeconds: 30
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /web/health
