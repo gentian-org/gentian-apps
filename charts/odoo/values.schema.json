@@ -146,6 +146,24 @@
                 "recursive"
               ],
               "description": "git-sync --submodules mode. recursive, because odoo-modules carries addons in submodules."
+            },
+            "autoReload": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Opt-in: restart the odoo container automatically when a new commit reaches the tracked branch.",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "periodSeconds": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "failureThreshold": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
             }
           }
         },
