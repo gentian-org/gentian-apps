@@ -312,7 +312,8 @@ spec:
       #!/bin/sh
       set -eu
       exec python3 - <<'PYEOF'
-      import base64, hashlib, hmac, json, os, secrets, sqlite3, sys, time
+      import base64, hashlib, hmac, json, os, secrets, shutil, sqlite3, sys
+      import tempfile, time
       import urllib.error, urllib.request
 
       DB = "/data/webui.db"
@@ -323,24 +324,82 @@ spec:
           with urllib.request.urlopen(req, timeout=timeout) as resp:
               return json.loads(resp.read())
 
+      def describe(e):
+          # str(HTTPError) is the status line and nothing else, so a refusal
+          # arrives as "HTTP Error 403: Forbidden" with no hint as to which of
+          # the several conditions behind that status was the one that fired.
+          # The body carries open-webui's own detail; print it.
+          if isinstance(e, urllib.error.HTTPError):
+              try:
+                  detail = json.loads(e.read()).get("detail")
+              except Exception:
+                  detail = None
+              if detail:
+                  return f"{e}: {detail}"
+          return str(e)
+
+      def admin_id():
+          """Return the id of an existing admin account, or None.
+
+          Read from a private copy rather than from /data directly. Open WebUI
+          keeps the database in WAL mode, and /data is mounted read-only, so
+          SQLite cannot create the -shm file a normal read-only WAL connection
+          needs. immutable=1 is the only way it will open the file at all -- and
+          immutable=1 tells it to ignore the WAL completely and answer from the
+          main file, which is a snapshot from before every write still pending
+          in the log. An account created minutes ago is invisible in exactly
+          that window, which is the window this Job runs in.
+
+          Copying the three files somewhere writable lets SQLite replay the WAL
+          and answer for the present. The originals are never opened for write.
+          """
+          tmp = tempfile.mkdtemp()
+          try:
+              for suffix in ("", "-wal", "-shm"):
+                  if os.path.exists(DB + suffix):
+                      shutil.copy(DB + suffix, os.path.join(tmp, "webui.db" + suffix))
+              conn = sqlite3.connect(os.path.join(tmp, "webui.db"))
+              try:
+                  row = conn.execute(
+                      "SELECT id FROM user WHERE role='admin' LIMIT 1").fetchone()
+              finally:
+                  conn.close()
+              return row[0] if row else None
+          finally:
+              shutil.rmtree(tmp, ignore_errors=True)
+
       if not os.path.exists(DB):
           print("[open-webui post-install] webui.db not present yet -- will retry")
           sys.exit(1)
 
-      # immutable=1: avoid touching the WAL file while Open WebUI's own pod
-      # has the DB open for writing -- we only need a long-lived admin row.
-      conn = sqlite3.connect(f"file:{DB}?mode=ro&immutable=1", uri=True)
-      row = conn.execute("SELECT id FROM user WHERE role='admin' LIMIT 1").fetchone()
-      conn.close()
+      try:
+          config = http_json(f"{base}/api/config")
+      except (urllib.error.URLError, TimeoutError) as e:
+          print(f"[open-webui post-install] open-webui is not answering yet: {describe(e)}")
+          sys.exit(1)
+
+      # /api/config needs no token and reports onboarding only while the
+      # instance has no users at all. That is the one state in which signup can
+      # succeed here: this profile sets ENABLE_LOGIN_FORM=false, and open-webui
+      # refuses signup outright once any user exists -- whatever ENABLE_SIGNUP
+      # says, and regardless of whether that user is an admin.
+      #
+      # Asking first is the whole difference between seeding an empty instance
+      # and posting a request that can only ever be refused. Without the check
+      # this Job read a stale database, concluded there was no admin, and
+      # crash-looped against a permanent 403 until its backoffLimit ran out.
+      onboarding = config.get("onboarding", False)
+      admin = admin_id()
 
       token = None
-      if not row:
-          # No account at all means Open WebUI is in onboarding, and onboarding
-          # is a dead end for this profile: its sign-in page only auto-redirects
-          # to SSO when an account already exists, and ENABLE_LOGIN_FORM=false
-          # leaves nothing else on the page. The tab renders the logo and stops,
-          # which is what the tenant sees -- and no one can sign in to clear it,
-          # because signing in is what it is blocking.
+      if onboarding:
+          # No accounts at all, so open-webui is sitting on its onboarding
+          # screen, and onboarding is a dead end for this profile: the sign-in
+          # page only auto-redirects to SSO when an account already exists, and
+          # ENABLE_LOGIN_FORM=false leaves nothing else on the page. The tab
+          # renders the logo and stops, which is what the tenant sees -- and no
+          # one can sign in to clear it, because signing in is what it is
+          # blocking.
           #
           # So create the account the tenant is going to use. The first one
           # Open WebUI is given becomes the admin, which clears onboarding; the
@@ -362,11 +421,23 @@ spec:
                                   data=signup, headers={"Content-Type": "application/json"})
           except (urllib.error.URLError, TimeoutError) as e:
               # Also the path a lost race takes: whoever won created the account,
-              # and the next attempt reads it from the DB instead.
-              print(f"[open-webui post-install] could not seed the admin account: {e}")
+              # and the next attempt finds it instead of onboarding.
+              print(f"[open-webui post-install] could not seed the admin account: {describe(e)}")
               sys.exit(1)
           token = created.get("token")
+          if token is None:
+              print("[open-webui post-install] signup returned no token -- will retry")
+              sys.exit(1)
           print("[open-webui post-install] seeded admin account admin@${TENANT_DOMAIN}")
+      elif admin is None:
+          # Accounts exist but none of them is an admin, so there is no identity
+          # to act as and no way to make one -- signup is refused and the
+          # database is read-only. This resolves itself: OAUTH_ADMIN_ROLES
+          # promotes the tenant administrator on their first SSO sign-in. Retry
+          # rather than pass, so the LLM connection below is not left unset.
+          print("[open-webui post-install] open-webui has accounts but no admin yet -- "
+                "waiting for a sign-in OAUTH_ADMIN_ROLES promotes, will retry")
+          sys.exit(1)
 
       if token is None:
           def b64url(data):
@@ -374,7 +445,7 @@ spec:
 
           secret = os.environ["WEBUI_SECRET_KEY"].encode()
           header = b64url(json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode())
-          payload = b64url(json.dumps({"id": row[0], "exp": int(time.time()) + 300}, separators=(",", ":")).encode())
+          payload = b64url(json.dumps({"id": admin, "exp": int(time.time()) + 300}, separators=(",", ":")).encode())
           signing_input = header + b"." + payload
           sig = b64url(hmac.new(secret, signing_input, hashlib.sha256).digest())
           token = (signing_input + b"." + sig).decode()
@@ -384,7 +455,7 @@ spec:
       try:
           current = http_json(f"{base}/openai/config", headers=headers)
       except (urllib.error.URLError, TimeoutError) as e:
-          print(f"[open-webui post-install] failed to read current config: {e}")
+          print(f"[open-webui post-install] failed to read current config: {describe(e)}")
           sys.exit(1)
 
       want_url = os.environ["OPENAI_API_BASE_URL"]
@@ -404,7 +475,7 @@ spec:
           http_json(f"{base}/openai/config/update", method="POST",
                     data=json.dumps(update).encode(), headers=req_headers)
       except (urllib.error.URLError, TimeoutError) as e:
-          print(f"[open-webui post-install] update failed: {e}")
+          print(f"[open-webui post-install] update failed: {describe(e)}")
           sys.exit(1)
 
       print("[open-webui post-install] openai config updated")
