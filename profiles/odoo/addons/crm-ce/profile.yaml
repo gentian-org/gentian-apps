@@ -7,7 +7,7 @@ metadata:
   annotations:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: addon
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["crm"],"gentianOdooGroupRoles":["sales_team.group_sale_salesman"]}'
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["sales_team.group_sale_manager"],"gentianOdooGroupRoles":["sales_team.group_sale_salesman"],"gentianOdooModules":["crm"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
   displayName: "Odoo CRM"

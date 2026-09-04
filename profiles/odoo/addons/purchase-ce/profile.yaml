@@ -7,7 +7,7 @@ metadata:
   annotations:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: addon
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["purchase"],"gentianOdooGroupRoles":["purchase.group_purchase_user","stock.group_stock_user"]}'
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["purchase.group_purchase_manager"],"gentianOdooGroupRoles":["purchase.group_purchase_user","stock.group_stock_user"],"gentianOdooModules":["purchase"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
   displayName: "Odoo Purchase"

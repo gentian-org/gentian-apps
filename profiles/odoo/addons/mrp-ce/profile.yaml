@@ -7,7 +7,7 @@ metadata:
   annotations:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: addon
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["mrp"],"gentianOdooGroupRoles":["mrp.group_mrp_user","stock.group_stock_user"]}'
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["mrp.group_mrp_manager"],"gentianOdooGroupRoles":["mrp.group_mrp_user","stock.group_stock_user"],"gentianOdooModules":["mrp"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
   displayName: "Odoo Manufacturing"
