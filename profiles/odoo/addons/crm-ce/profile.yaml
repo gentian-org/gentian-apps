@@ -29,28 +29,29 @@ spec:
       displayName:
         en_US: "Odoo CRM"
         de_DE: "Odoo CRM"
-      # crm.action_your_pipeline, not the raw crm.crm_lead_action_pipeline
-      # view it wraps. That view has no ir.ui.menu record pointing at it
-      # (upstream reaches it only via this server action) and no path,
-      # so the web client's app-resolution never finds an owner for it and
-      # falls back to sessionStorage's last-visited app -- shared by every
-      # Gentian Odoo tile open in the browser, since they are same-origin
-      # iframes in one tab. Whichever tile the user opened right before
-      # CRM would win, so CRM's own top bar showed that tile's menu
-      # sections instead of CRM's.
+      # gentian_app names the app this tile belongs to, by ir.ui.menu xml
+      # id. gentian_os reads it (embed_mode.js) and selects that app
+      # directly, instead of leaving the web client to infer one.
       #
-      # action_your_pipeline is what Odoo's own CRM icon actually opens: a
-      # thin, read-only server action (crm.crm_team's
-      # action_your_pipeline/_action_update_to_pipeline, checked against
-      # the addon source -- .check_access("read") plus a context/help-text
-      # computation, no writes) that resolves the user's own sales team and
-      # then returns this exact pipeline view. It has both a menu (CRM /
-      # Configuration, id 309) and a path ("crm"), so the web client
-      # resolves CRM's app directly from the action every time, regardless
-      # of what else is open. Every other Gentian Odoo tile already points
-      # at an action with its own menu and path; this brings CRM in line
-      # with the rest rather than teaching the web client something new.
-      linkSuffix: "/odoo/action-crm.action_your_pipeline?gentian_embed=1"
+      # It has to be told, because for this tile Odoo's data cannot say.
+      # WebClient.loadRouterState looks for an ir.ui.menu owning the
+      # action; nothing points at crm.crm_lead_action_pipeline and it has
+      # no path, so both attempts miss and it falls back to
+      # sessionStorage's last-visited app. Same-origin iframes share one
+      # sessionStorage, and every Gentian Odoo tile is one, so that means
+      # "whichever tile was opened most recently, in any window" -- CRM's
+      # top bar showed Employees' or Invoicing's sections.
+      #
+      # action_your_pipeline stays because it is what Odoo's own CRM icon
+      # opens -- a read-only server action (crm.crm_team, checked against
+      # the addon source: check_access("read") plus a context and
+      # help-text computation, no writes) that scopes the pipeline to the
+      # user's own sales team. It does not fix the top bar on its own:
+      # ActionService._executeServerAction runs it and recurses into what
+      # it returns, which is that same menu-less action, so the wrapper's
+      # menu and path are discarded before anything reads them. That was
+      # tried first and did not work.
+      linkSuffix: "/odoo/action-crm.action_your_pipeline?gentian_embed=1&gentian_app=crm.crm_menu_root"
       linkTarget: embedded
       allowedGroup: "App Users"
 
