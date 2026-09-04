@@ -1204,7 +1204,79 @@ then email local-part (same as the Nextcloud portal bridge).
 
 - [ ] Declare `spec.provisioning.privilegedRole` **and** `spec.provisioning.syncJob` when the app has a distinct admin group/role — the role alone is a declaration nothing applies
 - [ ] Do **not** conflate `app-admins` with `app:<profile>` unless product policy explicitly requires both
+- [ ] If the app grants roles from a **claim** rather than a Job, declare `gentianOdooAdminRoles` beside `gentianOdooGroupRoles` — see 6i
 - [ ] Ensure OIDC users exist in the app (bridge or provisioner creates accounts before admin grant)
+
+---
+
+### 6i. Admin roles for claim-driven apps (`gentianOdooAdminRoles`)
+
+6h covers apps whose admin construct is reached by a **Job**
+(`spec.provisioning.privilegedRole` + `syncJob`). Odoo is the other shape: roles
+arrive in the **OIDC claim** and the app assigns them at sign-in. Both exist, and
+a profile uses whichever matches its app — but the claim-driven one has a trap
+that cost a release to find, so it gets its own rule.
+
+**A profile that grants a member role must also declare the admin role.**
+
+```yaml
+metadata:
+  annotations:
+    gentianos.io/keycloak-group-attributes: >-
+      {"gentianOdooModules":["crm"],
+       "gentianOdooGroupRoles":["sales_team.group_sale_salesman"],
+       "gentianOdooAdminRoles":["sales_team.group_sale_manager"]}
+```
+
+| Attribute | Lands on | Granted to |
+|---|---|---|
+| `gentianOdooModules` | the app's own group | decides portal tile visibility |
+| `gentianOdooGroupRoles` | the app's own group | anyone entitled to that app |
+| `gentianOdooAdminRoles` | `gentian:tenant:<t>:app-admins` | app administrators, for **every** installed app |
+
+gentian-os unions every installed profile's `gentianOdooAdminRoles` onto the
+tenant's `app-admins` group, writing them there as `gentianOdooGroupRoles` — the
+same attribute the member roles use. So there is no second claim and no second
+protocol mapper: an app admin simply has more roles aggregated onto them, and
+`gentian_os`'s `res_users` maps them exactly as it maps the member roles.
+Withdrawal is symmetric — it tracks what it granted in `gentian_dynamic_roles`
+and removes what a later sign-in no longer claims.
+
+**Why it must be declared, rather than inferred from being an admin.** Odoo does
+not imply an application's manager group from platform administration. Its own
+documentation is explicit: a user "**must** have the specific *Administration*
+access rights set on their user profile", and the manager groups are separate
+grants that no other permission carries with it. `base.group_system` is not
+`sales_team.group_sale_manager`.
+
+That is exactly how this was missed. Every Odoo profile declared its member role
+and none declared an admin role, and `res_users` hardcoded three groups for
+admins — `base.group_system`, `base.group_erp_manager` and, alone among the
+modules, `account.group_account_manager`. Accounting therefore worked and looked
+like proof the mechanism was fine. It was not: an app admin opening CRM got
+`Sales / User: Own Documents Only`, and CRM's **Configuration** menu — gated on
+`Sales / Administrator` — was simply absent. Nothing errored. The menu was not
+there, which reads as "this app has no settings" rather than "you lack a role".
+
+**Finding the right role name.** Read it from the app, do not guess it. For a
+module installed on a live tenant:
+
+```
+env["ir.model.data"].search([("model","=","res.groups"),("module","=","crm")])
+```
+
+For one that is not, the group ids are in the addon source
+(`addons/<module>/security/*.xml`). Note the defining module is not always the
+one you install: CRM's manager group is `sales_team.group_sale_manager`, not
+`crm.*`. A module that defines no manager group — `calendar`, `contacts` —
+declares no `gentianOdooAdminRoles`, and that is a complete answer, not an
+omission.
+
+**Checklist:**
+
+- [ ] Every profile with `gentianOdooGroupRoles` also has `gentianOdooAdminRoles`, or the module genuinely defines no manager group
+- [ ] The role id was read from `ir.model.data` or the addon source, not inferred from the module name
+- [ ] Member roles stay member roles — do not grant a manager group to ordinary users to work around a missing admin declaration
 
 ---
 
