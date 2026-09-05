@@ -29,29 +29,17 @@ spec:
       displayName:
         en_US: "Odoo CRM"
         de_DE: "Odoo CRM"
-      # gentian_app names the app this tile belongs to, by ir.ui.menu xml
-      # id. gentian_os reads it (embed_mode.js) and selects that app
-      # directly, instead of leaving the web client to infer one.
+      # action_your_pipeline, not the raw crm.crm_lead_action_pipeline view it
+      # wraps: it is what Odoo's own CRM icon opens, and it scopes the pipeline
+      # to the user's sales team. A read-only server action -- crm.crm_team,
+      # checked against the addon source: check_access("read") plus a context
+      # and help-text computation, no writes.
       #
-      # It has to be told, because for this tile Odoo's data cannot say.
-      # WebClient.loadRouterState looks for an ir.ui.menu owning the
-      # action; nothing points at crm.crm_lead_action_pipeline and it has
-      # no path, so both attempts miss and it falls back to
-      # sessionStorage's last-visited app. Same-origin iframes share one
-      # sessionStorage, and every Gentian Odoo tile is one, so that means
-      # "whichever tile was opened most recently, in any window" -- CRM's
-      # top bar showed Employees' or Invoicing's sections.
-      #
-      # action_your_pipeline stays because it is what Odoo's own CRM icon
-      # opens -- a read-only server action (crm.crm_team, checked against
-      # the addon source: check_access("read") plus a context and
-      # help-text computation, no writes) that scopes the pipeline to the
-      # user's own sales team. It does not fix the top bar on its own:
-      # ActionService._executeServerAction runs it and recurses into what
-      # it returns, which is that same menu-less action, so the wrapper's
-      # menu and path are discarded before anything reads them. That was
-      # tried first and did not work.
-      linkSuffix: "/odoo/action-crm.action_your_pipeline?gentian_embed=1&gentian_app=crm.crm_menu_root"
+      # No gentian_app hint here any more. It was added when the embedded top
+      # bar showed whichever tile was opened last, and gentian_os now reads the
+      # app off the action's module instead -- crm.* to crm.crm_menu_root --
+      # which covers every tile without any of them declaring anything.
+      linkSuffix: "/odoo/action-crm.action_your_pipeline?gentian_embed=1"
       linkTarget: embedded
       allowedGroup: "App Users"
 
