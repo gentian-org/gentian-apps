@@ -1,0 +1,41 @@
+name: Package and push Helm chart
+description: >
+  GHCR login + helm package + oci push, gated on the same publish condition
+  every job here uses. Chart name/version come from the chart's own
+  Chart.yaml, not the directory name — several charts here live at a path
+  like apps/app-store/chart, where the two differ.
+inputs:
+  chart-path:
+    required: true
+  lint:
+    description: Run `helm lint` first (runs even when push is false).
+    required: false
+    default: "false"
+  push:
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Log in to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+
+    - name: Lint chart
+      if: inputs.lint == 'true'
+      shell: bash
+      run: helm lint "${{ inputs.chart-path }}"
+
+    - name: Package and push chart
+      if: inputs.push == 'true'
+      shell: bash
+      run: |
+        CHART_VERSION=$(grep '^version:' "${{ inputs.chart-path }}/Chart.yaml" | awk '{print $2}')
+        CHART_NAME=$(grep '^name:' "${{ inputs.chart-path }}/Chart.yaml" | awk '{print $2}')
+        helm package "${{ inputs.chart-path }}" -d /tmp
+        helm push "/tmp/${CHART_NAME}-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
