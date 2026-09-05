@@ -1280,6 +1280,58 @@ omission.
 
 ---
 
+### 6j. Same-origin iframes share browser state
+
+The desktop opens every tile as an iframe in **one browser tab**, and tiles of
+the same app family share a host — every Odoo module is `erp.<tenant>`. Browsers
+scope `sessionStorage` and `localStorage` per origin, not per iframe, so all of
+those tiles read and write **one** store. Anything an app remembers there as
+"the last thing this session did" is therefore shared with every other tile of
+that app, and the tile that wrote it last wins.
+
+That is not a bug in the app. It is a sound assumption — one web client per
+browser session — that the shell quietly breaks by running several at once.
+
+**Odoo's case, as a worked example.** `WebClient.loadRouterState` decides which
+app the top bar belongs to by finding an `ir.ui.menu` that points at the action,
+and falls back to `sessionStorage["menu_id"]`, the last app visited, when it
+finds none. In the portal that reads as *whichever tile the user opened most
+recently, in any window*: CRM's top bar showing Employees' menu sections.
+
+Finding no menu is not the exception it sounds like, which is why fixing it a
+tile at a time did not hold:
+
+- `crm.crm_lead_action_pipeline` has no menu pointing at it, for anyone.
+- `account.open_account_journal_dashboard_kanban` is reached from *Invoicing /
+  Dashboard* — so it depends on **who is looking**. Odoo sends the client only
+  the menus that user may see, and for a user without that one the action
+  arrives owned by nothing. A check run as superuser says it is owned fine.
+
+**You do not declare anything for this.** `gentian_os` reads the app off the
+tile URL: the module that defines an action also defines its app's root menu
+(`account.open_account_journal_dashboard_kanban` beside `account.menu_finance`),
+the xmlid is already in the URL, and `load_web_menus` already sends each menu's
+xmlid. A module added later is covered without touching anything.
+
+`?gentian_app=<app menu xmlid>` overrides it, for an action whose module is not
+its app's. No profile needs it today.
+
+**The general lesson.** When an embedded app shows state that belongs to another
+tile — the wrong app selected, the wrong workspace, a stale "recent" list —
+suspect per-origin browser storage before suspecting the profile. The tell is
+that it depends on *what you opened before*, and that it does not reproduce with
+a single tile open. The fix belongs in the app's own integration layer, deriving
+the answer from something specific to that tile (its URL), not in the tile's
+declaration.
+
+**Checklist:**
+
+- [ ] Two tiles of the same app family, opened in either order, each show their own state
+- [ ] Reproduced with both open — a bug that needs a *previous* tile is this class
+- [ ] Fixed by deriving from the tile's URL, not by adding a per-tile declaration
+
+---
+
 ## 7. Global domain and hosts
 
 Many Bitnami-family and opendesk charts read `global.domain` and `global.hosts`
