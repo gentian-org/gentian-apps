@@ -751,7 +751,13 @@ spec:
                 gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-release
               name: {{ $xrName }}-release
             spec:
-              rollbackLimit: 3
+              # No rollbackLimit, deliberately. provider-helm's shouldRollBack
+              # fires on StatusPendingInstall as readily as on StatusFailed, and
+              # at revision 1 there is nothing to roll back to, so what it does
+              # is uninstall -- deleting the chart's PVCs. OpenProject seeds a
+              # database on first boot and is exactly the kind of slow install
+              # that reaches waitTimeout while working. The long form is on the
+              # app Release in gentian-os crossplane/compositions/app-default.yaml.
               forProvider:
                 chart:
                   repository: {{ $chart.repository }}
