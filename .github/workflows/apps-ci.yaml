@@ -23,6 +23,7 @@ on:
       - "charts/mathesar/**"
       - "charts/docmost/**"
       - ".github/workflows/apps-ci.yaml"
+      - ".github/actions/**"
   pull_request:
     branches: [main, develop]
     paths:
@@ -35,13 +36,26 @@ on:
       - "charts/activepieces/**"
       - "charts/mathesar/**"
       - "charts/docmost/**"
+      - ".github/actions/**"
 
 env:
   REGISTRY: ghcr.io
   IMAGE_ORG: gentian-org
 
 jobs:
+  # Computed once here instead of repeated on every job below (it used to be
+  # the exact same boolean expression pasted into ~13 places) — every
+  # image/chart job reads it via needs.should-publish.outputs.publish.
+  should-publish:
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
+    steps:
+      - id: check
+        run: echo "publish=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}" >> "$GITHUB_OUTPUT"
+
   build-app-store:
+    needs: [should-publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -49,50 +63,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Read app-store release versions
         id: versions
         run: |
           IMAGE_TAG=$(grep 'tag:' apps/app-store/chart/values.yaml | head -1 | awk '{print $2}' | tr -d '"')
           echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
+      # linux/arm64 needs QEMU here (unlike gentian-os's Go binary, cross-
+      # compiled natively via TARGETARCH) — these Dockerfiles run pip/npm
+      # during the build, which only works for a foreign arch under emulation.
       - name: Build and push API image
-        uses: docker/build-push-action@v6
+        uses: ./.github/actions/build-push-image
         with:
           context: apps/app-store/backend
-          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
-          tags: |
+          platforms: linux/amd64,linux/arm64
+          qemu-arch: arm64
+          push: ${{ needs.should-publish.outputs.publish }}
+          image-tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:${{ github.sha }}
 
       - name: Build and push Web image
-        uses: docker/build-push-action@v6
+        uses: ./.github/actions/build-push-image
         with:
           context: apps/app-store/frontend
+          platforms: linux/amd64,linux/arm64
+          qemu-arch: arm64
           build-args: |
             VITE_AUTH_DISABLED=true
-          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
-          tags: |
+          push: ${{ needs.should-publish.outputs.publish }}
+          image-tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:${{ github.sha }}
 
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-
       - name: Package and push chart
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-        run: |
-          CHART_VERSION=$(grep '^version:' apps/app-store/chart/Chart.yaml | awk '{print $2}')
-          helm package apps/app-store/chart -d /tmp
-          helm push "/tmp/app-store-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+        uses: ./.github/actions/package-push-chart
+        with:
+          chart-path: apps/app-store/chart
+          push: ${{ needs.should-publish.outputs.publish }}
 
   build-nextcloud:
+    needs: [should-publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -119,18 +130,11 @@ jobs:
           echo "collectives_version=${COLLECTIVES_VERSION}" >> "$GITHUB_OUTPUT"
           echo "spreed_version=${SPREED_VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build and push Nextcloud bundle image
-        uses: docker/build-push-action@v6
+        uses: ./.github/actions/build-push-image
         with:
           context: images/nextcloud
-          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
+          push: ${{ needs.should-publish.outputs.publish }}
           build-args: |
             NEXTCLOUD_VERSION=${{ steps.versions.outputs.nextcloud_version }}
             USER_OIDC_VERSION=${{ steps.versions.outputs.user_oidc_version }}
@@ -143,11 +147,12 @@ jobs:
             DECK_VERSION=${{ steps.versions.outputs.deck_version }}
             COLLECTIVES_VERSION=${{ steps.versions.outputs.collectives_version }}
             SPREED_VERSION=${{ steps.versions.outputs.spreed_version }}
-          tags: |
+          image-tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ github.sha }}
 
   build-nextcloud-mcp:
+    needs: [should-publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -161,32 +166,23 @@ jobs:
           CHART_VERSION=$(grep '^version:' images/nextcloud-mcp/chart/Chart.yaml | awk '{print $2}')
           echo "chart_version=${CHART_VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build and push image
-        uses: docker/build-push-action@v6
+        uses: ./.github/actions/build-push-image
         with:
           context: images/nextcloud-mcp
-          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
-          tags: |
+          push: ${{ needs.should-publish.outputs.publish }}
+          image-tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud-mcp:${{ steps.version.outputs.chart_version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud-mcp:${{ github.sha }}
 
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-
       - name: Package and push chart
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-        run: |
-          helm package images/nextcloud-mcp/chart -d /tmp
-          helm push "/tmp/nextcloud-mcp-${{ steps.version.outputs.chart_version }}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+        uses: ./.github/actions/package-push-chart
+        with:
+          chart-path: images/nextcloud-mcp/chart
+          push: ${{ needs.should-publish.outputs.publish }}
 
   build-xwiki:
+    needs: [should-publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -204,23 +200,16 @@ jobs:
           echo "flavor_xip_sha256=${FLAVOR_XIP_SHA256}" >> "$GITHUB_OUTPUT"
           echo "oidc_version=${OIDC_VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build and push XWiki bundle image
-        uses: docker/build-push-action@v6
+        uses: ./.github/actions/build-push-image
         with:
           context: images/xwiki
-          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
+          push: ${{ needs.should-publish.outputs.publish }}
           build-args: |
             XWIKI_VERSION=${{ steps.versions.outputs.xwiki_version }}
             FLAVOR_XIP_SHA256=${{ steps.versions.outputs.flavor_xip_sha256 }}
             OIDC_VERSION=${{ steps.versions.outputs.oidc_version }}
-          tags: |
+          image-tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ github.sha }}
 
@@ -286,31 +275,21 @@ jobs:
         run: python3 scripts/customization-debt-report.py >> "$GITHUB_STEP_SUMMARY"
 
   build-odoo-chart:
+    needs: [should-publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-
       - name: Package and push chart
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-        run: |
-          CHART_VERSION=$(grep '^version:' charts/odoo/Chart.yaml | awk '{print $2}')
-          helm package charts/odoo -d /tmp
-          helm push "/tmp/odoo-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+        uses: ./.github/actions/package-push-chart
+        with:
+          chart-path: charts/odoo
+          push: ${{ needs.should-publish.outputs.publish }}
 
   build-activepieces-chart:
+    needs: [should-publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -323,7 +302,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ github.token }}
 
       - name: Install Helm
         uses: azure/setup-helm@v4
@@ -331,12 +310,16 @@ jobs:
       # The chart is not vendored: upstream is fetched at the pinned version and
       # the local patch series is applied on top. This step runs on pull requests
       # too — a series that no longer applies must fail review, not merge.
+      #
+      # Not a package-push-chart candidate like the plain charts below: the tgz
+      # comes out of this build script directly, there's no separate `helm
+      # package` of a vendored directory.
       - name: Build chart from pinned upstream + patch series
         id: build
         run: scripts/build-activepieces-chart.sh --out /tmp/ap-dist
 
       - name: Push chart
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+        if: needs.should-publish.outputs.publish == 'true'
         run: |
           # shellcheck source=/dev/null
           source charts/activepieces/UPSTREAM
@@ -344,155 +327,93 @@ jobs:
             oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
 
   build-sso-saml-sidecar-chart:
+    needs: [should-publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-
       - name: Package and push chart
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-        run: |
-          CHART_VERSION=$(grep '^version:' charts/gentian-sidecar-sso-saml/Chart.yaml | awk '{print $2}')
-          helm package charts/gentian-sidecar-sso-saml -d /tmp
-          helm push "/tmp/gentian-sidecar-sso-saml-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+        uses: ./.github/actions/package-push-chart
+        with:
+          chart-path: charts/gentian-sidecar-sso-saml
+          push: ${{ needs.should-publish.outputs.publish }}
 
   build-git-modules-sidecar-chart:
+    needs: [should-publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-
       - name: Package and push chart
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-        run: |
-          CHART_VERSION=$(grep '^version:' charts/gentian-sidecar-git-modules/Chart.yaml | awk '{print $2}')
-          helm package charts/gentian-sidecar-git-modules -d /tmp
-          helm push "/tmp/gentian-sidecar-git-modules-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+        uses: ./.github/actions/package-push-chart
+        with:
+          chart-path: charts/gentian-sidecar-git-modules
+          push: ${{ needs.should-publish.outputs.publish }}
 
   build-mathesar-chart:
+    needs: [should-publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-
-      - name: Lint chart
-        run: helm lint charts/mathesar
-
       - name: Package and push chart
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-        run: |
-          CHART_VERSION=$(grep '^version:' charts/mathesar/Chart.yaml | awk '{print $2}')
-          helm package charts/mathesar -d /tmp
-          helm push "/tmp/mathesar-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+        uses: ./.github/actions/package-push-chart
+        with:
+          chart-path: charts/mathesar
+          lint: "true"
+          push: ${{ needs.should-publish.outputs.publish }}
 
   build-docmost-chart:
+    needs: [should-publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-
-      - name: Lint chart
-        run: helm lint charts/docmost
-
       - name: Package and push chart
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-        run: |
-          CHART_VERSION=$(grep '^version:' charts/docmost/Chart.yaml | awk '{print $2}')
-          helm package charts/docmost -d /tmp
-          helm push "/tmp/docmost-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+        uses: ./.github/actions/package-push-chart
+        with:
+          chart-path: charts/docmost
+          lint: "true"
+          push: ${{ needs.should-publish.outputs.publish }}
 
   build-git-modules-sidecar-image:
+    needs: [should-publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build and push image
-        uses: docker/build-push-action@v6
+        uses: ./.github/actions/build-push-image
         with:
           context: images/gentian-sidecar-git-modules
-          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
-          tags: |
+          push: ${{ needs.should-publish.outputs.publish }}
+          image-tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/gentian-sidecar-git-modules:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/gentian-sidecar-git-modules:${{ github.sha }}
 
   build-sso-saml-sidecar-image:
+    needs: [should-publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build and push image
-        uses: docker/build-push-action@v6
+        uses: ./.github/actions/build-push-image
         with:
           context: images/gentian-sidecar-sso-saml
-          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
-          tags: |
+          push: ${{ needs.should-publish.outputs.publish }}
+          image-tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:${{ github.sha }}
