@@ -38,4 +38,25 @@ runs:
         CHART_VERSION=$(grep '^version:' "${{ inputs.chart-path }}/Chart.yaml" | awk '{print $2}')
         CHART_NAME=$(grep '^name:' "${{ inputs.chart-path }}/Chart.yaml" | awk '{print $2}')
         helm package "${{ inputs.chart-path }}" -d /tmp
-        helm push "/tmp/${CHART_NAME}-${CHART_VERSION}.tgz" oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+
+        # GHCR intermittently 404s the manifest it was just handed, failing the
+        # push with `Tag on destination: sha256:...: not found`. The identical
+        # push succeeds moments later, so a registry hiccup should cost a retry
+        # rather than a red pipeline. A genuine rejection still fails, just
+        # three attempts later.
+        push_chart() {
+            helm push "/tmp/${CHART_NAME}-${CHART_VERSION}.tgz" \
+                "oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts"
+        }
+
+        for attempt in 1 2 3; do
+            if push_chart; then
+                exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+                echo "push failed (attempt ${attempt}/3); retrying in $((attempt * 10))s" >&2
+                sleep $((attempt * 10))
+            fi
+        done
+        echo "ERROR: helm push failed after 3 attempts" >&2
+        exit 1
