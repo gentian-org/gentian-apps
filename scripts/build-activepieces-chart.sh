@@ -42,7 +42,11 @@ trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$OUT_DIR"
 
 echo "==> upstream ${CHART} ${UPSTREAM_VERSION} from ${REPO}"
-helm repo add activepieces-upstream "$REPO" >/dev/null
+# --force-update: the named repo already exists on any machine that ran an
+# earlier revision of this script, pinned to whatever REPO said back then.
+# Without it the add fails outright, and a plain retry would keep building
+# from the stale URL.
+helm repo add --force-update activepieces-upstream "$REPO" >/dev/null
 helm repo update activepieces-upstream >/dev/null
 helm pull "activepieces-upstream/${CHART}" \
     --version "$UPSTREAM_VERSION" --untar --untardir "$WORK/src" >/dev/null
