@@ -562,7 +562,15 @@ spec:
                 gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-release
               name: {{ $xrName }}-release
             spec:
-              rollbackLimit: 3
+              # No rollbackLimit, deliberately. provider-helm's shouldRollBack
+              # fires on StatusPendingInstall as readily as on StatusFailed, and
+              # at revision 1 there is nothing to roll back to, so what it does
+              # is uninstall -- taking odoo-data with it. Odoo's first boot
+              # installs modules and can outrun waitTimeout on slow storage while
+              # working perfectly well, which turned a slow install into three
+              # rounds of deleting the tenant's filestore and starting over. The
+              # long form is on the app Release in gentian-os
+              # crossplane/compositions/app-default.yaml.
               forProvider:
                 chart:
                   repository: {{ $chart.repository }}
@@ -763,7 +771,8 @@ spec:
                 gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $sc.name }}-release
               name: {{ $tenant }}-{{ $app }}-{{ $sc.name }}
             spec:
-              rollbackLimit: 3
+              # No rollbackLimit, for the reason on the app Release above: at
+              # revision 1 provider-helm's rollback is an uninstall.
               forProvider:
                 chart:
                   repository: {{ $sc.chart.repository }}
@@ -883,6 +892,28 @@ spec:
                   spec:
                     ttlSecondsAfterFinished: 600
                     backoffLimit: 10
+                    {{- /* This pod declares odoo-data in its volumes, so for as
+                         long as it exists Kubernetes will not let that PVC
+                         finish deleting -- kubernetes.io/pvc-protection counts a
+                         pod that merely references the claim, init containers
+                         and all. And wait-for-base below is an unbounded wait on
+                         the base Odoo.
+
+                         Put those together and there is a cycle: the PVC cannot
+                         go while this pod holds it, a replacement odoo pod
+                         cannot schedule against a PVC that is terminating, and
+                         wait-for-base waits forever for the pod that cannot
+                         start. Demo sat in it for an hour on 2026-09-04 with
+                         erp.<tenant> answering 500, and nothing in the cluster
+                         would have broken the tie.
+
+                         A deadline breaks it. The Job fails, the pod goes, the
+                         PVC completes its deletion, and the ttl above then has
+                         Crossplane compose a fresh Job into a world where Odoo
+                         can actually come up. 20m is long enough for a genuinely
+                         slow base boot and short enough to converge unattended.
+                     */}}
+                    activeDeadlineSeconds: 1200
                     template:
                       metadata:
                         labels:

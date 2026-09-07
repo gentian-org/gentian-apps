@@ -369,12 +369,33 @@ spec:
     # busy worker long enough that the liveness probe's own /status.php
     # check can't get answered in time, so it gets killed and retried
     # from scratch -- confirmed live, never once got far enough to finish.
-    # startupProbe wouldn't help here since it (like liveness/readiness)
-    # only checks /status.php, which already returns 200 instantly
-    # regardless of install state -- the slow part is a real page load,
-    # not startup itself. Widening tolerance to ~5 minutes covers a slow
-    # first install; a genuinely hung instance is still caught, just not
-    # as fast.
+    # Widening tolerance to ~5 minutes covers a slow first install; a
+    # genuinely hung instance is still caught, just not as fast.
+    #
+    # That was written about the schema-install phase, where Apache is up
+    # and /status.php answers 200 the moment it is asked -- and for that
+    # phase it was right that a startupProbe adds nothing.
+    #
+    # There is an earlier phase it did not account for. Before Apache
+    # starts at all, the entrypoint syncs the release into the volume:
+    # tens of thousands of small files, and on beefy1's NFS that runs
+    # well past the liveness budget with nothing listening on 8080 yet.
+    # The probe does not time out there, it is refused -- "connect:
+    # connection refused" -- so liveness burns its 30 failures and kills
+    # the container mid-sync, and the next start begins the same sync
+    # again. Demo did that 114 times in eleven hours and never finished.
+    #
+    # A startupProbe is exactly the tool: while it is pending, liveness
+    # and readiness do not run at all, so the sync gets as long as it
+    # needs, and the widened liveness above still covers the install
+    # phase afterwards. 180 x 10s = 30 minutes, matched to the Helm
+    # waitTimeout in gentian-os app-default.yaml.
+    startupProbe:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 10
+      failureThreshold: 180
     livenessProbe:
       initialDelaySeconds: 30
       periodSeconds: 10
