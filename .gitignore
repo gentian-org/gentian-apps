@@ -3,3 +3,6 @@
 
 # Python bytecode from scripts/
 __pycache__/
+
+# Claude Code worktrees
+.claude/worktrees/
