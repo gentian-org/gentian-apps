@@ -9,10 +9,10 @@
 # no longer applies, that failure is the point — resolve it deliberately rather
 # than letting the fork drift silently.
 
-REPO=https://adnoctem.github.io/helm
+REPO=https://adnoctem.github.io/charts
 CHART=activepieces
-UPSTREAM_VERSION=0.3.1
+UPSTREAM_VERSION=0.3.2
 
 # Version published to oci://ghcr.io/gentian-org/charts. Bump on every change to
 # UPSTREAM_VERSION or patches/; profiles pin this via spec.chart.version.
-CHART_VERSION=0.3.26
+CHART_VERSION=0.3.27

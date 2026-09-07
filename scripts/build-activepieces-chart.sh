@@ -42,7 +42,7 @@ trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$OUT_DIR"
 
 echo "==> upstream ${CHART} ${UPSTREAM_VERSION} from ${REPO}"
-helm repo add activepieces-upstream "$REPO" >/dev/null 2>&1 || true
+helm repo add activepieces-upstream "$REPO" >/dev/null
 helm repo update activepieces-upstream >/dev/null
 helm pull "activepieces-upstream/${CHART}" \
     --version "$UPSTREAM_VERSION" --untar --untardir "$WORK/src" >/dev/null
