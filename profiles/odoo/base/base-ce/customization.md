@@ -58,8 +58,7 @@ binaries. See §2.4 of the framework doc for why this is a hard rule.
 `ocb` (Odoo Community Backports) is a real L6 fork with its own release train. New deltas
 belong in `patches/` with DEP-3 headers, not in the tree — see `ocb/patches/README.md`.
 
-**Never** patch to unlock enterprise features. `hide_enterprise_modules` in `odoo-modules`
-is the correct L3 answer to enterprise-module noise.
+**Never** patch to unlock enterprise features.
 
 ## Gotchas
 
