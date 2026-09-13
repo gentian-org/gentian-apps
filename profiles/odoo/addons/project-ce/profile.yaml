@@ -1,0 +1,70 @@
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: odoo-project-ce
+  labels:
+    gentianos.io/profile-name: odoo-project-ce
+  annotations:
+    gentianos.io/platform-app: "false"
+    gentianos.io/deployment-role: addon
+    # Both roles are defined by project itself, unlike CRM's manager group which
+    # lives in sales_team. Read from addons/project/security/project_security.xml:
+    # group_project_user is "User", group_project_manager is "Administrator".
+    # The module's four other groups -- stages, recurring tasks, task
+    # dependencies, milestones -- are feature toggles rather than access tiers,
+    # so they are not roles to hand out here.
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["project.group_project_manager"],"gentianOdooGroupRoles":["project.group_project_user"],"gentianOdooModules":["project"]}'
+    gentianos.io/portal-auth-mode: oidc
+spec:
+  displayName: "Odoo Project"
+  description: "Project and task management module for Odoo."
+  family: odoo
+  catalogueVersion: "1.0.0"
+  edition: ce
+  trustTier: platform
+  license: LGPL-3.0
+  author: OCA
+  tile:
+    # Odoo's own icon for the module this profile installs, set inside the
+    # catalogue's 52x52 frame so it sits with the other tiles.
+    image: assets/tile.svg
+    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBkPSJtMzAuODQyIDM0LjYxMi04LjEwNSAxMC4zODdMNS40NTIgMzEuMzdhMy44NjIgMy44NjIgMCAwIDEtLjYxNi01LjQxN2w1Ljc0OC03LjI0MyAyMC4yNTggMTUuOTAzWiIgZmlsbD0iIzk4NTE4NCIvPjxwYXRoIGQ9Im0yMi42MjMgNDQuOTA5LTEwLjQ1NS04LjMzNSA4LjEyOC0xMC4yNDIgMTAuNTQ3IDguMjhMMjIuNzM4IDQ1bC0uMTE1LS4wOTFaIiBmaWxsPSIjMDA1RTdBIi8+PHBhdGggZD0ibTIyLjU5MyA0NC44ODYuMTQ0LjExNCAyMi40NDctMjguNzY3YTMuODYyIDMuODYyIDAgMCAwLS42MzYtNS4zOTNMMzcuMjIzIDUgMjAuMjk2IDI2LjMzMmwxMC41NDcgOC4yOC04LjEwNSAxMC4zODctLjE0NC0uMTEzWiIgZmlsbD0iIzFBRDNCQiIvPjwvc3ZnPjwvc3ZnPgo=
+
+  portalTiles:
+    - name: odoo-project
+      displayName:
+        en_US: "Odoo Project"
+        de_DE: "Odoo Projekt"
+      # What Odoo's own Project icon opens: menu_main_pm's first child at
+      # sequence 1 is menu_projects, which points here. A plain
+      # ir.actions.act_window on project.project in kanban view -- no server
+      # action to reason about, unlike CRM's action_your_pipeline.
+      #
+      # The sibling menu at the same sequence, menu_projects_group_stage, is
+      # gated on project.group_project_stages, a feature toggle that is off
+      # unless a manager turns it on, so it is not the default entry point.
+      linkSuffix: "/odoo/action-project.open_view_project_all?gentian_embed=1"
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  compositionRef: app-odoo
+  deploymentMethod: crossplane
+  chart:
+    repository: oci://ghcr.io/gentian-org/charts
+    name: odoo
+    version: "0.1.15"
+  # Odoo calls its addons "modules" — this maps the Gentian profile onto that name.
+  customization:
+    addon:
+      id: project
+      of: odoo-base-ce
+  extraValues:
+    odoo:
+      module: project
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
