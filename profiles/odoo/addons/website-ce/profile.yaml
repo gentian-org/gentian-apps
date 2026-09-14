@@ -1,0 +1,71 @@
+apiVersion: gentianos.io/v1alpha1
+kind: AppProfile
+metadata:
+  name: odoo-website-ce
+  labels:
+    gentianos.io/profile-name: odoo-website-ce
+  annotations:
+    gentianos.io/platform-app: "false"
+    gentianos.io/deployment-role: addon
+    # Read from addons/website/security/website_security.xml:
+    # group_website_restricted_editor is "Restricted Editor" and
+    # group_website_designer is "Editor and Designer". The designer group
+    # declares implied_ids onto the restricted editor, so the admin tier already
+    # subsumes the member tier and each is declared where it belongs.
+    gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["website.group_website_designer"],"gentianOdooGroupRoles":["website.group_website_restricted_editor"],"gentianOdooModules":["website"]}'
+    gentianos.io/portal-auth-mode: oidc
+spec:
+  displayName: "Odoo Website"
+  description: "Website builder for a tenant's public homepage, in Odoo."
+  family: odoo
+  catalogueVersion: "1.0.0"
+  edition: ce
+  trustTier: platform
+  license: LGPL-3.0
+  author: OCA
+  tile:
+    # Odoo's own icon for the module this profile installs, set inside the
+    # catalogue's 52x52 frame so it sits with the other tiles.
+    image: assets/tile.svg
+    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48ZyBjbGlwLXBhdGg9InVybCgjb19pY29uX3dlYnNpdGVfX2EpIj48cGF0aCBkPSJNMjYuMDAxIDM0LjVzLS44My0yLS45OTctMi4xNjdjMjAuNTAyLTkuODQgMjMuNTE4LTMuNTQgMjMuOTQtLjk1NS4wNjguNDE4LjAwNS44NDMtLjEyNCAxLjI0N0EyNC44NTcgMjQuODU3IDAgMCAxIDQ3IDM2Ljg5Yy0xLjUgMS41LTEwIDEuNjEtMTAgMS42MWwtMTEtNFoiIGZpbGw9IiMxNDQ0OTYiLz48cGF0aCBkPSJtMjEgMTQgNC4wMDQgMy42NjdjLTIwLjUwMiA5Ljg0LTIzLjUxOCAzLjU0LTIzLjk0Ljk1NS0uMDY4LS40MTgtLjAwNS0uODQzLjEyNC0xLjI0N2EyNC44NCAyNC44NCAwIDAgMSAxLjQyOC0zLjUxNEM2LjcxMyA1LjY0NCAxNC41MDEgMTEgMTQuNTAxIDExbDYuNSAzWiIgZmlsbD0iIzFBNkY2NiIvPjxwYXRoIGQ9Ik0xLjE4NyAzMi42MjVjLS4xMjktLjQwNC0uMTkyLS44MjktLjEyNC0xLjI0Ny40MjItMi41ODYgMy40MzgtOC44ODYgMjMuOTQuOTU1IDE0LjE5NyA2LjgxNSAyMC4wMSA1Ljg5IDIyLjM4MiAzLjgxOEM0My4yODYgNDQuMzYgMzQuODAzIDUwIDI1LjAwMyA1MCAxMy44NTUgNTAgNC40MTEgNDIuNzAzIDEuMTg3IDMyLjYyNVoiIGZpbGw9IiMyRUJDRkEiLz48cGF0aCBkPSJNNDguODE5IDE3LjM3NWMuMTI5LjQwNC4xOTIuODI5LjEyNCAxLjI0Ny0uNDIyIDIuNTg2LTMuNDM4IDguODg2LTIzLjk0LS45NTUtMTQuMTk3LTYuODE1LTIwLjAxLTUuODktMjIuMzgyLTMuODE4QzYuNzIgNS42NCAxNS4yMDMgMCAyNS4wMDMgMCAzNi4xNSAwIDQ1LjU5NCA3LjI5NyA0OC44MTkgMTcuMzc1WiIgZmlsbD0iIzFBRDNCQiIvPjwvZz48ZGVmcz48Y2xpcFBhdGggaWQ9Im9faWNvbl93ZWJzaXRlX19hIj48cGF0aCBmaWxsPSIjZmZmIiBkPSJNMCAwaDUwdjUwSDB6Ii8+PC9jbGlwUGF0aD48L2RlZnM+PC9zdmc+PC9zdmc+Cg==
+
+  portalTiles:
+    - name: odoo-website
+      displayName:
+        en_US: "Odoo Website"
+        de_DE: "Odoo Website"
+      # The builder, which is what Odoo's own Website icon opens:
+      # menu_website_configuration -> menu_site -> menu_website_preview at
+      # sequence 10. An ir.actions.client (tag website_preview) rather than an
+      # act_window -- the first client action among these addons -- but
+      # /odoo/action-<xmlid> addresses it the same way, and every tile in this
+      # family is an explicit action path for the same reason.
+      #
+      # This tile is the editor, not the published site. The site is served to
+      # anonymous visitors off the base's ingress and has no tile: a homepage is
+      # not something a signed-in member opens from the launcher.
+      linkSuffix: "/odoo/action-website.website_preview?gentian_embed=1"
+      linkTarget: embedded
+      allowedGroup: "App Users"
+
+  compositionRef: app-odoo
+  deploymentMethod: crossplane
+  chart:
+    repository: oci://ghcr.io/gentian-org/charts
+    name: odoo
+    version: "0.1.15"
+  # Odoo calls its addons "modules" — this maps the Gentian profile onto that name.
+  customization:
+    addon:
+      id: website
+      of: odoo-base-ce
+  extraValues:
+    odoo:
+      module: website
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
