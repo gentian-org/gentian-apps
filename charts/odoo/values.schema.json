@@ -145,7 +145,7 @@
                 "shallow",
                 "recursive"
               ],
-              "description": "git-sync --submodules mode. recursive, because odoo-modules carries addons in submodules."
+              "description": "git-sync --submodules mode. recursive fetches addons a module repository carries in submodules; each must be readable with the same credentials as the repository."
             },
             "autoReload": {
               "type": "object",

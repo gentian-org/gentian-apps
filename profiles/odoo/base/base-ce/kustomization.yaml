@@ -4,4 +4,3 @@ kind: Kustomization
 resources:
   - profile.yaml
   - composition.yaml
-  - customizations/hide-enterprise-modules.yaml
