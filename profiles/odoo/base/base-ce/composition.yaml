@@ -551,6 +551,37 @@ spec:
                 name: kubernetes
             {{- end }}
 
+            {{- /* ── Retry a failed release by upgrading it ───────────────────────
+                   A release that failed -- a first boot that outran waitTimeout,
+                   a module clone that could not be fetched yet -- is never tried
+                   again on its own. provider-helm counts a failed release with an
+                   unchanged spec as up to date, so without rollbackLimit it never
+                   calls Update; and rollbackLimit is not an option, because at
+                   revision 1 its retry is an uninstall that takes odoo-data with
+                   it (see the Release below). The workload recovers and the
+                   Release stays failed forever, and so does the App.
+
+                   So the desired values change when the observed release has
+                   failed: retryAfterRevision names the revision that failed. The
+                   release is then out of date, provider-helm runs Upgrade, and
+                   Helm upgrades a failed release in place -- volumes kept. Should
+                   that attempt fail too, its own revision is the next value, so
+                   each failure earns exactly one more attempt, each bounded by
+                   waitTimeout.
+
+                   The value is carried forward from the observed Release once the
+                   release deploys, not dropped: dropping it would change the
+                   values again and cost a pointless upgrade on every recovery.
+                   The chart does not read it; its schema allows extra keys. */}}
+            {{- $observedRelease := dig "resources" (printf "%s-release" $app) "resource" dict $.observed }}
+            {{- $retryAfter := dig "spec" "forProvider" "values" "gentianRelease" "retryAfterRevision" 0 $observedRelease | int }}
+            {{- if eq (dig "status" "atProvider" "state" "" $observedRelease) "failed" }}
+            {{- $retryAfter = dig "status" "atProvider" "revision" 0 $observedRelease | int }}
+            {{- end }}
+            {{- if gt $retryAfter 0 }}
+            {{- $extraVals = mergeOverwrite $extraVals (dict "gentianRelease" (dict "retryAfterRevision" $retryAfter)) }}
+            {{- end }}
+
             {{- $extraVals = $extraVals | toJson | fromJson }}
 
             {{- /* ── Emit Helm Release ────────────────────────────────────────── */}}
@@ -568,9 +599,9 @@ spec:
               # is uninstall -- taking odoo-data with it. Odoo's first boot
               # installs modules and can outrun waitTimeout on slow storage while
               # working perfectly well, which turned a slow install into three
-              # rounds of deleting the tenant's filestore and starting over. The
-              # long form is on the app Release in gentian-os
-              # crossplane/compositions/app-default.yaml.
+              # rounds of deleting the tenant's filestore and starting over. A
+              # failed release is retried by upgrading it instead -- see the
+              # retryAfterRevision block above.
               forProvider:
                 chart:
                   repository: {{ $chart.repository }}
@@ -761,6 +792,17 @@ spec:
             {{- $scRaw = $scRaw | replace "${APP_ID}"           $app }}
             {{- $scRaw = $scRaw | replace "${SIDECAR_ID}"       $sc.name }}
             {{- $scExtraVals = $scRaw | fromJson }}
+            {{- end }}
+            {{- /* Same retry as the app Release above, and for the same reason:
+                   this Release waits too, so a failed one would otherwise stay
+                   failed. */}}
+            {{- $scObservedRelease := dig "resources" (printf "%s-%s-release" $app $sc.name) "resource" dict $.observed }}
+            {{- $scRetryAfter := dig "spec" "forProvider" "values" "gentianRelease" "retryAfterRevision" 0 $scObservedRelease | int }}
+            {{- if eq (dig "status" "atProvider" "state" "" $scObservedRelease) "failed" }}
+            {{- $scRetryAfter = dig "status" "atProvider" "revision" 0 $scObservedRelease | int }}
+            {{- end }}
+            {{- if gt $scRetryAfter 0 }}
+            {{- $scExtraVals = mergeOverwrite $scExtraVals (dict "gentianRelease" (dict "retryAfterRevision" $scRetryAfter)) }}
             {{- end }}
             {{- $scExtraVals = $scExtraVals | toJson | fromJson }}
             ---
