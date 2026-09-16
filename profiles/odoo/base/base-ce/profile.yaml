@@ -81,7 +81,7 @@ spec:
   chart:
     repository: oci://ghcr.io/gentian-org/charts
     name: odoo
-    version: "0.1.21"
+    version: "0.1.23"
 
   deploymentMethod: crossplane
 
@@ -145,6 +145,14 @@ spec:
     gentian:
       initModules: "base,web,gentian_os,account"
       modulesPath: /opt/odoo/custom-addons
+      # Where this tenant's Odoo is actually served — the subDomain from
+      # spec.ingress above. Odoo keeps this in ir_config_parameter and builds
+      # its OAuth redirect_uri from it; left at Odoo's http://localhost:8069
+      # default it hands the identity provider a redirect that matches none of
+      # the redirectUris registered under kernelRequirements.identity, and every
+      # login fails with oauth_error=3 — which on a website-enabled database
+      # surfaces as a 500, because the login page itself cannot then render.
+      baseUrl: "https://erp.${TENANT_DOMAIN}"
       oidc:
         # Where the pod validates a token. The browser still goes to the public
         # issuer; only auth_oauth's server-side userinfo call moves in-cluster,

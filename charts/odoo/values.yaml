@@ -32,6 +32,20 @@ gentian:
   bindingsPath: /etc/gentian/bindings.json
   modulesPath: /opt/odoo/custom-addons
   initModules: "base,web,gentian_os"
+
+  # The URL this Odoo is actually reached on, e.g. https://erp.tenant.example.org.
+  #
+  # Odoo keeps this in ir_config_parameter (web.base.url), not in odoo.conf, and
+  # defaults it to http://localhost:8069. Every absolute URL it generates comes
+  # from there — including the OAuth redirect_uri sent to the identity provider,
+  # which then does not match the registered one and fails the login.
+  #
+  # Odoo self-corrects this on an administrator's first web login, which is no
+  # use when OIDC is the only way in: the login is what is broken. So it is set
+  # declaratively here instead.
+  #
+  # Empty leaves the parameter alone, for a deployment reached some other way.
+  baseUrl: ""
   git:
     enabled: true
     repo: "https://github.com/gentian-org/odoo-modules.git"

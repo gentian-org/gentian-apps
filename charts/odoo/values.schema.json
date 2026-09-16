@@ -118,6 +118,11 @@
           "type": "string",
           "description": "Comma-separated technical module names installed on first boot."
         },
+        "baseUrl": {
+          "type": "string",
+          "description": "Public URL this Odoo is served on (https://erp.<tenant domain>). Written to ir_config_parameter as web.base.url and frozen. Empty leaves the parameter alone.",
+          "default": ""
+        },
         "git": {
           "type": "object",
           "additionalProperties": false,
