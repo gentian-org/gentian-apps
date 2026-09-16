@@ -31,13 +31,27 @@ spec:
     baseUrl: "http://litellm-proxy.platform-kernel.svc.cluster.local:4000"
     tenantBinding: none
 
-  portalTiles:
-    - name: litellm-me
-      displayName:
-        en_US: "LLM Admin Panel"
-        de_DE: "LLM Admin Panel"
-      linkTarget: embedded
-      allowedGroup: "Domain Admins"
+  # No portalTiles, deliberately.
+  #
+  # This console configures the shared kernel LiteLLM: model routing, virtual
+  # keys and the token budgets that apply to every tenant on the cluster. That
+  # is not a tenant administrator's to open, and "Domain Admins" is a tenant
+  # role -- so a tile here handed cluster-wide cost and routing control to
+  # whoever administers any one workspace.
+  #
+  # It was invisible for a different reason until 2026-09: the tile is gated on
+  # the cluster capability "llm", and nothing ever set GENTIAN_CAPABILITIES, so
+  # it never rendered anywhere. Fixing that (gentian-os#200) turned it on for
+  # every tenant at once, which is how the mis-scoping surfaced.
+  #
+  # The profile stays in the catalogue, so an operator can still see that LLM
+  # administration exists. The way in is the platform-scope tile the portal
+  # offers platform administrators (KERNEL_SHELL_APPS in gentian-ui), which
+  # points at the same console and is withheld from tenant roles.
+  #
+  # linkTarget was "embedded", which would not have worked either: LiteLLM
+  # answers with x-frame-options: DENY and frame-ancestors 'none', so the
+  # iframe was blocked regardless of who opened it.
 
   # Customization ladder — see customization.md
   customization:
