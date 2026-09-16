@@ -237,6 +237,38 @@ spec:
                 -i {{ .Values.gentian.initModules }} \
                 --without-demo=all \
                 --stop-after-init || true
+              {{- if .Values.gentian.baseUrl }}
+              # web.base.url, after the modules exist and before Odoo serves.
+              #
+              # It lives in ir_config_parameter, so neither odoo.conf nor the
+              # environment can set it, and it defaults to http://localhost:8069.
+              # Odoo builds its OAuth redirect_uri from it, so with the default
+              # the identity provider is handed
+              # http://localhost:8069/auth_oauth/signin against a client
+              # registered for the real host. The login is refused, Odoo
+              # redirects to /web/login?oauth_error=3, and on a website-enabled
+              # database that page then fails to render at all — the request has
+              # no user, and the website layout calls ensure_one() on it.
+              #
+              # freeze, because the alternative is worse than it looks: unfrozen,
+              # Odoo rewrites this from whatever Host an administrator's first
+              # web login arrives on. Reached once through a port-forward or the
+              # in-cluster Service, it would silently pin itself to that address
+              # and break OAuth again with nothing recording who changed it.
+              python3 /opt/odoo/src/odoo/odoo-bin shell \
+                -d "${DB_NAME}" \
+                --db_host="${DB_HOST}" \
+                --db_port="${DB_PORT}" \
+                --db_user="${DB_USER}" \
+                --db_password="${DB_PASSWORD}" \
+                --config=/etc/odoo/odoo.conf \
+                --no-http --shell-interface=python <<'GENTIAN_BASEURL_EOF'
+              icp = env["ir.config_parameter"].sudo()
+              icp.set_param("web.base.url", """{{ .Values.gentian.baseUrl }}""")
+              icp.set_param("web.base.url.freeze", "True")
+              env.cr.commit()
+              GENTIAN_BASEURL_EOF
+              {{- end }}
               exec python3 /opt/odoo/src/odoo/odoo-bin \
                 -d "${DB_NAME}" \
                 --db_host="${DB_HOST}" \
