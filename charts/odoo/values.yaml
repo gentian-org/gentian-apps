@@ -5,6 +5,25 @@ tenantId: ""
 
 image:
   repository: ghcr.io/gentian-org/ocb
+  # The build every tenant runs, by digest.
+  #
+  # ocb publishes two tags, "main" and "latest", and both move. Pinned to a tag,
+  # a pod that restarts pulls whatever the tag pointed at that minute, so a
+  # tenant's Odoo version can change with no edit to any manifest and no record
+  # of what it changed from. Upgrading is now an edit to this line.
+  #
+  # Bump it by reading the digest back from the registry, not by trusting the
+  # tag to be what was just pushed:
+  #   TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:gentian-org/ocb:pull" | jq -r .token)
+  #   curl -sI -H "Authorization: Bearer $TOKEN" \
+  #     -H "Accept: application/vnd.oci.image.index.v1+json" \
+  #     https://ghcr.io/v2/gentian-org/ocb/manifests/latest | grep -i docker-content-digest
+  #
+  # A digest keeps a manifest alive in GHCR even once untagged, so an ocb
+  # retention sweep that prunes untagged versions would strand this. Immutable
+  # tags in ocb are the real fix; this is the pin available without one.
+  digest: "sha256:67467ad5256f3dd43bdea07f97bf858142777e8748ffc4a9b9c9b9131a01a689"
+  # Fallback when digest is empty — a deliberate moving target, for development.
   tag: latest
   pullPolicy: IfNotPresent
 

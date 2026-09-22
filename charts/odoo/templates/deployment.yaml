@@ -99,7 +99,7 @@ spec:
         # lexicographic order (00-49 platform, 50-89 profile, 90-99 tenant); later
         # keys win via configparser's read-order semantics.
         - name: merge-conf-d
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ include "odoo.image" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
@@ -178,7 +178,7 @@ spec:
               drop: ["ALL"]
             seccompProfile:
               type: RuntimeDefault
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ include "odoo.image" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             - /bin/sh
