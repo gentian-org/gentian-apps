@@ -30,7 +30,9 @@ async def cluster_me(
 ) -> Response:
     """Which of the cluster's verbs this person holds. Every verb false is an
     ordinary answer: it is what almost everyone who signs in gets."""
-    return await director.forward(settings, "GET", _cluster_path(settings, "/me"), bearer_of(credentials))
+    return await director.forward(
+        settings, "GET", _cluster_path(settings, "/me"), bearer_of(credentials)
+    )
 
 
 @router.get("/settings")
@@ -41,7 +43,9 @@ async def cluster_settings(
 ) -> Response:
     """What this cluster is configured with, catalogue and values together, so
     the screen renders from one answer and holds no catalogue of its own."""
-    return await director.forward(settings, "GET", _cluster_path(settings, "/settings"), bearer_of(credentials))
+    return await director.forward(
+        settings, "GET", _cluster_path(settings, "/settings"), bearer_of(credentials)
+    )
 
 
 @router.patch("/settings")
@@ -53,7 +57,13 @@ async def set_cluster_settings(
 ) -> Response:
     """One request is one commit. 202 with a commit means git has it and the
     cluster does not yet; 200 means the state asked for already held."""
-    return await director.forward(settings, "PATCH", _cluster_path(settings, "/settings"), bearer_of(credentials), json_body=body)
+    return await director.forward(
+        settings,
+        "PATCH",
+        _cluster_path(settings, "/settings"),
+        bearer_of(credentials),
+        json_body=body,
+    )
 
 
 @router.get("/tenants")
@@ -62,7 +72,9 @@ async def cluster_tenants(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    return await director.forward(settings, "GET", _cluster_path(settings, "/tenants"), bearer_of(credentials))
+    return await director.forward(
+        settings, "GET", _cluster_path(settings, "/tenants"), bearer_of(credentials)
+    )
 
 
 @router.post("/tenants")
@@ -72,7 +84,13 @@ async def create_cluster_tenant(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    return await director.forward(settings, "POST", _cluster_path(settings, "/tenants"), bearer_of(credentials), json_body=body)
+    return await director.forward(
+        settings,
+        "POST",
+        _cluster_path(settings, "/tenants"),
+        bearer_of(credentials),
+        json_body=body,
+    )
 
 
 @router.delete("/tenants/{tenant}")
@@ -82,7 +100,9 @@ async def retire_cluster_tenant(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    return await director.forward(settings, "DELETE", _cluster_path(settings, f"/tenants/{tenant}"), bearer_of(credentials))
+    return await director.forward(
+        settings, "DELETE", _cluster_path(settings, f"/tenants/{tenant}"), bearer_of(credentials)
+    )
 
 
 @router.get("/tiles")
@@ -91,4 +111,6 @@ async def cluster_tiles(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    return await director.forward(settings, "GET", _cluster_path(settings, "/tiles"), bearer_of(credentials))
+    return await director.forward(
+        settings, "GET", _cluster_path(settings, "/tiles"), bearer_of(credentials)
+    )
