@@ -1,0 +1,270 @@
+/* =========================================================================
+   Gentian shell theme — design tokens for the React portal (greenfield UI).
+
+   Fonts: frontend/public/fonts/
+   Tiles: frontend/public/tiles/
+   Logo:  frontend/public/branding/logo.png
+   ========================================================================= */
+
+/* ----- Webfonts ---------------------------------------------------------- */
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/HankenGrotesk-VariableFont_wght.ttf") format("truetype-variations"),
+       url("/fonts/HankenGrotesk-VariableFont_wght.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/HankenGrotesk-Italic-VariableFont_wght.ttf") format("truetype-variations"),
+       url("/fonts/HankenGrotesk-Italic-VariableFont_wght.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Commit Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/CommitMono-400-Regular.otf") format("opentype");
+}
+@font-face {
+  font-family: "Commit Mono";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/CommitMono-400-Italic.otf") format("opentype");
+}
+@font-face {
+  font-family: "Commit Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/CommitMono-700-Regular.otf") format("opentype");
+}
+@font-face {
+  font-family: "Commit Mono";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/CommitMono-700-Italic.otf") format("opentype");
+}
+
+:root {
+  /* ----- Ink ------------------------------------------------------------- */
+  --ink-0:    #07081A;
+  --ink-1:    #14152E;
+  --ink-2:    #232547;
+  --ink-3:    #45486B;
+  --ink-4:    #74779A;
+  --ink-5:    #A0A3C0;
+
+  /* ----- Paper — warm oat ------------------------------------------------ */
+  --paper-0:  #F4F1EA;
+  --paper-1:  #ECE8DF;
+  --paper-2:  #DED9CC;
+  --paper-3:  #FFFFFF;
+
+  /* ----- Gentian seal ---------------------------------------------------- */
+  --gentian-50:  #ECECF7;
+  --gentian-100: #D5D5EE;
+  --gentian-200: #ADADDF;
+  --gentian-300: #7878CC;
+  --gentian-400: #4A4AB3;
+  --gentian-500: #262696;
+  --gentian-600: #1B1A82;
+  --gentian-700: #131370;
+  --gentian-800: #0A0A33;
+
+  /* ----- Semantic -------------------------------------------------------- */
+  --iris:    #4B5FB3;   --iris-bg:  #E5E9F6;
+  --moss:    #4F6B3A;   --moss-bg:  #E4EBD6;
+  --ember:   #B2671B;   --ember-bg: #F4E5CB;
+  --madder:  #9B2D2D;   --madder-bg:#F2D9D9;
+
+  /* ----- Design-system semantic mapping ---------------------------------- */
+  --bg:           var(--paper-0);
+  --bg-raised:    var(--paper-1);
+  --bg-inset:     var(--paper-2);
+  --bg-card:      var(--paper-3);
+  --bg-inverse:   var(--ink-1);
+
+  --fg:           var(--ink-1);
+  --fg-strong:    var(--ink-0);
+  --fg-muted:     var(--ink-3);
+  --fg-subtle:    var(--ink-4);
+  --fg-disabled:  var(--ink-5);
+  --fg-on-ink:    var(--paper-0);
+  --fg-on-gentian:#FFFFFF;
+
+  --border:        rgba(20, 21, 46, 0.10);
+  --border-strong: rgba(20, 21, 46, 0.22);
+  --border-faint:  rgba(20, 21, 46, 0.05);
+
+  --accent:        var(--gentian-500);
+  --accent-hover:  var(--gentian-600);
+  --accent-active: var(--gentian-700);
+  --accent-fg:     #FFFFFF;
+
+  --link:          var(--gentian-500);
+  --link-visited:  var(--gentian-700);
+
+  --font-display: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans:    "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono:    "Commit Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius-1:    6px;
+  --radius-2:    10px;
+  --radius-3:    16px;
+  --radius-pill: 999px;
+
+  --shadow-1: 0 1px 2px rgba(20, 21, 46, 0.05);
+  --shadow-2: 0 4px 14px -4px rgba(20, 21, 46, 0.10);
+  --shadow-3: 0 12px 28px -8px rgba(20, 21, 46, 0.14);
+  --focus-ring: 0 0 0 3px rgba(74, 74, 179, 0.30);
+
+  --ease-out:   cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+
+  /* ----- --gtn-* aliases (Gentian shell components) ---------------------- */
+  --gtn-ink-0:    var(--ink-0);
+  --gtn-ink-1:    var(--ink-1);
+  --gtn-ink-2:    var(--ink-2);
+  --gtn-ink-3:    var(--ink-3);
+  --gtn-ink-4:    var(--ink-4);
+  --gtn-ink-5:    var(--ink-5);
+  --gtn-paper-0:  var(--paper-0);
+  --gtn-paper-1:  var(--paper-1);
+  --gtn-paper-2:  var(--paper-2);
+  --gtn-paper-3:  var(--paper-3);
+  --gtn-50:       var(--gentian-50);
+  --gtn-100:      var(--gentian-100);
+  --gtn-200:      var(--gentian-200);
+  --gtn-300:      var(--gentian-300);
+  --gtn-400:      var(--gentian-400);
+  --gtn-500:      var(--gentian-500);
+  --gtn-600:      var(--gentian-600);
+  --gtn-700:      var(--gentian-700);
+  --gtn-iris:     var(--iris);
+  --gtn-iris-bg:  var(--iris-bg);
+  --gtn-moss:     var(--moss);
+  --gtn-moss-bg:  var(--moss-bg);
+  --gtn-ember:    var(--ember);
+  --gtn-ember-bg: var(--ember-bg);
+  --gtn-madder:   var(--madder);
+  --gtn-madder-bg:var(--madder-bg);
+  --gtn-border:        var(--border);
+  --gtn-border-strong: var(--border-strong);
+  --gtn-border-faint:  var(--border-faint);
+  --gtn-shadow-1: var(--shadow-1);
+  --gtn-shadow-2: var(--shadow-2);
+  --gtn-shadow-3: var(--shadow-3);
+  --gtn-r1:       var(--radius-1);
+  --gtn-r2:       var(--radius-2);
+  --gtn-r3:       var(--radius-3);
+  --gtn-r-pill:   var(--radius-pill);
+  --gtn-ease-out: var(--ease-out);
+  --gtn-ease-io:  var(--ease-inout);
+  --gtn-dur-1:    var(--dur-1);
+  --gtn-dur-2:    var(--dur-2);
+  --gtn-dur-3:    var(--dur-3);
+  --gtn-font-sans:var(--font-sans);
+  --gtn-font-mono:var(--font-mono);
+  --gtn-focus-ring: var(--focus-ring);
+  --gtn-accent: var(--accent);
+
+  /* WinBox + app menu layout */
+  --winbox-header-height: 40px;
+  --app-menu-height: 56px;
+}
+
+/* ----- Global typography ------------------------------------------------- */
+body {
+  font-family: var(--font-sans);
+}
+
+/* ----- WinBox window chrome -------------------------------------------- */
+.winbox {
+  border-radius: var(--radius-2) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-3) !important;
+  font-family: var(--font-sans) !important;
+  background: var(--paper-0) !important;
+  overflow: hidden;
+}
+
+.winbox.min {
+  z-index: 210 !important;
+}
+
+.winbox.min .wb-drag {
+  cursor: pointer !important;
+}
+
+.wb-header {
+  background: var(--paper-1) !important;
+  height: var(--winbox-header-height) !important;
+  line-height: var(--winbox-header-height) !important;
+  padding: 0 4px 0 12px !important;
+  border-radius: var(--radius-2) var(--radius-2) 0 0 !important;
+  border-bottom: 1px solid var(--border-faint) !important;
+  transition: background var(--dur-2) var(--ease-out) !important;
+}
+
+.wb-title {
+  color: var(--ink-2) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.winbox.focus .wb-header,
+.winbox.active .wb-header {
+  background: var(--gentian-500) !important;
+  border-bottom-color: transparent !important;
+}
+
+.winbox.focus .wb-title,
+.winbox.active .wb-title {
+  color: #FFFFFF !important;
+}
+
+.wb-body {
+  background: var(--paper-0) !important;
+  border-top: none !important;
+}
+
+.wb-control {
+  float: right !important;
+  height: 100% !important;
+}
+
+.wb-control * {
+  display: inline-block !important;
+  width: 36px !important;
+  height: 100% !important;
+  max-width: none !important;
+  border-radius: 0 !important;
+  opacity: 1 !important;
+  filter: none !important;
+  transition: background-color var(--dur-1) !important;
+}
+
+.wb-control *:hover {
+  background-color: rgba(20, 21, 46, 0.08) !important;
+}
+
+.winbox.focus .wb-control *:hover,
+.winbox.active .wb-control *:hover {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+.portal-iframe__icon {
+  border-radius: var(--radius-2);
+}

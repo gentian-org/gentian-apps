@@ -1,0 +1,6 @@
+apiVersion: v2
+name: admin-console
+description: The administration console of Gentian OS, a component of the platform and a client of the director
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

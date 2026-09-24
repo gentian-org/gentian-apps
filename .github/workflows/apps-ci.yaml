@@ -102,6 +102,68 @@ jobs:
           chart-path: apps/app-store/chart
           push: ${{ needs.should-publish.outputs.publish }}
 
+  # The administration console: a component of the platform, built from
+  # apps/_template and a client of the director. Same shape as the app-store
+  # job, because it is the same kind of thing; the web image takes no build
+  # arguments, since its configuration arrives at container start.
+  build-admin-console:
+    needs: [should-publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read admin-console release versions
+        id: versions
+        run: |
+          IMAGE_TAG=$(grep 'tag:' apps/admin-console/chart/values.yaml | head -1 | awk '{print $2}' | tr -d '"')
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Backend tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install uv && cd apps/admin-console/backend && uv pip install --system -e ".[dev]" && ruff check app tests && pytest -q
+        shell: bash
+
+      - name: Frontend typecheck and build
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: cd apps/admin-console/frontend && npm ci --no-audit --no-fund && npm run build
+        shell: bash
+
+      - name: Build and push API image
+        uses: ./.github/actions/build-push-image
+        with:
+          context: apps/admin-console/backend
+          platforms: linux/amd64,linux/arm64
+          qemu-arch: arm64
+          push: ${{ needs.should-publish.outputs.publish }}
+          image-tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/admin-console-api:${{ steps.versions.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/admin-console-api:${{ github.sha }}
+
+      - name: Build and push Web image
+        uses: ./.github/actions/build-push-image
+        with:
+          context: apps/admin-console/frontend
+          platforms: linux/amd64,linux/arm64
+          qemu-arch: arm64
+          push: ${{ needs.should-publish.outputs.publish }}
+          image-tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/admin-console-web:${{ steps.versions.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/admin-console-web:${{ github.sha }}
+
+      - name: Package and push chart
+        uses: ./.github/actions/package-push-chart
+        with:
+          chart-path: apps/admin-console/chart
+          lint: "true"
+          push: ${{ needs.should-publish.outputs.publish }}
+
   build-nextcloud:
     needs: [should-publish]
     runs-on: ubuntu-latest

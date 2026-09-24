@@ -1,0 +1,23 @@
+{{- if .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "admin-console.fullname" . }}
+rules:
+  # Replace with the minimum verbs/resources your app needs.
+  - apiGroups: ["gentianos.io"]
+    resources: ["appprofiles"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "admin-console.fullname" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "admin-console.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "admin-console.fullname" . }}
+{{- end }}

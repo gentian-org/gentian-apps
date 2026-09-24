@@ -23,6 +23,36 @@ spec:
         - name: web
           image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag }}"
           imagePullPolicy: IfNotPresent
+          {{- /* Runtime configuration. docker-entrypoint.sh renders these into
+               /config.js at container start and index.html loads it before
+               the bundle. They are environment and not build arguments
+               because Vite freezes VITE_* into the bundle and one image
+               serves every cluster; a baked-in issuer can only be right for
+               the cluster that built it. Under edge the bundle needs no
+               issuer of its own: the Gateway holds the session. */}}
+          env:
+            - name: AUTH_DISABLED
+              value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
+            - name: AUTH_MODE
+              value: {{ .Values.auth.mode | default "pkce" | quote }}
+            {{- with .Values.auth.issuer }}
+            - name: OIDC_ISSUER
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.auth.clientId }}
+            - name: OIDC_CLIENT_ID
+              value: {{ . | quote }}
+            {{- end }}
+            - name: OIDC_SCOPES
+              value: {{ .Values.auth.scopes | default "openid profile email" | quote }}
+            {{- with .Values.platform.kernelDomain }}
+            - name: KERNEL_DOMAIN
+              value: {{ . | quote }}
+            {{- end }}
+            {{- range $key, $value := .Values.web.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
           ports:
             - containerPort: {{ .Values.web.port }}
               name: http
@@ -41,3 +71,14 @@ spec:
               port: http
           resources:
             {{- toYaml .Values.web.resources | nindent 12 }}
+          volumeMounts:
+            {{- /* The served document root. The entrypoint copies the built
+                 assets here and writes config.js beside them, which it
+                 cannot do in the image layer because the root filesystem is
+                 read-only. The container refuses to start without this mount
+                 rather than serve a bundle with no configuration. */}}
+            - name: www
+              mountPath: /app/www
+      volumes:
+        - name: www
+          emptyDir: {}
