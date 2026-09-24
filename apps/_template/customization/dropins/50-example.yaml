@@ -1,0 +1,6 @@
+# Example profile-level drop-in. Delete when scaffolding a real app.
+features:
+  exportEnabled: true
+  maxItemsPerPage: 50
+branding:
+  productName: "Gentian App"

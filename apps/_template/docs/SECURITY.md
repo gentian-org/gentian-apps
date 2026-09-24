@@ -1,7 +1,7 @@
 # Security conventions for Gentian apps
 
 This template implements the **application-layer** slice of
-[gentian-os/docs/design/security.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/security.md).
+[gentian-os/docs/design/new-security-architecture.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/new-security-architecture.md).
 Platform MAC (namespaces, default-deny egress, mesh) is enforced by Gentian OS;
 apps must not weaken it.
 
@@ -76,7 +76,7 @@ only references contract **names** that match those definitions.
 |---|---|---|---|
 | **Declaration** | `provides` + `optionalIntegrations` on AppProfile | Catalogue / app developer | **Implemented** (CRD) |
 | **Wiring** | `IntegrationBinding` — credentials + OIDC between installed apps | Platform operator (auto when peers match) | **Implemented** |
-| **Grant (ReBAC)** | `AppGrant` — tenant-approved subset + OpenFGA tuples | Tenant admin at install | **Done** (CRD + OpenFGA tuple sync; install-time UI subset pending) |
+| **Grant (ReBAC)** | Future `AppGrant` — tenant-approved subset + OpenFGA tuples | Tenant admin at install | **Planned** (Stage 2 in security architecture) |
 
 `kernelRequirements` (OIDC, Postgres, S3, …) is **separate** — it declares
 **kernel services**, not cross-app integration contracts.
@@ -85,7 +85,7 @@ only references contract **names** that match those definitions.
 |---|-------------|-----|
 | M18 | **Declare kernel needs honestly** | `kernelRequirements` — only OIDC/DB/storage/mail the app actually uses |
 | M19 | **Declare integration contracts honestly** | `provides` / `optionalIntegrations` — only contracts the app implements or consumes; see existing profiles under `gentian-apps/profiles/` |
-| M20 | **Never implement tenant grants in app code** | Cross-app access is wired by `IntegrationBinding` and `AppGrant` + OpenFGA — apps declare, they do not grant |
+| M20 | **Never implement tenant grants in app code** | Cross-app access is wired by `IntegrationBinding` (today) and `AppGrant` + OpenFGA (future) — apps declare, they do not grant |
 
 Kernel-only repos (e.g. `gentian-ui`) skip M18–M20; they deploy via ApplicationSet, not AppProfile.
 
@@ -115,7 +115,7 @@ When OpenFGA is available in the cluster, these become mandatory for all apps
 | # | Requirement |
 |---|-------------|
 | S1 | Call OpenFGA **Check** (AuthZEN API) on every mutation and sensitive read |
-| S2 | Effective access = `AppProfile contract declaration ∩ tenant grant (AppGrant) ∩ user ceiling ∩ ABAC` |
+| S2 | Effective access = `AppProfile contract declaration ∩ tenant grant (AppGrant, future) ∩ user ceiling ∩ ABAC` |
 | S3 | Agent routes validate **delegation tuple + task TTL** before acting |
 
 Until then, M1–M4 + M26 are the minimum authorization bar.
@@ -174,7 +174,7 @@ in the chart unless platform docs explicitly require an app-specific supplement.
 ## Related
 
 - [gentian-os/docs/design/app-catalogue.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/app-catalogue.md) — contracts, `provides`, `IntegrationBinding`
-- [gentian-os/docs/design/security.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/security.md) §3.4 — same model as `provides`/`optionalIntegrations`, plus AppGrant/ReBAC
+- [gentian-os/docs/design/new-security-architecture.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/new-security-architecture.md) §3.4 — same model as `provides`/`optionalIntegrations`, plus future AppGrant/ReBAC
 - [gentian-os/docs/design/gateway.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/gateway.md)
 - [gentian-os/docs/design/security.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/security.md)
 - [gentian-os/docs/design/app-catalogue-security.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/app-catalogue-security.md)

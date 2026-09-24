@@ -1,0 +1,52 @@
+# Paste into the app's AppProfile under spec: — this is what makes the ladder
+# machine-readable for the App Store and for agents.
+# Replace <app-id> throughout. See gentian-os/docs/app-customization.md §4.
+customization:
+  grade: A
+  rubricScore: 7
+  supportedRungs: [L0, L1, L3, L4]   # never list L2 — it is always available
+  ladderDocs: https://github.com/gentian-org/<repo>/blob/main/customization/README.md
+
+  configure:
+    valuesSchema: chart/values.schema.json
+    hotReload: false
+
+  dropIns:
+    - name: app-config
+      path: /etc/gentian/<app-id>/conf.d
+      format: yaml
+      source: configMap
+      upstreamDocumented: true
+      tenantEditable: false        # set true only for content that is safe self-service
+    - name: branding
+      path: /app/static/branding
+      format: files
+      source: configMap
+      upstreamDocumented: true
+      tenantEditable: true
+      maxBytes: 262144
+
+  extension:
+    mechanism: gentian-python-plugin
+    delivery: [image-layer]
+    modulePath: /app/plugins
+    apiStability: stable
+    apiDocs: https://github.com/gentian-org/<repo>/blob/main/customization/extensions/README.md
+    perTenantModules: false
+    testMatrix: ["1.0"]
+
+  publishes:
+    apis:
+      - contract: <contract-name>
+        protocol: http-json
+        spec: openapi
+        path: /api/v1
+        auth: oidc-token-exchange
+
+  repackage:
+    chartOwnership: gentian-owned
+
+  patch:
+    allowed: false     # we own the source: a "patch" here is just a commit
+  fork:
+    allowed: false

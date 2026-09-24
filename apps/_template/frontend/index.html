@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gentian App</title>
+    <!--
+      Runtime configuration, rendered by docker-entrypoint.sh at container start
+      from the environment. A classic script, not a module, so it executes before
+      the bundle below and window.__GENTIAN_CONFIG__ exists before any code reads
+      it. In development vite serves no config.js and the 404 is harmless: the
+      bundle falls back to VITE_* values.
+    -->
+    <script src="/config.js"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -26,4 +26,4 @@ Envoy Gateway (HTTPRoute) splits `/api` → API Service and `/` → web Service.
 ## Related
 
 - [AGENTS.md](./AGENTS.md)
-- [security.md](./security.md)
+- [SECURITY.md](./SECURITY.md)

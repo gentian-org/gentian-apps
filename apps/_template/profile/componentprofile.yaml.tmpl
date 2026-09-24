@@ -1,0 +1,740 @@
+# ComponentProfile — the catalogue entry for a component of the platform itself.
+#
+# Use this file instead of appprofile.yaml.tmpl when what this repo builds is a
+# component rather than a catalogue app: something the platform installs for
+# itself by creating a Component object that names this profile, not something a
+# tenant admin picks out of the app catalogue and gets through Tenant.spec.apps.
+# README.md and docs/AGENTS.md carry the full distinction; the operator's half of
+# it is that gentian-os reconciles a Component into a provider-helm Release plus
+# one Gateway API route and one Envoy SecurityPolicy per gateway exposure, while
+# an AppProfile goes through the tenant app path and its Crossplane composition.
+#
+# Replace COMPONENT_ID and the chart coordinates before committing. The resource
+# is cluster-scoped, so metadata.name is the name every Component's profileRef
+# points at: renaming it later does not migrate anything, it orphans every
+# install, which then reports ProfileMissing and waits forever.
+#
+# Nothing here describes how the component looks. The CRD has no displayName,
+# description, icon or tile — presentation belongs to the store, outside the
+# cluster, and a field for it here would be a second place to maintain it and a
+# second place to disagree. If you came looking for spec.tile, that is an
+# AppProfile field and has no ComponentProfile equivalent.
+#
+# Nothing here grants anything either. Every permissive statement below is a
+# request; who answers it, and when, is recorded on the Component by a named
+# person. A profile that asks for more than it needs does not get it quietly, it
+# gets an install that sits in PendingPrivileges until somebody says yes.
+apiVersion: gentianos.io/v1alpha1
+kind: ComponentProfile
+metadata:
+  name: COMPONENT_ID
+spec:
+  # The modes this component is certified to run under, and a claim rather than
+  # a choice: the Component picks exactly one of them at install and admission
+  # rejects a mode that is not listed here. "tenant" is a dedicated release in
+  # tenant-<t> and is the only mode the operator reconciles today — a Component
+  # of any other tenancy reports TenancyUnsupported and does nothing. "shared"
+  # is one backend in shared-<app> serving several tenants and is refused unless
+  # trustTier is platform. "system" serves contracts to other components from
+  # system-<function>, serves no human, is exclusive (it may not appear next to
+  # another mode) and must declare no exposure at all.
+  tenancy: [tenant]
+
+  # The review level this entry has been through, required and undefaulted
+  # because a trust tier is something a reviewer stated, not something that was
+  # left out. Setting "platform" on an entry nobody reviewed at that depth is
+  # how a component ends up eligible for shared tenancy and for forwardToken,
+  # both of which are refused at any lower tier.
+  trustTier: certified
+
+  # The version of this catalogue entry, not of the upstream project it
+  # packages. Bump it when anything in this file changes, including a chart
+  # version bump, so that what an install pinned can be told apart from what the
+  # catalogue now says.
+  version: "0.1.0"
+
+  # Whether every tenant gets one of these without anybody declaring it. The
+  # operator creates a Component of this profile in each tenant, named after
+  # the profile, when the tenant is provisioned; the desktop is one such
+  # component and the administration console is another. Leave it off for a
+  # component a tenant installs on purpose. Only a tenant-tenancy profile may
+  # say it, since there is no tenant to give a shared component to.
+  # defaultForTenants: true
+
+  # How the component is deployed. Exactly one of chart, compositionRef or
+  # apiIntegration must be present, and an entry with none of them is rejected
+  # at admission unless it is an addon riding on another component's base.
+  package:
+    # The chart the operator installs as a provider-helm Release in the
+    # component's own namespace. All three fields are required. The version must
+    # be an immutable one: provider-helm never upgrades a release whose version
+    # string has not changed, so pointing this at a moving prerelease tag means
+    # the first install wins and every later build is silently ignored.
+    chart:
+      repository: oci://ghcr.io/gentian-org/charts
+      name: COMPONENT_ID
+      version: "0.1.0"
+
+    # Where the platform writes what it granted into this chart's values. Each
+    # key is a dot-separated path into values.yaml, and a path that does not
+    # match the chart is not an error anywhere — the value simply lands in a key
+    # nothing reads, and the component starts up unconfigured. Bracket notation
+    # is available for keys that themselves contain dots.
+    valueMapping:
+      # The facts of the cluster this component runs in, and where this chart
+      # takes them. The values are the operator's to know and nothing here is
+      # configurable, only where it lands; a key left out is simply not set.
+      # These are what make a component built from this template work behind
+      # the platform's edge at all: the issuer the forwarded token is verified
+      # against, the client the edge holds the zone's session with, the
+      # audience that token carries, and which kind of zone this is. Every key
+      # below matches chart/values.yaml as shipped; rename both or neither.
+      platform:
+        issuerKey: "auth.issuer"
+        zoneClientIdKey: "auth.clientId"
+        audienceKey: "auth.audience"
+        tenantKey: "platform.tenant"
+        kernelDomainKey: "platform.kernelDomain"
+        realmKey: "platform.realm"
+        zoneKindKey: "platform.zoneKind"
+        # Only for a platform-trust component that relays the caller's token
+        # to the director, which is also the only kind that may forwardToken
+        # below. Naming directorUrlKey is what opens this component's egress
+        # to the control namespace, so an ordinary app leaves both out.
+        # directorUrlKey: "director.url"
+        # clusterKey: "director.cluster"
+      # The database, mapped from the requirement below. This chart consumes
+      # the credentials Secret whole, with envFrom, so it is told the Secret's
+      # name and nothing else; that is what secretNameKey receives, as a plain
+      # string. hostKey and the rest receive structured references for charts
+      # that take each value apart, and a chart wants one shape or the other.
+      database:
+        secretNameKey: "existingSecret.name"
+        # hostKey: "database.host"
+        # portKey: "database.port"
+        # nameKey: "database.name"
+        # userKey: "database.user"
+        # passwordKey: "database.password"
+        # The read-replica endpoint, for charts that take separate read and
+        # write connections. Leave both unset when the chart has one.
+        # readNameKey: "database.readName"
+        # readUserKey: "database.readUser"
+      # The component's OWN OIDC client, mapped from
+      # requires.contracts.identity.oidc, for a component that runs its own
+      # login. A component behind the platform's edge needs none of this: the
+      # edge holds the session, and the zone's client above is what its token
+      # names. Enable this and the identity requirement together, or neither.
+      # oidc:
+      #   issuerKey: "oidc.issuer"
+      #   clientIdKey: "oidc.clientId"
+      #   clientSecretKey: "oidc.clientSecret"
+      #   Override where the client secret is read from, for a component that
+      #   shares one kernel-realm client rather than getting a per-tenant one.
+      #   Getting this wrong points every tenant at one credential, so set it
+      #   only when the client really is shared.
+      #   clientSecretOpenbaoPath: "gentian-os/kernel/apps/COMPONENT_ID"
+      #   clientSecretOpenbaoProperty: "client-secret"
+      # The remaining contracts map the same way, and are here rather than in
+      # the active document because a component that has not declared the
+      # matching requirement above gets nothing to map.
+      # s3:
+      #   endpointKey: "s3.endpoint"
+      #   bucketKey: "s3.bucket"
+      #   accessKeyKey: "s3.accessKey"
+      #   secretKeyKey: "s3.secretKey"
+      #   regionKey: "s3.region"
+      # cache:
+      #   hostKey: "cache.host"
+      #   portKey: "cache.port"
+      #   userKey: "cache.user"
+      #   passwordKey: "cache.password"
+      # smtp:
+      #   hostKey: "smtp.host"
+      #   portKey: "smtp.port"
+      #   userKey: "smtp.user"
+      #   passwordKey: "smtp.password"
+      # imap:
+      #   hostKey: "imap.host"
+      #   portKey: "imap.port"
+      # Where this chart takes extra pod volumes and mounts, for charts that do
+      # not use the conventional extraVolumes and extraVolumeMounts. The
+      # platform writes the conventional paths regardless; these are written in
+      # addition, so naming them can never remove a mount the chart already got.
+      # volumes:
+      #   volumesPath: "volumes"
+      #   volumeMountsPath: "volumeMounts.container"
+      # Credentials of a peer component, keyed by the contract name from
+      # spec.integrations below. A contract listed here that is not listed there
+      # is never bound, so nothing is written.
+      # integrations:
+      #   file-store:
+      #     endpointKey: "integrations.files.url"
+      #     userKey: "integrations.files.user"
+      #     passwordKey: "integrations.files.password"
+
+    # Static values merged into the release beneath everything the platform
+    # computes. This is the place for settings that are true for every tenant;
+    # anything that differs per cluster or per tenant does not belong here,
+    # because one profile serves all of them.
+    extraValues:
+      # The name every object of the release derives from, pinned so that the
+      # Services the exposures below route to are known before the release
+      # exists. The operator installs the release under the Component's name,
+      # which is this profile's name.
+      fullnameOverride: COMPONENT_ID
+      # The shape of this chart as the platform runs it. The edge holds the
+      # session, so the bundle runs no code flow; and the operator writes the
+      # component's route, its policy and its network policy itself, so the
+      # chart writes none of its own. A chart that routed itself beside the
+      # operator's route would be a second, unguarded way in.
+      auth:
+        disabled: false
+        mode: edge
+      gateway:
+        enabled: false
+      rbac:
+        create: false
+      networkPolicy:
+        create: false
+      api:
+        env:
+          ENVIRONMENT: production
+
+    # How the orchestrator delivers this entry. The component reconciler does
+    # not read it — it installs package.chart as a provider-helm Release and
+    # reports PackageUnsupported for anything else — so it is a statement of
+    # intent for now, and "api" is the value that marks an entry with no
+    # workload at all.
+    # deploymentMethod: crossplane
+
+    # A Crossplane composition, for a component that is not one chart. Naming a
+    # composition the cluster does not have leaves the install waiting on a
+    # claim nothing reconciles, which looks like a slow install rather than a
+    # missing one.
+    # compositionRef: COMPONENT_ID-composition
+
+    # A component that is an API client rather than a workload: no pods are
+    # created and the tenant is sent to an external origin instead. runtime
+    # chooses between redirecting the browser (redirect), a kernel API proxy
+    # (proxy, reserved) and a same-origin relay through the portal BFF
+    # (portal-proxy); tenantBinding chooses whether the tenant's effective
+    # domain is passed along at all.
+    # apiIntegration:
+    #   runtime: redirect
+    #   baseUrl: "https://example.gentian.org"
+    #   tenantBinding: tenant-domain
+
+  # What the platform owes this component before it may run. An unmet
+  # requirement is the platform's fault, not the tenant's: the operator holds
+  # the install rather than starting a component whose database does not exist,
+  # and the component's NetworkPolicy is written from this block, so a store the
+  # component uses but does not declare here is a connection Calico refuses.
+  requires:
+    contracts:
+      # The OIDC client the platform registers in the tenant's realm. Declare it
+      # only for a component that runs its own login; one that lives behind a
+      # gateway exposure with authMode oidc already has a session and does not
+      # need a client of its own. redirectUris supports ${TENANT_DOMAIN}
+      # substitution, and a URI that does not match what the component actually
+      # calls back on fails at login time with an invalid_redirect_uri that
+      # names no profile.
+      # Off as shipped, because this template runs behind the edge and the
+      # edge holds the session. Enable it together with valueMapping.oidc
+      # above for a component that runs its own login.
+      # identity:
+      #   oidc:
+      #     clientId: "COMPONENT_ID"
+      #     name: "My Gentian Component"
+      #     accessType: CONFIDENTIAL
+      #     redirectUris:
+      #       - "https://COMPONENT_ID.${TENANT_DOMAIN}/oauth/callback"
+      #     postLogoutRedirectUris:
+      #       - "https://COMPONENT_ID.${TENANT_DOMAIN}/"
+      #     backchannelLogoutUrl: "https://COMPONENT_ID.${TENANT_DOMAIN}/logout/backchannel"
+      #     Enables the password grant, which hands a component the user's
+      #     credentials directly. Leave it off unless a CLI really needs it.
+      #     directAccessGrantsEnabled: false
+      #     Selects an entry of an OIDCPackCatalog when the pack key is not the
+      #     clientId.
+      #     oidcPackRef: COMPONENT_ID
+        # The SAML counterpart, for a component that speaks SAML rather than
+        # OIDC. Both values are what Keycloak registers, so a mismatch with what
+        # the component sends is rejected at the identity provider.
+        # saml:
+        #   entityId: "https://COMPONENT_ID.${TENANT_DOMAIN}/saml/metadata"
+        #   acsUrl: "https://COMPONENT_ID.${TENANT_DOMAIN}/saml/acs"
+
+      # A relational database. This is the one contract the component
+      # reconciler fulfils today: it provisions the database, writes the
+      # credentials Secret beside the component and opens egress to the
+      # database's namespace before the chart runs, so the component's first
+      # connection is not the one that is refused.
+      database:
+        # postgresql or mariadb.
+        engine: postgresql
+        # A database of this component's own per tenant, which is what a
+        # component storing its own state wants. Setting it false puts every
+        # tenant in one schema and makes isolation the component's problem.
+        databasePerTenant: true
+        # Lets the component create databases at runtime. Ask for it only when
+        # creating databases is what the component is for; a component that
+        # merely stores its own state must not, because the grant it needs is
+        # broad enough to reach every other database on the server.
+        # allowDynamicDatabaseCreation: false
+        # Which schema unqualified table names resolve against first. The
+        # default puts the component's own schema ahead of public, which is
+        # wrong for a component whose migrations create everything in public and
+        # then read it back unqualified — that one writes to one schema and
+        # reads the other, and nothing reports it.
+        # schemaPreference: app-schema
+
+      # Object storage and filesystem access. s3 gives the component a bucket
+      # through the MinIO kernel service; files gives it WebDAV against the
+      # tenant's file storage, with the capabilities it actually uses, since a
+      # component that asks for write and only reads has widened the blast
+      # radius of its own credential for nothing.
+      # storage:
+      #   s3:
+      #     bucketPerTenant: true
+      #   files:
+      #     protocol: webdav
+      #     capabilities: [read]
+
+      # A cache. redis or memcached; the platform provisions a per-component
+      # user for engines that have them, which is why the username belongs in
+      # valueMapping.cache.userKey rather than being reconstructed in a chart.
+      # cache:
+      #   engine: redis
+
+      # Mail. Both blocks are deliberately empty: whether the server wants
+      # port 587 and which auth mechanism it accepts is the platform's to know
+      # and would be a claim this component cannot verify. Declaring smtp says
+      # the component sends mail, imap that it reads it, and the values arrive
+      # through valueMapping.
+      # mail:
+      #   smtp: {}
+      #   imap: {}
+
+      # A Model Context Protocol server this component exposes, registered in
+      # the kernel MCP registry with OIDC wired up. The endpoint must be the
+      # path the component really serves MCP on, or the registry advertises a
+      # 404 to every agent that looks.
+      # mcp:
+      #   enabled: true
+      #   endpoint: /mcp
+      #   auth: oidc
+
+    # Everything that escapes the default posture. Each entry is a request with
+    # a name, and the name is what a PrivilegeGrant on the Component answers;
+    # until somebody named answers it, the install waits in PendingPrivileges
+    # rather than running without it or being rejected. Who may approve follows
+    # from the kind of privilege and never from anything written here, so there
+    # is no cheaper approver to ask for.
+    # privileges:
+    #   # Waives one admission policy for one named part of the component. This
+    #   # is cluster scope, because it weakens a rule that protects the node,
+    #   # and the reason is what the approver reads — write it for them and not
+    #   # for the linter.
+    #   podSecurity:
+    #     - name: allow-write-root
+    #       policy: require-read-only-root-filesystem
+    #       scope: api
+    #       reason: "The upstream image writes its rendered config to /etc at startup and has no option to relocate it."
+    #   # The rule of an egress request and the rules of a clusterRoles
+    #   # request are upstream Kubernetes types taken verbatim — a
+    #   # NetworkPolicyEgressRule and a list of PolicyRule — so every field
+    #   # those have is available here and means exactly what it means in a
+    #   # NetworkPolicy or a ClusterRole.
+    #   # Opens outbound network past the tenant baseline. Tenant scope: the
+    #   # traffic leaves the tenant's own namespace. The rule is a Kubernetes
+    #   # NetworkPolicy egress rule, so it is matched post-DNAT — name the port
+    #   # the destination pod listens on, not the one the Service publishes.
+    #   egress:
+    #     - name: upstream-api
+    #       rule:
+    #         to:
+    #           - ipBlock:
+    #               cidr: 0.0.0.0/0
+    #         ports:
+    #           - protocol: TCP
+    #             port: 443
+    #       reason: "The component synchronises with the vendor's hosted API, which publishes no fixed address range."
+    #   # Kubernetes API access for the component's ServiceAccount. The rarest
+    #   # request of the three: a component that needs the API is most of the
+    #   # way to being a controller, and should usually be one instead.
+    #   clusterRoles:
+    #     - name: read-namespaces
+    #       rules:
+    #         - apiGroups: [""]
+    #           resources: ["namespaces"]
+    #           verbs: ["get", "list", "watch"]
+    #       reason: "The component lists tenant namespaces to render its own inventory view and writes nothing."
+
+  # Opportunistic relationships with peer components. An absent peer is normal
+  # and must not break the install — this is not a dependency list — and every
+  # binding is still subject to the tenant's own grant, so a component that
+  # treats a listed integration as guaranteed will fail for the tenants that
+  # never granted it.
+  # integrations:
+  #   - contract: file-store
+  #     provider: nextcloud
+  #     capabilities: [read, write]
+
+  # The contracts this component supplies to others. Tenancy decides who can
+  # see them: cluster-wide for system and shared components, and within the
+  # tenant for a tenant component. A contract named here that the component does
+  # not actually serve is a binding that resolves and then fails at the first
+  # call.
+  # provides:
+  #   - name: COMPONENT_ID
+  #     protocol: http-json
+
+  # Values the platform generates and holds for this component and that have no
+  # counterparty anywhere else. Credentials that arrive with a granted
+  # requirement are not declared here; they come with the grant.
+  secrets:
+    # Random, created once, kept in the vault, and written into the chart at the
+    # value path given. This is the robust default: regenerating one is a
+    # rotation the component can be restarted through.
+    generated:
+      - name: admin_password
+        valuePath: "auth.adminPassword"
+    # Recomputed from the tenant and component name every time instead of being
+    # stored. The formula and its inputs are load-bearing forever: changing
+    # either silently rotates the value for every existing tenant, which for a
+    # session-signing key means logging everyone out. Prefer generated, and if a
+    # better derivation is ever needed, add it under a new key rather than
+    # changing this one in place.
+    derived:
+      - key: SESSION_SECRET_KEY
+
+  # The entry points this component has. Forbidden entirely for system tenancy,
+  # and every entry states its authMode because there is no default to fall back
+  # on. The operator renders one HTTPRoute per gateway entry in the component's
+  # namespace and one SecurityPolicy over all of the oidc ones, so two entries
+  # on one host share a single session — which is why forwardToken below is
+  # effectively the component's and not the entry's.
+  expose:
+    # The API. Its paths are the ones the backend serves; when authMode is oidc
+    # and the entry does not already cover the whole host, the operator adds the
+    # OAuth2 callback path itself, because a route behind a session that cannot
+    # carry the code flow's landing path never completes a login.
+    - name: api
+      # gateway is the authenticated tenant gateway and is always on: the entry
+      # carries the session. perimeter is a publishing proxy in tenant-<t>-dmz
+      # with a credential of its own, and is off until a perimeter approver
+      # enables it on the Component — the operator skips perimeter entries
+      # today, so one declared here routes nowhere yet.
+      surface: gateway
+      # oidc puts the edge session in front of this entry. The other values —
+      # jwt, bearer, basic, signature, none — say what the backend itself
+      # expects; none is a word somebody had to write, so that a reviewer can
+      # find it.
+      authMode: oidc
+      # The host label of this entry in the tenant's zone, so the entry answers
+      # at <subDomain>.<tenant domain>. Empty means the component's own name.
+      # Two entries that share a subDomain share a host and therefore a session,
+      # which is usually what an API and its web bundle want.
+      subDomain: COMPONENT_ID
+      # The paths this entry serves, as prefixes. Empty means the whole host.
+      paths: ["/api", "/healthz", "/readyz"]
+      # Paths refused even where paths admits them, with deny winning
+      # regardless of specificity so that a broad allow with narrow denials
+      # stays readable. The component reconciler does not render these yet, so
+      # today they document an intent the edge does not enforce — do not rely
+      # on one to keep an administrative path off the internet.
+      # denyPaths: ["/api/internal"]
+      # Removes the matched prefix before the request reaches the backend. Also
+      # not rendered by the component reconciler yet, so a backend that needs it
+      # will currently see the full path.
+      # stripPrefix: false
+      # Pins who may call this entry, before authMode is even considered, and is
+      # evaluated at the proxy rather than in the component. Exactly one form:
+      # component names another installed component whose pods may call, and is
+      # preferred because a CIDR list ages badly. Not rendered by the component
+      # reconciler yet either.
+      # source:
+      #   component: other-component
+      # The other form, which replaces component and is never written beside
+      # it, is the list of ranges admitted once the edge has resolved the real
+      # client IP:
+      # source:
+      #   cidrs: ["203.0.113.0/24"]
+      # Asks the gateway to hand the edge access token to this backend. Without
+      # it a backend gets identity headers, which is what most components
+      # should want: the edge token is also valid at the director and at every
+      # sibling, so forwarding it turns one compromised backend into all of
+      # them. It requires trustTier platform, and it is meaningless on a
+      # perimeter entry, which has no session.
+      # forwardToken: false
+      # The Service this entry routes to, in the component's own namespace. The
+      # name is the one the chart actually creates: <fullnameOverride>-api,
+      # with fullnameOverride pinned in extraValues above so the name is known
+      # before the release exists. A typo here produces a route whose backend
+      # never resolves, and a 500 at the edge rather than anything that names
+      # this profile.
+      backend:
+        service: COMPONENT_ID-api
+        port: 8000
+    # The web bundle, on the same host as the API so that both share one
+    # session. It declares no paths, which means the whole host, and the
+    # API's more specific prefixes still win at the gateway.
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: COMPONENT_ID
+      backend:
+        service: COMPONENT_ID-web
+        port: 8080
+      # How this component appears on the portal, and who may open it. Without
+      # a tile the component is routed but never shown. The relation is a
+      # permission of the authorization model, asked per caller by the
+      # director before the tile is put on their page; "on" says which object
+      # it is asked on. app, the default, is this component's own app object,
+      # where using an installed app is decided. A component that exists to
+      # administer the tenant it runs in asks on the tenant instead, which is
+      # where administering is decided: on: tenant, relation: can_administer.
+      tile:
+        displayName: "My Gentian Component"
+        description: "What this component does, in a sentence for the person using it."
+        icon: app
+        relation: can_launch
+        # on: app
+
+  # Caps the component's own session, for a component that runs its own login.
+  # The edge bounds how long a request is let through; it does not refresh the
+  # groups the component captured at its own login, so this and not the access
+  # token's lifetime is what bounds what a user may still do inside the
+  # component after their rights change.
+  # sessionMaxAge: 8h
+
+  # Containers shipped inside this component's own pod. It is the only escape
+  # hatch in the profile, and a deliberately narrow one: it cannot create
+  # anything cluster-scoped. Each entry is a chart of its own with its own
+  # requirements and secrets, stored under the synthetic key
+  # <component>-<name>, and stableServiceName is the Service the tenant's
+  # routing points at when the release's own name is not stable.
+  # extensions:
+  #   - name: sidecar-render
+  #     chart:
+  #       repository: oci://ghcr.io/gentian-org/charts
+  #       name: COMPONENT_ID-render
+  #       version: "0.1.0"
+  #     kernelRequirements:
+  #       cache:
+  #         engine: redis
+  #     appSecrets:
+  #       - name: render_token
+  #         valuePath: "auth.token"
+  #     extraValues:
+  #       replicaCount: 1
+  #     stableServiceName: COMPONENT_ID-render
+  #     stableServicePort: 8080
+
+  # Lifecycle actions at install, upgrade and resync.
+  # hooks:
+  #   # A Job run once after the component is first ready, for state the chart's
+  #   # values cannot express — typically a call to the component's own admin
+  #   # API. It is not a general PodSpec: image, script and a few named
+  #   # affordances only, so that it stays a safe composition feature rather
+  #   # than a way to run arbitrary workloads in a tenant namespace.
+  #   postInstall:
+  #     image: ghcr.io/gentian-org/gentian-app-api:0.1.0
+  #     script: |
+  #       set -eu
+  #       curl -fsS -X POST "http://COMPONENT_ID-api:8000/api/v1/bootstrap"
+  #     envFrom:
+  #       - COMPONENT_ID-sensitive-values
+  #     serviceAccountName: COMPONENT_ID-bootstrap
+  #     # Mounts one existing claim read-only, for the rare script that needs
+  #     # something only in the component's own persisted data. It needs a
+  #     # storage class that tolerates concurrent mounts, so most components
+  #     # should not use it.
+  #     readOnlyPVC:
+  #       claimName: COMPONENT_ID-data
+  #       mountPath: /var/lib/component
+  #   # How workspace group membership becomes an in-app role. The platform
+  #   # resolves who is in gentian:tenant:<t>:app-admins, publishes the list and
+  #   # runs the Job; the script speaks whatever protocol this component happens
+  #   # to expose, which is exactly the knowledge that must not live in the
+  #   # kernel. The script re-runs whenever membership changes, so it must
+  #   # converge on the membership it is given rather than apply a delta.
+  #   provisioning:
+  #     privilegedRole:
+  #       kind: group
+  #       name: admin
+  #     syncJob:
+  #       image: ghcr.io/gentian-org/gentian-app-api:0.1.0
+  #       script: |
+  #         set -eu
+  #         python -m app.admin sync-admins "$GENTIAN_APP_ADMINS_FILE" "$GENTIAN_PRIVILEGED_ROLE"
+  #       env:
+  #         - name: ADMIN_PASSWORD
+  #           secretKeyRef:
+  #             name: COMPONENT_ID-sensitive-values
+  #             key: internal-admin_password
+  #       envFrom:
+  #         - COMPONENT_ID-config
+  #       serviceAccountName: COMPONENT_ID-provisioning
+
+  # What a consistent copy of this component consists of. Every field is
+  # optional and the default is the safe one — scale to zero, dump every store
+  # declared above, archive every claim the release owns — so this section is
+  # for components that deviate. Schedule, retention, encryption and destination
+  # are absent on purpose: they are platform and tenant policy, and a component
+  # author must not be able to weaken them.
+  # backup:
+  #   # How writes are paused while the copy is taken. scaleDown works for
+  #   # everything and costs the longest pause; command keeps the component
+  #   # reachable and is better where it has a real maintenance mode; none only
+  #   # suits a component whose stores hold no references to each other. Both
+  #   # commands are argv, not shell lines, so nothing is word-split, and post
+  #   # must be safe to run when pre never did, because it also runs on the
+  #   # failure path and a component left paused is an outage.
+  #   quiesce:
+  #     mode: command
+  #     pre: ["/usr/local/bin/component", "maintenance", "on"]
+  #     post: ["/usr/local/bin/component", "maintenance", "off"]
+  #     container: api
+  #   # Narrows what is taken from the claims. An empty include means every
+  #   # claim the release owns. excludePaths drops what the component rebuilds
+  #   # by itself, which is often most of its disk — but never exclude a path
+  #   # holding configuration, because a component that keeps its data
+  #   # encryption key in its own config file becomes unrestorable the moment
+  #   # that file is skipped, and nothing notices until the restore.
+  #   volumes:
+  #     include: [COMPONENT_ID-data]
+  #     excludePaths: ["cache/**", "thumbnails/**"]
+  #   # Secrets this component's data is welded to: not derived, kept outside
+  #   # the captured data, and required to make sense of it again. Most
+  #   # components need none. The path is relative to the tenant's own prefix,
+  #   # so a profile can only ever name secrets of the tenant being captured.
+  #   boundSecrets:
+  #     - openBaoPath: apps/COMPONENT_ID/internal
+  #       keys: [data_encryption_key]
+  #   # What must run once the data is back and before the component is
+  #   # resumed. Each post entry is an argv; verify is the single command that
+  #   # must exit zero, without which a restore can only report that bytes were
+  #   # written and not that the component can read them.
+  #   restore:
+  #     post:
+  #       - ["/usr/local/bin/component", "reindex"]
+  #     verify: ["/usr/local/bin/component", "healthcheck"]
+  #   # Whether every store must be captured inside one quiesce window. app is
+  #   # the default and the right answer whenever the stores reference each
+  #   # other; perStore is only for a component whose stores do not.
+  #   consistency: app
+  #   # Refuses to restore a copy into a component older than this, expressed as
+  #   # the version the chart deploys. Older data into a newer component just
+  #   # runs the migrations; the reverse corrupts silently.
+  #   minRestoreVersion: "0.1.0"
+
+  # What a tenant may change about this component without forking it — the
+  # Gentian customization ladder, declared so that a human or an agent can pick
+  # the lowest rung that expresses a change instead of guessing. An absent block
+  # means grade unknown and only L0 and L4 assumed, which understates what an
+  # app built from this template actually supports.
+  customization:
+    # The summary of the rubric score below. CI checks that the two agree —
+    # A needs 7 or more, B is 5 to 6, C is 3 to 4, D is 2 or less — so an
+    # optimistic grade fails the catalogue build rather than misleading anyone.
+    grade: A
+    rubricScore: 7
+    # The rungs this component can be customized at. L2 must not be listed: a
+    # companion built against the published API is always possible, so it is a
+    # property of the customization rather than of the target.
+    supportedRungs: [L0, L1, L3, L4]
+    ladderDocs: "customization/README.md"
+    # L0, setting a value the component already exposes. The schema is what
+    # makes this machine-checkable, so a typo fails at install rather than at
+    # pod start; hotReload says whether the change applies without a restart.
+    configure:
+      valuesSchema: "chart/values.schema.json"
+      hotReload: false
+    # L1, directories the component already treats as extension points. Content
+    # is parsed at admission so a malformed fragment fails there rather than at
+    # boot. upstreamDocumented false means the path is really L4 — upstream has
+    # promised nothing about it surviving a reorganisation — and tenantEditable
+    # decides whether tenant admins may write here at all, which a policy file
+    # usually must not allow.
+    dropIns:
+      - name: conf
+        path: /etc/gentian/app/conf.d
+        format: yaml
+        source: configMap
+        upstreamDocumented: true
+        tenantEditable: true
+        maxBytes: 65536
+    # L3, this component's own addon system. apiStability is the honest one:
+    # anything below "stable" makes the decision procedure prefer a companion
+    # app over a plugin, because a plugin against an unstable API is a
+    # maintenance cost at every release. perTenantAddons is only valid where the
+    # component runs in the tenant's own namespace — a shared runtime loading
+    # per-tenant code is a cross-tenant data leak waiting to happen.
+    extension:
+      mechanism: gentian-app-plugin
+      delivery: [image-layer]
+      registry: ""
+      addonPath: /app/extensions
+      apiStability: stable
+      apiDocs: "customization/extensions/README.md"
+      perTenantAddons: false
+      testMatrix: ["0.1.0"]
+    # What this component offers so that somebody can build an L2 companion
+    # against it. It is not a rung of this component; it is what makes a rung
+    # available to everyone else.
+    publishes:
+      apis:
+        - contract: COMPONENT_ID
+          protocol: http-json
+          spec: openapi
+          path: /api/v1
+          auth: oidc
+    # L4, who owns the packaging. "gentian-owned" is the answer for a chart
+    # written here; "vendored" is a review signal rather than a normal state,
+    # because a copied chart is a fork of the packaging that will drift.
+    repackage:
+      chartOwnership: gentian-owned
+      compositionRef: ""
+    # L5 and L6. Both are gates: a patch series or a fork that nobody allowed
+    # is a change that has no owner at the next upstream release. A fork
+    # without cveWatch is an unowned liability, which is why the field exists
+    # rather than being assumed.
+    patch:
+      allowed: false
+      buildRepo: ""
+      seriesPath: ""
+      requiresApproval: ""
+    fork:
+      allowed: false
+      repo: ""
+      upstream: ""
+      owner: ""
+      cveWatch: false
+    # The three addon fields below turn this profile into part of somebody
+    # else's component. addon says this entry is not deployable on its own but
+    # activates into the base named by "of", using the id the base's own addon
+    # system knows it by — an Odoo module name, a Nextcloud app id — which is
+    # what keeps per-component parsing out of the reconciler.
+    # addon:
+    #   id: COMPONENT_ID
+    #   of: some-base-component
+    # addonActivation and addonValues are the base's side of the same
+    # relationship and belong on the base profile, never on the addon.
+    # Activation renders a script at a values path with __GENTIAN_ADDON_IDS__
+    # replaced by the selected ids — a literal token rather than a template
+    # placeholder, because the composition is itself a Go template and would
+    # consume braces as data. The script re-runs on every pod start, which is
+    # what makes a changed selection converge, so it has to be idempotent.
+    # addonActivation:
+    #   valuesPath: "hooks.before-starting"
+    #   script: |
+    #     for addon in __GENTIAN_ADDON_IDS__; do component addon enable "$addon"; done
+    # addonValues turns on part of the base's chart only when a given addon is
+    # selected, so the infrastructure an addon needs is not deployed for every
+    # tenant that never asked for it.
+    # addonValues:
+    #   - whenAddon: COMPONENT_ID
+    #     values:
+    #       companion:
+    #         enabled: true

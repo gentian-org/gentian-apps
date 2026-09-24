@@ -1,0 +1,149 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "admin-console.fullname" . }}-api
+  labels:
+    {{- include "admin-console.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "admin-console.name" . }}-api
+  template:
+    metadata:
+      labels:
+        {{- include "admin-console.labels" . | nindent 8 }}
+        app.kubernetes.io/name: {{ include "admin-console.name" . }}-api
+        app.kubernetes.io/component: api
+    spec:
+      serviceAccountName: {{ include "admin-console.fullname" . }}
+      securityContext:
+        {{- include "admin-console.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: api
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          securityContext:
+            {{- include "admin-console.containerSecurityContext" . | nindent 12 }}
+            {{- with .Values.api.securityContext }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            {{- /* The tenant from the platform when it says, else the value a
+                 developer set. Both name the same thing; the platform's is
+                 authoritative because it is the tenant the release is in. */}}
+            - name: TENANT_ID
+              value: {{ .Values.platform.tenant | default .Values.tenantId | quote }}
+            - name: TENANT_NAMESPACE
+              value: {{ .Values.tenantNamespace | quote }}
+            - name: AUTH_DISABLED
+              value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
+            - name: AUTH_MODE
+              value: {{ .Values.auth.mode | default "pkce" | quote }}
+            {{- /* Token verification. Under edge the forwarded token is
+                 verified against the zone's issuer and must carry the
+                 director's audience; the platform supplies both. Without an
+                 issuer the API verifies nothing, which the backend treats as
+                 "auth is not configured" rather than as "everyone is
+                 allowed" (see backend/app/core/auth.py). api.env wins when it
+                 names the same variable, so a developer can override. */}}
+            {{- if and .Values.auth.issuer (not (hasKey (default dict .Values.api.env) "OIDC_ISSUER")) }}
+            - name: OIDC_ISSUER
+              value: {{ .Values.auth.issuer | quote }}
+            {{- end }}
+            {{- if and .Values.auth.clientId (not (hasKey (default dict .Values.api.env) "OIDC_CLIENT_ID")) }}
+            - name: OIDC_CLIENT_ID
+              value: {{ .Values.auth.clientId | quote }}
+            {{- end }}
+            {{- if and .Values.auth.audience (not (hasKey (default dict .Values.api.env) "OIDC_AUDIENCE")) }}
+            - name: OIDC_AUDIENCE
+              value: {{ .Values.auth.audience | quote }}
+            {{- end }}
+            {{- /* The director, for a component that relays the caller's
+                 token to it. Left unset, the relay answers 503 and says the
+                 director is not configured, rather than guessing a host. */}}
+            {{- if and .Values.director.url (not (hasKey (default dict .Values.api.env) "DIRECTOR_URL")) }}
+            - name: DIRECTOR_URL
+              value: {{ .Values.director.url | quote }}
+            {{- end }}
+            {{- if and .Values.director.cluster (not (hasKey (default dict .Values.api.env) "GENTIAN_CLUSTER_ID")) }}
+            - name: GENTIAN_CLUSTER_ID
+              value: {{ .Values.director.cluster | quote }}
+            {{- end }}
+            {{- with .Values.platform.kernelDomain }}
+            - name: KERNEL_DOMAIN
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.platform.realm }}
+            - name: KERNEL_REALM
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.platform.zoneKind }}
+            - name: ZONE_KIND
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if and .Values.dropIns .Values.dropIns.enabled }}
+            - name: GENTIAN_DROPIN_DIR
+              value: {{ .Values.dropIns.mountPath | default "/etc/gentian/app/conf.d" | quote }}
+            {{- end }}
+            {{- if and .Values.extensions .Values.extensions.appId }}
+            - name: APP_ID
+              value: {{ .Values.extensions.appId | quote }}
+            {{- end }}
+            {{- range $key, $value := .Values.api.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if .Values.openfga.apiUrl }}
+            - name: OPENFGA_API_URL
+              value: {{ .Values.openfga.apiUrl | quote }}
+            {{- end }}
+            {{- if .Values.openfga.storeId }}
+            - name: OPENFGA_STORE_ID
+              value: {{ .Values.openfga.storeId | quote }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.existingSecret.name }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if and .Values.dropIns .Values.dropIns.enabled }}
+            - name: dropins
+              mountPath: {{ .Values.dropIns.mountPath | default "/etc/gentian/app/conf.d" }}
+              readOnly: true
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{/*
+          Customization ladder rung L1: each ConfigMap in dropIns.configMaps is
+          projected into the same directory, lowest precedence first. Filenames
+          carry precedence (00-49 platform, 50-89 profile, 90-99 tenant), so any
+          number of layers can coexist without the chart knowing which is which —
+          see docs/app-customization.md §2.2.
+        */}}
+        {{- if and .Values.dropIns .Values.dropIns.enabled }}
+        - name: dropins
+          projected:
+            sources:
+              {{- range .Values.dropIns.configMaps }}
+              - configMap:
+                  name: {{ . }}
+                  optional: true
+              {{- end }}
+        {{- end }}

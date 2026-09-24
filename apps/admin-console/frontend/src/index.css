@@ -1,0 +1,16 @@
+@import "tailwindcss";
+@import "../design-system/gentian-theme.css";
+
+/*
+  The console's own screens style themselves from the design tokens the theme
+  defines; nothing here is theirs. What the page provides is the ground they
+  sit on, in the same tokens, so the console looks like the desktop that
+  frames it.
+*/
+body {
+  margin: 0;
+  font-family: var(--gtn-font-sans, "Hanken Grotesk", system-ui, sans-serif);
+  background: var(--gtn-paper-0, #f4f1ea);
+  color: var(--gtn-ink-1, #14152e);
+  -webkit-font-smoothing: antialiased;
+}
