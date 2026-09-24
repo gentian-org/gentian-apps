@@ -95,8 +95,6 @@ NOT_YET_MAPPED: list[tuple[str, str, str]] = [
     ("PUT", "/admin/backup-schedules", "Backup schedules"),
     ("DELETE", "/admin/backup-schedules", "Backup schedules"),
     ("POST", "/admin/backup-keys", "Backup"),
-    ("GET", "/admin/security-policies", "Security"),
-    ("PUT", "/admin/security-policies", "Security"),
     ("GET", "/admin/integrations", "Integrations"),
     ("PUT", "/admin/grants", "Integrations"),
     ("GET", "/admin/groups", "Notifications"),

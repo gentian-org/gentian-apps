@@ -16,6 +16,7 @@ from app.api.routes import (
     extensions,
     health,
     resources,
+    security,
     session,
 )
 from app.core.config import get_settings
@@ -37,6 +38,7 @@ app.include_router(cluster.router, prefix=settings.api_v1_str)
 # the screens that are not yet clients of the director.
 app.include_router(resources.router, prefix=settings.api_v1_str)
 app.include_router(backups.router, prefix=settings.api_v1_str)
+app.include_router(security.router, prefix=settings.api_v1_str)
 app.include_router(admin.router, prefix=settings.api_v1_str)
 app.include_router(credentials.router, prefix=settings.api_v1_str)
 app.include_router(extensions.router, prefix=settings.api_v1_str)
