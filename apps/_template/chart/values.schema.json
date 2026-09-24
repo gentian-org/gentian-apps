@@ -31,9 +31,9 @@
     "existingSecret": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Pattern A: the chart consumes a Secret created by ExternalSecret. Credentials are never chart values.",
+      "description": "Pattern A: the chart consumes a Secret created by ExternalSecret. Credentials are never chart values. Empty means this component asked the platform for nothing that comes with credentials, so no Secret is written for it and none is mounted.",
       "required": ["name"],
-      "properties": { "name": { "type": "string", "minLength": 1 } }
+      "properties": { "name": { "type": "string" } }
     },
     "auth": {
       "type": "object",

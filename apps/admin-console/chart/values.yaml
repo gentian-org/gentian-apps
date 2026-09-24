@@ -56,8 +56,13 @@ gateway:
 existingSecret:
   # Pattern A: credentials arrive in a Secret the platform writes, never as
   # chart values. Under a ComponentProfile with a database requirement the
-  # operator names this Secret through valueMapping.database.hostKey.
-  name: gentian-admin-console-secrets
+  # operator names this Secret through valueMapping.database.secretNameKey.
+  #
+  # Empty here, and deliberately: this console keeps no state and holds no
+  # credential. It has no database, no bucket and no cache, so the platform
+  # writes no Secret for it, and naming one that will never exist is what
+  # leaves the API pod in CreateContainerConfigError.
+  name: ""
 
 auth:
   # Local development only; the backend refuses to start with this true in
