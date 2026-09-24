@@ -493,13 +493,13 @@ spec:
       # it is asked on. app, the default, is this component's own app object,
       # where using an installed app is decided. A component that exists to
       # administer the tenant it runs in asks on the tenant instead, which is
-      # where administering is decided: on: tenant, relation: can_administer.
+      # where administering is decided: object: tenant, relation: can_administer.
       tile:
         displayName: "My Gentian Component"
         description: "What this component does, in a sentence for the person using it."
         icon: app
         relation: can_launch
-        # on: app
+        # object: app
 
   # Caps the component's own session, for a component that runs its own login.
   # The edge bounds how long a request is let through; it does not refresh the
