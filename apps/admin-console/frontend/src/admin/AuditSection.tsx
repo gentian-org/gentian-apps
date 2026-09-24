@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import {
   downloadAuditExport,
   fetchAuditEvents,
+  fetchChanges,
   type AuditEventCategory,
 } from "@/api/admin";
 import "./admin.css";
@@ -27,6 +28,80 @@ function formatAuditTime(epochMs: number) {
 
 function categoryLabel(category: AuditEventCategory) {
   return CATEGORY_OPTIONS.find((option) => option.value === category)?.label ?? category;
+}
+
+/**
+ * What changed, who changed it, and what allowed them to.
+ *
+ * This needs no store: the commits are the record. It is shown first because
+ * it is the part of an audit trail this platform can actually answer, and the
+ * list says in its own words what it does not cover.
+ */
+function ChangeHistory({ tenant }: { tenant: string }) {
+  const changesQuery = useQuery({
+    queryKey: ["admin", "changes", tenant],
+    queryFn: () => fetchChanges(tenant),
+  });
+
+  if (changesQuery.isLoading) {
+    return <p className="admin-console__hint">Reading the change history…</p>;
+  }
+  if (changesQuery.isError) {
+    return (
+      <p className="admin-console__hint">
+        The change history is not available:{" "}
+        {changesQuery.error instanceof Error ? changesQuery.error.message : "unknown error"}
+      </p>
+    );
+  }
+
+  const changes = changesQuery.data?.changes ?? [];
+  return (
+    <div style={{ marginBottom: "1.5rem" }}>
+      <h3 className="admin-console__subsection-title">Changes</h3>
+      <p className="admin-console__hint">{changesQuery.data?.covers}</p>
+      {changes.length === 0 ? (
+        <p className="admin-console__hint">Nothing has changed in this workspace yet.</p>
+      ) : (
+        <table className="admin-console__table">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>What</th>
+              <th>Who</th>
+              <th>Under what authority</th>
+            </tr>
+          </thead>
+          <tbody>
+            {changes.map((change) => (
+              <tr key={change.commit}>
+                <td>{change.at ? new Date(change.at).toLocaleString() : "—"}</td>
+                <td>
+                  {change.summary}
+                  <div className="admin-console__mono" style={{ fontSize: "0.75rem" }}>
+                    {change.commit.slice(0, 7)} · {change.files.length} file
+                    {change.files.length === 1 ? "" : "s"}
+                  </div>
+                </td>
+                <td>{change.author?.Name || change.principal || "—"}</td>
+                <td>
+                  {change.throughPlatform ? (
+                    <span className="admin-console__mono" style={{ fontSize: "0.75rem" }}>
+                      {change.decision}
+                    </span>
+                  ) : (
+                    /* Not a failure of this screen: a commit with no trailer
+                       was pushed by hand, and saying so is the point. */
+                    <span className="admin-console__hint">pushed by hand — no record</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
 }
 
 export function AuditSection({ tenant }: AuditSectionProps) {
@@ -101,10 +176,7 @@ export function AuditSection({ tenant }: AuditSectionProps) {
         </div>
       </div>
 
-      <p style={{ fontSize: "0.875rem", color: "var(--gtn-ink-4)", marginBottom: "1rem" }}>
-        Admin mutations are stored in the portal database when configured. Sign-in events are
-        fetched live from Keycloak when realm events are enabled.
-      </p>
+      <ChangeHistory tenant={tenant} />
 
       <form
         className="admin-console__form"
