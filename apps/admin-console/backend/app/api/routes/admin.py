@@ -87,26 +87,25 @@ async def admin_context(
 # re-pointing, kept where the code is so it cannot drift from what the
 # console actually serves.
 NOT_YET_MAPPED: list[tuple[str, str, str]] = [
-    # Backup and Backup policy are relayed (routes/backups.py): the reads,
-    # the policy writes, and the two actions. What is left of them is the
-    # schedules, which are derived from the policy -- editing one does not
-    # hold, so the screen shows them and changes them through the policy --
-    # and minting a backup key, which belongs to the credential manager.
-    ("PUT", "/admin/backup-schedules", "Backup schedules"),
-    ("DELETE", "/admin/backup-schedules", "Backup schedules"),
+    # Four things are left, and each is here for a reason rather than for
+    # want of time.
+    #
+    # Minting a backup key would have this console generate an age private
+    # key and hand it over. It holds nothing by design, and a key that passes
+    # through it is a key it held. It belongs in the browser, or in the
+    # credential manager beside the escrow that already exists.
     ("POST", "/admin/backup-keys", "Backup"),
-    # The integrations read is relayed (routes/platform.py). Changing what an
-    # app may consume is a change to declared state and belongs in the
-    # deployments repository, which the director has no endpoint for yet.
-    ("PUT", "/admin/grants", "Integrations"),
+    # A notification can be addressed to groups, and the group list is
+    # Keycloak's. Nothing here holds a Keycloak credential, and the director
+    # has no endpoint for it: an audience of the whole tenant works today,
+    # and a group-scoped one waits for that list to have an owner.
     ("GET", "/admin/groups", "Notifications"),
-    ("GET", "/admin/notifications", "Notifications"),
-    ("POST", "/admin/notifications", "Notifications"),
+    # Sign-ins, refused requests and reads of data leave no commit. They need
+    # stores that do not exist yet -- see gentian-os docs/roadmap.md 1.12,
+    # which is a researched plan rather than a gap.
     ("GET", "/admin/audit-events", "Audit"),
-    # Platform security and the customisation report are relayed. What is
-    # left writes: which waivers the cluster permits is the operator chart's
-    # own configuration, and changing it is a commit nobody has built yet.
-    ("PUT", "/admin/platform/security-policy", "Platform security"),
+    # Who holds what, across the cluster. That is the authorization view of
+    # S7A.8, which reads OpenFGA and has not been built.
     ("GET", "/admin/platform/authorization-summary", "Platform security"),
 ]
 

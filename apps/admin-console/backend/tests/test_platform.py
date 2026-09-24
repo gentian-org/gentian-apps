@@ -92,17 +92,42 @@ def test_the_directors_refusal_is_passed_through_unchanged(monkeypatch, status):
     assert r.status_code == status
 
 
-def test_the_writes_still_say_they_are_not_wired():
-    """Changing what an app may consume, or what the cluster permits to
-    escape its posture, are both changes to declared state that nobody has
-    built a commit for yet."""
+def test_both_writes_are_commits(monkeypatch):
+    """A grant and the waiver allowlist are both declared state, so both
+    answer a commit rather than a save."""
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "a1b2c3d"}, seen, status=202)
     client = TestClient(_app(_settings()))
-    r = client.put("/api/v1/admin/grants/notes", json={}, headers={"Authorization": "Bearer t"})
-    assert r.status_code == 501 and "Integrations" in r.json()["detail"]
+
     r = client.put(
-        "/api/v1/admin/platform/security-policy", json={}, headers={"Authorization": "Bearer t"}
+        "/api/v1/admin/grants/notes",
+        json={"consume": [{"contract": "files", "granted": ["read"]}]},
+        headers={"Authorization": "Bearer t"},
     )
-    assert r.status_code == 501 and "Platform security" in r.json()["detail"]
+    assert r.status_code == 202
+    assert r.json()["commit"] == "a1b2c3d"
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/grants/notes"
+
+    r = client.put(
+        "/api/v1/admin/platform/security-policy",
+        json={"allowedMacWaivers": []},
+        headers={"Authorization": "Bearer t"},
+    )
+    assert r.status_code == 202
+    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/platform-security"
+
+
+def test_a_refused_waiver_change_is_the_models_answer(monkeypatch):
+    """`can_set_admission` is break-glass in model v1, so an ordinary
+    platform administrator is refused. That is correct, and the screen
+    shows the refusal rather than pretending the change landed."""
+    _fake_client(monkeypatch, {"error": "forbidden"}, {}, status=403)
+    r = TestClient(_app(_settings())).put(
+        "/api/v1/admin/platform/security-policy",
+        json={"allowedMacWaivers": [{"profile": "p", "policy": "q", "scope": "r"}]},
+        headers={"Authorization": "Bearer t"},
+    )
+    assert r.status_code == 403
 
 
 def test_no_token_is_refused_before_anything_is_forwarded():

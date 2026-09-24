@@ -7,10 +7,13 @@ operator from the CRs it reconciles — not here, and not by the screen, because
 a second implementation of any of them is a second answer to the same
 question.
 
-The writes are not here. Changing what an app may consume is a change to
-declared state and belongs in the deployments repository like every other;
-changing what the platform permits is the cluster's own configuration. Both
-are named in the plan and both still answer 501.
+The writes are commits. Changing what an app may consume is declared state,
+committed under `can_grant`; changing which waivers the platform permits is
+the cluster's own security configuration, committed under `can_set_admission`
+— which model v1 binds to break-glass, so an ordinary platform administrator
+is refused it. That refusal is correct and the screen should say so: letting
+an app out of the pod-security baseline is meant to cost a deliberate
+elevation.
 """
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -77,4 +80,60 @@ async def customization_debt(
         "GET",
         f"/v1/clusters/{director.cluster(settings)}/customizations",
         bearer_of(credentials),
+    )
+
+
+@router.put("/grants/{app}")
+async def set_grant(
+    app: str,
+    body: dict,
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """A WRITE of declared state: what this app may consume, and which apps
+    may consume from it. Answers a commit."""
+    return await director.forward(
+        settings,
+        "PUT",
+        f"/v1/tenants/{tenant or settings.tenant_id}/grants/{app}",
+        bearer_of(credentials),
+        json_body=body,
+    )
+
+
+@router.delete("/grants/{app}")
+async def clear_grant(
+    app: str,
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Withdraw everything it permitted."""
+    return await director.forward(
+        settings,
+        "DELETE",
+        f"/v1/tenants/{tenant or settings.tenant_id}/grants/{app}",
+        bearer_of(credentials),
+    )
+
+
+@router.put("/platform/security-policy")
+async def set_platform_security_policy(
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Which waivers the cluster permits. Needs `can_set_admission`, which is
+    break-glass: a 403 here means the caller has not elevated, not that the
+    screen is broken."""
+    return await director.forward(
+        settings,
+        "PUT",
+        f"/v1/clusters/{director.cluster(settings)}/platform-security",
+        bearer_of(credentials),
+        json_body=body,
     )

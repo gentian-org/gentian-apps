@@ -124,7 +124,7 @@ def test_a_screen_not_yet_mapped_says_which_one():
     screen, so the console shows that rather than a spinner. A route nobody
     calls is a plain 404."""
     client = TestClient(_app(_settings()))
-    r = client.get("/api/v1/admin/notifications", headers={"Authorization": "Bearer t"})
+    r = client.get("/api/v1/admin/groups", headers={"Authorization": "Bearer t"})
     assert r.status_code == 501 and "Notifications" in r.json()["detail"]
     r = client.get("/api/v1/admin/audit-events", headers={"Authorization": "Bearer t"})
     assert r.status_code == 501 and "Audit" in r.json()["detail"]
