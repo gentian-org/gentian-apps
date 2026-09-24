@@ -14,8 +14,6 @@ the cluster. The console does not check that choice; the director does, and
 its refusal comes back as the refusal it is.
 """
 
-import json
-
 from fastapi import APIRouter, Depends, Query, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -31,18 +29,6 @@ def _tenant_path(settings: Settings, tenant: str | None, suffix: str = "") -> st
     return f"/v1/tenants/{tenant or settings.tenant_id}/resources{suffix}"
 
 
-def _unwrapped(answer: Response, key: str) -> Response:
-    """Hand back one field of the director's answer as the screen reads it.
-
-    The director answers a list under a key, with the tenant or the cluster
-    beside it; the screen was written against the bare list and stays as it
-    is. A refusal or an error is passed through untouched."""
-    if answer.status_code != 200:
-        return answer
-    body = json.loads(answer.body)
-    return Response(content=json.dumps(body.get(key, [])), status_code=200, media_type="application/json")
-
-
 @router.get("")
 async def resource_state(
     tenant: str | None = Query(default=None),
@@ -51,7 +37,9 @@ async def resource_state(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """The tenant's ceiling, what is under it, and the plan it is on."""
-    return await director.forward(settings, "GET", _tenant_path(settings, tenant), bearer_of(credentials))
+    return await director.forward(
+        settings, "GET", _tenant_path(settings, tenant), bearer_of(credentials)
+    )
 
 
 @router.get("/plans")
@@ -64,8 +52,10 @@ async def resource_plans(
     """The catalogue as it applies to this tenant and this person. Whether the
     person chooses for themselves or for the cluster is the director's call,
     made from the graph; the screen asserts nothing about it."""
-    answer = await director.forward(settings, "GET", _tenant_path(settings, tenant, "/plans"), bearer_of(credentials))
-    return _unwrapped(answer, "plans")
+    answer = await director.forward(
+        settings, "GET", _tenant_path(settings, tenant, "/plans"), bearer_of(credentials)
+    )
+    return director.unwrapped(answer, "plans")
 
 
 @router.put("")
@@ -95,9 +85,17 @@ async def resource_usage(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    params = {k: str(v) for k, v in {"from": from_, "to": to, "stepSeconds": stepSeconds}.items() if v is not None}
+    params = {
+        k: str(v)
+        for k, v in {"from": from_, "to": to, "stepSeconds": stepSeconds}.items()
+        if v is not None
+    }
     return await director.forward(
-        settings, "GET", _tenant_path(settings, tenant, "/usage"), bearer_of(credentials), params=params
+        settings,
+        "GET",
+        _tenant_path(settings, tenant, "/usage"),
+        bearer_of(credentials),
+        params=params,
     )
 
 
@@ -112,7 +110,11 @@ async def resource_report(
 ) -> Response:
     params = {k: v for k, v in {"from": from_, "to": to}.items() if v is not None}
     return await director.forward(
-        settings, "GET", _tenant_path(settings, tenant, "/report"), bearer_of(credentials), params=params
+        settings,
+        "GET",
+        _tenant_path(settings, tenant, "/report"),
+        bearer_of(credentials),
+        params=params,
     )
 
 
@@ -125,6 +127,9 @@ async def tenant_resource_states(
     """Every tenant's ceiling side by side, for the cluster's view. The
     director lists the tenants from git and asks the operator about each."""
     answer = await director.forward(
-        settings, "GET", f"/v1/clusters/{director.cluster(settings)}/resources", bearer_of(credentials)
+        settings,
+        "GET",
+        f"/v1/clusters/{director.cluster(settings)}/resources",
+        bearer_of(credentials),
     )
-    return _unwrapped(answer, "tenants")
+    return director.unwrapped(answer, "tenants")

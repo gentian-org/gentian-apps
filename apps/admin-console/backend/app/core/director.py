@@ -21,6 +21,8 @@ requires trustTier platform, and without forwardToken there is no token here
 to relay. An ordinary app leaves director.url unset and never calls this.
 """
 
+import json
+
 import httpx
 from fastapi import HTTPException, Response
 
@@ -31,13 +33,17 @@ _TIMEOUT = httpx.Timeout(15.0)
 
 def base_url(settings: Settings) -> str:
     if not settings.director_url:
-        raise HTTPException(status_code=503, detail="The director is not configured for this component.")
+        raise HTTPException(
+            status_code=503, detail="The director is not configured for this component."
+        )
     return settings.director_url.rstrip("/")
 
 
 def cluster(settings: Settings) -> str:
     if not settings.cluster_id:
-        raise HTTPException(status_code=503, detail="This component does not know which cluster it belongs to.")
+        raise HTTPException(
+            status_code=503, detail="This component does not know which cluster it belongs to."
+        )
     return settings.cluster_id
 
 
@@ -67,4 +73,21 @@ async def forward(
         content=upstream.content,
         status_code=upstream.status_code,
         media_type=upstream.headers.get("content-type", "application/json"),
+    )
+
+
+def unwrapped(answer: Response, key: str) -> Response:
+    """Hand back one field of the director's answer as the screen reads it.
+
+    The director answers a list under a key, with the tenant or the cluster
+    beside it, because an answer that says what it is about is the right shape
+    for an API. The screens were written against the bare list and stay as
+    they are. A refusal or an error is passed through untouched — only a 200
+    is unwrapped, because only a 200 has the field.
+    """
+    if answer.status_code != 200:
+        return answer
+    body = json.loads(answer.body)
+    return Response(
+        content=json.dumps(body.get(key, [])), status_code=200, media_type="application/json"
     )

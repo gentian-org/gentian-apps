@@ -101,5 +101,7 @@ async def get_current_user(
 def bearer_of(credentials: HTTPAuthorizationCredentials | None) -> str:
     """The raw bearer, for relaying to the director as the caller."""
     if credentials is None or not credentials.credentials:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="A bearer token is required.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="A bearer token is required."
+        )
     return credentials.credentials

@@ -15,7 +15,9 @@ router = APIRouter(prefix="/credentials", tags=["credentials"])
 
 @router.api_route("/{rest:path}", methods=["GET", "PUT", "DELETE"])
 @router.api_route("", methods=["GET"])
-async def not_yet_relayed(request: Request, rest: str = "", _user: dict = Depends(get_current_user)) -> None:
+async def not_yet_relayed(
+    request: Request, rest: str = "", _user: dict = Depends(get_current_user)
+) -> None:
     raise HTTPException(
         status_code=501,
         detail="The Credentials screen is not yet a client of the director. "

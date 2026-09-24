@@ -21,10 +21,14 @@ def readyz(response: Response) -> dict[str, object]:
     if settings.is_production and not settings.oidc_issuer:
         errors.append("OIDC_ISSUER required in production")
     if not settings.director_url or not settings.cluster_id:
-        errors.append("DIRECTOR_URL and GENTIAN_CLUSTER_ID are required: this console is a client of the director")
+        errors.append(
+            "DIRECTOR_URL and GENTIAN_CLUSTER_ID are required: this console is a client of the director"
+        )
 
     checks["oidc"] = "ok" if settings.oidc_issuer or not settings.is_production else "missing"
-    checks["director"] = "configured" if settings.director_url and settings.cluster_id else "missing"
+    checks["director"] = (
+        "configured" if settings.director_url and settings.cluster_id else "missing"
+    )
 
     if errors:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE

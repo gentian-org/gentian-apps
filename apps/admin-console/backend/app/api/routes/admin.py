@@ -48,7 +48,9 @@ class AdminContextResponse(BaseModel):
 async def _relations(settings: Settings, path: str, token: str) -> dict[str, bool]:
     answer = await director.forward(settings, "GET", path, token)
     if answer.status_code != 200:
-        raise HTTPException(status_code=answer.status_code, detail=answer.body.decode() or "the director refused")
+        raise HTTPException(
+            status_code=answer.status_code, detail=answer.body.decode() or "the director refused"
+        )
     import json
 
     body = json.loads(answer.body)
@@ -85,13 +87,14 @@ async def admin_context(
 # re-pointing, kept where the code is so it cannot drift from what the
 # console actually serves.
 NOT_YET_MAPPED: list[tuple[str, str, str]] = [
-    ("GET", "/admin/backups", "Backup"),
+    # The backup reads are relayed (routes/backups.py). What is left here
+    # writes: a policy is a commit the director has no endpoint for yet, and
+    # taking or deleting a backup is an action rather than declared state,
+    # which is a decision before it is code.
     ("POST", "/admin/backups", "Backup"),
     ("DELETE", "/admin/backups", "Backup"),
-    ("GET", "/admin/backup-policy", "Backup policy"),
     ("PUT", "/admin/backup-policy", "Backup policy"),
     ("DELETE", "/admin/backup-policy", "Backup policy"),
-    ("GET", "/admin/backup-schedules", "Backup schedules"),
     ("PUT", "/admin/backup-schedules", "Backup schedules"),
     ("DELETE", "/admin/backup-schedules", "Backup schedules"),
     ("POST", "/admin/backup-keys", "Backup"),
@@ -118,7 +121,9 @@ def screen_for(method: str, path: str) -> str | None:
 
 
 @router.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-async def not_yet_mapped(rest: str, request: Request, _user: dict = Depends(get_current_user)) -> None:
+async def not_yet_mapped(
+    rest: str, request: Request, _user: dict = Depends(get_current_user)
+) -> None:
     path = "/admin/" + rest
     screen = screen_for(request.method, path)
     if screen is None:
