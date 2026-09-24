@@ -892,3 +892,40 @@ export function fetchResourceReport(
 export function fetchTenantResourceStates() {
   return apiFetch<ResourceState[]>("/admin/resources/tenants");
 }
+
+// --- Changes ----------------------------------------------------------------
+
+/**
+ * One change to declared state, from git.
+ *
+ * Every change the platform makes is a commit the director authored as the
+ * person whose token authorised it, trailered with the relation and object
+ * that permitted it. A commit with `throughPlatform: false` was pushed by
+ * hand — with whatever credential the pusher held and no record of what
+ * allowed it — and is shown as such rather than dressed up as authorised.
+ */
+export type Change = {
+  commit: string;
+  author: { Name: string; Email: string };
+  at: string;
+  summary: string;
+  files: string[];
+  throughPlatform: boolean;
+  principal?: string;
+  decision?: string;
+  requestId?: string;
+};
+
+export type ChangesResponse = {
+  changes: Change[];
+  /** What this list does not cover, in the director's own words. */
+  covers: string;
+};
+
+export function fetchChanges(tenant?: string, scope: "tenant" | "cluster" = "tenant") {
+  const params = new URLSearchParams({ scope, limit: "50" });
+  if (tenant) {
+    params.set("tenant", tenant);
+  }
+  return apiFetch<ChangesResponse>(`/admin/changes?${params.toString()}`);
+}
