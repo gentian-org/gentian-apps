@@ -106,9 +106,19 @@ spec:
             - name: OPENFGA_STORE_ID
               value: {{ .Values.openfga.storeId | quote }}
             {{- end }}
+          {{- /* The Secret the platform writes for this component, when it
+               asked for anything that comes with credentials -- a database, a
+               bucket, a cache. A component that asked for none has no such
+               Secret and must not name one: envFrom is not optional by
+               default, so a missing Secret leaves the pod in
+               CreateContainerConfigError, which says nothing about why.
+               Leaving existingSecret.name empty is how a component says it
+               needs nothing from the platform but the caller's token. */}}
+          {{- if .Values.existingSecret.name }}
           envFrom:
             - secretRef:
                 name: {{ .Values.existingSecret.name }}
+          {{- end }}
           volumeMounts:
             - name: tmp
               mountPath: /tmp
