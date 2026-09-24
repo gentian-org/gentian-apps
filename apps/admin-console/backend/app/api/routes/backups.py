@@ -24,7 +24,7 @@ moment somebody chose, and writing it into git would leave an object there
 that has already finished.
 """
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core import director
@@ -33,6 +33,10 @@ from app.core.config import Settings, get_settings
 
 router = APIRouter(prefix="/admin", tags=["backups"])
 _bearer = HTTPBearer(auto_error=False)
+
+# The one schedule the BackupPolicy reconciler owns per tenant. It restates it
+# from the policy on every pass, so it is the policy that has to change.
+MANAGED_SCHEDULE = "policy"
 
 
 def _tenant(settings: Settings, tenant: str | None) -> str:
@@ -222,4 +226,78 @@ async def delete_backup(
         f"/v1/tenants/{_tenant(settings, tenant)}/actions/delete-backup",
         bearer_of(credentials),
         json_body={"name": name},
+    )
+
+
+@router.put("/backup-schedules/{name}")
+async def set_backup_schedule(
+    name: str,
+    body: dict,
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Change the schedule by changing the policy it comes from.
+
+    The operator derives one schedule per tenant from the backup policy and
+    restates it on every reconcile, so editing the schedule object directly
+    does not hold — it is reverted within the minute, which looks like the
+    save failing at random. So this writes the policy instead: the same
+    three fields, at the place that decides them.
+
+    A schedule that is not the derived one would be somebody's own, and
+    nothing creates those today; changing one is refused rather than
+    silently redirected into the policy.
+    """
+    if name != MANAGED_SCHEDULE:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Only the {MANAGED_SCHEDULE!r} schedule is managed here, and it is derived "
+                "from the backup policy. Change the policy instead."
+            ),
+        )
+    policy: dict = {}
+    if schedule := body.get("schedule"):
+        policy["schedule"] = schedule
+    if body.get("suspended"):
+        policy["suspendSchedule"] = True
+    if retention := body.get("retention"):
+        policy["retention"] = retention
+    if encryption := body.get("encryption"):
+        # The policy states recipients; "platform" means none of its own.
+        recipients = encryption.get("recipients") or []
+        if encryption.get("mode") == "own" and recipients:
+            policy["encryption"] = {"recipients": recipients}
+    return await director.forward(
+        settings,
+        "PUT",
+        f"/v1/tenants/{_tenant(settings, tenant)}/backup-policy",
+        bearer_of(credentials),
+        json_body=policy,
+    )
+
+
+@router.delete("/backup-schedules/{name}")
+async def clear_backup_schedule(
+    name: str,
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Stop the derived schedule, which is the policy suspending it. The
+    object itself would be recreated on the next reconcile."""
+    if name != MANAGED_SCHEDULE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only the {MANAGED_SCHEDULE!r} schedule is managed here.",
+        )
+    return await director.forward(
+        settings,
+        "PUT",
+        f"/v1/tenants/{_tenant(settings, tenant)}/backup-policy",
+        bearer_of(credentials),
+        json_body={"suspendSchedule": True},
     )

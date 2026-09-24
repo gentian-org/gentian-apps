@@ -91,3 +91,52 @@ def unwrapped(answer: Response, key: str) -> Response:
     return Response(
         content=json.dumps(body.get(key, [])), status_code=200, media_type="application/json"
     )
+
+
+def credential_manager_url(settings: Settings) -> str:
+    """Where credential writes go.
+
+    A separate service from the director and a separate question: the
+    director decides what a person may do and writes git, the credential
+    manager exchanges the person's token for one OpenBao accepts and writes
+    the secret. Neither holds authority of its own, and this component holds
+    neither of theirs.
+    """
+    if not settings.credential_manager_url:
+        raise HTTPException(
+            status_code=503,
+            detail="The credential manager is not configured for this component.",
+        )
+    return settings.credential_manager_url.rstrip("/")
+
+
+async def forward_to(
+    base: str,
+    method: str,
+    path: str,
+    token: str,
+    *,
+    params: dict[str, str] | None = None,
+    json_body: object | None = None,
+) -> Response:
+    """Pass one request to a service other than the director, as the caller.
+
+    Same rule, same shape: the caller's own bearer, the answer unchanged,
+    including a refusal. Only the base differs.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            upstream = await client.request(
+                method,
+                f"{base}{path}",
+                params=params,
+                json=json_body,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=f"The service is unreachable: {exc}") from exc
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        media_type=upstream.headers.get("content-type", "application/json"),
+    )

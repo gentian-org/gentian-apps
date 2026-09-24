@@ -201,15 +201,39 @@ def test_deleting_a_backup_is_an_action_not_a_deletion_of_state(monkeypatch):
     assert seen["json"] == {"name": "nightly-1"}
 
 
-def test_what_is_left_still_says_it_is_not_wired():
-    """Schedules are derived from the policy, and minting a key belongs to
-    the credential manager. Both still answer 501 naming their screen."""
-    client = TestClient(_app(_settings()))
-    r = client.put(
-        "/api/v1/admin/backup-schedules/policy", json={}, headers={"Authorization": "Bearer t"}
+def test_a_schedule_is_changed_through_the_policy_it_comes_from(monkeypatch):
+    """The operator restates the derived schedule from the policy on every
+    reconcile, so editing the object directly is reverted within the minute
+    — which looks like the save failing at random. The write goes to the
+    policy instead."""
+    seen: dict = {}
+    _fake_client(monkeypatch, _answer(202, {"status": "updated", "commit": "a1b2c3d"}), seen)
+    r = TestClient(_app(_settings())).put(
+        "/api/v1/admin/backup-schedules/policy",
+        json={"schedule": "0 4 * * *", "suspended": False, "retention": {"keepDaily": 7}},
+        headers={"Authorization": "Bearer t"},
     )
-    assert r.status_code == 501 and "Backup schedules" in r.json()["detail"]
-    r = client.post(
+    assert r.status_code == 202
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/backup-policy"
+    assert seen["json"] == {"schedule": "0 4 * * *", "retention": {"keepDaily": 7}}
+
+
+def test_a_schedule_nobody_derives_is_refused_not_redirected(monkeypatch):
+    """Silently writing somebody's own schedule into the policy would change
+    something they did not ask about."""
+    seen: dict = {}
+    _fake_client(monkeypatch, _answer(202, {}), seen)
+    r = TestClient(_app(_settings())).put(
+        "/api/v1/admin/backup-schedules/mine", json={}, headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 400
+    assert not seen
+
+
+def test_minting_a_key_still_says_it_is_not_wired():
+    """A key minted here is a key this console held, and it is designed to
+    hold nothing."""
+    r = TestClient(_app(_settings())).post(
         "/api/v1/admin/backup-keys/mint", json={}, headers={"Authorization": "Bearer t"}
     )
     assert r.status_code == 501 and "Backup" in r.json()["detail"]

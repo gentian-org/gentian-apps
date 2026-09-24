@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     # than guessing a host.
     director_url: str | None = Field(default=None, alias="DIRECTOR_URL")
     cluster_id: str | None = Field(default=None, alias="GENTIAN_CLUSTER_ID")
+    # Where a person's own credential writes are relayed. Unset leaves the
+    # Credentials screen answering that it is not configured, rather than
+    # guessing at a host.
+    credential_manager_url: str | None = Field(default=None, alias="CREDENTIAL_MANAGER_URL")
 
     auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
 
