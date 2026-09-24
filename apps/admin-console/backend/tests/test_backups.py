@@ -52,6 +52,7 @@ def _fake_client(monkeypatch, responder, seen: dict):
 
         async def request(self, method, url, params=None, json=None, headers=None):
             seen["method"], seen["url"] = method, url
+            seen["json"] = json
             seen["auth"] = (headers or {}).get("Authorization")
             return responder(method, url)
 
@@ -142,14 +143,76 @@ def test_the_directors_refusal_is_passed_through_unchanged(monkeypatch, status):
     assert r.status_code == status
 
 
-def test_the_writes_still_say_they_are_not_wired(monkeypatch):
-    """A screen that silently did nothing would be worse than one that says
-    it cannot. Taking a backup and saving a policy both still answer 501."""
+def test_a_policy_is_a_commit_and_a_backup_is_something_started(monkeypatch):
+    """The two kinds of write, and the two shapes of answer. A policy says
+    what should be true from now on and comes back as a commit; a backup
+    happens once and comes back as something started, with no commit because
+    nothing was declared."""
+    seen: dict = {}
+    _fake_client(
+        monkeypatch,
+        _answer(202, {"status": "updated", "commit": "a1b2c3d"}),
+        seen,
+    )
     client = TestClient(_app(_settings()))
+    r = client.put(
+        "/api/v1/admin/backup-policy",
+        json={"schedule": "0 3 * * *"},
+        headers={"Authorization": "Bearer t"},
+    )
+    assert r.status_code == 202
+    assert r.json()["commit"] == "a1b2c3d"
+    assert seen["method"] == "PUT"
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/backup-policy"
+
+    _fake_client(
+        monkeypatch,
+        _answer(202, {"action": "backup", "name": "manual-1", "status": "started"}),
+        seen,
+    )
     r = client.post("/api/v1/admin/backups", json={}, headers={"Authorization": "Bearer t"})
+    assert r.status_code == 202
+    body = r.json()
+    assert body["status"] == "started" and "commit" not in body
+    # An action goes to an action route, which is what says it is one.
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/actions/backup"
+
+
+def test_clearing_a_policy_is_how_a_tenant_inherits_again(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, _answer(202, {"status": "updated", "commit": "d4e5f6a"}), seen)
+    r = TestClient(_app(_settings())).delete(
+        "/api/v1/admin/backup-policy", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 202
+    assert seen["method"] == "DELETE"
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/backup-policy"
+
+
+def test_deleting_a_backup_is_an_action_not_a_deletion_of_state(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, _answer(202, {"action": "delete-backup", "status": "started"}), seen)
+    r = TestClient(_app(_settings())).delete(
+        "/api/v1/admin/backups/nightly-1", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 202
+    assert seen["method"] == "POST"
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/actions/delete-backup"
+    assert seen["json"] == {"name": "nightly-1"}
+
+
+def test_what_is_left_still_says_it_is_not_wired():
+    """Schedules are derived from the policy, and minting a key belongs to
+    the credential manager. Both still answer 501 naming their screen."""
+    client = TestClient(_app(_settings()))
+    r = client.put(
+        "/api/v1/admin/backup-schedules/policy", json={}, headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 501 and "Backup schedules" in r.json()["detail"]
+    r = client.post(
+        "/api/v1/admin/backup-keys/mint", json={}, headers={"Authorization": "Bearer t"}
+    )
     assert r.status_code == 501 and "Backup" in r.json()["detail"]
-    r = client.put("/api/v1/admin/backup-policy", json={}, headers={"Authorization": "Bearer t"})
-    assert r.status_code == 501 and "Backup policy" in r.json()["detail"]
 
 
 def test_no_token_is_refused_before_anything_is_forwarded():

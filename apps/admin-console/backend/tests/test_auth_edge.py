@@ -91,12 +91,17 @@ def test_a_token_for_another_audience_is_refused(keypair):
     administration console's is not, and is refused here rather than accepted
     as somebody's session."""
     with pytest.raises(jwt.InvalidAudienceError):
-        auth.decode_token(token(keypair, aud=["realm-management", "account"], azp="security-admin-console"), settings())
+        auth.decode_token(
+            token(keypair, aud=["realm-management", "account"], azp="security-admin-console"),
+            settings(),
+        )
 
 
 def test_a_token_from_another_issuer_is_refused(keypair):
     with pytest.raises(jwt.InvalidIssuerError):
-        auth.decode_token(token(keypair, iss="https://id.example.test/auth/realms/other"), settings())
+        auth.decode_token(
+            token(keypair, iss="https://id.example.test/auth/realms/other"), settings()
+        )
 
 
 def test_an_expired_token_is_refused(keypair):

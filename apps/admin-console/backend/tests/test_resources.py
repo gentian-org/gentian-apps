@@ -66,8 +66,12 @@ def _answer(status, body):
 
 def test_the_state_is_the_directors_answer_for_the_consoles_own_tenant(monkeypatch):
     seen: dict = {}
-    _fake_client(monkeypatch, _answer(200, {"tenant": "platform", "plan": "nodes-2", "quota": []}), seen)
-    r = TestClient(_app(_settings())).get("/api/v1/admin/resources", headers={"Authorization": "Bearer person"})
+    _fake_client(
+        monkeypatch, _answer(200, {"tenant": "platform", "plan": "nodes-2", "quota": []}), seen
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/resources", headers={"Authorization": "Bearer person"}
+    )
     assert r.status_code == 200
     assert r.json()["plan"] == "nodes-2"
     assert seen["url"] == "http://director.test:8080/v1/tenants/platform/resources"
@@ -86,9 +90,14 @@ def test_a_platform_operator_asks_about_any_tenant_and_the_director_decides(monk
 
 def test_the_plans_arrive_as_the_bare_list_the_screen_reads(monkeypatch):
     seen: dict = {}
-    plans = [{"name": "nodes-2", "current": True, "selectable": True}, {"name": "nodes-4", "selectable": False}]
+    plans = [
+        {"name": "nodes-2", "current": True, "selectable": True},
+        {"name": "nodes-4", "selectable": False},
+    ]
     _fake_client(monkeypatch, _answer(200, {"tenant": "platform", "plans": plans}), seen)
-    r = TestClient(_app(_settings())).get("/api/v1/admin/resources/plans", headers={"Authorization": "Bearer t"})
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/resources/plans", headers={"Authorization": "Bearer t"}
+    )
     assert r.status_code == 200
     assert r.json() == plans
     # No selfService flag: whether this person chooses for themselves is the
@@ -100,12 +109,23 @@ def test_choosing_a_plan_is_a_commit(monkeypatch):
     seen: dict = {}
     _fake_client(
         monkeypatch,
-        _answer(202, {"status": "updated", "tenant": "platform", "plan": "nodes-4", "previousPlan": "nodes-2",
-                      "commit": "a1b2c3", "message": "committed"}),
+        _answer(
+            202,
+            {
+                "status": "updated",
+                "tenant": "platform",
+                "plan": "nodes-4",
+                "previousPlan": "nodes-2",
+                "commit": "a1b2c3",
+                "message": "committed",
+            },
+        ),
         seen,
     )
     r = TestClient(_app(_settings())).put(
-        "/api/v1/admin/resources", json={"plan": "nodes-4", "force": False}, headers={"Authorization": "Bearer t"}
+        "/api/v1/admin/resources",
+        json={"plan": "nodes-4", "force": False},
+        headers={"Authorization": "Bearer t"},
     )
     assert r.status_code == 202
     assert r.json()["previousPlan"] == "nodes-2"
@@ -139,7 +159,8 @@ def test_history_queries_travel_with_the_request(monkeypatch):
 
     _fake_client(monkeypatch, _answer(200, {"tenant": "acme", "intervals": []}), seen)
     r = TestClient(_app(_settings())).get(
-        "/api/v1/admin/resources/report?tenant=acme&to=2026-10-01T00:00:00Z", headers={"Authorization": "Bearer t"}
+        "/api/v1/admin/resources/report?tenant=acme&to=2026-10-01T00:00:00Z",
+        headers={"Authorization": "Bearer t"},
     )
     assert r.status_code == 200
     assert seen["url"] == "http://director.test:8080/v1/tenants/acme/resources/report"
@@ -149,8 +170,12 @@ def test_history_queries_travel_with_the_request(monkeypatch):
 def test_the_clusters_view_is_every_tenants_state(monkeypatch):
     seen: dict = {}
     states = [{"tenant": "acme", "plan": "nodes-2"}, {"tenant": "platform", "plan": "nodes-4"}]
-    _fake_client(monkeypatch, _answer(200, {"cluster": "demo", "tenants": states, "unavailable": []}), seen)
-    r = TestClient(_app(_settings())).get("/api/v1/admin/resources/tenants", headers={"Authorization": "Bearer t"})
+    _fake_client(
+        monkeypatch, _answer(200, {"cluster": "demo", "tenants": states, "unavailable": []}), seen
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/resources/tenants", headers={"Authorization": "Bearer t"}
+    )
     assert r.status_code == 200
     assert r.json() == states
     assert seen["url"] == "http://director.test:8080/v1/clusters/demo/resources"
