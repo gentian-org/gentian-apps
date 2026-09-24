@@ -114,7 +114,7 @@ NOT_YET_MAPPED: list[tuple[str, str, str]] = [
 
 def screen_for(method: str, path: str) -> str | None:
     for m, prefix, screen in NOT_YET_MAPPED:
-        if m == method and (path == prefix or path.startswith(prefix + "/") or path.startswith(prefix + "?")):
+        if m == method and (path == prefix or path.startswith((prefix + "/", prefix + "?"))):
             return screen
     return None
 

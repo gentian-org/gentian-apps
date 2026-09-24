@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0.0", "ruff>=0.8.0"]
+dev = ["pytest>=8.0.0", "ruff>=0.16,<0.17"]
 
 [build-system]
 requires = ["hatchling"]
@@ -24,3 +24,9 @@ packages = ["app"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+# Depends(...) in a parameter default is FastAPI's own idiom for declaring a
+# dependency, and bugbear's B008 cannot tell it from a mutable default. Naming
+# the calls as immutable keeps the rule for everything else.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", "fastapi.Path", "fastapi.Body"]

@@ -5,7 +5,8 @@ ReBAC PDP before sensitive operations. When OPENFGA_API_URL is unset, checks
 pass through (tenant MAC + OIDC only).
 """
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from fastapi import Depends, HTTPException, status
 

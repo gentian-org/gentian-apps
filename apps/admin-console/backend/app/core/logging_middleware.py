@@ -11,10 +11,10 @@ from starlette.responses import Response
 logger = logging.getLogger("gentian.access")
 
 _REDACT_PATTERNS = (
-    (re.compile(r"(authorization:\s*)([^\s,]+)", re.I), r"\1[REDACTED]"),
-    (re.compile(r"(bearer\s+)([^\s]+)", re.I), r"\1[REDACTED]"),
-    (re.compile(r"(password=)[^&\s]+", re.I), r"\1[REDACTED]"),
-    (re.compile(r"(token=)[^&\s]+", re.I), r"\1[REDACTED]"),
+    (re.compile(r"(authorization:\s*)([^\s,]+)", re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r"(bearer\s+)([^\s]+)", re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r"(password=)[^&\s]+", re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r"(token=)[^&\s]+", re.IGNORECASE), r"\1[REDACTED]"),
 )
 
 

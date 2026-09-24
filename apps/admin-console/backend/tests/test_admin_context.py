@@ -23,14 +23,14 @@ def _app(settings: Settings) -> FastAPI:
 
 
 def _settings(**over) -> Settings:
-    env = dict(
-        AUTH_DISABLED="true",
-        KERNEL_DOMAIN="desk.gentian.org",
-        KERNEL_REALM="kernel",
-        TENANT_ID="platform",
-        DIRECTOR_URL="http://director.test:8080",
-        GENTIAN_CLUSTER_ID="demo",
-    )
+    env = {
+        "AUTH_DISABLED": "true",
+        "KERNEL_DOMAIN": "desk.gentian.org",
+        "KERNEL_REALM": "kernel",
+        "TENANT_ID": "platform",
+        "DIRECTOR_URL": "http://director.test:8080",
+        "GENTIAN_CLUSTER_ID": "demo",
+    }
     env.update(over)
     return Settings(**env)
 

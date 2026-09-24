@@ -42,19 +42,19 @@ def jwks(keypair, monkeypatch):
 
 
 def settings(**over) -> Settings:
-    base = dict(
+    base = {
         # Explicit, because a conftest may put AUTH_DISABLED=true in the
         # process environment for tests that never verify a token, and these
         # tests exist to verify one. In production the validator refuses the
         # inherited value outright, which is right, and this is the fix.
-        AUTH_DISABLED="false",
-        AUTH_MODE="edge",
-        OIDC_ISSUER=ISSUER,
-        OIDC_CLIENT_ID="gentian-edge-kernel",
-        OIDC_AUDIENCE="gentian-director",
-        TENANT_ID="platform",
-        ENVIRONMENT="local",
-    )
+        "AUTH_DISABLED": "false",
+        "AUTH_MODE": "edge",
+        "OIDC_ISSUER": ISSUER,
+        "OIDC_CLIENT_ID": "gentian-edge-kernel",
+        "OIDC_AUDIENCE": "gentian-director",
+        "TENANT_ID": "platform",
+        "ENVIRONMENT": "local",
+    }
     base.update(over)
     return Settings(**base)
 
