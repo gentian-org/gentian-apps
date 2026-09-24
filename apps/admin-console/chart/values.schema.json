@@ -64,6 +64,12 @@
         "zoneKind": { "enum": ["", "kernel", "tenant"] }
       }
     },
+    "credentialManager": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where a person's own credential writes are relayed. Empty leaves the Credentials screen saying it is not configured.",
+      "properties": { "url": { "type": "string" } }
+    },
     "director": {
       "type": "object",
       "additionalProperties": false,

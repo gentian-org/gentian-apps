@@ -70,6 +70,10 @@ spec:
             - name: DIRECTOR_URL
               value: {{ .Values.director.url | quote }}
             {{- end }}
+            {{- if and .Values.credentialManager .Values.credentialManager.url (not (hasKey (default dict .Values.api.env) "CREDENTIAL_MANAGER_URL")) }}
+            - name: CREDENTIAL_MANAGER_URL
+              value: {{ .Values.credentialManager.url | quote }}
+            {{- end }}
             {{- if and .Values.director.cluster (not (hasKey (default dict .Values.api.env) "GENTIAN_CLUSTER_ID")) }}
             - name: GENTIAN_CLUSTER_ID
               value: {{ .Values.director.cluster | quote }}

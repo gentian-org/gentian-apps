@@ -107,6 +107,14 @@ platform:
 # forwarded token to it. An app that does not talk to the director leaves both
 # empty; naming director.url in the profile's mapping is also what opens the
 # component's egress to the control namespace.
+# Where a person's own credential writes go. The credential manager holds no
+# authority of its own: every write takes the caller's token and exchanges it
+# for one OpenBao will accept, so relaying to it is passing the person
+# through, exactly as relaying to the director is. Empty leaves the
+# Credentials screen answering that it is not configured.
+credentialManager:
+  url: ""
+
 director:
   url: ""
   cluster: ""
