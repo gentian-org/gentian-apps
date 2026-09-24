@@ -8,7 +8,7 @@ change here is decided by the director from the authorization graph.
 
 from fastapi import FastAPI
 
-from app.api.routes import admin, cluster, credentials, extensions, health, session
+from app.api.routes import admin, cluster, credentials, extensions, health, resources, session
 from app.core.config import get_settings
 from app.core.logging_middleware import RedactingAccessLogMiddleware
 from app.extensions import loader
@@ -24,6 +24,9 @@ app.add_middleware(RedactingAccessLogMiddleware)
 app.include_router(health.router)
 app.include_router(session.router, prefix=settings.api_v1_str)
 app.include_router(cluster.router, prefix=settings.api_v1_str)
+# Each screen's own routes go before admin's, whose catch-all answers for
+# the screens that are not yet clients of the director.
+app.include_router(resources.router, prefix=settings.api_v1_str)
 app.include_router(admin.router, prefix=settings.api_v1_str)
 app.include_router(credentials.router, prefix=settings.api_v1_str)
 app.include_router(extensions.router, prefix=settings.api_v1_str)

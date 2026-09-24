@@ -85,8 +85,6 @@ async def admin_context(
 # re-pointing, kept where the code is so it cannot drift from what the
 # console actually serves.
 NOT_YET_MAPPED: list[tuple[str, str, str]] = [
-    ("GET", "/admin/resources", "Resources"),
-    ("PUT", "/admin/resources", "Resources"),
     ("GET", "/admin/backups", "Backup"),
     ("POST", "/admin/backups", "Backup"),
     ("DELETE", "/admin/backups", "Backup"),

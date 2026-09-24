@@ -108,7 +108,7 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
       setError(null);
       setPending(null);
       setSuccess(
-        result.status === "no_change"
+        result.status === "unchanged"
           ? `${selected} is already on ${result.plan}.`
           : `${selected} moved to ${result.plan}. ${result.message}`,
       );
