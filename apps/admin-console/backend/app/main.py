@@ -16,6 +16,7 @@ from app.api.routes import (
     credentials,
     extensions,
     health,
+    platform,
     resources,
     security,
     session,
@@ -41,6 +42,7 @@ app.include_router(resources.router, prefix=settings.api_v1_str)
 app.include_router(audit.router, prefix=settings.api_v1_str)
 app.include_router(backups.router, prefix=settings.api_v1_str)
 app.include_router(security.router, prefix=settings.api_v1_str)
+app.include_router(platform.router, prefix=settings.api_v1_str)
 app.include_router(admin.router, prefix=settings.api_v1_str)
 app.include_router(credentials.router, prefix=settings.api_v1_str)
 app.include_router(extensions.router, prefix=settings.api_v1_str)

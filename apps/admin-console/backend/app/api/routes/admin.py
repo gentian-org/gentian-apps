@@ -95,16 +95,19 @@ NOT_YET_MAPPED: list[tuple[str, str, str]] = [
     ("PUT", "/admin/backup-schedules", "Backup schedules"),
     ("DELETE", "/admin/backup-schedules", "Backup schedules"),
     ("POST", "/admin/backup-keys", "Backup"),
-    ("GET", "/admin/integrations", "Integrations"),
+    # The integrations read is relayed (routes/platform.py). Changing what an
+    # app may consume is a change to declared state and belongs in the
+    # deployments repository, which the director has no endpoint for yet.
     ("PUT", "/admin/grants", "Integrations"),
     ("GET", "/admin/groups", "Notifications"),
     ("GET", "/admin/notifications", "Notifications"),
     ("POST", "/admin/notifications", "Notifications"),
     ("GET", "/admin/audit-events", "Audit"),
-    ("GET", "/admin/platform/security-policy", "Platform security"),
+    # Platform security and the customisation report are relayed. What is
+    # left writes: which waivers the cluster permits is the operator chart's
+    # own configuration, and changing it is a commit nobody has built yet.
     ("PUT", "/admin/platform/security-policy", "Platform security"),
     ("GET", "/admin/platform/authorization-summary", "Platform security"),
-    ("GET", "/admin/platform/customization-debt", "Customization"),
 ]
 
 
