@@ -87,14 +87,11 @@ async def admin_context(
 # re-pointing, kept where the code is so it cannot drift from what the
 # console actually serves.
 NOT_YET_MAPPED: list[tuple[str, str, str]] = [
-    # The backup reads are relayed (routes/backups.py). What is left here
-    # writes: a policy is a commit the director has no endpoint for yet, and
-    # taking or deleting a backup is an action rather than declared state,
-    # which is a decision before it is code.
-    ("POST", "/admin/backups", "Backup"),
-    ("DELETE", "/admin/backups", "Backup"),
-    ("PUT", "/admin/backup-policy", "Backup policy"),
-    ("DELETE", "/admin/backup-policy", "Backup policy"),
+    # Backup and Backup policy are relayed (routes/backups.py): the reads,
+    # the policy writes, and the two actions. What is left of them is the
+    # schedules, which are derived from the policy -- editing one does not
+    # hold, so the screen shows them and changes them through the policy --
+    # and minting a backup key, which belongs to the credential manager.
     ("PUT", "/admin/backup-schedules", "Backup schedules"),
     ("DELETE", "/admin/backup-schedules", "Backup schedules"),
     ("POST", "/admin/backup-keys", "Backup"),

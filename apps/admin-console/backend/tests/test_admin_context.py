@@ -60,11 +60,16 @@ def _director(monkeypatch, answers: dict[str, dict]):
 
 
 def test_a_platform_administrator_sees_the_platform_screens(monkeypatch):
-    seen = _director(monkeypatch, {
-        "/v1/tenants/platform/me": {"relations": {"can_administer": True, "can_enter": True}},
-        "/v1/clusters/demo/me": {"relations": {"can_configure": True, "can_audit": True}},
-    })
-    r = TestClient(_app(_settings())).get("/api/v1/admin/context", headers={"Authorization": "Bearer person"})
+    seen = _director(
+        monkeypatch,
+        {
+            "/v1/tenants/platform/me": {"relations": {"can_administer": True, "can_enter": True}},
+            "/v1/clusters/demo/me": {"relations": {"can_configure": True, "can_audit": True}},
+        },
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer person"}
+    )
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["tenant"] == "platform" and body["realm"] == "kernel"
@@ -79,26 +84,38 @@ def test_a_platform_administrator_sees_the_platform_screens(monkeypatch):
 
 
 def test_a_tenant_administrator_sees_no_platform_screens(monkeypatch):
-    _director(monkeypatch, {
-        "/v1/tenants/platform/me": {"relations": {"can_administer": True}},
-        "/v1/clusters/demo/me": {"relations": {"can_configure": False, "can_audit": False}},
-    })
-    r = TestClient(_app(_settings())).get("/api/v1/admin/context", headers={"Authorization": "Bearer t"})
+    _director(
+        monkeypatch,
+        {
+            "/v1/tenants/platform/me": {"relations": {"can_administer": True}},
+            "/v1/clusters/demo/me": {"relations": {"can_configure": False, "can_audit": False}},
+        },
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+    )
     assert r.status_code == 200
     assert r.json()["isPlatformAdmin"] is False
 
 
 def test_someone_the_edge_let_in_but_who_may_not_administer_is_refused(monkeypatch):
-    _director(monkeypatch, {
-        "/v1/tenants/platform/me": {"relations": {"can_administer": False, "can_enter": True}},
-        "/v1/clusters/demo/me": {"relations": {}},
-    })
-    r = TestClient(_app(_settings())).get("/api/v1/admin/context", headers={"Authorization": "Bearer t"})
+    _director(
+        monkeypatch,
+        {
+            "/v1/tenants/platform/me": {"relations": {"can_administer": False, "can_enter": True}},
+            "/v1/clusters/demo/me": {"relations": {}},
+        },
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+    )
     assert r.status_code == 403
 
 
 def test_without_a_director_the_console_says_so():
-    r = TestClient(_app(_settings(DIRECTOR_URL=None))).get("/api/v1/admin/context", headers={"Authorization": "Bearer t"})
+    r = TestClient(_app(_settings(DIRECTOR_URL=None))).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+    )
     assert r.status_code == 503
 
 
@@ -107,9 +124,11 @@ def test_a_screen_not_yet_mapped_says_which_one():
     screen, so the console shows that rather than a spinner. A route nobody
     calls is a plain 404."""
     client = TestClient(_app(_settings()))
-    r = client.get("/api/v1/admin/security-policies?tenant=platform", headers={"Authorization": "Bearer t"})
+    r = client.get(
+        "/api/v1/admin/security-policies?tenant=platform", headers={"Authorization": "Bearer t"}
+    )
     assert r.status_code == 501 and "Security" in r.json()["detail"]
-    r = client.put("/api/v1/admin/backup-policy/cluster", json={}, headers={"Authorization": "Bearer t"})
-    assert r.status_code == 501 and "Backup policy" in r.json()["detail"]
+    r = client.get("/api/v1/admin/audit-events", headers={"Authorization": "Bearer t"})
+    assert r.status_code == 501 and "Audit" in r.json()["detail"]
     r = client.get("/api/v1/admin/members", headers={"Authorization": "Bearer t"})
     assert r.status_code == 404
