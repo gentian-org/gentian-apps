@@ -18,6 +18,12 @@ export type ClusterSetting = {
   oneOf?: string[];
   /** What the claim carries now. Absent when the claim does not set it. */
   value?: string;
+  /**
+   * What applies while the setting is unset, from the Cluster XRD. Absent
+   * when the schema declares no default, which is itself the answer: nothing
+   * is applied, and the screen must not invent a value.
+   */
+  default?: string;
 };
 
 export type ClusterSettingsResponse = {
