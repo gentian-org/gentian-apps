@@ -25,6 +25,17 @@ import "./admin.css";
  *    Argo CD has not applied yet, so the screen says committed and names the
  *    commit rather than claiming the cluster now matches.
  */
+/** What to show for a setting the claim does not carry.
+ *
+ * The default comes from the Cluster XRD by way of the director, so what the
+ * screen names is what the cluster will actually apply. A setting the schema
+ * gives no default says so plainly rather than implying there is one. */
+function unsetLabel(setting: ClusterSetting): string {
+  return setting.default === undefined
+    ? "not set — and the schema applies no default"
+    : `not set — the default applies: ${setting.default}`;
+}
+
 export function ClusterSettingsSection() {
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({
@@ -144,9 +155,12 @@ export function ClusterSettingsSection() {
                       >
                         {/* An unset setting is its own option, so choosing a
                             value is deliberate and the schema's default is
-                            visible as the state it actually is. */}
+                            visible as the state it actually is. Naming the
+                            default matters: "the default applies" without
+                            saying which one leaves the reader to go and find
+                            the schema. */}
                         {setting.value === undefined ? (
-                          <option value="">not set — the default applies</option>
+                          <option value="">{unsetLabel(setting)}</option>
                         ) : null}
                         {setting.oneOf.map((choice) => (
                           <option value={choice} key={choice}>
@@ -159,9 +173,7 @@ export function ClusterSettingsSection() {
                         id={id}
                         type="text"
                         value={currentValue(setting)}
-                        placeholder={
-                          setting.value === undefined ? "not set — the default applies" : undefined
-                        }
+                        placeholder={setting.value === undefined ? unsetLabel(setting) : undefined}
                         onChange={(event) => edit(setting.path, event.target.value)}
                       />
                     )}
