@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from app.api.routes import (
     admin,
+    audit,
     backups,
     cluster,
     credentials,
@@ -37,6 +38,7 @@ app.include_router(cluster.router, prefix=settings.api_v1_str)
 # Each screen's own routes go before admin's, whose catch-all answers for
 # the screens that are not yet clients of the director.
 app.include_router(resources.router, prefix=settings.api_v1_str)
+app.include_router(audit.router, prefix=settings.api_v1_str)
 app.include_router(backups.router, prefix=settings.api_v1_str)
 app.include_router(security.router, prefix=settings.api_v1_str)
 app.include_router(admin.router, prefix=settings.api_v1_str)
