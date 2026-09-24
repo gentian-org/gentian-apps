@@ -162,6 +162,16 @@ jobs:
         with:
           chart-path: apps/admin-console/chart
           lint: "true"
+          # The chart names the images of the build it came from, by their
+          # immutable name. Both images are ours, which is what makes the
+          # blanket rewrite safe here.
+          pin-image-tag: ${{ github.sha }}
+          # And the chart itself is published per commit, because a Helm
+          # release under an unchanged version string is never upgraded: a
+          # chart republished at 0.1.1 reaches no cluster that already has
+          # 0.1.1. The installer resolves the moving version to the immutable
+          # one, the way it already does for the desktop.
+          branch-versions: "true"
           push: ${{ needs.should-publish.outputs.publish }}
 
   build-nextcloud:
