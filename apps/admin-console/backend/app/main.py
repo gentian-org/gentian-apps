@@ -17,6 +17,7 @@ from app.api.routes import (
     extensions,
     health,
     notifications,
+    people,
     platform,
     resources,
     security,
@@ -44,6 +45,7 @@ app.include_router(audit.router, prefix=settings.api_v1_str)
 app.include_router(backups.router, prefix=settings.api_v1_str)
 app.include_router(security.router, prefix=settings.api_v1_str)
 app.include_router(platform.router, prefix=settings.api_v1_str)
+app.include_router(people.router, prefix=settings.api_v1_str)
 app.include_router(notifications.router, prefix=settings.api_v1_str)
 app.include_router(admin.router, prefix=settings.api_v1_str)
 app.include_router(credentials.router, prefix=settings.api_v1_str)

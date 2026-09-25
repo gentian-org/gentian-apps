@@ -944,3 +944,98 @@ export function fetchChanges(tenant?: string, scope: "tenant" | "cluster" = "ten
   }
   return apiFetch<ChangesResponse>(`/admin/changes?${params.toString()}`);
 }
+
+// People, groups and the realm's password policy (S7A.17).
+//
+// The console reads and writes these through the director, with the caller's
+// own token. Nothing here holds a Keycloak credential: the director holds one
+// per realm, and what the caller may do with it was decided by OpenFGA before
+// the director touched anything.
+
+export type Person = {
+  id: string;
+  /** Keycloak's login name. For anybody invited here it is the address. */
+  username: string;
+  email: string;
+  /** The display name, empty until they set one. */
+  name?: string;
+  enabled: boolean;
+  /**
+   * Invited and not finished: the address is unverified or a required action
+   * is outstanding. Worth its own column — somebody who cannot sign in yet
+   * looks identical otherwise, which is how a failed invitation goes unseen.
+   */
+  pending: boolean;
+  /** Group paths, without the leading slash. Filled only by the single read. */
+  groups?: string[];
+};
+
+export type PersonGroup = {
+  id: string;
+  /** The path without the leading slash, which is the name the graph uses. */
+  path: string;
+  name: string;
+};
+
+export type IdentitySettings = {
+  tenant: string;
+  realm: string;
+  /** Keycloak's own spelling, e.g. "length(12) and notUsername(undefined)". */
+  passwordPolicy: string;
+};
+
+export type InviteResult = {
+  person: Person;
+  /**
+   * False means the person exists and the link did not go. The repair is to
+   * re-send rather than to invite again, so the screen has to tell them apart.
+   */
+  mailed: boolean;
+  warning?: string;
+};
+
+export function fetchPeople(opts?: { search?: string; tenant?: string }) {
+  const params = new URLSearchParams();
+  if (opts?.search) params.set("search", opts.search);
+  if (opts?.tenant) params.set("tenant", opts.tenant);
+  const query = params.toString();
+  return apiFetch<{ tenant: string; people: Person[] }>(
+    `/admin/people${query ? `?${query}` : ""}`,
+  );
+}
+
+export function fetchPerson(id: string, tenant?: string) {
+  return apiFetch<Person>(`/admin/people/${encodeURIComponent(id)}${tenantQuery(tenant)}`);
+}
+
+export function fetchPersonGroups(tenant?: string) {
+  return apiFetch<{ tenant: string; groups: PersonGroup[] }>(`/admin/groups${tenantQuery(tenant)}`);
+}
+
+export function fetchIdentitySettings(tenant?: string) {
+  return apiFetch<IdentitySettings>(`/admin/identity${tenantQuery(tenant)}`);
+}
+
+export function invitePerson(body: { email: string; groups: string[] }, tenant?: string) {
+  return apiFetch<InviteResult>(`/admin/people/invite${tenantQuery(tenant)}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function setMembership(
+  body: { person: string; group: string; member: boolean },
+  tenant?: string,
+) {
+  return apiFetch<{ person: string; group: string; member: boolean }>(
+    `/admin/people/membership${tenantQuery(tenant)}`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+export function setPasswordPolicy(passwordPolicy: string, tenant?: string) {
+  return apiFetch<IdentitySettings>(`/admin/identity/password-policy${tenantQuery(tenant)}`, {
+    method: "POST",
+    body: JSON.stringify({ passwordPolicy }),
+  });
+}

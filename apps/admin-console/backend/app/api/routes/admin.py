@@ -87,7 +87,7 @@ async def admin_context(
 # re-pointing, kept where the code is so it cannot drift from what the
 # console actually serves.
 NOT_YET_MAPPED: list[tuple[str, str, str]] = [
-    # Four things are left, and each is here for a reason rather than for
+    # Two things are left, and each is here for a reason rather than for
     # want of time.
     #
     # Minting a backup key would have this console generate an age private
@@ -95,15 +95,17 @@ NOT_YET_MAPPED: list[tuple[str, str, str]] = [
     # through it is a key it held. It belongs in the browser, or in the
     # credential manager beside the escrow that already exists.
     ("POST", "/admin/backup-keys", "Backup"),
-    # A notification can be addressed to groups, and the group list is
-    # Keycloak's. Nothing here holds a Keycloak credential, and the director
-    # has no endpoint for it: an audience of the whole tenant works today,
-    # and a group-scoped one waits for that list to have an owner.
-    ("GET", "/admin/groups", "Notifications"),
     # Sign-ins, refused requests and reads of data leave no commit. They need
     # stores that do not exist yet -- see gentian-os docs/roadmap.md 1.12,
     # which is a researched plan rather than a gap.
     ("GET", "/admin/audit-events", "Audit"),
+    # GROUPS ARE NO LONGER HERE. The entry said a group-scoped notification
+    # audience waited for the group list to have an owner; it has one now --
+    # the director reads it through its per-realm Keycloak credential, and
+    # people.py serves it before this catch-all is reached. What is still
+    # missing for that screen is narrower and belongs to the notify action
+    # rather than to the list: POST /actions/notify takes a tenant audience
+    # and no group. An entry that outlived its reason is worse than none.
 ]
 
 
