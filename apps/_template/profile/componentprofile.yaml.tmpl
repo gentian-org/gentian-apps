@@ -29,21 +29,43 @@ kind: ComponentProfile
 metadata:
   name: COMPONENT_ID
 spec:
-  # The modes this component is certified to run under, and a claim rather than
-  # a choice: the Component picks exactly one of them at install and admission
-  # rejects a mode that is not listed here. "tenant" is a dedicated release in
-  # tenant-<t> and is the only mode the operator reconciles today — a Component
-  # of any other tenancy reports TenancyUnsupported and does nothing. "shared"
-  # is one backend in shared-<app> serving several tenants and is refused unless
-  # trustTier is platform. "system" serves contracts to other components from
-  # system-<function>, serves no human, is exclusive (it may not appear next to
-  # another mode) and must declare no exposure at all.
-  tenancy: [tenant]
+  # Who this component serves, and therefore who is responsible for it. A
+  # claim rather than a choice: the Component picks exactly one of these at
+  # install and admission rejects one that is not listed here.
+  #
+  #   app         a dedicated release in tenant-<t>, serving the people of one
+  #               tenant. The only class the operator reconciles today — a
+  #               Component of any other reports ClassUnsupported and does
+  #               nothing.
+  #   shared-app  one backend in shared-<app> serving several tenants, each of
+  #               which still installs the app for itself. Refused unless
+  #               trustTier is platform.
+  #   service     serves other components over contracts, and operators at its
+  #               own console, from system-<function>. Exclusive: it may not
+  #               appear beside another class. It may expose a console, but
+  #               only on the gateway, and that console's tile asks on the
+  #               cluster.
+  #
+  # This was called `tenancy`, with the values system, shared and tenant.
+  classes: [app]
+
+  # How a person reaches this component. Required and undefaulted: an app
+  # nobody can open should be refused at admission, and "nothing opens this"
+  # has to be a word somebody wrote rather than a field they left out.
+  #
+  #   tile   at least one exposure below carries a tile. The usual answer.
+  #   from   another component opens it, named in launchFrom below: Collabora
+  #          from Nextcloud, a viewer from a file manager.
+  #   none   nothing opens it — either it is the launcher itself, which is the
+  #          desktop and only the desktop, or it has no human surface at all,
+  #          which is a database.
+  launch: tile
+  # launchFrom: file-store
 
   # The review level this entry has been through, required and undefaulted
   # because a trust tier is something a reviewer stated, not something that was
   # left out. Setting "platform" on an entry nobody reviewed at that depth is
-  # how a component ends up eligible for shared tenancy and for forwardToken,
+  # how a component ends up eligible for class shared-app and for forwardToken,
   # both of which are refused at any lower tier.
   trustTier: certified
 
@@ -57,13 +79,16 @@ spec:
   # operator creates a Component of this profile in each tenant, named after
   # the profile, when the tenant is provisioned; the desktop is one such
   # component and the administration console is another. Leave it off for a
-  # component a tenant installs on purpose. Only a tenant-tenancy profile may
-  # say it, since there is no tenant to give a shared component to.
+  # component a tenant installs on purpose. Only a profile of class app may say
+  # it: a service and a shared-app have one instance, so there is nothing to
+  # give each tenant.
   # defaultForTenants: true
 
-  # How the component is deployed. Exactly one of chart, compositionRef or
-  # apiIntegration must be present, and an entry with none of them is rejected
-  # at admission unless it is an addon riding on another component's base.
+  # What this component is made of, and it is exactly one thing: a chart, a
+  # composition, an api or an addon. Delivery — whether the platform runs the
+  # component, only routes to it, or does neither — is read from here rather
+  # than stated beside it, so there is no second field to contradict this one.
+  # There used to be: deploymentMethod could say "api" beside a chart.
   package:
     # The chart the operator installs as a provider-helm Release in the
     # component's own namespace. All three fields are required. The version must
@@ -201,28 +226,33 @@ spec:
           ENVIRONMENT: production
 
     # How the orchestrator delivers this entry. The component reconciler does
-    # not read it — it installs package.chart as a provider-helm Release and
-    # reports PackageUnsupported for anything else — so it is a statement of
-    # intent for now, and "api" is the value that marks an entry with no
-    # workload at all.
-    # deploymentMethod: crossplane
-
     # A Crossplane composition, for a component that is not one chart. Naming a
     # composition the cluster does not have leaves the install waiting on a
     # claim nothing reconciles, which looks like a slow install rather than a
-    # missing one.
-    # compositionRef: COMPONENT_ID-composition
+    # missing one. Delivery: workload.
+    # composition: COMPONENT_ID-composition
 
-    # A component that is an API client rather than a workload: no pods are
-    # created and the tenant is sent to an external origin instead. runtime
-    # chooses between redirecting the browser (redirect), a kernel API proxy
-    # (proxy, reserved) and a same-origin relay through the portal BFF
-    # (portal-proxy); tenantBinding chooses whether the tenant's effective
-    # domain is passed along at all.
-    # apiIntegration:
+    # A component the platform routes to rather than runs: no pods are created
+    # and the request is sent to an origin that is already serving. It does not
+    # mean external — the catalogue's own example points at a Service inside
+    # the cluster. runtime chooses between redirecting the browser (redirect),
+    # a kernel API proxy (proxy, reserved and not built) and a same-origin
+    # relay through the desktop's BFF (portal-proxy); tenantBinding chooses
+    # whether the tenant's effective domain is passed along.
+    # Delivery: api.
+    # api:
     #   runtime: redirect
     #   baseUrl: "https://example.gentian.org"
     #   tenantBinding: tenant-domain
+
+    # A component the platform does not deploy at all: it flips a switch inside
+    # another component's own addon system. id is what that component calls it
+    # — an Odoo module name, a Nextcloud app id — and of names the profile it
+    # activates into. An addon's exposure routes into its base, so its backend
+    # names that component. Delivery: addon.
+    # addon:
+    #   id: richdocuments
+    #   of: nextcloud-base-ce
 
   # What the platform owes this component before it may run. An unmet
   # requirement is the platform's fault, not the tenant's: the operator holds
@@ -230,7 +260,13 @@ spec:
   # and the component's NetworkPolicy is written from this block, so a store the
   # component uses but does not declare here is a connection Calico refuses.
   requires:
-    contracts:
+    # What the platform must fulfil before this component runs. Each is
+    # fulfilled by a component of class service, or by something outside the
+    # cluster entirely — a mail relay, a bucket at a cloud provider. It was
+    # called kernelRequirements, which named a fulfiller that is not the
+    # fulfiller, and then contracts, which is the word `provides` below
+    # already holds.
+    services:
       # The OIDC client the platform registers in the tenant's realm. Declare it
       # only for a component that runs its own login; one that lives behind a
       # gateway exposure with authMode oidc already has a session and does not
@@ -408,9 +444,10 @@ spec:
     derived:
       - key: SESSION_SECRET_KEY
 
-  # The entry points this component has. Forbidden entirely for system tenancy,
-  # and every entry states its authMode because there is no default to fall back
-  # on. The operator renders one HTTPRoute per gateway entry in the component's
+  # The entry points this component has. A service may have them — a console
+  # is not a contract surface — but only on the gateway, since the perimeter
+  # has no session. Every entry states its authMode because there is no
+  # default to fall back on. The operator renders one HTTPRoute per gateway entry in the component's
   # namespace and one SecurityPolicy over all of the oidc ones, so two entries
   # on one host share a single session — which is why forwardToken below is
   # effectively the component's and not the entry's.
@@ -473,6 +510,11 @@ spec:
       # before the release exists. A typo here produces a route whose backend
       # never resolves, and a 500 at the edge rather than anything that names
       # this profile.
+      # The Service this entry routes to. It defaults to this component's own
+      # namespace; `component: <other>` routes into another component's
+      # instead, which is what an addon's tile needs — an addon has no Service
+      # of its own and points into its base. Admission bounds it to a
+      # component this one is already bound to.
       backend:
         service: COMPONENT_ID-api
         port: 8000
@@ -487,13 +529,16 @@ spec:
         service: COMPONENT_ID-web
         port: 8080
       # How this component appears on the portal, and who may open it. Without
-      # a tile the component is routed but never shown. The relation is a
+      # a tile the component is routed but never shown, which is why `launch`
+      # above has to say so. The relation is a
       # permission of the authorization model, asked per caller by the
       # director before the tile is put on their page; "on" says which object
       # it is asked on. app, the default, is this component's own app object,
       # where using an installed app is decided. A component that exists to
       # administer the tenant it runs in asks on the tenant instead, which is
       # where administering is decided: object: tenant, relation: can_administer.
+      # A service's console asks on the cluster instead, where the relations
+      # that govern one live: object: cluster, relation: can_operate_system.
       tile:
         displayName: "My Gentian Component"
         description: "What this component does, in a sentence for the person using it."
@@ -711,14 +756,11 @@ spec:
       upstream: ""
       owner: ""
       cveWatch: false
-    # The three addon fields below turn this profile into part of somebody
-    # else's component. addon says this entry is not deployable on its own but
-    # activates into the base named by "of", using the id the base's own addon
-    # system knows it by — an Odoo module name, a Nextcloud app id — which is
-    # what keeps per-component parsing out of the reconciler.
-    # addon:
-    #   id: COMPONENT_ID
-    #   of: some-base-component
+    # Saying this entry IS an addon is package.addon, above, not here: it is
+    # what the platform delivers rather than how changeable the component is,
+    # and having it here is why the package's one-of rule used to reach out of
+    # package to finish itself.
+    #
     # addonActivation and addonValues are the base's side of the same
     # relationship and belong on the base profile, never on the addon.
     # Activation renders a script at a values path with __GENTIAN_ADDON_IDS__
