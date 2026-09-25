@@ -104,9 +104,6 @@ NOT_YET_MAPPED: list[tuple[str, str, str]] = [
     # stores that do not exist yet -- see gentian-os docs/roadmap.md 1.12,
     # which is a researched plan rather than a gap.
     ("GET", "/admin/audit-events", "Audit"),
-    # Who holds what, across the cluster. That is the authorization view of
-    # S7A.8, which reads OpenFGA and has not been built.
-    ("GET", "/admin/platform/authorization-summary", "Platform security"),
 ]
 
 

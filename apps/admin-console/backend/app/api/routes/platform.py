@@ -137,3 +137,45 @@ async def set_platform_security_policy(
         bearer_of(credentials),
         json_body=body,
     )
+
+
+@router.get("/authorization")
+async def authorization(
+    tenant: str | None = Query(default=None),
+    scope: str = Query(default="tenant"),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Who holds which role here, and what each role carries.
+
+    Read-only, and that is the point of it existing at all: it replaces the
+    idea of exposing OpenFGA's own playground, which is a development tool
+    with a write surface. Anything a person wants to change is changed on the
+    other screens, through the director, and lands in git or in Keycloak.
+
+    Two scopes, because they answer to different relations. A tenant's
+    bindings are the tenant's, read under `can_view`. The cluster's are read
+    under `can_audit`, which is the security officer's and the auditor's. A
+    tenant administrator asking for the cluster's is refused by the director,
+    and that refusal is correct rather than a gap in this screen.
+
+    The director resolves the model's derivations, so a role arrives with the
+    permissions it carries. Without that a reader sees `admin` and has to go
+    and read `model.fga` to learn what it means.
+    """
+    if scope == "cluster":
+        cluster = settings.cluster_id
+        if not cluster:
+            # No cluster id configured means no object to ask about. Saying so
+            # is better than asking the director about the empty string.
+            return Response(
+                status_code=501,
+                media_type="application/json",
+                content='{"detail":"this console does not know which cluster it serves; '
+                'set GENTIAN_CLUSTER_ID"}',
+            )
+        path = f"/v1/clusters/{cluster}/authorization"
+    else:
+        path = f"/v1/tenants/{tenant or settings.tenant_id}/authorization"
+    return await director.forward(settings, "GET", path, bearer_of(credentials))
