@@ -78,8 +78,20 @@ second.
 3. Add `gentian-apps/profiles/<name>/profile.yaml`.
 4. See [custom-app-guide.md](https://github.com/gentian-org/gentian-apps/blob/main/custom-app-guide.md).
 
-## Kernel shell (gentian-ui)
+## Components the platform ships itself
 
-Use the same `backend/` + `frontend/` + `chart/` layout. Skip `profile/`; deploy via
-`gentian-os` ApplicationSet. Add domain folders under `frontend/src/` (`shell/`,
-`windows/`, etc.) as needed.
+The desktop (`gentian-ui`) and the administration console (`apps/admin-console`)
+are components, not catalogue apps: the platform installs one of each for every
+tenant from a profile that declares `defaultForTenants`, rather than a tenant
+administrator picking them out of a catalogue.
+
+Use the same `backend/` + `frontend/` + `chart/` layout, and **skip
+`profile/`**. Their ComponentProfiles live in the gentian-os chart
+(`charts/gentian-os/templates/componentprofile-*.yaml`), because the repository
+that installs them is the one that should declare them — a second copy here
+would be a second answer to the same question, and the one that drifted would
+produce an install that reports `ProfileMissing` for a reason nothing explains.
+
+Everything else is the same, so moving either of them into this repository, or
+out into one of its own, is a move of files. Add domain folders under
+`frontend/src/` (`shell/`, `windows/`, etc.) as needed.
