@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52" role="img">
+  <title>Placeholder tile</title>
+  <rect width="52" height="52" rx="10" fill="#ECE8DF"/>
+  <rect width="52" height="52" rx="10" fill="none" stroke="rgba(20, 21, 46, 0.08)" stroke-width="1"/>
+  <g fill="none" stroke="#14152E" stroke-opacity="0.45" stroke-width="2" stroke-linejoin="round">
+    <rect x="16" y="16" width="20" height="20" rx="4"/>
+    <path d="M16 23h20"/>
+  </g>
+  <circle cx="20.5" cy="19.5" r="1.25" fill="#14152E" fill-opacity="0.45"/>
+</svg>
