@@ -1,0 +1,9 @@
+profile: openproject-ce
+displayName: "OpenProject"
+description: "Open-source project management with Gantt charts, Kanban boards, and time tracking."
+family: openproject
+edition: ce
+author: OpenProject
+license: Apache-2.0
+tile:
+  icon: projects

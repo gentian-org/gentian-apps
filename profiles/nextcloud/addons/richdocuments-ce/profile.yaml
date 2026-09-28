@@ -1,10 +1,10 @@
-# AppProfile — Nextcloud Nextcloud Office (addon)
+# ComponentProfile — Nextcloud Nextcloud Office (addon)
 #
 # Activated inside a Nextcloud base rather than deployed: the app ships disabled in
 # the base image's custom_apps, and selecting this addon runs `occ app:enable richdocuments`.
 # It therefore carries no chart of its own.
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: nextcloud-richdocuments-ce
   labels:
@@ -12,59 +12,61 @@ metadata:
   annotations:
     gentianos.io/deployment-role: addon
 spec:
-  displayName: "Nextcloud Office"
-  description: "Collabora-backed document, spreadsheet and presentation editing."
-  family: nextcloud
-  catalogueVersion: "1.0.0"
-  edition: ce
+  classes:
+    - app
   trustTier: certified
-  license: AGPL-3.0-only
-  author: Nextcloud
-  tile:
-    image: assets/tile-office.svg
-    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDMyIDMyIj48cGF0aCBzdHlsZT0iY29sb3I6IzAwMDAwMDtibG9jay1wcm9ncmVzc2lvbjp0Yjt0ZXh0LXRyYW5zZm9ybTpub25lO3RleHQtaW5kZW50OjAiIGZpbGw9IiMwMDgyQzkiIGQ9Im00LjY5OTIgMi4wMDRjLTAuMzk1IDAuMDc2NC0wLjcwNjIgMC40NjY2LTAuNjk5MiAwLjg3NXYyNi4yNDRjMCAwLjQ2IDAuNDEyMiAwLjg3NiAwLjg2MzIgMC44NzZoMjIuMjc2YzAuNDUyIDAgMC44NjQtMC40MTYgMC44NjQtMC44NzZ2LTIwLjI4NGMtMC4wMDgtMC4xMzM4LTAuMDQ2LTAuMjY2LTAuMTEtMC4zODNsLTYuNjI0LTYuMzk4NGMtMC4wODYtMC4wMzI4LTAuMTc4LTAuMDUxLTAuMjctMC4wNTQ2aC0xNi4xMzdjLTAuMDUzMi0wLjAwNTMtMC4xMS0wLjAwNTMtMC4xNjM2IDB6bTMuMzAwOCAzLjk5NmgxMnYyaC0xMnYtMnptMCA2aDEwdjJoLTEwdi0yem0wIDZoMTZ2MmgtMTZ2LTJ6bTAgNmg4djJoLTh2LTJ6IiAvPgo8L3N2Zz4KPC9zdmc+Cg==
-  # Tile for the app menu / quick bar. The addon has no ingress of its own, so the
-  # shell resolves the base URL from spec.customization.addon.of and appends this
-  # suffix to deep-link into the feature inside Nextcloud.
-  # Three tiles, not one. The portal bridge resolves ?open=<type> to the user's most
-  # recently edited document of that kind, or creates one from a template if they have
-  # none — see portal-bridge.php in gentian-ui. A single "Office" tile pointing at the
-  # app root loses that entirely, which is what the office bundle used to provide.
-  portalTiles:
-    - name: document
-      displayName:
-        en_US: "Document"
-        de_DE: "Dokument"
-      linkSuffix: "?open=document"
-      linkTarget: embedded
-      allowedGroup: "Domain Users"
-      tile:
-        image: assets/tile-document.svg
-        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjMDA4MkM5Ij48cGF0aCBkPSJNMCAwaDI0djI0SDB6IiBmaWxsPSJub25lIiAvPgoJPHBhdGggZmlsbD0iIzAwODJDOSIgZD0iTTE0IDJINmMtMS4xIDAtMS45OS45LTEuOTkgMkw0IDIwYzAgMS4xLjg5IDIgMS45OSAySDE4YzEuMSAwIDItLjkgMi0yVjhsLTYtNnptMiAxNkg4di0yaDh2MnptMC00SDh2LTJoOHYyem0tMy01VjMuNUwxOC41IDlIMTN6IiAvPgo8L3N2Zz4KPC9zdmc+Cg==
-    - name: spreadsheet
-      displayName:
-        en_US: "Spreadsheet"
-        de_DE: "Tabelle"
-      linkSuffix: "?open=spreadsheet"
-      linkTarget: embedded
-      allowedGroup: "Domain Users"
-      tile:
-        image: assets/tile-spreadsheet.svg
-        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSIjMDA4MkM5IiBkPSJNMTkgM0g1QzMuODkgMyAzIDMuODkgMyA1VjE5QzMgMjAuMSAzLjkgMjEgNSAyMUgxOUMyMC4xIDIxIDIxIDIwLjEgMjEgMTlWNUMyMSAzLjg5IDIwLjEgMyAxOSAzTTkgMThINlYxNkg5VjE4TTkgMTVINlYxM0g5VjE1TTkgMTJINlYxMEg5VjEyTTEzIDE4SDEwVjE2SDEzVjE4TTEzIDE1SDEwVjEzSDEzVjE1TTEzIDEySDEwVjEwSDEzVjEyWiIgLz4KPC9zdmc+Cjwvc3ZnPgo=
-    - name: presentation
-      displayName:
-        en_US: "Presentation"
-        de_DE: "Präsentation"
-      linkSuffix: "?open=presentation"
-      linkTarget: embedded
-      allowedGroup: "Domain Users"
-      tile:
-        image: assets/tile-presentation.svg
-        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSIjMDA4MkM5IiBkPSJNMTksMTZINVY4SDE5TTE5LDNINUMzLjg5LDMgMywzLjg5IDMsNVYxOUEyLDIgMCAwLDAgNSwyMUgxOUEyLDIgMCAwLDAgMjEsMTlWNUMyMSwzLjg5IDIwLjEsMyAxOSwzWiIgLz4KPC9zdmc+Cjwvc3ZnPgo=
-
-  deploymentMethod: crossplane
-
-  customization:
+  version: "1.0.0"
+  package:
     addon:
       id: richdocuments
       of: nextcloud-base-ce
+  expose:
+    - name: document
+      surface: gateway
+      authMode: oidc
+      subDomain: cloud
+      backend:
+        component: nextcloud-base-ce
+        service: nextcloud
+        port: 8080
+      tile:
+        displayName: "Document"
+        displayNames:
+          de_DE: "Dokument"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjMDA4MkM5Ij48cGF0aCBkPSJNMCAwaDI0djI0SDB6IiBmaWxsPSJub25lIiAvPgoJPHBhdGggZmlsbD0iIzAwODJDOSIgZD0iTTE0IDJINmMtMS4xIDAtMS45OS45LTEuOTkgMkw0IDIwYzAgMS4xLjg5IDIgMS45OSAySDE4YzEuMSAwIDItLjkgMi0yVjhsLTYtNnptMiAxNkg4di0yaDh2MnptMC00SDh2LTJoOHYyem0tMy01VjMuNUwxOC41IDlIMTN6IiAvPgo8L3N2Zz4KPC9zdmc+Cg==
+        image: assets/tile-document.svg
+        path: /?open=document
+        relation: can_launch
+    - name: spreadsheet
+      surface: gateway
+      authMode: oidc
+      subDomain: cloud
+      backend:
+        component: nextcloud-base-ce
+        service: nextcloud
+        port: 8080
+      tile:
+        displayName: "Spreadsheet"
+        displayNames:
+          de_DE: "Tabelle"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSIjMDA4MkM5IiBkPSJNMTkgM0g1QzMuODkgMyAzIDMuODkgMyA1VjE5QzMgMjAuMSAzLjkgMjEgNSAyMUgxOUMyMC4xIDIxIDIxIDIwLjEgMjEgMTlWNUMyMSAzLjg5IDIwLjEgMyAxOSAzTTkgMThINlYxNkg5VjE4TTkgMTVINlYxM0g5VjE1TTkgMTJINlYxMEg5VjEyTTEzIDE4SDEwVjE2SDEzVjE4TTEzIDE1SDEwVjEzSDEzVjE1TTEzIDEySDEwVjEwSDEzVjEyWiIgLz4KPC9zdmc+Cjwvc3ZnPgo=
+        image: assets/tile-spreadsheet.svg
+        path: /?open=spreadsheet
+        relation: can_launch
+    - name: presentation
+      surface: gateway
+      authMode: oidc
+      subDomain: cloud
+      backend:
+        component: nextcloud-base-ce
+        service: nextcloud
+        port: 8080
+      tile:
+        displayName: "Presentation"
+        displayNames:
+          de_DE: "Präsentation"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSIjMDA4MkM5IiBkPSJNMTksMTZINVY4SDE5TTE5LDNINUMzLjg5LDMgMywzLjg5IDMsNVYxOUEyLDIgMCAwLDAgNSwyMUgxOUEyLDIgMCAwLDAgMjEsMTlWNUMyMSwzLjg5IDIwLjEsMyAxOSwzWiIgLz4KPC9zdmc+Cjwvc3ZnPgo=
+        image: assets/tile-presentation.svg
+        path: /?open=presentation
+        relation: can_launch
+  launch: tile

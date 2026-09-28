@@ -1,0 +1,10 @@
+profile: element-ce
+displayName: "Element"
+description: "Federated team chat and collaboration based on the Matrix protocol, with Synapse homeserver."
+family: element
+edition: ce
+author: Element
+license: Apache-2.0
+tile:
+  icon: chat
+

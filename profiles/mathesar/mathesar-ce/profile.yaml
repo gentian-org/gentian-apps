@@ -1,4 +1,4 @@
-# AppProfile — Mathesar (self-hosted, spreadsheet-like Postgres data explorer)
+# ComponentProfile — Mathesar (self-hosted, spreadsheet-like Postgres data explorer)
 #
 # Source: no upstream Helm chart exists for Mathesar (docker-compose only), so
 #   this profile is backed by a first-party Gentian chart: charts/mathesar/
@@ -53,7 +53,7 @@
 #   (REQUIRE_SSO_LOGIN=false) only because Mathesar requires it to exist as a
 #   toggle — app-admins members are expected to use SSO like everyone else.
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: mathesar-ce
   labels:
@@ -68,38 +68,77 @@ metadata:
     # the app-default composition — see extraEnvVars in charts/mathesar.
     gentianos.io/kernel-egress-namespaces: envoy-gateway-system
 spec:
-  displayName: "Mathesar"
-  description: "Spreadsheet-like interface for viewing, editing, and querying Postgres data directly."
-  family: mathesar
-  catalogueVersion: "1.0.0"
-  edition: ce
+  classes:
+    - app
   trustTier: certified
-  license: GPL-3.0
-  author: Mathesar Foundation
-  tile:
-    icon: database
+  version: "1.0.0"
+  package:
+    chart:
+      repository: "oci://ghcr.io/gentian-org/charts"
+      name: mathesar
+      version: "0.1.3"
 
-  kernelRequirements:
-    identity:
+    valueMapping:
       oidc:
+        clientSecretKey: "oidc.clientSecret"
+      database:
+        hostKey: "database.host"
+        portKey: "database.port"
+        nameKey: "database.name"
+        userKey: "database.user"
+        passwordKey: "database.password"
+
+    extraValues:
+      fullnameOverride: "mathesar-ce"
+
+      allowedHosts: ".${TENANT_DOMAIN}"
+      instanceName: "Mathesar"
+
+      oidc:
+        enabled: true
+        providerKey: keycloak
         clientId: "gentian-mathesar"
-        name: "Mathesar"
-        accessType: CONFIDENTIAL
+      # Note the /auth prefix: Gentian's Keycloak serves realms under it, so
+      # .../realms/<tenant>/.well-known/openid-configuration returns 404 and
+      # allauth turns that into a bare "Server Error (500)" at login. Same base
+      # as xwiki-ce's oidc.provider — the issuer this returns
+      # (https://id.<kernel>/auth/realms/<tenant>) must also match the one the
+      # operator seeds, or token validation fails on the claim instead.
+        serverUrl: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}"
+
+      ingress:
+        enabled: false
+
+      persistence:
+        enabled: true
+        size: "5Gi"
+
+      podAnnotations:
+        secret.reloader.stakater.com/reload: mathesar-ce-sensitive-values
+
+  # Customization ladder — see customization.md
+  requires:
+    services:
+      identity:
+        oidc:
+          clientId: "gentian-mathesar"
+          name: "Mathesar"
+          accessType: CONFIDENTIAL
         # Provider key "keycloak" must match extraValues.oidc.providerKey below —
         # Mathesar builds this path from the SSO_CONFIG_DICT provider key.
-        redirectUris:
-          - "https://data.${TENANT_DOMAIN}/auth/oidc/keycloak/login/callback/"
-        postLogoutRedirectUris:
-          - "https://data.${TENANT_DOMAIN}/"
+          redirectUris:
+            - "https://data.${TENANT_DOMAIN}/auth/oidc/keycloak/login/callback/"
+          postLogoutRedirectUris:
+            - "https://data.${TENANT_DOMAIN}/"
         # No backchannelLogoutUrl: this app signs in through django-allauth,
         # whose OpenID Connect provider implements no endpoint for receiving a
         # logout_token. Signing out of the portal therefore leaves this app's own
         # session running until it expires on its own. Recorded rather than left
         # blank, so the absence reads as a limit of the app and not as an
         # oversight to be filled in.
-    database:
-      engine: postgresql
-      databasePerTenant: true
+      database:
+        engine: postgresql
+        databasePerTenant: true
       # Mathesar exists to explore Postgres data, and its "create a database"
       # flow issues CREATE DATABASE on this same server as the app role — so
       # without this the app installs successfully and is then unusable, with
@@ -109,70 +148,84 @@ spec:
       #
       # Safe to purge: everything the role creates is owned by it, and
       # `gtnctl apps uninstall --purge` drops every database that role owns.
-      allowDynamicDatabaseCreation: true
+        allowDynamicDatabaseCreation: true
 
   provides:
     - name: data-explorer
       protocol: http-html
 
-  optionalIntegrations:
+  integrations:
     - contract: central-navigation
       provider: portal
       capabilities:
         - navigation:register
 
-  portalTiles:
-    - name: mathesar-ce
-      displayName:
-        de_DE: "Mathesar"
-        en_US: "Mathesar"
-      # Direct OIDC Flow (guide §8a). Open allauth's provider login endpoint
-      # rather than "/": Mathesar's own landing page renders a "Log in to
-      # Mathesar" form with an SSO button and has no auto-redirect setting, so
-      # "/" would stop at that form even though the portal has already warmed up
-      # the Keycloak session cookie. Going straight here redirects to Keycloak,
-      # which returns immediately on an existing session — the tile opens
-      # already logged in. The path is allauth's, so it tracks
-      # SSO_CONFIG_DICT's provider key ("keycloak"), same as redirectUris above.
-      linkSuffix: "/auth/oidc/keycloak/login/"
-      linkTarget: embedded
-      allowedGroup: "App Users"
-
-  chart:
-    repository: "oci://ghcr.io/gentian-org/charts"
-    name: mathesar
-    version: "0.1.3"
-
-  deploymentMethod: crossplane
-
-  valueMapping:
-    oidc:
-      clientSecretKey: "oidc.clientSecret"
-    database:
-      hostKey: "database.host"
-      portKey: "database.port"
-      nameKey: "database.name"
-      userKey: "database.user"
-      passwordKey: "database.password"
-
-  appSecrets:
-    - name: secret_key
-      valuePath: "secretKey"
-    - name: bootstrap_admin_password
-      valuePath: "bootstrapAdminPassword"   # not consumed by the chart itself —
+  secrets:
+    generated:
+      - name: secret_key
+        valuePath: "secretKey"
+      - name: bootstrap_admin_password
+        valuePath: "bootstrapAdminPassword" # not consumed by the chart itself —
         # only via existingSecret key internal-bootstrap_admin_password, by
         # spec.postInstallJob and spec.provisioning.syncJob.
 
   # Maps gentian:tenant:<t>:app-admins members to Mathesar is_superuser —
   # never the portalTiles allowedGroup above, which only gates the tile/OIDC
   # entitlement.
-  provisioning:
-    privilegedRole:
-      kind: group
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: "data"
+      backend:
+        service: "mathesar-ce"
+        port: 8000
+      tile:
+        displayName: "Mathesar"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDx0aXRsZT5QbGFjZWhvbGRlciB0aWxlPC90aXRsZT4KICA8cmVjdCB3aWR0aD0iNTIiIGhlaWdodD0iNTIiIHJ4PSIxMCIgZmlsbD0iI0VDRThERiIvPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMjAsIDIxLCA0NiwgMC4wOCkiIHN0cm9rZS13aWR0aD0iMSIvPgogIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzE0MTUyRSIgc3Ryb2tlLW9wYWNpdHk9IjAuNDUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+CiAgICA8cmVjdCB4PSIxNiIgeT0iMTYiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgcng9IjQiLz4KICAgIDxwYXRoIGQ9Ik0xNiAyM2gyMCIvPgogIDwvZz4KICA8Y2lyY2xlIGN4PSIyMC41IiBjeT0iMTkuNSIgcj0iMS4yNSIgZmlsbD0iIzE0MTUyRSIgZmlsbC1vcGFjaXR5PSIwLjQ1Ii8+Cjwvc3ZnPgo=
+        image: assets/tile.svg
+        path: /auth/oidc/keycloak/login/
+        relation: can_launch
+  hooks:
+    postInstall:
+      image: docker.io/mathesar/mathesar:0.12.0
+      script: |
+        #!/bin/sh
+        set -eu
+        export DJANGO_SETTINGS_MODULE=config.settings.production
+        export POSTGRES_HOST="$DB_HOST"
+        export POSTGRES_PORT="$DB_PORT"
+        export POSTGRES_DB="$DB_NAME"
+        export POSTGRES_USER="$DB_USER"
+        export POSTGRES_PASSWORD="$DB_PASSWORD"
+
+        # Idempotent: mirrors installation_incomplete's own gate
+        # (mathesar/views/installation/decorators.py) — a no-op once any
+        # superuser exists, so re-running this Job on every tenant reconcile is
+        # safe. The password never touches the Python source (os.environ, not
+        # string interpolation) so it can't break out of the quoted literal.
+        python3 manage.py shell -c "
+        import os
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        if not User.objects.filter(is_superuser=True).exists():
+            User.objects.create_superuser(
+                username='gentian-bootstrap-admin',
+                email='gentian-bootstrap-admin@internal.invalid',
+                password=os.environ['BOOTSTRAP_ADMIN_PASSWORD'],
+            )
+            print('created bootstrap superuser')
+        else:
+            print('a superuser already exists; nothing to do')
+        "
+
+    provisioning:
+      privilegedRole:
+        kind: group
       # Mathesar's privilege model is the boolean is_superuser, not a named
       # group, so this is descriptive only — the script below is what decides
       # what it means.
-      name: superuser
+        name: superuser
 
     # How this app applies that role. The platform resolves app-admins
     # membership, publishes it as JSON and runs this Job; everything below is
@@ -184,162 +237,95 @@ spec:
     # Idempotent by construction: it converges Mathesar to exactly the
     # membership it is handed rather than applying a delta, so re-running it is
     # always safe.
-    syncJob:
-      image: docker.io/mathesar/mathesar:0.12.0
+      syncJob:
+        image: docker.io/mathesar/mathesar:0.12.0
       # Bound key by key, not envFrom: the Secret's keys are hyphenated and
       # Kubernetes drops those from envFrom without a word, so the variable
       # would simply never appear.
-      env:
-        - name: BOOTSTRAP_ADMIN_PASSWORD
-          secretKeyRef:
-            name: mathesar-ce-sensitive-values
-            key: internal-bootstrap_admin_password
-      script: |
-        #!/bin/sh
-        set -eu
-        exec python3 - <<'PY'
-        import json, os, sys, urllib.request, base64
+        env:
+          - name: BOOTSTRAP_ADMIN_PASSWORD
+            secretKeyRef:
+              name: mathesar-ce-sensitive-values
+              key: internal-bootstrap_admin_password
+        script: |
+          #!/bin/sh
+          set -eu
+          exec python3 - <<'PY'
+          import json, os, sys, urllib.request, base64
 
-        # HTTP Basic Auth as the technical bootstrap superuser: the only auth
-        # mode users.* accepts (mathesar/rpc/decorators.py upstream). That
-        # account is created by spec.postInstallJob and is never a human.
-        USER = "gentian-bootstrap-admin"
-        PASSWORD = os.environ["BOOTSTRAP_ADMIN_PASSWORD"]
-        APP = os.environ["GENTIAN_APP"]
-        URL = "http://%s:8000/api/rpc/v0/" % APP
+          # HTTP Basic Auth as the technical bootstrap superuser: the only auth
+          # mode users.* accepts (mathesar/rpc/decorators.py upstream). That
+          # account is created by spec.postInstallJob and is never a human.
+          USER = "gentian-bootstrap-admin"
+          PASSWORD = os.environ["BOOTSTRAP_ADMIN_PASSWORD"]
+          APP = os.environ["GENTIAN_APP"]
+          URL = "http://%s:8000/api/rpc/v0/" % APP
 
-        def rpc(method, params=None):
-            body = json.dumps({
-                "jsonrpc": "2.0", "method": method,
-                "params": params or {}, "id": 1,
-            }).encode()
-            token = base64.b64encode(("%s:%s" % (USER, PASSWORD)).encode()).decode()
-            req = urllib.request.Request(URL, data=body, headers={
-                "Content-Type": "application/json",
-                "Authorization": "Basic " + token,
-                # ALLOWED_HOSTS covers the Service name; without a matching Host
-                # Django answers 400 DisallowedHost.
-                "Host": APP,
-            })
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                payload = json.load(resp)
-            if payload.get("error"):
-                raise SystemExit("mathesar rpc %s failed: %s" % (method, payload["error"]))
-            return payload.get("result")
+          def rpc(method, params=None):
+              body = json.dumps({
+                  "jsonrpc": "2.0", "method": method,
+                  "params": params or {}, "id": 1,
+              }).encode()
+              token = base64.b64encode(("%s:%s" % (USER, PASSWORD)).encode()).decode()
+              req = urllib.request.Request(URL, data=body, headers={
+                  "Content-Type": "application/json",
+                  "Authorization": "Basic " + token,
+                  # ALLOWED_HOSTS covers the Service name; without a matching Host
+                  # Django answers 400 DisallowedHost.
+                  "Host": APP,
+              })
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  payload = json.load(resp)
+              if payload.get("error"):
+                  raise SystemExit("mathesar rpc %s failed: %s" % (method, payload["error"]))
+              return payload.get("result")
 
-        with open(os.environ["GENTIAN_APP_ADMINS_FILE"]) as fh:
-            members = json.load(fh)
-        want = {m["email"].lower(): m for m in members if m.get("email")}
+          with open(os.environ["GENTIAN_APP_ADMINS_FILE"]) as fh:
+              members = json.load(fh)
+          want = {m["email"].lower(): m for m in members if m.get("email")}
 
-        existing = {u["email"].lower(): u for u in rpc("users.list") if u.get("email")}
+          existing = {u["email"].lower(): u for u in rpc("users.list") if u.get("email")}
 
-        for email, member in want.items():
-            user = existing.get(email)
-            if user is None:
-                # Pre-provision so the member's first SSO login links to this
-                # account instead of creating a fresh non-admin one
-                # (mathesar/sso.py save_user). The password is throwaway: the
-                # account is claimed via SSO, never by password login.
-                rpc("users.add", {"user_def": {
-                    "username": member.get("username") or email,
-                    "password": base64.urlsafe_b64encode(os.urandom(24)).decode(),
-                    "is_superuser": True,
-                    "email": email,
-                }})
-                print("provisioned %s" % email)
-            elif not user.get("is_superuser"):
-                rpc("users.patch_other", {
-                    "user_id": user["id"], "username": user["username"],
-                    "is_superuser": True, "email": user.get("email", ""),
-                    "full_name": user.get("full_name", ""),
-                    "display_language": user.get("display_language", "en"),
-                })
-                print("promoted %s" % email)
+          for email, member in want.items():
+              user = existing.get(email)
+              if user is None:
+                  # Pre-provision so the member's first SSO login links to this
+                  # account instead of creating a fresh non-admin one
+                  # (mathesar/sso.py save_user). The password is throwaway: the
+                  # account is claimed via SSO, never by password login.
+                  rpc("users.add", {"user_def": {
+                      "username": member.get("username") or email,
+                      "password": base64.urlsafe_b64encode(os.urandom(24)).decode(),
+                      "is_superuser": True,
+                      "email": email,
+                  }})
+                  print("provisioned %s" % email)
+              elif not user.get("is_superuser"):
+                  rpc("users.patch_other", {
+                      "user_id": user["id"], "username": user["username"],
+                      "is_superuser": True, "email": user.get("email", ""),
+                      "full_name": user.get("full_name", ""),
+                      "display_language": user.get("display_language", "en"),
+                  })
+                  print("promoted %s" % email)
 
-        # Demote anyone who lost membership. The bootstrap account is matched by
-        # username, not membership — it is what authenticates this very call and
-        # must never lock itself out.
-        for email, user in existing.items():
-            if user["username"] == USER or not user.get("is_superuser") or email in want:
-                continue
-            rpc("users.patch_other", {
-                "user_id": user["id"], "username": user["username"],
-                "is_superuser": False, "email": user.get("email", ""),
-                "full_name": user.get("full_name", ""),
-                "display_language": user.get("display_language", "en"),
-            })
-            print("demoted %s" % email)
+          # Demote anyone who lost membership. The bootstrap account is matched by
+          # username, not membership — it is what authenticates this very call and
+          # must never lock itself out.
+          for email, user in existing.items():
+              if user["username"] == USER or not user.get("is_superuser") or email in want:
+                  continue
+              rpc("users.patch_other", {
+                  "user_id": user["id"], "username": user["username"],
+                  "is_superuser": False, "email": user.get("email", ""),
+                  "full_name": user.get("full_name", ""),
+                  "display_language": user.get("display_language", "en"),
+              })
+              print("demoted %s" % email)
 
-        print("app administrators synchronised: %d" % len(want))
-        PY
+          print("app administrators synchronised: %d" % len(want))
+          PY
 
-  postInstallJob:
-    image: docker.io/mathesar/mathesar:0.12.0
-    script: |
-      #!/bin/sh
-      set -eu
-      export DJANGO_SETTINGS_MODULE=config.settings.production
-      export POSTGRES_HOST="$DB_HOST"
-      export POSTGRES_PORT="$DB_PORT"
-      export POSTGRES_DB="$DB_NAME"
-      export POSTGRES_USER="$DB_USER"
-      export POSTGRES_PASSWORD="$DB_PASSWORD"
-
-      # Idempotent: mirrors installation_incomplete's own gate
-      # (mathesar/views/installation/decorators.py) — a no-op once any
-      # superuser exists, so re-running this Job on every tenant reconcile is
-      # safe. The password never touches the Python source (os.environ, not
-      # string interpolation) so it can't break out of the quoted literal.
-      python3 manage.py shell -c "
-      import os
-      from django.contrib.auth import get_user_model
-      User = get_user_model()
-      if not User.objects.filter(is_superuser=True).exists():
-          User.objects.create_superuser(
-              username='gentian-bootstrap-admin',
-              email='gentian-bootstrap-admin@internal.invalid',
-              password=os.environ['BOOTSTRAP_ADMIN_PASSWORD'],
-          )
-          print('created bootstrap superuser')
-      else:
-          print('a superuser already exists; nothing to do')
-      "
-
-  ingress:
-    subDomain: "data"
-    serviceName: "mathesar-ce"
-    servicePort: 8000
-    tlsEnabled: true
-
-  extraValues:
-    fullnameOverride: "mathesar-ce"
-
-    allowedHosts: ".${TENANT_DOMAIN}"
-    instanceName: "Mathesar"
-
-    oidc:
-      enabled: true
-      providerKey: keycloak
-      clientId: "gentian-mathesar"
-      # Note the /auth prefix: Gentian's Keycloak serves realms under it, so
-      # .../realms/<tenant>/.well-known/openid-configuration returns 404 and
-      # allauth turns that into a bare "Server Error (500)" at login. Same base
-      # as xwiki-ce's oidc.provider — the issuer this returns
-      # (https://id.<kernel>/auth/realms/<tenant>) must also match the one the
-      # operator seeds, or token validation fails on the claim instead.
-      serverUrl: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}"
-
-    ingress:
-      enabled: false
-
-    persistence:
-      enabled: true
-      size: "5Gi"
-
-    podAnnotations:
-      secret.reloader.stakater.com/reload: mathesar-ce-sensitive-values
-
-  # Customization ladder — see customization.md
   customization:
     grade: C
     rubricScore: 3
@@ -366,3 +352,4 @@ spec:
       requiresApproval: platform-team
     fork:
       allowed: false
+  launch: tile

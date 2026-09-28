@@ -1,5 +1,5 @@
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: odoo-accounting-ce
   labels:
@@ -10,47 +10,39 @@ metadata:
     gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["account.group_account_manager"],"gentianOdooGroupRoles":["account.group_account_invoice"],"gentianOdooModules":["account"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
-  displayName: "Odoo Accounting"
-  description: "Accounting and financial management module for Odoo."
-  family: odoo
-  catalogueVersion: "1.0.0"
-  edition: ce
+  classes:
+    - app
   trustTier: platform
-  license: LGPL-3.0
-  author: OCA
-  tile:
-    # Odoo's own icon for the module this profile installs, set inside the
-    # catalogue's 52x52 frame so it sits with the other tiles.
-    image: assets/tile.svg
-    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBkPSJNMzggNDZIMTJjLTQuNDE4IDAtOC0zLjQ5OC04LTcuODE0VjRoMzBjMi4yMSAwIDQgMS43NSA0IDMuOTA3VjQ2WiIgZmlsbD0iIzJFQkNGQSIvPjxwYXRoIGQ9Ik0xMiA0NmgyNmE3Ljk5OSA3Ljk5OSAwIDAgMCA4LThIMjBhOCA4IDAgMCAxLTggOFoiIGZpbGw9IiMxNDQ0OTYiLz48cGF0aCBkPSJNMzggOEMyMy40MDggOCAxMC42ODcgMTYuMDE0IDQgMjcuODhWNGgzMGE0IDQgMCAwIDEgNCA0WiIgZmlsbD0iIzA4OEJGNSIvPjxwYXRoIGQ9Ik0yMC40MjUgMzRoMS4xODF2LTEuNzA3YzMuMjMtLjE5OCA1LjM5NC0xLjc5MSA1LjM5NC00LjQzNXYtLjAyMWMwLTIuMzMyLTEuNDk1LTMuNDk4LTQuNDQyLTQuMTQzbC0uOTUyLS4xOTh2LTMuMDJjMS4wMzUuMTY3IDEuNzE1Ljc0IDEuODYgMS43MDhsLjAxMS4wMiAzLjI4My0uMDEuMDEtLjAxYy0uMTE1LTIuNTMtMi4wMDctNC4yMTYtNS4xNjQtNC40MzVWMTZoLTEuMTh2MS43MzljLTMuMDc0LjE0NS01LjI4IDEuNzI4LTUuMjggNC4zM3YuMDIxYzAgMi4zNDMgMS41NDcgMy42MDIgNC4zMzggNC4yMTZsLjk0MS4xOTh2My4wODJjLTEuMjIzLS4xMTUtMS45MzQtLjYyNS0yLjEwMS0xLjU0bC0uMDEtLjAyMi0zLjI5My4wMS0uMDIxLjAxMWMuMDg0IDIuNjY1IDIuMjM3IDQuMTMzIDUuNDI1IDQuMjU4VjM0Wm0tMS43NzctMTIuMTl2LS4wMjJjMC0uNzUuNjA2LTEuMjI4IDEuNzc3LTEuMzMydjIuNzY5Yy0xLjIxMy0uMzIzLTEuNzc3LS43MjktMS43NzctMS40MTZabTQuODUgNi40MjN2LjAyYzAgLjgwMi0uNjggMS4yMjktMS44OTIgMS4zMzN2LTIuODIxYzEuMzYuMzQzIDEuODkyLjY5NyAxLjg5MiAxLjQ2OFoiIGZpbGw9IiNmZmYiLz48L3N2Zz48L3N2Zz4K
-
-  portalTiles:
-    - name: odoo-accounting
-      displayName:
-        en_US: "Odoo Accounting"
-        de_DE: "Odoo Finanzen"
-      linkSuffix: "/odoo/action-account.open_account_journal_dashboard_kanban?gentian_embed=1"
-      linkTarget: embedded
-      allowedGroup: "App Users"
-
-  compositionRef: app-odoo
-  deploymentMethod: crossplane
-  chart:
-    repository: oci://ghcr.io/gentian-org/charts
-    name: odoo
-    version: "0.1.15"
-  # Odoo calls its addons "modules" — this maps the Gentian profile onto that name.
-  customization:
+  version: "1.0.0"
+  package:
+    extraValues:
+      odoo:
+        module: account
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 250m
+          memory: 256Mi
     addon:
       id: account
       of: odoo-base-ce
-  extraValues:
-    odoo:
-      module: account
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 250m
-        memory: 256Mi
+  expose:
+    - name: odoo-accounting
+      surface: gateway
+      authMode: oidc
+      subDomain: erp
+      backend:
+        component: odoo-base-ce
+        service: odoo
+        port: 8069
+      tile:
+        displayName: "Odoo Accounting"
+        displayNames:
+          de_DE: "Odoo Finanzen"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBkPSJNMzggNDZIMTJjLTQuNDE4IDAtOC0zLjQ5OC04LTcuODE0VjRoMzBjMi4yMSAwIDQgMS43NSA0IDMuOTA3VjQ2WiIgZmlsbD0iIzJFQkNGQSIvPjxwYXRoIGQ9Ik0xMiA0NmgyNmE3Ljk5OSA3Ljk5OSAwIDAgMCA4LThIMjBhOCA4IDAgMCAxLTggOFoiIGZpbGw9IiMxNDQ0OTYiLz48cGF0aCBkPSJNMzggOEMyMy40MDggOCAxMC42ODcgMTYuMDE0IDQgMjcuODhWNGgzMGE0IDQgMCAwIDEgNCA0WiIgZmlsbD0iIzA4OEJGNSIvPjxwYXRoIGQ9Ik0yMC40MjUgMzRoMS4xODF2LTEuNzA3YzMuMjMtLjE5OCA1LjM5NC0xLjc5MSA1LjM5NC00LjQzNXYtLjAyMWMwLTIuMzMyLTEuNDk1LTMuNDk4LTQuNDQyLTQuMTQzbC0uOTUyLS4xOTh2LTMuMDJjMS4wMzUuMTY3IDEuNzE1Ljc0IDEuODYgMS43MDhsLjAxMS4wMiAzLjI4My0uMDEuMDEtLjAxYy0uMTE1LTIuNTMtMi4wMDctNC4yMTYtNS4xNjQtNC40MzVWMTZoLTEuMTh2MS43MzljLTMuMDc0LjE0NS01LjI4IDEuNzI4LTUuMjggNC4zM3YuMDIxYzAgMi4zNDMgMS41NDcgMy42MDIgNC4zMzggNC4yMTZsLjk0MS4xOTh2My4wODJjLTEuMjIzLS4xMTUtMS45MzQtLjYyNS0yLjEwMS0xLjU0bC0uMDEtLjAyMi0zLjI5My4wMS0uMDIxLjAxMWMuMDg0IDIuNjY1IDIuMjM3IDQuMTMzIDUuNDI1IDQuMjU4VjM0Wm0tMS43NzctMTIuMTl2LS4wMjJjMC0uNzUuNjA2LTEuMjI4IDEuNzc3LTEuMzMydjIuNzY5Yy0xLjIxMy0uMzIzLTEuNzc3LS43MjktMS43NzctMS40MTZabTQuODUgNi40MjN2LjAyYzAgLjgwMi0uNjggMS4yMjktMS44OTIgMS4zMzN2LTIuODIxYzEuMzYuMzQzIDEuODkyLjY5NyAxLjg5MiAxLjQ2OFoiIGZpbGw9IiNmZmYiLz48L3N2Zz48L3N2Zz4K
+        image: assets/tile.svg
+        path: /odoo/action-account.open_account_journal_dashboard_kanban?gentian_embed=1
+        relation: can_launch
+  launch: tile

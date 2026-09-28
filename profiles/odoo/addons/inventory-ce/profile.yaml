@@ -1,5 +1,5 @@
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: odoo-inventory-ce
   labels:
@@ -10,47 +10,39 @@ metadata:
     gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["stock.group_stock_manager"],"gentianOdooGroupRoles":["stock.group_stock_user"],"gentianOdooModules":["stock"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
-  displayName: "Odoo Inventory"
-  description: "Inventory and warehouse management module for Odoo."
-  family: odoo
-  catalogueVersion: "1.0.0"
-  edition: ce
+  classes:
+    - app
   trustTier: platform
-  license: LGPL-3.0
-  author: OCA
-  tile:
-    # Odoo's own icon for the module this profile installs, set inside the
-    # catalogue's 52x52 frame so it sits with the other tiles.
-    image: assets/tile.svg
-    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBkPSJtMjUgNCA2Ljg1NyA0TDE1LjUgMTl2MTZsLjUgNS43NS05LTUuMjV2LTIxTDI1IDRaIiBmaWxsPSIjRkJCOTQ1Ii8+PHBhdGggZD0ibTE4LjA4NyA0MS45NjctNi4xMzgtMy41OFYxNy41TDMwLjA0NiA2Ljk0M2w2LjI4MyAzLjY2NUwyMi4wMDEgMjMuNWwtMy45MTUgMTguNDY3WiIgZmlsbD0iI0Y4NjEyNiIvPjxwYXRoIGQ9Ik0zNi4zMjggMTAuNjEgNDMgMTQuNXYyMUwyNSA0NmwtNi45MTQtNC4wMzJWMjEuMjVsMTguMjQyLTEwLjY0MloiIGZpbGw9IiM5ODUxODQiLz48L3N2Zz48L3N2Zz4K
-
-  portalTiles:
-    - name: odoo-inventory
-      displayName:
-        en_US: "Odoo Inventory"
-        de_DE: "Odoo Inventar"
-      linkSuffix: "/odoo/action-stock.stock_picking_type_action?gentian_embed=1"
-      linkTarget: embedded
-      allowedGroup: "App Users"
-
-  compositionRef: app-odoo
-  deploymentMethod: crossplane
-  chart:
-    repository: oci://ghcr.io/gentian-org/charts
-    name: odoo
-    version: "0.1.15"
-  # Odoo calls its addons "modules" — this maps the Gentian profile onto that name.
-  customization:
+  version: "1.0.0"
+  package:
+    extraValues:
+      odoo:
+        module: stock
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 250m
+          memory: 256Mi
     addon:
       id: stock
       of: odoo-base-ce
-  extraValues:
-    odoo:
-      module: stock
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 250m
-        memory: 256Mi
+  expose:
+    - name: odoo-inventory
+      surface: gateway
+      authMode: oidc
+      subDomain: erp
+      backend:
+        component: odoo-base-ce
+        service: odoo
+        port: 8069
+      tile:
+        displayName: "Odoo Inventory"
+        displayNames:
+          de_DE: "Odoo Inventar"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBkPSJtMjUgNCA2Ljg1NyA0TDE1LjUgMTl2MTZsLjUgNS43NS05LTUuMjV2LTIxTDI1IDRaIiBmaWxsPSIjRkJCOTQ1Ii8+PHBhdGggZD0ibTE4LjA4NyA0MS45NjctNi4xMzgtMy41OFYxNy41TDMwLjA0NiA2Ljk0M2w2LjI4MyAzLjY2NUwyMi4wMDEgMjMuNWwtMy45MTUgMTguNDY3WiIgZmlsbD0iI0Y4NjEyNiIvPjxwYXRoIGQ9Ik0zNi4zMjggMTAuNjEgNDMgMTQuNXYyMUwyNSA0NmwtNi45MTQtNC4wMzJWMjEuMjVsMTguMjQyLTEwLjY0MloiIGZpbGw9IiM5ODUxODQiLz48L3N2Zz48L3N2Zz4K
+        image: assets/tile.svg
+        path: /odoo/action-stock.stock_picking_type_action?gentian_embed=1
+        relation: can_launch
+  launch: tile

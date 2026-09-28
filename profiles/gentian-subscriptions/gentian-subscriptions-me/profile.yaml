@@ -1,4 +1,4 @@
-# AppProfile — Gentian Subscriptions (ApiProfile)
+# ComponentProfile — Gentian Subscriptions (ApiProfile)
 #
 # Reference ApiProfile (deploymentMethod: api): a catalogue entry backed by the
 # hosted gentian-corp commerce service. It runs NO workload pods in the tenant —
@@ -8,7 +8,7 @@
 # Installed by default on new tenants (opt-out). See gentian-corp/foundations.md
 # section 2.1 (ApiProfile) and 1.2 (default tenant experience).
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: gentian-subscriptions-me
   labels:
@@ -17,31 +17,16 @@ metadata:
     gentianos.io/platform-app: "true"
     gentianos.io/deployment-role: base
 spec:
-  displayName: "Gentian Subscriptions"
-  family: gentian-subscriptions
-  edition: me
-  description: "Manage Pro app subscriptions, billing, and entitlements for this tenant."
-  license: Apache-2.0
-  author: Gentian
-  tile:
-    icon: erp
+  classes:
+    - app
+  trustTier: experimental
+  version: 0.0.0
+  package:
+    api:
+      runtime: portal-proxy
+      baseUrl: "https://corp.desk.gentian.org"
+      tenantBinding: tenant-domain
 
-  deploymentMethod: api
-
-  apiIntegration:
-    runtime: portal-proxy
-    baseUrl: "https://corp.desk.gentian.org"
-    tenantBinding: tenant-domain
-
-  portalTiles:
-    - name: subscriptions
-      displayName:
-        en_US: "Subscriptions"
-        de_DE: "Abonnements"
-      linkTarget: embedded
-      allowedGroup: "Tenant Admins"
-
-  # Customization ladder — see customization.md
   customization:
     grade: B
     rubricScore: 5
@@ -72,3 +57,4 @@ spec:
       requiresApproval: platform-team
     fork:
       allowed: false
+  launch: none

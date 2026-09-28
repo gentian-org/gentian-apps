@@ -1,0 +1,10 @@
+profile: open-webui
+displayName: "AI Chat"
+description: "User-friendly chat interface for LLMs, configured to route through the central LiteLLM proxy."
+family: open-webui
+edition: me
+author: Gentian
+license: MIT
+tile:
+  icon: chat
+

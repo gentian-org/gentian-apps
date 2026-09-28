@@ -1,4 +1,4 @@
-# AppProfile — OpenDesk Nextcloud AIO (per-tenant file sharing)
+# ComponentProfile — OpenDesk Nextcloud AIO (per-tenant file sharing)
 #
 # Source chart: oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-nextcloud
 #   opendesk-nextcloud v4.7.2 (AIO + exporter subcharts)
@@ -13,46 +13,116 @@
 # OIDC uses the tenant realm with client ID `opendesk-nextcloud` and
 # `opendesk-nextcloud-scope` from profiles/nextcloud-base-od/oidc-catalog.yaml.
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: nextcloud-base-od
   labels:
     gentianos.io/profile-name: nextcloud-base-od
 spec:
-  displayName: "Nextcloud (OpenDesk)"
-  description: "OpenDesk Nextcloud AIO file sync and share with OIDC SSO and portal integration."
-  family: nextcloud
-  catalogueVersion: "1.0.0"
-  edition: ee
+  classes:
+    - app
   trustTier: certified
-  license: proprietary
-  author: openDesk
-  tile:
-    image: assets/tile-files.svg
-    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAtOTYwIDk2MCA5NjAiIGZpbGw9IiMwMDgyQzkiPjxwYXRoIGQ9Ik0xNjgtMTkycS0yOSAwLTUwLjUtMjEuNVQ5Ni0yNjR2LTQzMnEwLTMwIDIxLjUtNTF0NTAuNS0yMWgyMTZsOTYgOTZoMzEycTMwIDAgNTEgMjF0MjEgNTF2MzM2cTAgMjktMjEgNTAuNVQ3OTItMTkySDE2OFoiIC8+PC9zdmc+Cjwvc3ZnPgo=
+  version: "1.0.0"
+  package:
+    chart:
+      repository: "oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-nextcloud"
+      name: opendesk-nextcloud
+      version: "4.7.2"
 
-  kernelRequirements:
-    identity:
+    valueMapping:
       oidc:
-        clientId: "opendesk-nextcloud"
-        name: "Nextcloud"
-        accessType: CONFIDENTIAL
-        redirectUris:
-          - "https://files.${TENANT_DOMAIN}/*"
-        postLogoutRedirectUris:
-          - "https://files.${TENANT_DOMAIN}/"
-          - "https://portal.${KERNEL_DOMAIN}/"
-        backchannelLogoutUrl: "https://files.${TENANT_DOMAIN}/apps/user_oidc/backchannel-logout/opendesk"
-    database:
-      engine: postgresql
-      databasePerTenant: true
-    cache:
-      engine: redis
-    storage:
+        clientSecretKey: "aio.configuration.oidc.secret"
+      database:
+        hostKey: "aio.configuration.database.host"
+        portKey: "aio.configuration.database.port"
+        nameKey: "aio.configuration.database.name"
+        userKey: "aio.configuration.database.auth.username.value"
+        passwordKey: "aio.configuration.database.auth.password"
+      cache:
+        hostKey: "aio.configuration.cache.host"
+        portKey: "aio.configuration.cache.port"
+        passwordKey: "aio.configuration.cache.auth.password"
       s3:
-        bucketPerTenant: true
-    mail:
-      smtp: {}
+        secretKeyKey: "aio.configuration.objectstore.auth.secretKey"
+      smtp:
+        passwordKey: "aio.configuration.smtp.auth.password"
+
+    extraValues:
+      global:
+        domain: "${KERNEL_DOMAIN}"
+        hosts:
+          nextcloud: "files.${TENANT_ID}"
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 1
+          memory: 1Gi
+        imagePullSecrets:
+          - registry-credentials
+
+      fullnameOverride: "nextcloud"
+
+      aio:
+        podAnnotations:
+          reloader.stakater.com/auto: "true"
+        image:
+          registry: "registry.opencode.de"
+          repository: "bmi/opendesk/components/platform-development/images/opendesk-nextcloud"
+          tag: "2.12.2"
+        configuration:
+          database:
+            type: "pgsql"
+            port: "5432"
+            name: "${TENANT_ID}-nextcloud"
+            auth:
+              username:
+                value: "${TENANT_ID}-nextcloud"
+          cache:
+            auth:
+              enabled: true
+          trustedProxy: "10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
+          oidc:
+            username:
+              value: "opendesk-nextcloud"
+        ingress:
+          enabled: false
+        extraEnvVars:
+          - name: FS_ENV_OIDC_DISCOVERY_URI
+            value: "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
+
+      exporter:
+        enabled: true
+        configuration:
+          server: "http://nextcloud-aio"
+
+      persistence:
+        enabled: true
+        size: 10Gi
+  requires:
+    services:
+      identity:
+        oidc:
+          clientId: "opendesk-nextcloud"
+          name: "Nextcloud"
+          accessType: CONFIDENTIAL
+          redirectUris:
+            - "https://files.${TENANT_DOMAIN}/*"
+          postLogoutRedirectUris:
+            - "https://files.${TENANT_DOMAIN}/"
+            - "https://portal.${KERNEL_DOMAIN}/"
+          backchannelLogoutUrl: "https://files.${TENANT_DOMAIN}/apps/user_oidc/backchannel-logout/opendesk"
+      database:
+        engine: postgresql
+        databasePerTenant: true
+      cache:
+        engine: redis
+      storage:
+        s3:
+          bucketPerTenant: true
+      mail:
+        smtp: {}
 
   provides:
     - name: file-store
@@ -60,7 +130,7 @@ spec:
     - name: filepicker
       protocol: ocs
 
-  optionalIntegrations:
+  integrations:
     - contract: central-navigation
       provider: portal
       capabilities:
@@ -70,131 +140,36 @@ spec:
       capabilities:
         - wopi:edit
 
-  portalTiles:
-    - name: nextcloud
-      displayName:
-        de_DE: "Dateien"
-        en_US: "Files"
-      linkTarget: embedded
-      allowedGroup: "App Users"
+  secrets:
+    generated:
+      - name: metrics_token
+        valuePath: "exporter.configuration.token.value"
 
-  # Customization ladder — deliberately NOT inherited from nextcloud-base-ce.
-  #
-  # This profile shares a family name with the community base and nothing else. It
-  # deploys the OpenDesk AIO chart from registry.opencode.de, a credentialed
-  # registry, and that bundle is a locked-down distribution with a fixed app set —
-  # not the Gentian Nextcloud image, which stages addons in /usr/src/gentian-addons
-  # for `occ app:enable`. None of the nine nextcloud addons targets this base, and
-  # the drop-in paths the community base declares do not exist here.
-  #
-  # Grade is `unknown` rather than a guess. The rubric scores things that cannot be
-  # read from outside a credentialed registry — whether the bundle exposes drop-in
-  # directories, whether its app set can be extended at all. Per framework §4 an
-  # uncharacterised app is reachable at L0 and L4 only, and a task to characterise
-  # it is owed. Recording a confident grade here would be inventing one.
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: "files"
+      backend:
+        service: nextcloud
+        port: 8080
+      tile:
+        displayName: "Files"
+        displayNames:
+          de_DE: "Dateien"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAtOTYwIDk2MCA5NjAiIGZpbGw9IiMwMDgyQzkiPjxwYXRoIGQ9Ik0xNjgtMTkycS0yOSAwLTUwLjUtMjEuNVQ5Ni0yNjR2LTQzMnEwLTMwIDIxLjUtNTF0NTAuNS0yMWgyMTZsOTYgOTZoMzEycTMwIDAgNTEgMjF0MjEgNTF2MzM2cTAgMjktMjEgNTAuNVQ3OTItMTkySDE2OFoiIC8+PC9zdmc+Cjwvc3ZnPgo=
+        image: assets/tile-files.svg
+        relation: can_launch
+  hooks:
+    provisioning:
+      privilegedRole:
+        kind: group
+        name: admin
+
   customization:
     grade: unknown
     supportedRungs: [L0, L4]
     repackage:
       chartOwnership: upstream
 
-  provisioning:
-    privilegedRole:
-      kind: group
-      name: admin
-
-  chart:
-    repository: "oci://registry.opencode.de/bmi/opendesk/components/platform-development/charts/opendesk-nextcloud"
-    name: opendesk-nextcloud
-    version: "4.7.2"
-
-  deploymentMethod: crossplane
-
-  valueMapping:
-    oidc:
-      clientSecretKey: "aio.configuration.oidc.secret"
-    database:
-      hostKey: "aio.configuration.database.host"
-      portKey: "aio.configuration.database.port"
-      nameKey: "aio.configuration.database.name"
-      userKey: "aio.configuration.database.auth.username.value"
-      passwordKey: "aio.configuration.database.auth.password"
-    cache:
-      hostKey: "aio.configuration.cache.host"
-      portKey: "aio.configuration.cache.port"
-      passwordKey: "aio.configuration.cache.auth.password"
-    s3:
-      secretKeyKey: "aio.configuration.objectstore.auth.secretKey"
-    smtp:
-      passwordKey: "aio.configuration.smtp.auth.password"
-
-  appSecrets:
-    - name: metrics_token
-      valuePath: "exporter.configuration.token.value"
-
-  ingress:
-    subDomain: "files"
-    # Aligned with fullnameOverride, as nextcloud-base-ce is. "nextcloud-aio" could
-    # not have worked: it does not start with "nextcloud-base-od-", so the derived
-    # component selector was the whole service name and matched no pods.
-    serviceName: nextcloud
-    servicePort: 8080
-    tlsEnabled: true
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "512M"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-
-  extraValues:
-    global:
-      domain: "${KERNEL_DOMAIN}"
-      hosts:
-        nextcloud: "files.${TENANT_ID}"
-    resources:
-      requests:
-        cpu: 250m
-        memory: 512Mi
-      limits:
-        cpu: 1
-        memory: 1Gi
-      imagePullSecrets:
-        - registry-credentials
-
-    fullnameOverride: "nextcloud"
-
-    aio:
-      podAnnotations:
-        reloader.stakater.com/auto: "true"
-      image:
-        registry: "registry.opencode.de"
-        repository: "bmi/opendesk/components/platform-development/images/opendesk-nextcloud"
-        tag: "2.12.2"
-      configuration:
-        database:
-          type: "pgsql"
-          port: "5432"
-          name: "${TENANT_ID}-nextcloud"
-          auth:
-            username:
-              value: "${TENANT_ID}-nextcloud"
-        cache:
-          auth:
-            enabled: true
-        trustedProxy: "10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
-        oidc:
-          username:
-            value: "opendesk-nextcloud"
-      ingress:
-        enabled: false
-      extraEnvVars:
-        - name: FS_ENV_OIDC_DISCOVERY_URI
-          value: "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
-
-    exporter:
-      enabled: true
-      configuration:
-        server: "http://nextcloud-aio"
-
-    persistence:
-      enabled: true
-      size: 10Gi
+  launch: tile

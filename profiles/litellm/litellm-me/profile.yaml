@@ -1,5 +1,5 @@
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: litellm-me
   labels:
@@ -11,25 +11,15 @@ metadata:
     gentianos.io/platform-app: "true"
     gentianos.io/deployment-role: base
 spec:
-  displayName: "LLM Admin Panel"
-  family: litellm
-  edition: me
-  description: "Manage LLM configurations, models, virtual keys, and track token usage."
-  license: MIT
-  author: Gentian
-  tile:
-    icon: settings
-
-  deploymentMethod: api
-
-  ingress:
-    subDomain: llm-admin
-    tlsEnabled: true
-
-  apiIntegration:
-    runtime: portal-proxy
-    baseUrl: "http://litellm-proxy.platform-kernel.svc.cluster.local:4000"
-    tenantBinding: none
+  classes:
+    - app
+  trustTier: experimental
+  version: 0.0.0
+  package:
+    api:
+      runtime: portal-proxy
+      baseUrl: "http://litellm-proxy.platform-kernel.svc.cluster.local:4000"
+      tenantBinding: none
 
   # No portalTiles, deliberately.
   #
@@ -54,6 +44,14 @@ spec:
   # iframe was blocked regardless of who opened it.
 
   # Customization ladder — see customization.md
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: llm-admin
+      backend:
+        service: REVIEW
+        port: 80
   customization:
     grade: B
     rubricScore: 5
@@ -95,3 +93,4 @@ spec:
       requiresApproval: platform-team
     fork:
       allowed: false
+  launch: none

@@ -1,5 +1,5 @@
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: odoo-contacts-ce
   labels:
@@ -10,47 +10,39 @@ metadata:
     gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["contacts"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
-  displayName: "Odoo Contacts"
-  description: "Contact management module for Odoo."
-  family: odoo
-  catalogueVersion: "1.0.0"
-  edition: ce
+  classes:
+    - app
   trustTier: platform
-  license: LGPL-3.0
-  author: OCA
-  tile:
-    # Odoo's own icon for the module this profile installs, set inside the
-    # catalogue's 52x52 frame so it sits with the other tiles.
-    image: assets/tile.svg
-    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTM5IDQ2YTggOCAwIDAgMCA4LThWOEgxM2E0IDQgMCAwIDAtNCA0djM0aDMwWiIgZmlsbD0iI0ZDODY4QiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMzkgNDJhNCA0IDAgMCAwIDQtNFY0SDEzYTggOCAwIDAgMC04IDh2MzBoMzRaIiBmaWxsPSIjMUFEM0JCIi8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik00MyAzOGE0IDQgMCAwIDEtNCA0SDlWMTJhNCA0IDAgMCAxIDQtNGgzMHYzMFoiIGZpbGw9IiMxQTZGNjYiLz48cGF0aCBkPSJNMjUgMjhhOSA5IDAgMCAwLTkgOWgxMGE5IDkgMCAwIDAgOS05SDI1WiIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjI1IiBjeT0iMTkiIHI9IjYiIGZpbGw9IiNmZmYiLz48L3N2Zz48L3N2Zz4K
-
-  portalTiles:
-    - name: odoo-contacts
-      displayName:
-        en_US: "Odoo Contacts"
-        de_DE: "Odoo Kontakte"
-      linkSuffix: "/odoo/action-contacts.action_contacts?gentian_embed=1"
-      linkTarget: embedded
-      allowedGroup: "App Users"
-
-  compositionRef: app-odoo
-  deploymentMethod: crossplane
-  chart:
-    repository: oci://ghcr.io/gentian-org/charts
-    name: odoo
-    version: "0.1.15"
-  # Odoo calls its addons "modules" — this maps the Gentian profile onto that name.
-  customization:
+  version: "1.0.0"
+  package:
+    extraValues:
+      odoo:
+        module: contacts
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 250m
+          memory: 256Mi
     addon:
       id: contacts
       of: odoo-base-ce
-  extraValues:
-    odoo:
-      module: contacts
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 250m
-        memory: 256Mi
+  expose:
+    - name: odoo-contacts
+      surface: gateway
+      authMode: oidc
+      subDomain: erp
+      backend:
+        component: odoo-base-ce
+        service: odoo
+        port: 8069
+      tile:
+        displayName: "Odoo Contacts"
+        displayNames:
+          de_DE: "Odoo Kontakte"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTM5IDQ2YTggOCAwIDAgMCA4LThWOEgxM2E0IDQgMCAwIDAtNCA0djM0aDMwWiIgZmlsbD0iI0ZDODY4QiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMzkgNDJhNCA0IDAgMCAwIDQtNFY0SDEzYTggOCAwIDAgMC04IDh2MzBoMzRaIiBmaWxsPSIjMUFEM0JCIi8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik00MyAzOGE0IDQgMCAwIDEtNCA0SDlWMTJhNCA0IDAgMCAxIDQtNGgzMHYzMFoiIGZpbGw9IiMxQTZGNjYiLz48cGF0aCBkPSJNMjUgMjhhOSA5IDAgMCAwLTkgOWgxMGE5IDkgMCAwIDAgOS05SDI1WiIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjI1IiBjeT0iMTkiIHI9IjYiIGZpbGw9IiNmZmYiLz48L3N2Zz48L3N2Zz4K
+        image: assets/tile.svg
+        path: /odoo/action-contacts.action_contacts?gentian_embed=1
+        relation: can_launch
+  launch: tile

@@ -21,8 +21,8 @@ spec:
         kind: Input
         spec:
           extraResources:
-            - kind: AppProfile
-              into: appProfile
+            - kind: ComponentProfile
+              into: componentProfile
               apiVersion: gentianos.io/v1alpha1
               type: Selector
               selector:
@@ -84,18 +84,19 @@ spec:
 
             {{- /* ── Load AppProfile from pipeline context ────────────────────── */}}
             {{- $extraRes  := index .context "apiextensions.crossplane.io/extra-resources" }}
-            {{- $profiles  := dig "appProfile" list $extraRes }}
+            {{- $profiles  := dig "componentProfile" list $extraRes }}
             {{- if eq (len $profiles) 0 }}
-              {{- fail (printf "AppProfile %q not found in cluster" $spec.profileRef.name) }}
+              {{- fail (printf "ComponentProfile %q not found in cluster" $spec.profileRef.name) }}
             {{- end }}
             {{- $profile   := index $profiles 0 }}
             {{- $pSpec     := dig "spec" dict $profile }}
-            {{- $vm        := default dict $pSpec.valueMapping }}
-            {{- $appSecrets := default list $pSpec.appSecrets }}
-            {{- $chart     := $pSpec.chart }}
+            {{- $package   := dig "package" dict $pSpec }}
+            {{- $vm        := dig "valueMapping" dict $package }}
+            {{- $appSecrets := dig "secrets" "generated" list $pSpec }}
+            {{- $chart     := dig "chart" nil $package }}
             {{- $role      := default "standalone" (dig "metadata" "annotations" "gentianos.io/deployment-role" "" $profile) }}
 
-            {{- $kr := default dict $pSpec.kernelRequirements }}
+            {{- $kr := dig "requires" "services" dict $pSpec }}
 
             {{- /* ── Load cluster-config ConfigMap ──────────────────────────────── */}}
             {{- $ccRes      := dig "clusterConfig" list $extraRes }}
@@ -317,14 +318,14 @@ spec:
             {{- $ksRes := dig "kernelServices" list $extraRes }}
             {{- $ksCM  := default dict (index $ksRes 0) }}
             {{- $ksCMData := dig "data" dict $ksCM }}
-            {{- if $pSpec.extraValues }}
+            {{- if $package.extraValues }}
             {{- $kernelDomain := dig "KERNEL_DOMAIN" "" $ksCMData }}
             {{- /* No SMTP host is substituted, and none should be: mail.smtpHost
             is spec.mail.host, the smarthost Postfix relays THROUGH, and no app
             is given the credential to authenticate there. An app that needs to
             send mail declares it and receives a credential. See
             app-default.yaml. */}}
-            {{- $raw := $pSpec.extraValues | toJson }}
+            {{- $raw := $package.extraValues | toJson }}
             {{- $raw = $raw | replace "${TENANT_DOMAIN}"    $domain }}
             {{- $raw = $raw | replace "${TENANT_NAMESPACE}" $ns }}
             {{- $raw = $raw | replace "${TENANT_ID}"        $tenant }}
@@ -362,7 +363,7 @@ spec:
 
             {{- $acmeStaging := eq (dig "ACME_STAGING" "false" $ksCMData) "true" }}
             {{- if $acmeStaging }}
-            {{- $krStaging := default dict $pSpec.kernelRequirements }}
+            {{- $krStaging := dig "requires" "services" dict $pSpec }}
             {{- $identityStaging := default dict $krStaging.identity }}
             {{- $oidcStaging := default dict $identityStaging.oidc }}
             {{- $stagingVol := dict
@@ -409,7 +410,7 @@ spec:
             {{- end }}
 
             {{- /* ── Emit Keycloak Client CR ──────────────────────────────────── */}}
-            {{- $kr       := default dict $pSpec.kernelRequirements }}
+            {{- $kr       := dig "requires" "services" dict $pSpec }}
             {{- $identity := default dict $kr.identity }}
             {{- $oidcCl   := default dict $identity.oidc }}
             {{- if $oidcCl.clientId }}
@@ -643,12 +644,23 @@ spec:
                 name: kubernetes
 
             {{- /* ── Emit stable service alias ─────────────────────────────────── */}}
-            {{- $ingressSpec    := default dict $pSpec.ingress }}
-            {{- $stableSvcName  := dig "serviceName" "" $ingressSpec }}
+            {{- /* AppProfile had one spec.ingress with serviceName and servicePort;
+                 ComponentProfile has a list of exposures, each naming the Service
+                 it routes to. The gateway entry is the one that needs an alias:
+                 it is the one the edge resolves by name. The FIRST, because the
+                 alias is one Service and a profile publishing several entries on
+                 one backend names the same one. */}}
+            {{- $backend := dict }}
+            {{- range $e := (dig "expose" list $pSpec) }}
+              {{- if and (eq (dig "surface" "" $e) "gateway") (not $backend.service) }}
+                {{- $backend = dig "backend" dict $e }}
+              {{- end }}
+            {{- end }}
+            {{- $stableSvcName  := dig "service" "" $backend }}
             {{- $fullnameOverride := dig "fullnameOverride" "" $extraVals }}
             {{- if and $stableSvcName (ne $stableSvcName $fullnameOverride) }}
             {{- $component := trimPrefix (printf "%s-" $app) $stableSvcName }}
-            {{- $svcPort   := default 80 (dig "servicePort" 0 $ingressSpec | int) }}
+            {{- $svcPort   := default 80 (dig "port" 0 $backend | int) }}
             ---
             apiVersion: kubernetes.crossplane.io/v1alpha2
             kind: Object
@@ -678,7 +690,7 @@ spec:
             {{- end }}
 
             {{- /* ── Emit sidecars (AppProfile.spec.sidecars) ────────────────────── */}}
-            {{- $sidecars := default list $pSpec.sidecars }}
+            {{- $sidecars := dig "extensions" list $pSpec }}
             {{- range $sc := $sidecars }}
             {{- if and $sc.name $sc.chart.name }}
             {{- $scKey := printf "%s-%s" $app $sc.name }}
