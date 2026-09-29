@@ -298,8 +298,15 @@ jobs:
   # Needs Pages enabled for the repository, with "GitHub Actions" as the
   # source. Until it is, this job fails and nothing else does.
   publish-catalogue:
-    needs: [should-publish, validate-profiles]
-    if: needs.should-publish.outputs.publish == 'true'
+    needs: [validate-profiles]
+    # main only, for two reasons that point the same way. A repository has ONE
+    # Pages site, so publishing from main and develop as well would make the
+    # catalogue whichever branch ran last. And a catalogue is what somebody's
+    # cluster installs from: it should follow releases, not the branch work is
+    # happening on. A cluster that wants the in-progress catalogue declares no
+    # source and syncs it wholesale from git, the way every cluster did before
+    # AD-3.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -313,7 +320,7 @@ jobs:
       - name: Install PyYAML
         run: pip install pyyaml
       - name: Build the catalogue source
-        run: python3 scripts/build-catalogue-source.py --out dist/catalogue
+        run: python3 scripts/build-catalogue-source.py --out dist/catalogue --with-landing-page
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

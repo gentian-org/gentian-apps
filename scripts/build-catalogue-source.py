@@ -161,6 +161,11 @@ def main() -> int:
         action="store_true",
         help="build into a temporary directory and report, writing nothing lasting",
     )
+    ap.add_argument(
+        "--with-landing-page",
+        action="store_true",
+        help="also write index.html, so a person who opens the site sees what it is",
+    )
     args = ap.parse_args()
 
     out = args.out
@@ -183,6 +188,41 @@ def main() -> int:
         f"  a cluster browsing this source lists {local}; "
         f"the other {len(entries) - local} are the App Store's to present."
     )
+
+    if args.with_landing_page:
+        # Served over https for machines, so the root would otherwise be a 404
+        # for the person who follows the URL to find out what it is.
+        rows = "\n".join(
+            f'      <tr><td><code>{e["name"]}</code></td><td>{e["version"]}</td>'
+            f'<td>{e["edition"]}</td></tr>'
+            for e in entries
+        )
+        (out / "index.html").write_text(f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gentian catalogue</title>
+<style>
+ body {{ font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 52rem; padding: 0 1rem; }}
+ table {{ border-collapse: collapse; width: 100%; }}
+ td, th {{ text-align: left; padding: .3rem .6rem; border-bottom: 1px solid #ddd; }}
+ code {{ font-size: .9em; }}
+</style></head><body>
+<h1>Gentian catalogue</h1>
+<p>A catalogue source: profile bundles a Gentian cluster installs from. Name it on
+a Cluster claim under <code>spec.catalogue.sources</code>; the director fetches an
+entry at the digest the App Store states and refuses anything else.</p>
+<ul>
+ <li><a href="index.yaml">index.yaml</a> — what is here, at which version and digest</li>
+ <li><code>profiles/&lt;name&gt;.yaml</code> — the ComponentProfile</li>
+ <li><code>listings/&lt;name&gt;.yaml</code> — how the App Store presents it</li>
+</ul>
+<p>{len(entries)} entries.</p>
+<table><thead><tr><th>Name</th><th>Version</th><th>Edition</th></tr></thead>
+<tbody>
+{rows}
+</tbody></table>
+</body></html>
+""")
 
     if args.check:
         shutil.rmtree(out, ignore_errors=True)
