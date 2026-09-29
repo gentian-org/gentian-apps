@@ -5,6 +5,7 @@ import { AuditSection } from "@/admin/AuditSection";
 import { BackupPolicySection } from "@/admin/BackupPolicySection";
 import { BackupSchedulesSection } from "@/admin/BackupSchedulesSection";
 import { BackupSection } from "@/admin/BackupSection";
+import { CatalogueSection } from "@/admin/CatalogueSection";
 import { CredentialsSection } from "@/admin/CredentialsSection";
 import { CustomizationDebtSection } from "@/admin/CustomizationDebtSection";
 import { ClusterSettingsSection } from "@/admin/ClusterSettingsSection";
@@ -24,6 +25,7 @@ type AdminTab =
   | "backup"
   | "security"
   | "integrations"
+  | "catalogue"
   | "credentials"
   | "notifications"
   | "audit"
@@ -57,6 +59,11 @@ const TABS: { id: AdminTab; label: string; platformOnly?: boolean }[] = [
   { id: "backup", label: "Backup" },
   { id: "security", label: "Security" },
   { id: "integrations", label: "Integrations" },
+  // Near the end on purpose. Apps come from the App Store; this tab is the
+  // plain fallback for when the store is not the answer, and putting it where
+  // a shop would go would make it look like a rival to the one that is
+  // maintained.
+  { id: "catalogue", label: "Catalogues" },
   { id: "credentials", label: "Credentials" },
   { id: "notifications", label: "Notifications" },
   { id: "audit", label: "Audit" },
@@ -148,6 +155,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <SecurityPoliciesSection tenant={tenant} />
           ) : tab === "integrations" ? (
             <IntegrationsSection tenant={tenant} />
+          ) : tab === "catalogue" ? (
+            <CatalogueSection tenant={tenant} />
           ) : tab === "resources" ? (
             <ResourcesSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
           ) : tab === "settings" ? (
