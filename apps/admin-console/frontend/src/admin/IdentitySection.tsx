@@ -11,6 +11,7 @@ import {
   type Person,
 } from "@/api/admin";
 import "./admin.css";
+import { Trans, useTranslation } from "react-i18next";
 
 type IdentitySectionProps = {
   /** The realm this tenant's people live in. */
@@ -40,6 +41,8 @@ type IdentitySectionProps = {
  * append-only, and a name and an address committed there outlive the account.
  */
 export function IdentitySection({ realm, kernelDomain }: IdentitySectionProps) {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
@@ -98,7 +101,7 @@ export function IdentitySection({ realm, kernelDomain }: IdentitySectionProps) {
   const groups = groupsQuery.data?.groups ?? [];
 
   if (peopleQuery.isLoading) {
-    return <p className="admin-console__loading">Loading people…</p>;
+    return <p className="admin-console__loading">{t("identity.loadingPeople")}</p>;
   }
   // 503 here is the platform's problem, not the caller's: the director holds
   // one credential per realm and the operator writes it. Saying "unavailable"
@@ -108,12 +111,10 @@ export function IdentitySection({ realm, kernelDomain }: IdentitySectionProps) {
     return (
       <section>
         <p className="admin-console__error">
-          People cannot be read right now. {String(peopleQuery.error)}
+          {t("identity.peopleCannotBeReadRight")}{String(peopleQuery.error)}
         </p>
         <p className="admin-console__hint">
-          The director holds one Keycloak credential per realm, written by the operator. Until
-          this realm has one, nothing here can read or change anybody.
-        </p>
+          {t("identity.theDirectorHoldsOneKeycloak")}</p>
       </section>
     );
   }
@@ -125,18 +126,16 @@ export function IdentitySection({ realm, kernelDomain }: IdentitySectionProps) {
     <section>
       <header className="admin-console__section-head">
         <div>
-          <h2 className="admin-console__section-title">People</h2>
+          <h2 className="admin-console__section-title">{t("identity.people")}</h2>
           <p className="admin-console__lead">
-            Who is in this tenant, what they belong to, and how passwords are required to look.
-            Changes take effect immediately.
-          </p>
+            {t("identity.whoIsInThisTenant")}</p>
         </div>
         <div className="admin-console__field">
-          <label htmlFor="people-search">Search</label>
+          <label htmlFor="people-search">{t("identity.search")}</label>
           <input
             id="people-search"
             type="search"
-            placeholder="Name or address"
+            placeholder={t("identity.nameOrAddress")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -145,25 +144,22 @@ export function IdentitySection({ realm, kernelDomain }: IdentitySectionProps) {
 
       <div className="admin-console__card">
         <div className="admin-console__card-main">
-          <h3 className="admin-console__card-title">Invite someone</h3>
+          <h3 className="admin-console__card-title">{t("identity.inviteSomeone")}</h3>
           <p className="admin-console__card-desc">
-            They are created without a password and sent a link that lets them set one and prove
-            the address reaches them. The platform never holds a password, so there is nothing to
-            transport.
-          </p>
+            {t("identity.theyAreCreatedWithoutA")}</p>
           <div className="admin-console__field-row">
             <div className="admin-console__field">
-              <label htmlFor="invite-email">Address</label>
+              <label htmlFor="invite-email">{t("identity.address")}</label>
               <input
                 id="invite-email"
                 type="email"
-                placeholder="name@example.org"
+                placeholder={t("identity.nameExampleOrg")}
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
               />
             </div>
             <div className="admin-console__field">
-              <label htmlFor="invite-groups">Groups</label>
+              <label htmlFor="invite-groups">{t("identity.groups")}</label>
               <select
                 id="invite-groups"
                 multiple
@@ -187,14 +183,12 @@ export function IdentitySection({ realm, kernelDomain }: IdentitySectionProps) {
             // The half-done case, said as what it is. Inviting again would
             // answer "already here"; the repair is to re-send.
             <p className="admin-console__error">
-              {inviteMutation.data.person.email} was created and the invitation did not go.
-              Re-sending is the repair, not inviting again. {inviteMutation.data.warning}
+              {inviteMutation.data.person.email} {t("identity.wasCreatedAndTheInvitation")}{inviteMutation.data.warning}
             </p>
           )}
           {inviteMutation.data?.mailed && (
             <p className="admin-console__hint">
-              Invitation sent to {inviteMutation.data.person.email}. They stay pending until they
-              set a password.
+              {t("identity.invitationSentTo", { email: inviteMutation.data.person.email })}
             </p>
           )}
         </div>
@@ -214,14 +208,14 @@ export function IdentitySection({ realm, kernelDomain }: IdentitySectionProps) {
         <div className="admin-console__card-main">
           <h3 className="admin-console__card-title">
             {people.length} {people.length === 1 ? "person" : "people"}
-            {pending > 0 && <span className="admin-console__badge">{pending} pending</span>}
+            {pending > 0 && <span className="admin-console__badge">{pending} {t("identity.pending")}</span>}
           </h3>
           <table className="admin-console__table">
             <thead>
               <tr>
-                <th>Address</th>
-                <th>Name</th>
-                <th>State</th>
+                <th>{t("identity.address2")}</th>
+                <th>{t("identity.name")}</th>
+                <th>{t("identity.state")}</th>
                 <th />
               </tr>
             </thead>
@@ -241,7 +235,7 @@ export function IdentitySection({ realm, kernelDomain }: IdentitySectionProps) {
               {people.length === 0 && (
                 <tr>
                   <td colSpan={4} className="admin-console__empty">
-                    {search ? "Nobody matches that." : "Nobody here yet."}
+                    {t(search ? "identity.nobodyMatches" : "identity.nobodyYet")}
                   </td>
                 </tr>
               )}
@@ -253,15 +247,15 @@ export function IdentitySection({ realm, kernelDomain }: IdentitySectionProps) {
       {settingsQuery.data && (
         <div className="admin-console__card">
           <div className="admin-console__card-main">
-            <h3 className="admin-console__card-title">Password policy</h3>
+            <h3 className="admin-console__card-title">{t("identity.passwordPolicy")}</h3>
             <p className="admin-console__card-desc">
-              In the realm's own spelling, such as{" "}
-              <span className="admin-console__mono">length(12) and notUsername(undefined)</span>.
-              It is passed through unchanged: this platform does not interpret it, and a second
-              interpretation would be a second answer to the same question.
+              <Trans
+                i18nKey="identity.passwordPolicyHint"
+                components={{ mono: <span className="admin-console__mono" /> }}
+              />
             </p>
             <div className="admin-console__field">
-              <label htmlFor="password-policy">Policy</label>
+              <label htmlFor="password-policy">{t("identity.policy")}</label>
               <input
                 id="password-policy"
                 type="text"
@@ -288,14 +282,11 @@ export function IdentitySection({ realm, kernelDomain }: IdentitySectionProps) {
 
       <div className="admin-console__card">
         <div className="admin-console__card-main">
-          <h3 className="admin-console__card-title">Identity console</h3>
+          <h3 className="admin-console__card-title">{t("identity.identityConsole")}</h3>
           <p className="admin-console__card-desc">
-            Everything this screen does not: identity providers, authentication flows, sessions
-            and the realm's full settings. The detail view behind this one, with the session you
-            already hold.
-          </p>
+            {t("identity.everythingThisScreenDoesNot")}</p>
           <p className="admin-console__card-meta">
-            realm <span className="admin-console__mono">{realm}</span>
+            {t("identity.realm")}<span className="admin-console__mono">{realm}</span>
           </p>
         </div>
         <div className="admin-console__card-aside admin-console__card-aside--top">
@@ -305,16 +296,12 @@ export function IdentitySection({ realm, kernelDomain }: IdentitySectionProps) {
             target="_blank"
             rel="noreferrer"
           >
-            Open
-          </a>
+            {t("identity.open")}</a>
         </div>
       </div>
 
       <p className="admin-console__hint">
-        This console holds no credential for the realm. Every change above is made by the
-        director, with your token, after it has asked whether you may — and a change made in the
-        identity console instead is recorded by the realm without that half.
-      </p>
+        {t("identity.thisConsoleHoldsNoCredential")}</p>
     </section>
   );
 }
@@ -332,6 +319,8 @@ function PersonRow({
   onToggle: () => void;
   onMembership: (group: string, member: boolean) => void;
 }) {
+  const { t } = useTranslation();
+
   // The list does not carry anybody's groups, and deliberately: reading them
   // is a call per person, so a tenant with two hundred people would make two
   // hundred and one. They are read when a row is opened.
@@ -348,9 +337,9 @@ function PersonRow({
         <td>{person.name || "—"}</td>
         <td>
           {!person.enabled ? (
-            <span className="admin-console__badge">disabled</span>
+            <span className="admin-console__badge">{t("identity.disabled")}</span>
           ) : person.pending ? (
-            <span className="admin-console__badge">pending</span>
+            <span className="admin-console__badge">{t("identity.pending2")}</span>
           ) : (
             "active"
           )}
@@ -365,7 +354,7 @@ function PersonRow({
         <tr>
           <td colSpan={4}>
             <div className="admin-console__checkbox-grid">
-              {detail.isLoading && <p className="admin-console__hint">Reading their groups…</p>}
+              {detail.isLoading && <p className="admin-console__hint">{t("identity.readingTheirGroups")}</p>}
               {!detail.isLoading &&
                 groups.map((group) => (
                   <label key={group} className="admin-console__checkbox">
@@ -378,7 +367,7 @@ function PersonRow({
                   </label>
                 ))}
               {groups.length === 0 && (
-                <p className="admin-console__hint">This tenant has no groups to put anybody in.</p>
+                <p className="admin-console__hint">{t("identity.thisTenantHasNoGroups")}</p>
               )}
             </div>
           </td>

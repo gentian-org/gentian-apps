@@ -6,6 +6,7 @@ import {
   retireClusterTenant,
 } from "@/api/cluster";
 import "./admin.css";
+import { Trans, useTranslation } from "react-i18next";
 
 /**
  * The customers this cluster carries.
@@ -22,6 +23,8 @@ import "./admin.css";
  * before the field rather than after the refusal.
  */
 export function TenantsSection() {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const tenantsQuery = useQuery({
     queryKey: ["cluster", "tenants"],
@@ -59,14 +62,12 @@ export function TenantsSection() {
   const nameTouched = name.length > 0;
 
   if (tenantsQuery.isLoading) {
-    return <p className="admin-console__loading">Loading tenants…</p>;
+    return <p className="admin-console__loading">{t("tenants.loadingTenants")}</p>;
   }
   if (tenantsQuery.isError || !tenantsQuery.data) {
     return (
       <p className="admin-console__error">
-        Tenants are unavailable. This needs the cluster's audit relation, and the director has
-        to be reachable from this console.
-      </p>
+        {t("tenants.tenantsAreUnavailableThisNeeds")}</p>
     );
   }
 
@@ -76,29 +77,29 @@ export function TenantsSection() {
     <section>
       <header className="admin-console__section-head">
         <div>
-          <h2 className="admin-console__section-title">Tenants</h2>
+          <h2 className="admin-console__section-title">{t("tenants.tenants")}</h2>
           <p className="admin-console__lead">
-            Each tenant is a manifest in the deployments repository. Bringing one on is a
-            commit; the realm, the namespaces, the database and the desktop follow when Argo CD
-            syncs it.
-          </p>
+            {t("tenants.eachTenantIsAManifest")}</p>
         </div>
       </header>
 
       {lastCommit ? (
         <p className="admin-console__success">
-          Committed as <span className="admin-console__mono">{lastCommit.slice(0, 8)}</span>.
-          Provisioning follows once Argo CD has synced it.
+          <Trans
+            i18nKey="tenants.committedAs"
+            values={{ commit: lastCommit.slice(0, 8) }}
+            components={{ mono: <span className="admin-console__mono" /> }}
+          />
         </p>
       ) : null}
       {createMutation.isError ? (
         <p className="admin-console__error">
-          {(createMutation.error as Error).message || "The tenant could not be created."}
+          {(createMutation.error as Error).message || t("tenants.couldNotCreate")}
         </p>
       ) : null}
       {retireMutation.isError ? (
         <p className="admin-console__error">
-          {(retireMutation.error as Error).message || "The tenant could not be retired."}
+          {(retireMutation.error as Error).message || t("tenants.couldNotRetire")}
         </p>
       ) : null}
 
@@ -106,9 +107,9 @@ export function TenantsSection() {
         <table className="admin-console__table">
           <thead>
             <tr>
-              <th>Tenant</th>
-              <th>Realm</th>
-              <th>Apps</th>
+              <th>{t("tenants.tenant")}</th>
+              <th>{t("tenants.realm")}</th>
+              <th>{t("tenants.apps")}</th>
               <th />
             </tr>
           </thead>
@@ -116,8 +117,7 @@ export function TenantsSection() {
             {tenants.length === 0 ? (
               <tr>
                 <td colSpan={4} className="admin-console__empty">
-                  No tenants yet.
-                </td>
+                  {t("tenants.noTenantsYet")}</td>
               </tr>
             ) : null}
             {tenants.map((tenant) => (
@@ -134,10 +134,9 @@ export function TenantsSection() {
                   {tenant.protected ? (
                     <span
                       className="admin-console__badge admin-console__badge--info"
-                      title="This tenant carries the realm every administrator signs in against, so it cannot be retired here."
+                      title={t("tenants.thisTenantCarriesTheRealm")}
                     >
-                      protected
-                    </span>
+                      {t("tenants.protected")}</span>
                   ) : confirming === tenant.name ? (
                     <span className="admin-console__actions">
                       <button
@@ -146,15 +145,14 @@ export function TenantsSection() {
                         disabled={retireMutation.isPending}
                         onClick={() => retireMutation.mutate(tenant.name)}
                       >
-                        Retire {tenant.name}
+                        {t("tenants.retire")}{tenant.name}
                       </button>
                       <button
                         type="button"
                         className="admin-console__btn admin-console__btn--quiet"
                         onClick={() => setConfirming(null)}
                       >
-                        Cancel
-                      </button>
+                        {t("tenants.cancel")}</button>
                     </span>
                   ) : (
                     <button
@@ -162,8 +160,7 @@ export function TenantsSection() {
                       className="admin-console__btn admin-console__btn--danger"
                       onClick={() => setConfirming(tenant.name)}
                     >
-                      Retire
-                    </button>
+                      {t("tenants.retire2")}</button>
                   )}
                 </td>
               </tr>
@@ -174,14 +171,16 @@ export function TenantsSection() {
 
       {confirming ? (
         <p className="admin-console__hint">
-          Retiring removes <span className="admin-console__mono">{confirming}</span> from git,
-          and Argo CD prunes what git no longer names. Its data is kept or removed according to
-          the tenant's own deletion policy, which defaults to keeping it.
+          <Trans
+            i18nKey="tenants.retiringRemoves"
+            values={{ tenant: confirming }}
+            components={{ mono: <span className="admin-console__mono" /> }}
+          />
         </p>
       ) : null}
 
       <div className="admin-console__subsection">
-        <h3 className="admin-console__subsection-title">Bring a tenant on</h3>
+        <h3 className="admin-console__subsection-title">{t("tenants.bringATenantOn")}</h3>
         <form
           className="admin-console__form admin-console__form--plain"
           onSubmit={(event) => {
@@ -192,7 +191,7 @@ export function TenantsSection() {
         >
           <div className="admin-console__field">
             <label className="admin-console__label" htmlFor="tenant-name">
-              <span className="admin-console__label-text">Name</span>
+              <span className="admin-console__label-text">{t("tenants.name")}</span>
               <input
                 id="tenant-name"
                 type="text"
@@ -202,13 +201,11 @@ export function TenantsSection() {
               />
             </label>
             <p className={nameTouched && !nameIsValid ? "admin-console__field-error" : "admin-console__hint"}>
-              Lower-case letters, digits and hyphens. This becomes the namespace, the realm, the
-              database prefix and the hostname, so it cannot be changed later.
-            </p>
+              {t("tenants.lowerCaseLettersDigitsAnd")}</p>
           </div>
           <div className="admin-console__field">
             <label className="admin-console__label" htmlFor="tenant-display">
-              <span className="admin-console__label-text">Display name</span>
+              <span className="admin-console__label-text">{t("tenants.displayName")}</span>
               <input
                 id="tenant-display"
                 type="text"
@@ -218,8 +215,7 @@ export function TenantsSection() {
               />
             </label>
             <p className="admin-console__hint">
-              What people call this customer. Can be changed at any time.
-            </p>
+              {t("tenants.whatPeopleCallThisCustomer")}</p>
           </div>
           <div className="admin-console__form-footer">
             <button
@@ -227,7 +223,7 @@ export function TenantsSection() {
               className="admin-console__btn admin-console__btn--primary"
               disabled={!nameIsValid || createMutation.isPending}
             >
-              {createMutation.isPending ? "Committing…" : "Commit new tenant"}
+              {createMutation.isPending ? "Committing…" : t("tenants.commitNewTenant")}
             </button>
           </div>
         </form>

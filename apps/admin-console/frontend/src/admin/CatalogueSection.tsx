@@ -6,6 +6,7 @@ import {
   type CatalogueEntry,
 } from "@/api/catalogue";
 import "./admin.css";
+import { useTranslation } from "react-i18next";
 
 /**
  * The cluster's own catalogues — the fallback, and it is meant to look like
@@ -31,6 +32,8 @@ import "./admin.css";
  * (enterprise) are counted and named to the store.
  */
 export function CatalogueSection({ tenant }: { tenant: string }) {
+  const { t } = useTranslation();
+
   const sourcesQuery = useQuery({
     queryKey: ["catalogue", "sources", tenant],
     queryFn: () => fetchCatalogueSources(tenant),
@@ -55,24 +58,23 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
   });
 
   if (sourcesQuery.isLoading) {
-    return <p className="admin-console__loading">Loading catalogues…</p>;
+    return <p className="admin-console__loading">{t("catalogue.loadingCatalogues")}</p>;
   }
   if (sourcesQuery.isError) {
-    return <p className="admin-console__error">Catalogues are unavailable.</p>;
+    return <p className="admin-console__error">{t("catalogue.cataloguesAreUnavailable")}</p>;
   }
 
   return (
     <section>
       <header className="admin-console__section-head">
         <div>
-          <h2 className="admin-console__section-title">Catalogues</h2>
+          <h2 className="admin-console__section-title">{t("catalogue.catalogues")}</h2>
           <p className="admin-console__lead">
             {storeUrl ? (
               <>
                 Apps come from the{" "}
                 <a href={storeUrl} target="_blank" rel="noreferrer">
-                  App Store
-                </a>
+                  {t("catalogue.appStore")}</a>
                 . This page is the plain fallback: what is in this cluster&rsquo;s own
                 catalogue sources, for when the store is not the answer.
               </>
@@ -88,8 +90,7 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
 
       {sources.length === 0 ? (
         <p className="admin-console__lead">
-          This cluster names no catalogue sources. They are declared on the Cluster claim,
-          under <code>spec.catalogue.sources</code>.
+          {t("catalogue.thisClusterNamesNoCatalogue")}<code>spec.catalogue.sources</code>.
         </p>
       ) : (
         <>
@@ -134,33 +135,33 @@ function CatalogueTable({
   loading: boolean;
   error: boolean;
 }) {
+  const { t } = useTranslation();
+
   if (loading) {
-    return <p className="admin-console__loading">Loading entries…</p>;
+    return <p className="admin-console__loading">{t("catalogue.loadingEntries")}</p>;
   }
   if (error) {
     // The source is somebody else's web server and it is allowed to be down.
     return (
       <p className="admin-console__error">
-        This catalogue source could not be read. It is a web server outside the cluster;
-        nothing here is broken.
-      </p>
+        {t("catalogue.thisCatalogueSourceCouldNot")}</p>
     );
   }
 
   return (
     <>
       {entries.length === 0 ? (
-        <p className="admin-console__empty">Nothing this cluster lists for itself.</p>
+        <p className="admin-console__empty">{t("catalogue.nothingThisClusterListsFor")}</p>
       ) : (
         <div className="admin-console__table-wrap">
           <table className="admin-console__table">
             <thead>
               <tr>
-                <th>Coordinate</th>
-                <th>Version</th>
-                <th>Edition</th>
-                <th>Trust</th>
-                <th>Install</th>
+                <th>{t("catalogue.coordinate")}</th>
+                <th>{t("catalogue.version")}</th>
+                <th>{t("catalogue.edition")}</th>
+                <th>{t("catalogue.trust")}</th>
+                <th>{t("catalogue.install")}</th>
               </tr>
             </thead>
             <tbody>
@@ -180,9 +181,9 @@ function CatalogueTable({
                       // screens. This page says what exists, not what to
                       // press: an install button here would be a third place
                       // that installs apps, after the store and the desktop.
-                      <span>from this cluster</span>
+                      <span>{t("catalogue.fromThisCluster")}</span>
                     ) : (
-                      <span>via the App Store</span>
+                      <span>{t("catalogue.viaTheAppStore")}</span>
                     )}
                   </td>
                 </tr>
@@ -193,14 +194,13 @@ function CatalogueTable({
       )}
       {storeOnly > 0 ? (
         <p className="admin-console__lead">
-          {storeOnly} further {storeOnly === 1 ? "entry is" : "entries are"} maintained or
-          licensed and not listed here.{" "}
+          {t("catalogue.storeOnly", { count: storeOnly })}{" "}
           {storeUrl ? (
             <a href={storeUrl} target="_blank" rel="noreferrer">
-              See them in the App Store
+              {t("catalogue.seeThemInTheApp")}
             </a>
           ) : (
-            <>They are the App Store&rsquo;s to present.</>
+            t("catalogue.theyAreTheStoreS")
           )}
         </p>
       ) : null}

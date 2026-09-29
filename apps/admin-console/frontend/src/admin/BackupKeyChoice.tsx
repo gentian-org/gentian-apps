@@ -17,6 +17,7 @@ import {
   type MintedKey,
 } from "@/api/admin";
 import { qrDataUrl, saveKeyFile, saveKeyQr } from "@/admin/backupKeyFile";
+import { Trans, useTranslation } from "react-i18next";
 
 /** "passphrase" only appears where a human is present to type one — a schedule
  * has nobody at 03:00, so its form does not offer it. */
@@ -67,6 +68,8 @@ export function BackupKeyChoice({
    * control — it goes in a Secret, not in a recipients list. */
   passphrase?: { body: string; fields: ReactNode; ready: boolean };
 }) {
+  const { t } = useTranslation();
+
   const status = useBackupKeyStatus(tenant);
   const [minted, setMinted] = useState<MintedKey | null>(null);
   const [minting, setMinting] = useState(false);
@@ -122,7 +125,7 @@ export function BackupKeyChoice({
         try {
           await escrowBackupKey(key.identity, key.recipient);
         } catch {
-          setMintError("The key was generated but could not be kept in the vault — save the file.");
+          setMintError(t("backupKey.escrowFailed"));
         }
       }
       setMinted(key);
@@ -152,31 +155,21 @@ export function BackupKeyChoice({
 
   return (
     <fieldset className="admin-console__fieldset admin-console__fieldset--plain">
-      <legend>Who can read it</legend>
+      <legend>{t("backupKey.whoCanReadIt")}</legend>
 
       <div className="admin-console__choices">
-        {card(
-          "platform",
-          "The platform's key",
-          "Your provider can open the backup, so they can help you restore it. The right choice unless you have a reason otherwise.",
-        )}
-        {card(
-          "new",
-          "A new key for this workspace",
-          "Generated now and shown once. Nobody here can read the backup, including your provider — restoring is yours alone to do.",
-        )}
+        {card("platform", t("backupKey.platformKey"), t("backupKey.platformKeyBody"))}
+        {card("new", t("backupKey.newKey"), t("backupKey.newKeyBody"))}
         {status?.exists
           ? card(
               "existing",
-              "The key this workspace already has",
-              `Escrowed${status.setBy ? ` by ${status.setBy}` : ""}. Use it again so one key opens every backup this workspace makes.`,
+              t("backupKey.existingKey"),
+              status.setBy
+                ? t("backupKey.existingKeyBodyBy", { who: status.setBy })
+                : t("backupKey.existingKeyBody"),
             )
-          : card(
-              "existing",
-              "A key I already have",
-              "Paste the public half of a key you hold. Nothing here ever sees the private one.",
-            )}
-        {passphrase && card("passphrase", "My passphrase", passphrase.body)}
+          : card("existing", t("backupKey.ownKey"), t("backupKey.ownKeyBody"))}
+        {passphrase && card("passphrase", t("backupKey.myPassphrase"), passphrase.body)}
       </div>
 
       {choice === "passphrase" && passphrase && (
@@ -192,14 +185,12 @@ export function BackupKeyChoice({
               onChange={(e) => setKeepInVault(e.target.checked)}
             />
             <span>
-              Keep a copy in the vault
-              {status?.exists ? " — this replaces the key escrowed now" : ""}
+              {t("backupKey.keepACopyInThe")}
+              {status?.exists ? t("backupKey.replacesEscrowed") : ""}
             </span>
           </label>
           <p className="admin-console__hint">
-            {keepInVault
-              ? "You can restore without the downloaded file. A workspace administrator can read the key; the platform cannot."
-              : "The download is the only copy. Lose it and these backups are unreadable by anyone."}
+            {t(keepInVault ? "backupKey.vaultKept" : "backupKey.downloadOnly")}
           </p>
           <div className="admin-console__submit">
             <button
@@ -208,7 +199,7 @@ export function BackupKeyChoice({
               disabled={minting}
               onClick={generate}
             >
-              {minting ? "Generating…" : "Generate backup key"}
+              {t(minting ? "backupKey.generating" : "backupKey.generateBackupKey")}
             </button>
           </div>
           {mintError && <p className="admin-console__error">{mintError}</p>}
@@ -218,15 +209,13 @@ export function BackupKeyChoice({
       {choice === "new" && minted && (
         <div className="admin-console__keycard">
           <p className="admin-console__keycard-lead">
-            <strong>Save this now.</strong> It is shown once. Without it these backups cannot be
-            opened by anyone, including you.
-          </p>
+            <strong>{t("backupKey.saveThisNow")}</strong> {t("backupKey.itIsShownOnceWithout")}</p>
           <div className="admin-console__keycard-body">
             {qr && (
               <img
                 className="admin-console__keycard-qr"
                 src={qr}
-                alt="Your backup key as a QR code, for printing"
+                alt={t("backupKey.yourBackupKeyAsA")}
                 width={160}
                 height={160}
               />
@@ -237,15 +226,13 @@ export function BackupKeyChoice({
                 className="admin-console__btn admin-console__btn--primary"
                 onClick={() => saveKeyFile(minted, tenant)}
               >
-                Save key file
-              </button>
+                {t("backupKey.saveKeyFile")}</button>
               <button
                 type="button"
                 className="admin-console__btn"
                 onClick={() => void saveKeyQr(minted, tenant)}
               >
-                Save QR as PNG
-              </button>
+                {t("backupKey.saveQrAsPng")}</button>
             </div>
           </div>
           {mintError && <p className="admin-console__error">{mintError}</p>}
@@ -256,29 +243,26 @@ export function BackupKeyChoice({
         <div className="admin-console__stack">
           {status?.exists && status.recipient && !pasted && (
             <p className="admin-console__hint">
-              Using <code className="admin-console__wrap">{status.recipient}</code>
+              {t("backupKey.using")}<code className="admin-console__wrap">{status.recipient}</code>
             </p>
           )}
           {status?.exists && !status.recipient && (
             <p className="admin-console__warning">
-              A key is escrowed for this workspace, but its public half was not recorded, so it
-              cannot be reused here. Paste it below, or generate a new key.
-            </p>
+              {t("backupKey.aKeyIsEscrowedFor")}</p>
           )}
           <label className="admin-console__label">
             <span className="admin-console__label-text">
-              {status?.exists ? "Or use a different public key" : "Your public key"}
+              {t(status?.exists ? "backupKey.orADifferentKey" : "backupKey.yourPublicKey")}
             </span>
             <textarea
               rows={2}
               spellCheck={false}
-              placeholder="age1…"
+              placeholder={t("backupKey.age1")}
               value={pasted}
               onChange={(e) => setPasted(e.target.value)}
             />
             <span className="admin-console__hint">
-              The <code>age1</code> line from <code>age-keygen</code>. Leave empty to keep using the
-              escrowed key.
+              <Trans i18nKey="backupKey.pasteHint" components={{ code: <code /> }} />
             </span>
           </label>
         </div>

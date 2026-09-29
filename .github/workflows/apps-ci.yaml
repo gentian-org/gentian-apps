@@ -285,6 +285,42 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ github.sha }}
 
+  # The catalogue source, served over https for directors to fetch from.
+  #
+  # GitHub Pages because this repository is public and these are the same
+  # files it already shows: publishing them flattened discloses nothing new,
+  # and it gives the catalogue a URL that does not depend on anything of ours
+  # staying up. A cluster names it on its Cluster claim under
+  # spec.catalogue.sources, and the bytes are admitted by digest, never by
+  # where they came from (AD-3) -- so this host is not trusted, only
+  # convenient.
+  #
+  # Needs Pages enabled for the repository, with "GitHub Actions" as the
+  # source. Until it is, this job fails and nothing else does.
+  publish-catalogue:
+    needs: [should-publish, validate-profiles]
+    if: needs.should-publish.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PyYAML
+        run: pip install pyyaml
+      - name: Build the catalogue source
+        run: python3 scripts/build-catalogue-source.py --out dist/catalogue
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/catalogue
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
   validate-profiles:
     runs-on: ubuntu-latest
     steps:
@@ -328,6 +364,15 @@ jobs:
             kubectl kustomize "$d" >/dev/null
           done < <(find profiles -name profile.yaml | sort)
           echo "Validated ${found} profile bundle(s)"
+
+      - name: Build the catalogue source
+        # The flat, https-served shape a director fetches from and the App
+        # Store ingests, with the index that lets a cluster say what is in
+        # this catalogue at all (AD-14). Built on every run, not only when
+        # publishing: a bundle that cannot be published is a bundle that
+        # silently disappears from every cluster's catalogue, and finding
+        # that on main is finding it late.
+        run: python3 scripts/build-catalogue-source.py --check
 
       - name: Validate profile tile specs
         run: python3 scripts/validate-profile-tiles.py

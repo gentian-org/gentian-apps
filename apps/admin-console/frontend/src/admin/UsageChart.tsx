@@ -6,6 +6,7 @@ import {
   quantityKind,
   resourceLabel,
 } from "@/admin/resourceQuantity";
+import { useTranslation } from "react-i18next";
 
 /**
  * One resource's history: what was committed under the ceiling, and — where a
@@ -38,6 +39,8 @@ const PAD = { top: 14, right: 78, bottom: 22, left: 8 };
 type Point = { x: number; y: number; value: number; sample: ResourceSample };
 
 export function UsageChart({ resource, samples }: UsageChartProps) {
+  const { t } = useTranslation();
+
   const [hover, setHover] = useState<number | null>(null);
   const kind = useMemo(() => quantityKind(resource), [resource]);
 
@@ -123,14 +126,14 @@ export function UsageChart({ resource, samples }: UsageChartProps) {
         {hasActual ? (
           <span className="usage-chart__legend">
             <span className="usage-chart__key" style={{ background: COMMITTED }} />
-            committed
+            {t("usage.committed")}
             <span className="usage-chart__key" style={{ background: ACTUAL }} />
-            in use
+            {t("usage.inUse")}
           </span>
         ) : (
           // One series needs no legend box — the axis label and the direct
           // label at the line's end already name it.
-          <span className="usage-chart__legend usage-chart__legend--muted">committed</span>
+          <span className="usage-chart__legend usage-chart__legend--muted">{t("usage.committed")}</span>
         )}
       </figcaption>
 
@@ -225,17 +228,17 @@ export function UsageChart({ resource, samples }: UsageChartProps) {
             </div>
             <div className="usage-chart__tooltip-row">
               <span className="usage-chart__key" style={{ background: COMMITTED }} />
-              committed {formatQuantity(hovered.value, kind)}
+              {t("usage.committed2")}{formatQuantity(hovered.value, kind)}
             </div>
             {hoveredActual && (
               <div className="usage-chart__tooltip-row">
                 <span className="usage-chart__key" style={{ background: ACTUAL }} />
-                in use {formatQuantity(hoveredActual.value, kind)}
+                {t("usage.inUse")}{formatQuantity(hoveredActual.value, kind)}
               </div>
             )}
             {hovered.sample.plan && (
               <div className="usage-chart__tooltip-row usage-chart__tooltip-row--muted">
-                plan {hovered.sample.plan}
+                {t("usage.plan")}{hovered.sample.plan}
               </div>
             )}
           </div>

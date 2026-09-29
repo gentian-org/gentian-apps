@@ -13,6 +13,7 @@ import {
 import { UsageChart } from "@/admin/UsageChart";
 import { formatQuantity, parseQuantity, quantityKind, resourceLabel } from "@/admin/resourceQuantity";
 import "./admin.css";
+import { useTranslation } from "react-i18next";
 
 type ResourcesSectionProps = {
   tenant: string;
@@ -21,10 +22,10 @@ type ResourcesSectionProps = {
 
 /** How far back the history charts and the billing report look. */
 const RANGES = [
-  { id: "7d", label: "7 days", days: 7 },
-  { id: "30d", label: "30 days", days: 30 },
-  { id: "90d", label: "90 days", days: 90 },
-  { id: "365d", label: "12 months", days: 365 },
+  { id: "7d", labelKey: "range7d", days: 7 },
+  { id: "30d", labelKey: "range30d", days: 30 },
+  { id: "90d", labelKey: "range90d", days: 90 },
+  { id: "365d", labelKey: "range365d", days: 365 },
 ] as const;
 
 type RangeId = (typeof RANGES)[number]["id"];
@@ -63,6 +64,8 @@ function planLabel(plan: ResourcePlan): string {
 }
 
 export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionProps) {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   // A platform operator manages any tenant from here; a tenant administrator
   // only ever sees their own, and the BFF refuses anything else regardless of
@@ -149,21 +152,16 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
     <section>
       <header className="admin-console__section-head">
         <div>
-          <h2 className="admin-console__section-title">Resources</h2>
+          <h2 className="admin-console__section-title">{t("resources.resources")}</h2>
           <p className="admin-console__lead">
-            A workspace runs under a ceiling — how much CPU, memory and storage its apps may
-            claim between them. Changing plan commits the new ceiling to the deployments
-            repository, the same path an app install takes, so what is running and what is
-            recorded never disagree.
-          </p>
+            {t("resources.aWorkspaceRunsUnderA")}</p>
         </div>
         <button
           type="button"
           className="admin-console__btn"
           onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin", "resources"] })}
         >
-          Refresh
-        </button>
+          {t("resources.refresh")}</button>
       </header>
 
       {error && <p className="admin-console__error">{error}</p>}
@@ -171,20 +169,20 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
 
       {isPlatformAdmin && (
         <div className="admin-console__subsection">
-          <h3 className="admin-console__subsection-title">All tenants</h3>
-          {overviewQuery.isLoading && <p className="admin-console__loading">Loading…</p>}
+          <h3 className="admin-console__subsection-title">{t("resources.allTenants")}</h3>
+          {overviewQuery.isLoading && <p className="admin-console__loading">{t("resources.loading")}</p>}
           {overviewQuery.isError && (
-            <p className="admin-console__error">The cluster overview could not be loaded.</p>
+            <p className="admin-console__error">{t("resources.theClusterOverviewCouldNot")}</p>
           )}
           {overviewQuery.data && (
             <div className="admin-console__table-wrap">
               <table className="admin-console__table">
                 <thead>
                   <tr>
-                    <th>Tenant</th>
-                    <th>Plan</th>
-                    <th>Headroom</th>
-                    <th>Apps</th>
+                    <th>{t("resources.tenant")}</th>
+                    <th>{t("resources.plan")}</th>
+                    <th>{t("resources.headroom")}</th>
+                    <th>{t("resources.apps")}</th>
                     <th />
                   </tr>
                 </thead>
@@ -193,12 +191,12 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                     <tr key={row.tenant} className={row.tenant === selected ? "admin-console__row--editing" : undefined}>
                       <td className="admin-console__mono">{row.tenant}</td>
                       <td>
-                        {row.plan || <span className="admin-console__hint">no plan</span>}
+                        {row.plan || <span className="admin-console__hint">{t("resources.noPlan")}</span>}
                         {row.custom && (
-                          <span className="admin-console__badge admin-console__badge--warn">custom</span>
+                          <span className="admin-console__badge admin-console__badge--warn">{t("resources.custom")}</span>
                         )}
                         {row.drifted && (
-                          <span className="admin-console__badge admin-console__badge--warn">drifted</span>
+                          <span className="admin-console__badge admin-console__badge--warn">{t("resources.drifted")}</span>
                         )}
                       </td>
                       <td>
@@ -230,14 +228,15 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
 
       <div className="admin-console__subsection">
         <h3 className="admin-console__subsection-title">
-          {isPlatformAdmin ? `Current ceiling — ${selected}` : "Current ceiling"}
+          {isPlatformAdmin
+            ? t("resources.currentCeilingFor", { tenant: selected })
+            : t("resources.currentCeiling")}
         </h3>
 
-        {stateQuery.isLoading && <p className="admin-console__loading">Loading…</p>}
+        {stateQuery.isLoading && <p className="admin-console__loading">{t("resources.loading2")}</p>}
         {stateQuery.isError && (
           <p className="admin-console__error">
-            The resources API could not be reached. Plans and usage are unavailable until it is.
-          </p>
+            {t("resources.theResourcesApiCouldNot")}</p>
         )}
 
         {state && (
@@ -245,44 +244,37 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
             <div className="admin-console__stats admin-console__stats--strip">
               <div className="admin-console__stat">
                 <span className="admin-console__stat-value">{state.plan || "custom"}</span>
-                <span className="admin-console__stat-label">Plan</span>
+                <span className="admin-console__stat-label">{t("resources.plan2")}</span>
               </div>
               <div className="admin-console__stat">
                 <span className="admin-console__stat-value">{state.installedApps}</span>
-                <span className="admin-console__stat-label">Installed apps</span>
+                <span className="admin-console__stat-label">{t("resources.installedApps")}</span>
               </div>
             </div>
 
             {state.custom && (
               <p className="admin-console__warning">
-                This workspace&apos;s ceiling was set by hand and matches no plan in the
-                catalogue, so nothing prices it. Moving it onto a plan is what makes it
-                invoiceable.
-              </p>
+                {t("resources.thisWorkspaceSCeilingWas")}</p>
             )}
             {state.drifted && (
               <p className="admin-console__warning">
-                The ceiling in force is not the one {state.annotatedPlan} describes. The cluster
-                enforces what is there; what is billed is what is recorded. Re-applying a plan
-                settles both.
+                {t("resources.ceilingDrifted", { plan: state.annotatedPlan })}
               </p>
             )}
 
             {!state.hasQuota ? (
               <p className="admin-console__empty">
-                This workspace runs without a ceiling — its apps may claim whatever the cluster
-                has.
-              </p>
+                {t("resources.thisWorkspaceRunsWithoutA")}</p>
             ) : (
               <div className="admin-console__table-wrap">
                 <table className="admin-console__table">
                   <thead>
                     <tr>
-                      <th>Resource</th>
-                      <th>Committed</th>
-                      <th>Ceiling</th>
-                      <th>Headroom</th>
-                      <th>In use now</th>
+                      <th>{t("resources.resource")}</th>
+                      <th>{t("resources.committed")}</th>
+                      <th>{t("resources.ceiling")}</th>
+                      <th>{t("resources.headroom2")}</th>
+                      <th>{t("resources.inUseNow")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -307,7 +299,7 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                             </span>
                             <span className="admin-console__hint">
                               {row.usedRatio == null
-                                ? "no ceiling"
+                                ? t("resources.noCeiling")
                                 : `${Math.round(row.usedRatio * 100)}%`}
                             </span>
                           </td>
@@ -324,8 +316,9 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
 
             {!state.actual || Object.keys(state.actual).length === 0 ? (
               <p className="admin-console__hint">
-                Live consumption is {state.actualSource || "unavailable"}. Committed figures come
-                from the quota the cluster enforces and are unaffected.
+                {t("resources.liveConsumption", {
+                  source: state.actualSource || t("resources.unavailable"),
+                })}
               </p>
             ) : null}
           </>
@@ -333,18 +326,15 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
       </div>
 
       <div className="admin-console__subsection">
-        <h3 className="admin-console__subsection-title">Plans</h3>
+        <h3 className="admin-console__subsection-title">{t("resources.plans")}</h3>
         <p className="admin-console__lead">
-          {isPlatformAdmin
-            ? "Changing a tenant's plan commits to the deployments repository and Argo CD applies it on the next sync."
-            : "Pick the plan this workspace should run on. A larger plan takes effect once the change syncs; a smaller one is refused while more than it allows is in use."}
+          {t(isPlatformAdmin ? "resources.plansLeadAdmin" : "resources.plansLeadTenant")}
         </p>
 
-        {plansQuery.isLoading && <p className="admin-console__loading">Loading…</p>}
+        {plansQuery.isLoading && <p className="admin-console__loading">{t("resources.loading3")}</p>}
         {plansQuery.data?.length === 0 && (
           <p className="admin-console__empty">
-            No resource plans are defined on this cluster.
-          </p>
+            {t("resources.noResourcePlansAreDefined")}</p>
         )}
 
         <div className="admin-console__cards">
@@ -357,7 +347,7 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                 <div className="admin-console__card-title">
                   <span>{planLabel(plan)}</span>
                   {plan.current && (
-                    <span className="admin-console__badge admin-console__badge--ok">current</span>
+                    <span className="admin-console__badge admin-console__badge--ok">{t("resources.current")}</span>
                   )}
                   {plan.productSku && (
                     <span className="admin-console__badge">{plan.productSku}</span>
@@ -384,7 +374,7 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                     disabled={!plan.selectable || changeMutation.isPending}
                     onClick={() => requestChange(plan, false)}
                   >
-                    {pending === plan.name ? "Applying…" : "Switch to this plan"}
+                    {t(pending === plan.name ? "resources.applying" : "resources.switchToThisPlan")}
                   </button>
                 )}
                 {/* Force exists only for a platform operator, and only where the
@@ -400,17 +390,18 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                     onClick={() => {
                       if (
                         window.confirm(
-                          `Shrink ${selected} to ${planLabel(plan)} anyway?\n\n${plan.blocked}\n\n` +
-                            "Running pods keep running, but the cluster will refuse to recreate " +
-                            "any that restart until usage fits.",
+                          t("resources.shrinkConfirm", {
+                            tenant: selected,
+                            plan: planLabel(plan),
+                            blocked: plan.blocked,
+                          }),
                         )
                       ) {
                         requestChange(plan, true);
                       }
                     }}
                   >
-                    Force
-                  </button>
+                    {t("resources.force")}</button>
                 )}
               </div>
             </article>
@@ -420,8 +411,8 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
 
       <div className="admin-console__subsection">
         <div className="admin-console__section-head">
-          <h3 className="admin-console__subsection-title">History</h3>
-          <div className="admin-console__toggle-group" role="group" aria-label="Time range">
+          <h3 className="admin-console__subsection-title">{t("resources.history")}</h3>
+          <div className="admin-console__toggle-group" role="group" aria-label={t("resources.timeRange")}>
             {RANGES.map((entry) => (
               <button
                 key={entry.id}
@@ -430,21 +421,19 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                 aria-pressed={range === entry.id}
                 onClick={() => setRange(entry.id)}
               >
-                {entry.label}
+                {t(`resources.${entry.labelKey}`)}
               </button>
             ))}
           </div>
         </div>
 
-        {usageQuery.isLoading && <p className="admin-console__loading">Loading…</p>}
+        {usageQuery.isLoading && <p className="admin-console__loading">{t("resources.loading4")}</p>}
         {usageQuery.isError && (
-          <p className="admin-console__error">The usage history could not be loaded.</p>
+          <p className="admin-console__error">{t("resources.theUsageHistoryCouldNot")}</p>
         )}
         {usageQuery.data && samples.length === 0 && (
           <p className="admin-console__empty">
-            No samples in this window. The platform records a workspace&apos;s ceiling and
-            consumption on a timer, so history begins when sampling was switched on.
-          </p>
+            {t("resources.noSamplesInThisWindow")}</p>
         )}
 
         {chartedResources.map((resource) => (
@@ -453,32 +442,28 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
       </div>
 
       <div className="admin-console__subsection">
-        <h3 className="admin-console__subsection-title">Billed plan intervals</h3>
+        <h3 className="admin-console__subsection-title">{t("resources.billedPlanIntervals")}</h3>
         <p className="admin-console__lead">
-          What this window resolves to for invoicing: each stretch the workspace spent on one
-          plan, and the SKU in effect over it.
-        </p>
+          {t("resources.whatThisWindowResolvesTo")}</p>
 
-        {reportQuery.isLoading && <p className="admin-console__loading">Loading…</p>}
+        {reportQuery.isLoading && <p className="admin-console__loading">{t("resources.loading5")}</p>}
         {reportQuery.data?.incomplete && (
           <p className="admin-console__warning">
-            Nothing is recorded about the plan in force when this window opened, so the table
-            below covers only the changes inside it.
-          </p>
+            {t("resources.nothingIsRecordedAboutThe")}</p>
         )}
         {reportQuery.data && reportQuery.data.intervals.length === 0 ? (
-          <p className="admin-console__empty">No plan intervals in this window.</p>
+          <p className="admin-console__empty">{t("resources.noPlanIntervalsInThis")}</p>
         ) : (
           reportQuery.data && (
             <div className="admin-console__table-wrap">
               <table className="admin-console__table admin-console__table--numeric">
                 <thead>
                   <tr>
-                    <th>Plan</th>
-                    <th>SKU</th>
-                    <th>From</th>
-                    <th>To</th>
-                    <th>Days</th>
+                    <th>{t("resources.plan3")}</th>
+                    <th>{t("resources.sku")}</th>
+                    <th>{t("resources.from")}</th>
+                    <th>{t("resources.to")}</th>
+                    <th>{t("resources.days")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -505,8 +490,10 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
 
 /** A compact bar per resource, for the cluster admin's one-row-per-tenant view. */
 function TenantHeadroom({ state }: { state: ResourceState }) {
+  const { t } = useTranslation();
+
   if (!state.hasQuota || state.quota.length === 0) {
-    return <span className="admin-console__hint">no ceiling</span>;
+    return <span className="admin-console__hint">{t("resources.noCeiling")}</span>;
   }
   return (
     <span className="resource-headroom">

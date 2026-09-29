@@ -22,6 +22,7 @@ import {
   type KeyDecision,
 } from "@/admin/BackupKeyChoice";
 import "./admin.css";
+import { useTranslation } from "react-i18next";
 
 type BackupSchedulesSectionProps = {
   tenant: string;
@@ -58,6 +59,8 @@ function EditForm({
   ) => void;
   saving: boolean;
 }) {
+  const { t } = useTranslation();
+
   const [form, setForm] = useState<ScheduleForm>(() =>
     formFromCron(schedule.schedule, false),
   );
@@ -78,21 +81,21 @@ function EditForm({
     <div className="admin-console__card-footer">
       <div className="admin-console__field-row">
         <label className="admin-console__label">
-          <span className="admin-console__label-text">How often</span>
+          <span className="admin-console__label-text">{t("backupSchedules.howOften")}</span>
           <select
             value={form.frequency}
             onChange={(e) => setForm({ ...form, frequency: e.target.value as Frequency })}
           >
-            <option value="daily">Every day</option>
-            <option value="weekly">Every week</option>
-            <option value="monthly">Every month</option>
-            <option value="custom">Custom (cron)</option>
+            <option value="daily">{t("backupSchedules.everyDay")}</option>
+            <option value="weekly">{t("backupSchedules.everyWeek")}</option>
+            <option value="monthly">{t("backupSchedules.everyMonth")}</option>
+            <option value="custom">{t("backupSchedules.customCron")}</option>
           </select>
         </label>
 
         {form.frequency === "weekly" && (
           <label className="admin-console__label">
-            <span className="admin-console__label-text">Day</span>
+            <span className="admin-console__label-text">{t("backupSchedules.day")}</span>
             <select
               value={form.weekday}
               onChange={(e) => setForm({ ...form, weekday: Number(e.target.value) })}
@@ -108,7 +111,7 @@ function EditForm({
 
         {form.frequency === "monthly" && (
           <label className="admin-console__label">
-            <span className="admin-console__label-text">Day of month</span>
+            <span className="admin-console__label-text">{t("backupSchedules.dayOfMonth")}</span>
             <select
               value={form.monthday}
               onChange={(e) => setForm({ ...form, monthday: Number(e.target.value) })}
@@ -124,7 +127,7 @@ function EditForm({
 
         {showTime && (
           <label className="admin-console__label">
-            <span className="admin-console__label-text">Start at (UTC)</span>
+            <span className="admin-console__label-text">{t("backupSchedules.startAtUtc")}</span>
             <input
               type="time"
               value={form.time}
@@ -136,7 +139,7 @@ function EditForm({
 
       {form.frequency === "custom" && (
         <label className="admin-console__label">
-          <span className="admin-console__label-text">Cron expression (UTC)</span>
+          <span className="admin-console__label-text">{t("backupSchedules.cronExpressionUtc")}</span>
           <input
             placeholder="0 3 * * *"
             value={form.custom}
@@ -145,14 +148,14 @@ function EditForm({
         </label>
       )}
 
-      <h4 className="admin-console__group-title">How many to keep</h4>
+      <h4 className="admin-console__group-title">{t("backupSchedules.howManyToKeep")}</h4>
       <div className="admin-console__field-row">
         {(
           [
-            ["keepLast", "Most recent"],
-            ["keepDaily", "Days"],
-            ["keepWeekly", "Weeks"],
-            ["keepMonthly", "Months"],
+            ["keepLast", t("backupSchedules.retentionLast")],
+            ["keepDaily", t("backupSchedules.retentionDaily")],
+            ["keepWeekly", t("backupSchedules.retentionWeekly")],
+            ["keepMonthly", t("backupSchedules.retentionMonthly")],
             ["keepYearly", "Years"],
           ] as [keyof BackupRetention, string][]
         ).map(([key, label]) => (
@@ -197,14 +200,15 @@ function EditForm({
           {saving ? "Saving…" : "Save"}
         </button>
         <button type="button" className="admin-console__btn" onClick={onCancel}>
-          Cancel
-        </button>
+          {t("backupSchedules.cancel")}</button>
       </div>
     </div>
   );
 }
 
 export function BackupSchedulesSection({ tenant, isPlatformAdmin }: BackupSchedulesSectionProps) {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const [allTenants, setAllTenants] = useState(isPlatformAdmin);
   const [editing, setEditing] = useState<string | null>(null);
@@ -280,10 +284,9 @@ export function BackupSchedulesSection({ tenant, isPlatformAdmin }: BackupSchedu
     <section>
       <header className="admin-console__section-head">
         <div>
-          <h2 className="admin-console__section-title">Scheduled backups</h2>
+          <h2 className="admin-console__section-title">{t("backupSchedules.scheduledBackups")}</h2>
           <p className="admin-console__lead">
-            What runs automatically, and when it last succeeded.
-          </p>
+            {t("backupSchedules.whatRunsAutomaticallyAndWhen")}</p>
         </div>
         {isPlatformAdmin && (
           <label className="admin-console__checkbox">
@@ -292,19 +295,18 @@ export function BackupSchedulesSection({ tenant, isPlatformAdmin }: BackupSchedu
               checked={allTenants}
               onChange={(e) => setAllTenants(e.target.checked)}
             />
-            <span>All tenants</span>
+            <span>{t("backupSchedules.allTenants")}</span>
           </label>
         )}
       </header>
 
       {error && <p className="admin-console__error">{error}</p>}
 
-      {query.isLoading && <p className="admin-console__loading">Loading…</p>}
+      {query.isLoading && <p className="admin-console__loading">{t("backupSchedules.loading")}</p>}
 
       {!query.isLoading && schedules.length === 0 && (
         <p className="admin-console__empty">
-          Nothing runs automatically. Set a schedule in the backup settings below.
-        </p>
+          {t("backupSchedules.nothingRunsAutomaticallySetA")}</p>
       )}
 
       <div className="admin-console__cards">
@@ -316,37 +318,38 @@ export function BackupSchedulesSection({ tenant, isPlatformAdmin }: BackupSchedu
                   {allTenants ? `${s.tenant} / ${s.name}` : s.name}
                 </span>
                 {s.suspended && (
-                  <span className="admin-console__badge admin-console__badge--warn">paused</span>
+                  <span className="admin-console__badge admin-console__badge--warn">{t("backupSchedules.paused")}</span>
                 )}
-                {s.managed && <span className="admin-console__badge">from settings</span>}
+                {s.managed && <span className="admin-console__badge">{t("backupSchedules.fromSettings")}</span>}
               </div>
               <p className="admin-console__card-desc">
-                {describeSchedule(formFromCron(s.schedule, false), "")} Keeps {keptSummary(s.retention)}.
+                {describeSchedule(formFromCron(s.schedule, false), "")} {t("backupSchedules.keeps")}{keptSummary(s.retention)}.
               </p>
               <p className="admin-console__card-meta">
-                Last success {formatTime(s.lastSuccessfulTime)} · next {formatTime(s.nextScheduleTime)}
-                {s.encryption.mode === "own"
-                  ? " · encrypted to your own key"
-                  : " · encrypted to the platform's key"}
+                {t("backupSchedules.lastAndNext", {
+                  last: formatTime(s.lastSuccessfulTime),
+                  next: formatTime(s.nextScheduleTime),
+                })}
+                {t(
+                  s.encryption.mode === "own"
+                    ? "backupSchedules.encryptedOwnKey"
+                    : "backupSchedules.encryptedPlatformKey",
+                )}
               </p>
               {s.encryption.mode === "own" && (
                 <p className="admin-console__hint">
-                  Nobody here can read these backups. Restoring one needs the private key you
-                  hold — keep it somewhere that survives losing this cluster.
-                </p>
+                  {t("backupSchedules.nobodyHereCanReadThese")}</p>
               )}
               {s.message && <p className="admin-console__warning">{s.message}</p>}
               {!s.lastSuccessfulTime && s.lastScheduleTime && (
                 <p className="admin-console__warning">
-                  Has run but never succeeded — a schedule that fails every night looks healthy
-                  by every other measure.
-                </p>
+                  {t("backupSchedules.hasRunButNeverSucceeded")}</p>
               )}
             </div>
 
             <div className="admin-console__card-aside admin-console__card-aside--top">
               {s.managed ? (
-                <span className="admin-console__hint">Change in the settings below</span>
+                <span className="admin-console__hint">{t("backupSchedules.changeInTheSettingsBelow")}</span>
               ) : (
                 <div className="admin-console__actions">
                   <button
@@ -374,8 +377,7 @@ export function BackupSchedulesSection({ tenant, isPlatformAdmin }: BackupSchedu
                       }
                     }}
                   >
-                    Delete
-                  </button>
+                    {t("backupSchedules.delete")}</button>
                 </div>
               )}
             </div>

@@ -6,3 +6,6 @@ __pycache__/
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Built by scripts/build-catalogue-source.py; published by CI, never committed.
+dist/

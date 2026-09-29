@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchCustomizationDebtReport, type CustomizationRecord } from "@/api/admin";
 import "./admin.css";
+import { Trans, useTranslation } from "react-i18next";
 
 const RUNGS = ["L0", "L1", "L2", "L3", "L4", "L5", "L6"] as const;
 
@@ -16,17 +17,19 @@ const CARRIED_FROM = 4;
  * lets Gentian see it before it accumulates.
  */
 export function CustomizationDebtSection() {
+  const { t } = useTranslation();
+
   const reportQuery = useQuery({
     queryKey: ["admin", "platform", "customization-debt"],
     queryFn: () => fetchCustomizationDebtReport(),
   });
 
   if (reportQuery.isLoading) {
-    return <p className="admin-console__loading">Loading customization debt report…</p>;
+    return <p className="admin-console__loading">{t("customizationDebt.loadingCustomizationDebtReport")}</p>;
   }
   if (reportQuery.isError || !reportQuery.data) {
     return (
-      <p className="admin-console__error">Customization debt report is unavailable.</p>
+      <p className="admin-console__error">{t("customizationDebt.customizationDebtReportIsUnavailable")}</p>
     );
   }
 
@@ -36,19 +39,21 @@ export function CustomizationDebtSection() {
     <section>
       <header className="admin-console__section-head">
         <div>
-          <h2 className="admin-console__section-title">Customization debt</h2>
+          <h2 className="admin-console__section-title">{t("customizationDebt.customizationDebt")}</h2>
           <p className="admin-console__lead">
-            Every deviation from an app as shipped, tracked as a <code>Customization</code>{" "}
-            record. Lower rungs (L0–L1) are routine; rungs L4 and above are carried deltas that
-            must be reviewed, forwarded upstream, and eventually dropped. See the{" "}
-            <a
-              href="https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md"
-              target="_blank"
-              rel="noreferrer"
-            >
-              customization ladder
-            </a>
-            .
+            <Trans
+              i18nKey="customizationDebt.lead"
+              components={{
+                code: <code />,
+                ladder: (
+                  <a
+                    href="https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md"
+                    target="_blank"
+                    rel="noreferrer"
+                  />
+                ),
+              }}
+            />
           </p>
         </div>
       </header>
@@ -57,7 +62,7 @@ export function CustomizationDebtSection() {
         <div className="admin-console__stat">
           <div className="admin-console__stat-value">{report.totalRecords}</div>
           <div className="admin-console__stat-label">
-            Tracked record{report.totalRecords === 1 ? "" : "s"}
+            {t("customizationDebt.trackedRecord")}{report.totalRecords === 1 ? "" : "s"}
           </div>
         </div>
         {/* The one number meant to trend down — the only tile that raises its
@@ -70,11 +75,11 @@ export function CustomizationDebtSection() {
           }`}
         >
           <div className="admin-console__stat-value">{report.carriedDeltas}</div>
-          <div className="admin-console__stat-label">Carried delta at L4+</div>
+          <div className="admin-console__stat-label">{t("customizationDebt.carriedDeltaAtL4")}</div>
         </div>
       </div>
 
-      <h3 className="admin-console__subsection-title">Records by rung</h3>
+      <h3 className="admin-console__subsection-title">{t("customizationDebt.recordsByRung")}</h3>
       <div className="admin-console__stats admin-console__stats--strip">
         {RUNGS.map((rung, index) => (
           <div
@@ -90,17 +95,17 @@ export function CustomizationDebtSection() {
       </div>
 
       <RecordList
-        title="Past review date"
+        title={t("customizationDebt.pastReviewDate")}
         empty="Nothing is overdue for review."
         records={report.reviewOverdue}
       />
       <RecordList
-        title="Upstream-first obligation unmet or superseded"
+        title={t("customizationDebt.upstreamFirstObligationUnmetOr")}
         empty="Every carried delta has a recorded upstream outcome."
         records={report.upstreamStale}
       />
       <RecordList
-        title="A cheaper rung is now available"
+        title={t("customizationDebt.aCheaperRungIsNow")}
         empty="No record could currently descend to a cheaper rung."
         records={report.rungAboveRecommended}
       />
@@ -117,6 +122,8 @@ function RecordList({
   empty: string;
   records: CustomizationRecord[];
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="admin-console__subsection">
       <h3 className="admin-console__subsection-title">
@@ -135,12 +142,12 @@ function RecordList({
           <table className="admin-console__table">
             <thead>
               <tr>
-                <th>Record</th>
-                <th>Target</th>
-                <th>Rung</th>
-                <th>Scope</th>
-                <th>Owner</th>
-                <th>Review by</th>
+                <th>{t("customizationDebt.record")}</th>
+                <th>{t("customizationDebt.target")}</th>
+                <th>{t("customizationDebt.rung")}</th>
+                <th>{t("customizationDebt.scope")}</th>
+                <th>{t("customizationDebt.owner")}</th>
+                <th>{t("customizationDebt.reviewBy")}</th>
               </tr>
             </thead>
             <tbody>

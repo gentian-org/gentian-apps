@@ -10,6 +10,8 @@ import {
 } from "@/api/admin";
 import { BackupKeyChoice, type KeyChoice, type KeyDecision } from "@/admin/BackupKeyChoice";
 import "./admin.css";
+import type { TFunction } from "i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 type BackupSectionProps = {
   tenant: string;
@@ -24,12 +26,12 @@ function defaultName(): string {
   return `export-${stamp}`;
 }
 
-function pauseWindow(app: Backup["apps"][number]): string {
+function pauseWindow(app: Backup["apps"][number], t: TFunction): string {
   if (!app.quiesceStart) {
     return "—";
   }
   if (!app.quiesceEnd) {
-    return "paused now";
+    return t("backup.pausedNow");
   }
   const seconds = Math.max(
     0,
@@ -57,6 +59,8 @@ function phaseBadgeClass(phase: string): string {
 }
 
 export function BackupSection({ tenant }: BackupSectionProps) {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const [name, setName] = useState(defaultName);
   const [keyChoice, setKeyChoice] = useState<KeyChoice>("platform");
@@ -166,11 +170,11 @@ export function BackupSection({ tenant }: BackupSectionProps) {
 
     if (mode === "passphrase") {
       if (passphrase.length < 12) {
-        setError("Use a passphrase of at least 12 characters.");
+        setError(t("backup.passphraseTooShort"));
         return;
       }
       if (passphrase !== confirmPassphrase) {
-        setError("The passphrases do not match.");
+        setError(t("backup.passphrasesDiffer"));
         return;
       }
     }
@@ -181,20 +185,22 @@ export function BackupSection({ tenant }: BackupSectionProps) {
     // exactly the reader the choice was made to exclude.
     if (!keyDecision.ready) {
       setError(
-        keyDecision.choice === "new"
-          ? "Generate the key first, and save it — the backup cannot be made without it."
-          : "Enter the public key to encrypt this backup to.",
+        t(
+          keyDecision.choice === "new"
+            ? "backup.generateKeyFirst"
+            : "backup.enterPublicKey",
+        ),
       );
       return;
     }
 
     if (target === "custom") {
       if (!endpoint.trim()) {
-        setError("Enter the S3 endpoint to write this backup to.");
+        setError(t("backup.enterEndpoint"));
         return;
       }
       if (credentialSource === "transient" && (!accessKey.trim() || !secretKey.trim())) {
-        setError("Enter both an access key and a secret key, or use the stored credentials.");
+        setError(t("backup.enterBothKeys"));
         return;
       }
     }
@@ -232,20 +238,16 @@ export function BackupSection({ tenant }: BackupSectionProps) {
     <section>
       <header className="admin-console__section-head">
         <div>
-          <h2 className="admin-console__section-title">Backup</h2>
+          <h2 className="admin-console__section-title">{t("backup.backup")}</h2>
           <p className="admin-console__lead">
-            An export captures this tenant — app databases, files and member accounts — into
-            one encrypted bundle. Apps are paused one at a time while each is captured, so every
-            app&apos;s data is internally consistent; the rest keep running.
-          </p>
+            {t("backup.anExportCapturesThisTenant")}</p>
         </div>
         <button
           type="button"
           className="admin-console__btn"
           onClick={() => void backupsQuery.refetch()}
         >
-          Refresh
-        </button>
+          {t("backup.refresh")}</button>
       </header>
 
       {error && <p className="admin-console__error">{error}</p>}
@@ -254,18 +256,18 @@ export function BackupSection({ tenant }: BackupSectionProps) {
       <form className="admin-console__form admin-console__form--plain" onSubmit={submit}>
         <div className="admin-console__stack">
           <label className="admin-console__label">
-            <span className="admin-console__label-text">Name</span>
+            <span className="admin-console__label-text">{t("backup.name")}</span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="export-2026-08-18"
+              placeholder={t("backup.export20260818")}
               required
             />
           </label>
         </div>
 
         <fieldset className="admin-console__fieldset admin-console__fieldset--plain">
-          <legend>Where it goes</legend>
+          <legend>{t("backup.whereItGoes")}</legend>
 
           <div className="admin-console__choices">
             <label
@@ -280,10 +282,9 @@ export function BackupSection({ tenant }: BackupSectionProps) {
                 onChange={() => setTarget("policy")}
               />
               <span>
-                <span className="admin-console__choice-title">Where my backups normally go</span>
+                <span className="admin-console__choice-title">{t("backup.whereMyBackupsNormallyGo")}</span>
                 <span className="admin-console__choice-desc">
-                  The destination this workspace is configured for — the same place the nightly backup writes.
-                </span>
+                  {t("backup.theDestinationThisWorkspaceIs")}</span>
               </span>
             </label>
             <label
@@ -298,10 +299,9 @@ export function BackupSection({ tenant }: BackupSectionProps) {
                 onChange={() => setTarget("platform")}
               />
               <span>
-                <span className="admin-console__choice-title">This platform's own storage</span>
+                <span className="admin-console__choice-title">{t("backup.thisPlatformSOwnStorage")}</span>
                 <span className="admin-console__choice-desc">
-                  A copy kept close, for just before a risky change. It shares a home with the data it protects, so it is not what you want for disaster recovery.
-                </span>
+                  {t("backup.aCopyKeptCloseFor")}</span>
               </span>
             </label>
             <label
@@ -316,10 +316,9 @@ export function BackupSection({ tenant }: BackupSectionProps) {
                 onChange={() => setTarget("custom")}
               />
               <span>
-                <span className="admin-console__choice-title">My own S3 storage</span>
+                <span className="admin-console__choice-title">{t("backup.myOwnS3Storage")}</span>
                 <span className="admin-console__choice-desc">
-                  A bucket you name, on a provider you name. For handing a copy to someone, or keeping one somewhere this platform cannot reach.
-                </span>
+                  {t("backup.aBucketYouNameOn")}</span>
               </span>
             </label>
 
@@ -328,28 +327,28 @@ export function BackupSection({ tenant }: BackupSectionProps) {
             {target === "custom" && (
               <div className="admin-console__choice-detail">
                 <label className="admin-console__label">
-                  <span className="admin-console__label-text">Endpoint</span>
+                  <span className="admin-console__label-text">{t("backup.endpoint")}</span>
                   <input
                     value={endpoint}
                     onChange={(event) => setEndpoint(event.target.value)}
-                    placeholder="https://sos-ch-dk-2.exo.io"
+                    placeholder={t("backup.httpsSosChDk2")}
                     required
                   />
                 </label>
                 <label className="admin-console__label">
-                  <span className="admin-console__label-text">Bucket</span>
+                  <span className="admin-console__label-text">{t("backup.bucket")}</span>
                   <input
                     value={bucket}
                     onChange={(event) => setBucket(event.target.value)}
-                    placeholder="leave empty to keep this workspace's bucket name"
+                    placeholder={t("backup.leaveEmptyToKeepThis")}
                   />
                 </label>
                 <label className="admin-console__label">
-                  <span className="admin-console__label-text">Region</span>
+                  <span className="admin-console__label-text">{t("backup.region")}</span>
                   <input
                     value={region}
                     onChange={(event) => setRegion(event.target.value)}
-                    placeholder="ch-dk-2 — some providers need one, MinIO does not"
+                    placeholder={t("backup.chDk2SomeProviders")}
                   />
                 </label>
 
@@ -366,11 +365,9 @@ export function BackupSection({ tenant }: BackupSectionProps) {
                       onChange={() => setCredentialSource("managed")}
                     />
                     <span>
-                      <span className="admin-console__choice-title">Use my stored keys</span>
+                      <span className="admin-console__choice-title">{t("backup.useMyStoredKeys")}</span>
                       <span className="admin-console__choice-desc">
-                        The credentials already held for this workspace — the ones the nightly
-                        backup uses. Nothing to type, and nothing new to keep safe.
-                      </span>
+                        {t("backup.theCredentialsAlreadyHeldFor")}</span>
                     </span>
                   </label>
 
@@ -386,11 +383,9 @@ export function BackupSection({ tenant }: BackupSectionProps) {
                       onChange={() => setCredentialSource("transient")}
                     />
                     <span>
-                      <span className="admin-console__choice-title">Enter keys for this backup</span>
+                      <span className="admin-console__choice-title">{t("backup.enterKeysForThisBackup")}</span>
                       <span className="admin-console__choice-desc">
-                        Used for this backup only. They are kept while it runs and removed when it
-                        finishes — they are not stored for next time.
-                      </span>
+                        {t("backup.usedForThisBackupOnly")}</span>
                     </span>
                   </label>
                 </div>
@@ -398,7 +393,7 @@ export function BackupSection({ tenant }: BackupSectionProps) {
                 {credentialSource === "transient" && (
                   <div className="admin-console__choice-detail">
                     <label className="admin-console__label">
-                      <span className="admin-console__label-text">Access key</span>
+                      <span className="admin-console__label-text">{t("backup.accessKey")}</span>
                       <input
                         value={accessKey}
                         onChange={(event) => setAccessKey(event.target.value)}
@@ -407,7 +402,7 @@ export function BackupSection({ tenant }: BackupSectionProps) {
                       />
                     </label>
                     <label className="admin-console__label">
-                      <span className="admin-console__label-text">Secret key</span>
+                      <span className="admin-console__label-text">{t("backup.secretKey")}</span>
                       <input
                         type="password"
                         value={secretKey}
@@ -430,12 +425,12 @@ export function BackupSection({ tenant }: BackupSectionProps) {
           onChoiceChange={setKeyChoice}
           onDecision={setKeyDecision}
           passphrase={{
-            body: "Encrypted so only you can open it — not the platform, not support. If the passphrase is lost, the bundle cannot be recovered by anyone.",
+            body: t("backup.passphraseBody"),
             ready: passphrase.length >= 12 && passphrase === confirmPassphrase,
             fields: (
               <>
               <label className="admin-console__label">
-                <span className="admin-console__label-text">Passphrase</span>
+                <span className="admin-console__label-text">{t("backup.passphrase")}</span>
                 <input
                   type="password"
                   value={passphrase}
@@ -446,7 +441,7 @@ export function BackupSection({ tenant }: BackupSectionProps) {
                 />
               </label>
               <label className="admin-console__label">
-                <span className="admin-console__label-text">Confirm passphrase</span>
+                <span className="admin-console__label-text">{t("backup.confirmPassphrase")}</span>
                 <input
                   type="password"
                   value={confirmPassphrase}
@@ -467,24 +462,22 @@ export function BackupSection({ tenant }: BackupSectionProps) {
             className="admin-console__btn admin-console__btn--primary"
             disabled={createMutation.isPending || running.length > 0}
           >
-            {createMutation.isPending ? "Starting…" : "Start export"}
+            {t(createMutation.isPending ? "backup.starting" : "backup.startExport")}
           </button>
           {running.length > 0 && (
             <p className="admin-console__hint">
-              An export is already running. Only one runs at a time, so no app is paused by two at
-              once.
-            </p>
+              {t("backup.anExportIsAlreadyRunning")}</p>
           )}
         </div>
       </form>
 
       <div className="admin-console__subsection">
-        <h3 className="admin-console__subsection-title">History</h3>
+        <h3 className="admin-console__subsection-title">{t("backup.history")}</h3>
 
-        {backupsQuery.isLoading && <p className="admin-console__loading">Loading…</p>}
+        {backupsQuery.isLoading && <p className="admin-console__loading">{t("backup.loading")}</p>}
 
         {!backupsQuery.isLoading && backups.length === 0 && (
-          <p className="admin-console__empty">No exports yet.</p>
+          <p className="admin-console__empty">{t("backup.noExportsYet")}</p>
         )}
 
         <div className="admin-console__cards">
@@ -494,10 +487,10 @@ export function BackupSection({ tenant }: BackupSectionProps) {
                 <div className="admin-console__card-title">
                   <span className="admin-console__mono">{backup.name}</span>
                   <span className={phaseBadgeClass(backup.phase)}>
-                    {backup.phase || "Pending"}
+                    {backup.phase || t("backup.pending")}
                   </span>
                   <span className="admin-console__badge">
-                    {backup.encryptionMode === "passphrase" ? "your passphrase" : "platform key"}
+                    {t(backup.encryptionMode === "passphrase" ? "backup.yourPassphrase" : "backup.platformKey")}
                   </span>
                 </div>
 
@@ -507,8 +500,7 @@ export function BackupSection({ tenant }: BackupSectionProps) {
 
                 {backup.phase === "Ready" && !backup.platformReadable && (
                   <p className="admin-console__card-desc">
-                    Only you can open this bundle.
-                  </p>
+                    {t("backup.onlyYouCanOpenThis")}</p>
                 )}
 
                 {backup.bundlePrefix && (
@@ -541,8 +533,7 @@ export function BackupSection({ tenant }: BackupSectionProps) {
                 <div className="admin-console__card-footer">
                   {backup.quiesced.length > 0 && (
                     <p className="admin-console__warning">
-                      Paused right now: {backup.quiesced.join(", ")}. These apps stay offline
-                      until this export finishes.
+                      {t("backup.pausedRightNow", { apps: backup.quiesced.join(", ") })}
                     </p>
                   )}
 
@@ -551,10 +542,10 @@ export function BackupSection({ tenant }: BackupSectionProps) {
                       <table className="admin-console__table">
                         <thead>
                           <tr>
-                            <th>App</th>
-                            <th>State</th>
-                            <th>Captured</th>
-                            <th>Paused for</th>
+                            <th>{t("backup.app")}</th>
+                            <th>{t("backup.state")}</th>
+                            <th>{t("backup.captured")}</th>
+                            <th>{t("backup.pausedFor")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -568,7 +559,7 @@ export function BackupSection({ tenant }: BackupSectionProps) {
                                 )}
                               </td>
                               <td>{app.stores.length > 0 ? app.stores.join(", ") : "—"}</td>
-                              <td>{pauseWindow(app)}</td>
+                              <td>{pauseWindow(app, t)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -578,9 +569,7 @@ export function BackupSection({ tenant }: BackupSectionProps) {
 
                   {backup.phase === "Ready" && (
                     <p className="admin-console__hint">
-                      The bundle stays in the platform&apos;s object storage at the location
-                      above. <code>bundle-info.json</code> inside it is readable and names the
-                      exact command that decrypts the rest.
+                      <Trans i18nKey="backup.bundleStays" components={{ code: <code /> }} />
                     </p>
                   )}
                 </div>

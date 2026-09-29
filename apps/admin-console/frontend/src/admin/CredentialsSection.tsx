@@ -14,6 +14,7 @@ import {
   type RepositoryView,
 } from "@/api/credentials";
 import "./admin.css";
+import { Trans, useTranslation } from "react-i18next";
 
 /**
  * Credentials and repositories.
@@ -31,6 +32,8 @@ import "./admin.css";
  *   skip.
  */
 export function CredentialsSection() {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const credentialsQuery = useQuery({
     queryKey: ["admin", "credentials"],
@@ -42,7 +45,7 @@ export function CredentialsSection() {
   });
 
   if (credentialsQuery.isLoading) {
-    return <p className="admin-console__loading">Loading credentials…</p>;
+    return <p className="admin-console__loading">{t("credentials.loadingCredentials")}</p>;
   }
   if (credentialsQuery.isError) {
     // The message, not a summary of it. apiFetch already distinguishes "the
@@ -53,17 +56,16 @@ export function CredentialsSection() {
     return (
       <section>
         <header className="admin-console__section-head">
-          <h2 className="admin-console__section-title">Credentials</h2>
+          <h2 className="admin-console__section-title">{t("credentials.credentials")}</h2>
         </header>
-        <p className="admin-console__error">Credentials cannot be read right now.</p>
+        <p className="admin-console__error">{t("credentials.credentialsCannotBeReadRight")}</p>
         {detail ? <p className="admin-console__error"><code>{detail}</code></p> : null}
         <button
           type="button"
           className="admin-console__btn"
           onClick={() => void credentialsQuery.refetch()}
         >
-          Try again
-        </button>
+          {t("credentials.tryAgain")}</button>
       </section>
     );
   }
@@ -75,30 +77,26 @@ export function CredentialsSection() {
     <section>
       <header className="admin-console__section-head">
         <div>
-          <h2 className="admin-console__section-title">Credentials</h2>
+          <h2 className="admin-console__section-title">{t("credentials.credentials2")}</h2>
           <p className="admin-console__lead">
-            Values are write-only. This shows whether a credential is present, who set it and
-            when — never the value itself. A lost credential is rotated, not recovered.
-          </p>
+            {t("credentials.valuesAreWriteOnlyThis")}</p>
         </div>
         <button
           type="button"
           className="admin-console__btn"
           onClick={() => void credentialsQuery.refetch()}
         >
-          Refresh
-        </button>
+          {t("credentials.refresh")}</button>
       </header>
 
       {unsatisfied.length > 0 ? (
         <p className="admin-console__warning" role="status">
-          {unsatisfied.length} required credential{unsatisfied.length === 1 ? " is" : "s are"} not
-          yet supplied.
+          {t("credentials.unsatisfied", { count: unsatisfied.length })}
         </p>
       ) : null}
 
       {credentials.length === 0 ? (
-        <p className="admin-console__empty">No credentials are declared for your scope.</p>
+        <p className="admin-console__empty">{t("credentials.noCredentialsAreDeclaredFor")}</p>
       ) : (
         <ul className="admin-console__cards">
           {credentials.map((credential) => (
@@ -132,6 +130,8 @@ function CredentialCard({
   credential: CredentialStatus;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
+
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const mutation = useMutation({
@@ -171,10 +171,16 @@ function CredentialCard({
                   : "admin-console__badge--danger"
             }`}
           >
-            {credential.satisfied ? "present" : credential.optional ? "not set" : "missing"}
+            {t(
+              credential.satisfied
+                ? "credentials.present"
+                : credential.optional
+                  ? "credentials.notSet"
+                  : "credentials.missing",
+            )}
           </span>
           {credential.tenant ? (
-            <span className="admin-console__badge">tenant {credential.tenant}</span>
+            <span className="admin-console__badge">{t("credentials.tenant")}{credential.tenant}</span>
           ) : null}
         </div>
 
@@ -191,7 +197,7 @@ function CredentialCard({
 
         {credential.setBy ? (
           <p className="admin-console__card-meta">
-            Set by {credential.setBy}
+            {t("credentials.setBy")}{credential.setBy}
             {credential.updatedAt ? ` on ${new Date(credential.updatedAt).toLocaleString()}` : ""}
           </p>
         ) : null}
@@ -261,8 +267,7 @@ function CredentialCard({
               className="admin-console__btn admin-console__btn--quiet"
               onClick={() => setOpen(false)}
             >
-              Cancel
-            </button>
+              {t("credentials.cancel")}</button>
           </div>
         </form>
       ) : null}
@@ -279,6 +284,8 @@ function RepositoriesPanel({
   loading: boolean;
   onChanged: () => void;
 }) {
+  const { t } = useTranslation();
+
   const [pending, setPending] = useState<{
     name: string;
     input?: RepositoryInput;
@@ -324,11 +331,9 @@ function RepositoriesPanel({
 
   return (
     <div className="admin-console__subsection">
-      <h3 className="admin-console__subsection-title">Repositories</h3>
+      <h3 className="admin-console__subsection-title">{t("credentials.repositories")}</h3>
       <p className="admin-console__lead">
-        Where your apps come from. The cluster&apos;s own repositories are listed but not
-        editable — your apps depend on them.
-      </p>
+        {t("credentials.whereYourAppsComeFrom")}</p>
 
       {error ? <p className="admin-console__error">{error}</p> : null}
 
@@ -350,51 +355,44 @@ function RepositoriesPanel({
           }}
         >
           <label className="admin-console__field">
-            Name
-            <input
+            {t("credentials.name")}<input
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              placeholder="my-catalogue"
+              placeholder={t("credentials.myCatalogue")}
               required
             />
           </label>
           <label className="admin-console__field">
-            Repository URL
-            <input
+            {t("credentials.repositoryUrl")}<input
               value={draft.url}
               onChange={(e) => setDraft({ ...draft, url: e.target.value })}
-              placeholder="https://github.com/acme/gentian-apps"
+              placeholder={t("credentials.httpsGithubComAcmeGentian")}
               required
             />
           </label>
           <label className="admin-console__field">
-            Kind
-            <select
+            {t("credentials.kind")}<select
               value={draft.type}
               onChange={(e) => setDraft({ ...draft, type: e.target.value as "git" | "oci" })}
             >
-              <option value="git">git</option>
-              <option value="oci">oci</option>
+              <option value="git">{t("credentials.git")}</option>
+              <option value="oci">{t("credentials.oci")}</option>
             </select>
           </label>
           {draft.type === "git" ? (
             <label className="admin-console__field">
-              Branch
-              <input
+              {t("credentials.branch")}<input
                 value={draft.branch ?? ""}
                 onChange={(e) => setDraft({ ...draft, branch: e.target.value })}
-                placeholder="main"
+                placeholder={t("credentials.main")}
               />
             </label>
           ) : null}
           <p className="admin-console__hint">
-            An additive app catalogue for this tenant. Its apps appear alongside the
-            cluster&apos;s; removing it removes those apps.
-          </p>
+            {t("credentials.anAdditiveAppCatalogueFor")}</p>
           <div className="admin-console__form-actions">
             <button type="submit" className="admin-console__btn admin-console__btn--primary">
-              Add repository
-            </button>
+              {t("credentials.addRepository")}</button>
             <button
               type="button"
               className="admin-console__btn"
@@ -403,8 +401,7 @@ function RepositoriesPanel({
                 setError(null);
               }}
             >
-              Cancel
-            </button>
+              {t("credentials.cancel2")}</button>
           </div>
         </form>
       ) : (
@@ -413,14 +410,13 @@ function RepositoriesPanel({
           className="admin-console__btn admin-console__btn--primary"
           onClick={() => setAdding(true)}
         >
-          Add a repository
-        </button>
+          {t("credentials.addARepository")}</button>
       )}
 
       {loading ? (
-        <p className="admin-console__loading">Loading repositories…</p>
+        <p className="admin-console__loading">{t("credentials.loadingRepositories")}</p>
       ) : repositories.length === 0 ? (
-        <p className="admin-console__empty">No repositories are configured for your scope.</p>
+        <p className="admin-console__empty">{t("credentials.noRepositoriesAreConfiguredFor")}</p>
       ) : (
         <ul className="admin-console__cards">
           {repositories.map((repo) => (
@@ -432,7 +428,7 @@ function RepositoriesPanel({
                     {repo.role}
                   </span>
                   <span className="admin-console__badge">{repo.type}</span>
-                  {!repo.owned ? <span className="admin-console__badge">cluster</span> : null}
+                  {!repo.owned ? <span className="admin-console__badge">{t("credentials.cluster")}</span> : null}
                 </div>
                 <p className="admin-console__card-meta">
                   <code>{repo.url}</code>
@@ -446,8 +442,7 @@ function RepositoriesPanel({
                     className="admin-console__btn admin-console__btn--danger"
                     onClick={() => void run(repo.name)}
                   >
-                    Remove
-                  </button>
+                    {t("credentials.remove")}</button>
                 </div>
               ) : null}
             </li>
@@ -462,13 +457,16 @@ function RepositoriesPanel({
       {pending ? (
         <div className="admin-console__danger" role="alertdialog" aria-labelledby="danger-zone-title">
           <h4 id="danger-zone-title" className="admin-console__danger-title">
-            This cannot be undone
-          </h4>
+            {t("credentials.thisCannotBeUndone")}</h4>
           <p>{pending.detail.error}</p>
           <label className="admin-console__label">
             <span className="admin-console__label-text">
-              Type <code>{pending.detail.confirmWith}</code> to confirm
-            </span>
+                    <Trans
+                      i18nKey="credentials.typeToConfirm"
+                      values={{ name: pending.detail.confirmWith }}
+                      components={{ code: <code /> }}
+                    />
+                  </span>
             <input
               value={typed}
               onChange={(event) => setTyped(event.target.value)}
@@ -482,8 +480,7 @@ function RepositoriesPanel({
               disabled={typed !== pending.detail.confirmWith}
               onClick={() => void run(pending.name, pending.input, typed)}
             >
-              I understand, continue
-            </button>
+              {t("credentials.iUnderstandContinue")}</button>
             <button
               type="button"
               className="admin-console__btn"
@@ -492,8 +489,7 @@ function RepositoriesPanel({
                 setTyped("");
               }}
             >
-              Cancel
-            </button>
+              {t("credentials.cancel3")}</button>
           </div>
         </div>
       ) : null}

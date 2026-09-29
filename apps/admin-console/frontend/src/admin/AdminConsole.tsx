@@ -17,6 +17,7 @@ import { PlatformSecuritySection } from "@/admin/PlatformSecuritySection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
 import { TenantsSection } from "@/admin/TenantsSection";
 import "./admin.css";
+import { useTranslation } from "react-i18next";
 
 type AdminTab =
   | "tenants"
@@ -49,27 +50,27 @@ type AdminTab =
  * copied one member's shell preferences onto another, which is a member screen
  * wearing a different name.
  */
-const TABS: { id: AdminTab; label: string; platformOnly?: boolean }[] = [
+const TABS: { id: AdminTab; labelKey: string; platformOnly?: boolean }[] = [
   // First, and platform-only, because bringing a customer on is what an MSP
   // employee opens this console to do. A tenant administrator sees their own
   // tenant's screens and has no business listing the others.
-  { id: "tenants", label: "Tenants", platformOnly: true },
-  { id: "people", label: "People" },
-  { id: "resources", label: "Resources" },
-  { id: "backup", label: "Backup" },
-  { id: "security", label: "Security" },
-  { id: "integrations", label: "Integrations" },
+  { id: "tenants", labelKey: "tabTenants", platformOnly: true },
+  { id: "people", labelKey: "tabPeople" },
+  { id: "resources", labelKey: "tabResources" },
+  { id: "backup", labelKey: "tabBackup" },
+  { id: "security", labelKey: "tabSecurity" },
+  { id: "integrations", labelKey: "tabIntegrations" },
   // Near the end on purpose. Apps come from the App Store; this tab is the
   // plain fallback for when the store is not the answer, and putting it where
   // a shop would go would make it look like a rival to the one that is
   // maintained.
-  { id: "catalogue", label: "Catalogues" },
-  { id: "credentials", label: "Credentials" },
-  { id: "notifications", label: "Notifications" },
-  { id: "audit", label: "Audit" },
-  { id: "settings", label: "Cluster settings", platformOnly: true },
-  { id: "platform", label: "Platform", platformOnly: true },
-  { id: "customization", label: "Customization", platformOnly: true },
+  { id: "catalogue", labelKey: "tabCatalogues" },
+  { id: "credentials", labelKey: "tabCredentials" },
+  { id: "notifications", labelKey: "tabNotifications" },
+  { id: "audit", labelKey: "tabAudit" },
+  { id: "settings", labelKey: "tabClusterSettings", platformOnly: true },
+  { id: "platform", labelKey: "tabPlatform", platformOnly: true },
+  { id: "customization", labelKey: "tabCustomization", platformOnly: true },
 ];
 
 type AdminConsoleProps = {
@@ -78,6 +79,8 @@ type AdminConsoleProps = {
 };
 
 export function AdminConsole({ embedded = false }: AdminConsoleProps) {
+  const { t } = useTranslation();
+
   const [tab, setTab] = useState<AdminTab>("people");
   const contextQuery = useQuery({
     queryKey: ["admin", "context"],
@@ -96,7 +99,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
       <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
         <div className="admin-console__frame">
           <div className="admin-console__body">
-            <p className="admin-console__loading">Loading admin console…</p>
+            <p className="admin-console__loading">{t("adminConsole.loadingAdminConsole")}</p>
           </div>
         </div>
       </div>
@@ -108,8 +111,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
       <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
         <div className="admin-console__frame">
           <div className="admin-console__body admin-console__error">
-            Admin Console is not available for this account.
-          </div>
+            {t("adminConsole.adminConsoleIsNotAvailable")}</div>
         </div>
       </div>
     );
@@ -122,15 +124,15 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
       <div className="admin-console__frame">
         <header className="admin-console__header">
           <div className="admin-console__identity">
-            tenant {tenant}
-            {isPlatformAdmin ? " · platform scope" : ""}
+            {t("adminConsole.tenant")}{tenant}
+            {isPlatformAdmin ? t("adminConsole.platformScope") : ""}
           </div>
           <div className="admin-console__identity admin-console__identity--muted">
-            realm/{realm}
+            {t("adminConsole.realm")}{realm}
           </div>
         </header>
 
-        <nav className="admin-console__tabs" aria-label="Admin sections">
+        <nav className="admin-console__tabs" aria-label={t("adminConsole.adminSections")}>
           {TABS.filter((entry) => !entry.platformOnly || isPlatformAdmin).map((entry) => (
             <button
               key={entry.id}
@@ -141,7 +143,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
               }`}
               onClick={() => setTab(entry.id)}
             >
-              {entry.label}
+              {t(`adminConsole.${entry.labelKey}`)}
             </button>
           ))}
         </nav>

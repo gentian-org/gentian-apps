@@ -6,6 +6,7 @@ import {
   type SecurityPolicies,
 } from "@/api/admin";
 import "./admin.css";
+import { useTranslation } from "react-i18next";
 
 type SecurityPoliciesSectionProps = {
   tenant: string;
@@ -30,6 +31,8 @@ const DEFAULT_FORM: SecurityPolicies = {
 };
 
 export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps) {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const [form, setForm] = useState<SecurityPolicies>(DEFAULT_FORM);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +54,7 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
     onSuccess: async (data) => {
       setForm(data);
       setError(null);
-      setSuccess("Security policies saved.");
+      setSuccess(t("securityPolicies.saved"));
       await queryClient.invalidateQueries({ queryKey: ["admin", "security-policies", tenant] });
       await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
     },
@@ -62,19 +65,18 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
   });
 
   if (policiesQuery.isLoading) {
-    return <p>Loading security policies…</p>;
+    return <p>{t("securityPolicies.loadingSecurityPolicies")}</p>;
   }
 
   if (policiesQuery.isError) {
-    return <p className="admin-console__error">Security policies are not available.</p>;
+    return <p className="admin-console__error">{t("securityPolicies.securityPoliciesAreNotAvailable")}</p>;
   }
 
   return (
     <section>
       <div className="admin-console__toolbar">
         <h2 className="admin-console__section-title">
-          Security policies
-        </h2>
+          {t("securityPolicies.securityPolicies")}</h2>
       </div>
 
       <form
@@ -86,9 +88,9 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
         }}
       >
         <fieldset className="admin-console__fieldset">
-          <legend>Password</legend>
+          <legend>{t("securityPolicies.password")}</legend>
           <div className="admin-console__field">
-            <label htmlFor="password-min-length">Minimum length</label>
+            <label htmlFor="password-min-length">{t("securityPolicies.minimumLength")}</label>
             <input
               id="password-min-length"
               type="number"
@@ -108,8 +110,7 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
                 setForm((prev) => ({ ...prev, passwordRequireDigits: e.target.checked }))
               }
             />
-            Require digit
-          </label>
+            {t("securityPolicies.requireDigit")}</label>
           <label className="admin-console__checkbox">
             <input
               type="checkbox"
@@ -118,8 +119,7 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
                 setForm((prev) => ({ ...prev, passwordRequireLowercase: e.target.checked }))
               }
             />
-            Require lowercase letter
-          </label>
+            {t("securityPolicies.requireLowercaseLetter")}</label>
           <label className="admin-console__checkbox">
             <input
               type="checkbox"
@@ -128,8 +128,7 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
                 setForm((prev) => ({ ...prev, passwordRequireUppercase: e.target.checked }))
               }
             />
-            Require uppercase letter
-          </label>
+            {t("securityPolicies.requireUppercaseLetter")}</label>
           <label className="admin-console__checkbox">
             <input
               type="checkbox"
@@ -138,10 +137,9 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
                 setForm((prev) => ({ ...prev, passwordRequireSpecialChars: e.target.checked }))
               }
             />
-            Require special character
-          </label>
+            {t("securityPolicies.requireSpecialCharacter")}</label>
           <div className="admin-console__field">
-            <label htmlFor="password-history">Password history (0 = off)</label>
+            <label htmlFor="password-history">{t("securityPolicies.passwordHistory0Off")}</label>
             <input
               id="password-history"
               type="number"
@@ -154,7 +152,7 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
             />
           </div>
           <div className="admin-console__field">
-            <label htmlFor="password-max-age">Max password age in days (0 = off)</label>
+            <label htmlFor="password-max-age">{t("securityPolicies.maxPasswordAgeInDays")}</label>
             <input
               id="password-max-age"
               type="number"
@@ -169,9 +167,9 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
         </fieldset>
 
         <fieldset className="admin-console__fieldset">
-          <legend>Session</legend>
+          <legend>{t("securityPolicies.session")}</legend>
           <div className="admin-console__field">
-            <label htmlFor="session-idle">SSO idle timeout (minutes)</label>
+            <label htmlFor="session-idle">{t("securityPolicies.ssoIdleTimeoutMinutes")}</label>
             <input
               id="session-idle"
               type="number"
@@ -184,7 +182,7 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
             />
           </div>
           <div className="admin-console__field">
-            <label htmlFor="session-max">Max session lifespan (hours)</label>
+            <label htmlFor="session-max">{t("securityPolicies.maxSessionLifespanHours")}</label>
             <input
               id="session-max"
               type="number"
@@ -202,12 +200,11 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
               checked={form.rememberMe}
               onChange={(e) => setForm((prev) => ({ ...prev, rememberMe: e.target.checked }))}
             />
-            Allow remember me
-          </label>
+            {t("securityPolicies.allowRememberMe")}</label>
         </fieldset>
 
         <fieldset className="admin-console__fieldset">
-          <legend>Lockout</legend>
+          <legend>{t("securityPolicies.lockout")}</legend>
           <label className="admin-console__checkbox">
             <input
               type="checkbox"
@@ -216,10 +213,9 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
                 setForm((prev) => ({ ...prev, bruteForceProtected: e.target.checked }))
               }
             />
-            Brute-force protection enabled
-          </label>
+            {t("securityPolicies.bruteForceProtectionEnabled")}</label>
           <div className="admin-console__field">
-            <label htmlFor="max-failures">Max failed login attempts</label>
+            <label htmlFor="max-failures">{t("securityPolicies.maxFailedLoginAttempts")}</label>
             <input
               id="max-failures"
               type="number"
@@ -233,7 +229,7 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
             />
           </div>
           <div className="admin-console__field">
-            <label htmlFor="lockout-duration">Lockout duration (seconds)</label>
+            <label htmlFor="lockout-duration">{t("securityPolicies.lockoutDurationSeconds")}</label>
             <input
               id="lockout-duration"
               type="number"
@@ -249,7 +245,7 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
         </fieldset>
 
         <fieldset className="admin-console__fieldset">
-          <legend>MFA (TOTP)</legend>
+          <legend>{t("securityPolicies.mfaTotp")}</legend>
           <label className="admin-console__checkbox">
             <input
               type="checkbox"
@@ -258,10 +254,9 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
                 setForm((prev) => ({ ...prev, requireTotpAdmins: e.target.checked }))
               }
             />
-            Require TOTP for tenant administrators
-          </label>
+            {t("securityPolicies.requireTotpForTenantAdministrators")}</label>
           <div className="admin-console__field">
-            <label htmlFor="require-totp-members">Require TOTP for members</label>
+            <label htmlFor="require-totp-members">{t("securityPolicies.requireTotpForMembers")}</label>
             <select
               id="require-totp-members"
               value={form.requireTotpMembers}
@@ -272,9 +267,9 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
                 }))
               }
             >
-              <option value="none">Not required</option>
-              <option value="optional">Optional (per-user only)</option>
-              <option value="required">Required for all members</option>
+              <option value="none">{t("securityPolicies.notRequired")}</option>
+              <option value="optional">{t("securityPolicies.optionalPerUserOnly")}</option>
+              <option value="required">{t("securityPolicies.requiredForAllMembers")}</option>
             </select>
           </div>
         </fieldset>
@@ -286,7 +281,7 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
           type="submit"
           disabled={saveMutation.isPending}
         >
-          {saveMutation.isPending ? "Saving…" : "Save policies"}
+          {saveMutation.isPending ? "Saving…" : t("securityPolicies.savePolicies")}
         </button>
       </form>
     </section>

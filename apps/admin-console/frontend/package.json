@@ -5,15 +5,20 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "build": "node scripts/i18n.mjs --check && tsc && vite build",
+    "preview": "vite preview",
+    "i18n": "node scripts/i18n.mjs --check",
+    "i18n:extract": "node scripts/i18n.mjs --apply && node scripts/i18n-hooks.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.66.0",
     "@tanstack/react-router": "^1.114.0",
+    "i18next": "^26.4.2",
+    "i18next-browser-languagedetector": "^8.2.1",
     "qrcode": "^1.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-i18next": "^17.0.15",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
