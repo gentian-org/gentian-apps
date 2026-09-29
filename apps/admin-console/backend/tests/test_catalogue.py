@@ -15,7 +15,6 @@ from app.api.routes import catalogue
 from app.core import director
 from app.core.config import Settings, get_settings
 
-
 # The relay forwards the CALLER's bearer, so every call carries one even
 # where authentication is disabled: it is the token the director decides by.
 _auth = {"Authorization": "Bearer t"}
