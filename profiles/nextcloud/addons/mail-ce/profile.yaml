@@ -1,10 +1,10 @@
-# AppProfile — Nextcloud Mail (addon)
+# ComponentProfile — Nextcloud Mail (addon)
 #
 # Activated inside a Nextcloud base rather than deployed: the app ships disabled in
 # the base image's custom_apps, and selecting this addon runs `occ app:enable mail`.
 # It therefore carries no chart of its own.
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: nextcloud-mail-ce
   labels:
@@ -12,32 +12,29 @@ metadata:
   annotations:
     gentianos.io/deployment-role: addon
 spec:
-  displayName: "Mail"
-  description: "IMAP mail client integrated with the Nextcloud contacts."
-  family: nextcloud
-  catalogueVersion: "1.0.0"
-  edition: ce
+  classes:
+    - app
   trustTier: certified
-  license: AGPL-3.0-only
-  author: Nextcloud
-  tile:
-    image: assets/tile-mail.svg
-    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDMyIDMyIj48ZyBpZD0ic3VyZmFjZTEiPgo8cGF0aCBzdHlsZT0iIHN0cm9rZTpub25lO2ZpbGwtcnVsZTpub256ZXJvO2ZpbGw6IzAwODJDOTtmaWxsLW9wYWNpdHk6MTsiIGQ9Ik0gMjYuNjY3OTY5IDUuMzMyMDMxIEwgNS4zMzIwMzEgNS4zMzIwMzEgQyAzLjg2NzE4OCA1LjMzMjAzMSAyLjY3OTY4OCA2LjUzNTE1NiAyLjY3OTY4OCA4IEwgMi42Njc5NjkgMjQgQyAyLjY2Nzk2OSAyNS40NjQ4NDQgMy44NjcxODggMjYuNjY3OTY5IDUuMzMyMDMxIDI2LjY2Nzk2OSBMIDI2LjY2Nzk2OSAyNi42Njc5NjkgQyAyOC4xMzI4MTIgMjYuNjY3OTY5IDI5LjMzMjAzMSAyNS40NjQ4NDQgMjkuMzMyMDMxIDI0IEwgMjkuMzMyMDMxIDggQyAyOS4zMzIwMzEgNi41MzUxNTYgMjguMTMyODEyIDUuMzMyMDMxIDI2LjY2Nzk2OSA1LjMzMjAzMSBaIE0gMjYuNjY3OTY5IDEwLjY2Nzk2OSBMIDE2IDE3LjMzMjAzMSBMIDUuMzMyMDMxIDEwLjY2Nzk2OSBMIDUuMzMyMDMxIDggTCAxNiAxNC42Njc5NjkgTCAyNi42Njc5NjkgOCBaIE0gMjYuNjY3OTY5IDEwLjY2Nzk2OSAiIC8+CjwvZz4KPC9zdmc+Cjwvc3ZnPgo=
-  # Tile for the app menu / quick bar. The addon has no ingress of its own, so the
-  # shell resolves the base URL from spec.customization.addon.of and appends this
-  # suffix to deep-link into the feature inside Nextcloud.
-  portalTiles:
-    - name: mail
-      displayName:
-        en_US: "Mail"
-        de_DE: "E-Mail"
-      linkSuffix: "?app=mail"
-      linkTarget: embedded
-      allowedGroup: "Domain Users"
-
-  deploymentMethod: crossplane
-
-  customization:
+  version: "1.0.0"
+  package:
     addon:
       id: mail
       of: nextcloud-base-ce
+  expose:
+    - name: mail
+      surface: gateway
+      authMode: oidc
+      subDomain: cloud
+      backend:
+        component: nextcloud-base-ce
+        service: nextcloud
+        port: 8080
+      tile:
+        displayName: "Mail"
+        displayNames:
+          de_DE: "E-Mail"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDMyIDMyIj48ZyBpZD0ic3VyZmFjZTEiPgo8cGF0aCBzdHlsZT0iIHN0cm9rZTpub25lO2ZpbGwtcnVsZTpub256ZXJvO2ZpbGw6IzAwODJDOTtmaWxsLW9wYWNpdHk6MTsiIGQ9Ik0gMjYuNjY3OTY5IDUuMzMyMDMxIEwgNS4zMzIwMzEgNS4zMzIwMzEgQyAzLjg2NzE4OCA1LjMzMjAzMSAyLjY3OTY4OCA2LjUzNTE1NiAyLjY3OTY4OCA4IEwgMi42Njc5NjkgMjQgQyAyLjY2Nzk2OSAyNS40NjQ4NDQgMy44NjcxODggMjYuNjY3OTY5IDUuMzMyMDMxIDI2LjY2Nzk2OSBMIDI2LjY2Nzk2OSAyNi42Njc5NjkgQyAyOC4xMzI4MTIgMjYuNjY3OTY5IDI5LjMzMjAzMSAyNS40NjQ4NDQgMjkuMzMyMDMxIDI0IEwgMjkuMzMyMDMxIDggQyAyOS4zMzIwMzEgNi41MzUxNTYgMjguMTMyODEyIDUuMzMyMDMxIDI2LjY2Nzk2OSA1LjMzMjAzMSBaIE0gMjYuNjY3OTY5IDEwLjY2Nzk2OSBMIDE2IDE3LjMzMjAzMSBMIDUuMzMyMDMxIDEwLjY2Nzk2OSBMIDUuMzMyMDMxIDggTCAxNiAxNC42Njc5NjkgTCAyNi42Njc5NjkgOCBaIE0gMjYuNjY3OTY5IDEwLjY2Nzk2OSAiIC8+CjwvZz4KPC9zdmc+Cjwvc3ZnPgo=
+        image: assets/tile-mail.svg
+        path: /?app=mail
+        relation: can_launch
+  launch: tile

@@ -8,6 +8,8 @@ import {
   type NotificationSeverity,
 } from "@/api/admin";
 import "./admin.css";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 
 type NotificationsSectionProps = {
   tenant: string;
@@ -27,9 +29,12 @@ function formatPublishedAt(epochMs: number) {
   return new Date(epochMs).toLocaleString();
 }
 
-function audienceLabel(audience: { scope: string; tenant?: string | null; groups: string[] }) {
+function audienceLabel(
+  audience: { scope: string; tenant?: string | null; groups: string[] },
+  t: TFunction,
+) {
   if (audience.scope === "platform") {
-    return "Platform (all users)";
+    return t("notifications.platformAllUsers");
   }
   if (audience.groups.length === 1) {
     return audience.groups[0];
@@ -41,6 +46,8 @@ function audienceLabel(audience: { scope: string; tenant?: string | null; groups
 }
 
 export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsSectionProps) {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -81,7 +88,7 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
       ),
     onSuccess: async () => {
       setError(null);
-      setSuccess("Notification published.");
+      setSuccess(t("notifications.published"));
       setTitle("");
       setBody("");
       setLinkUrl("");
@@ -111,21 +118,17 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
     <section>
       <div className="admin-console__toolbar">
         <h2 className="admin-console__section-title">
-          Notifications
-        </h2>
+          {t("notifications.notifications")}</h2>
         <button
           type="button"
           className="admin-console__btn"
           onClick={() => notificationsQuery.refetch()}
         >
-          Refresh
-        </button>
+          {t("notifications.refresh")}</button>
       </div>
 
       <p className="admin-console__hint" style={{ marginBottom: "1rem" }}>
-        Publish scoped broadcasts to workspace members. Delivered to the shell notification inbox
-        (v1 — no external email or chat consumers yet).
-      </p>
+        {t("notifications.publishScopedBroadcastsToWorkspace")}</p>
 
       {error && <p className="admin-console__error">{error}</p>}
       {success && <p className="admin-console__success">{success}</p>}
@@ -138,7 +141,7 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
         }}
       >
         <label className="admin-console__field">
-          <span>Title</span>
+          <span>{t("notifications.title")}</span>
           <input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
@@ -148,7 +151,7 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
         </label>
 
         <label className="admin-console__field">
-          <span>Message</span>
+          <span>{t("notifications.message")}</span>
           <textarea
             value={body}
             onChange={(event) => setBody(event.target.value)}
@@ -160,7 +163,7 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
 
         <div className="admin-console__field-row">
           <label className="admin-console__field">
-            <span>Severity</span>
+            <span>{t("notifications.severity")}</span>
             <select
               value={severity}
               onChange={(event) => setSeverity(event.target.value as NotificationSeverity)}
@@ -174,20 +177,20 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
           </label>
 
           <label className="admin-console__field">
-            <span>Audience</span>
+            <span>{t("notifications.audience")}</span>
             <select
               value={scope}
               onChange={(event) => setScope(event.target.value as "tenant" | "platform")}
             >
-              <option value="tenant">Tenant groups</option>
-              {isPlatformAdmin && <option value="platform">Platform (all users)</option>}
+              <option value="tenant">{t("notifications.tenantGroups")}</option>
+              {isPlatformAdmin && <option value="platform">{t("notifications.platformAllUsers")}</option>}
             </select>
           </label>
         </div>
 
         {scope === "tenant" && (
           <fieldset className="admin-console__fieldset">
-            <legend>Target groups (empty = all tenant members)</legend>
+            <legend>{t("notifications.targetGroupsEmptyAllTenant")}</legend>
             <div className="admin-console__checkbox-grid">
               {groups.map((group) => (
                 <label key={group.id} className="admin-console__checkbox">
@@ -205,11 +208,11 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
 
         <div className="admin-console__field-row">
           <label className="admin-console__field">
-            <span>Link URL (optional)</span>
+            <span>{t("notifications.linkUrlOptional")}</span>
             <input value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} />
           </label>
           <label className="admin-console__field">
-            <span>Link label (optional)</span>
+            <span>{t("notifications.linkLabelOptional")}</span>
             <input value={linkLabel} onChange={(event) => setLinkLabel(event.target.value)} />
           </label>
         </div>
@@ -219,24 +222,23 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
           className="admin-console__btn admin-console__btn--primary"
           disabled={publishMutation.isPending || !title.trim() || !body.trim()}
         >
-          {publishMutation.isPending ? "Publishing…" : "Publish notification"}
+          {publishMutation.isPending ? "Publishing…" : t("notifications.publishNotification")}
         </button>
       </form>
 
       <h3 className="admin-console__subtitle" style={{ marginTop: "2rem" }}>
-        Published
-      </h3>
+        {t("notifications.published")}</h3>
       {notifications.length === 0 ? (
-        <p className="admin-console__hint">No notifications published for this tenant yet.</p>
+        <p className="admin-console__hint">{t("notifications.noNotificationsPublishedForThis")}</p>
       ) : (
         <table className="admin-console__table">
           <thead>
             <tr>
-              <th>Published</th>
-              <th>Title</th>
-              <th>Severity</th>
-              <th>Audience</th>
-              <th>Publisher</th>
+              <th>{t("notifications.published2")}</th>
+              <th>{t("notifications.title2")}</th>
+              <th>{t("notifications.severity2")}</th>
+              <th>{t("notifications.audience2")}</th>
+              <th>{t("notifications.publisher")}</th>
             </tr>
           </thead>
           <tbody>
@@ -250,7 +252,7 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
                   </div>
                 </td>
                 <td>{notification.severity}</td>
-                <td>{audienceLabel(notification.audience)}</td>
+                <td>{audienceLabel(notification.audience, t)}</td>
                 <td>{notification.publisher}</td>
               </tr>
             ))}

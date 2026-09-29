@@ -1,0 +1,10 @@
+profile: gentian-subscriptions-me
+displayName: "Gentian Subscriptions"
+description: "Manage Pro app subscriptions, billing, and entitlements for this tenant."
+family: gentian-subscriptions
+edition: me
+author: Gentian
+license: Apache-2.0
+tile:
+  icon: erp
+

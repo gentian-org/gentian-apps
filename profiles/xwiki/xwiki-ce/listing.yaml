@@ -1,0 +1,10 @@
+profile: xwiki-ce
+displayName: "XWiki"
+description: "Open-source enterprise wiki with structured data, WYSIWYG editing, and extensible application platform."
+family: xwiki
+edition: ce
+author: XWiki
+license: LGPL-2.1
+tile:
+  icon: wiki
+

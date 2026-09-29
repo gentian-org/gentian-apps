@@ -28,6 +28,21 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 SECRET_RE = re.compile(r"([a-z0-9][a-z0-9-]*)-sensitive-values")
 
 
+def _composition_services(composition: pathlib.Path) -> set[str]:
+    """Service names a profile's own composition creates.
+
+    A regex rather than a YAML parser on purpose: the file is a Go template
+    and the manifests inside it are not valid YAML until rendered. A literal
+    `name:` two lines under `kind: Service` is what this is after, which is
+    how every one of them is written.
+    """
+    if not composition.is_file():
+        return set()
+    pattern = re.compile(
+        r"kind:\s*Service\s*\n\s*metadata:\s*\n\s*name:\s*([a-z0-9][a-z0-9.-]*)\s*\n")
+    return set(pattern.findall(composition.read_text(encoding="utf-8")))
+
+
 def check_gateway_backends(path: pathlib.Path, doc: dict) -> list[str]:
     """Gateway backends must name a Service something actually creates.
 
@@ -45,6 +60,10 @@ def check_gateway_backends(path: pathlib.Path, doc: dict) -> list[str]:
     """
     meta, spec = doc.get("metadata") or {}, doc.get("spec") or {}
     if spec.get("compositionRef"):
+        # The old signal for "rendered by its own composition". AD-4 deletes
+        # the field -- the composition is chosen by the claim now -- so the
+        # sibling composition.yaml is what says it. Kept for an unconverted
+        # profile.
         return []
     raw = (meta.get("annotations") or {}).get("gentianos.io/gateway-api-backends")
     if not raw:
@@ -56,12 +75,34 @@ def check_gateway_backends(path: pathlib.Path, doc: dict) -> list[str]:
     except json.JSONDecodeError as exc:
         return [f"{path}: gateway-api-backends is not valid JSON: {exc}"]
 
+    # Where a Service the platform actually creates can be named.
+    #
+    # Read from ComponentProfile's shape: spec.ingress became one entry of
+    # spec.expose, each naming its own backend, and spec.sidecars became
+    # spec.extensions. Both spellings are accepted while the catalogue is
+    # converted -- a validator that only knew the new shape would report every
+    # unconverted profile as broken, which is noise rather than a finding.
     allowed = {f"{name}-api"}
+    for exposure in spec.get("expose") or []:
+        service = ((exposure or {}).get("backend") or {}).get("service")
+        if service:
+            allowed.add(service)
+    for extension in (spec.get("extensions") or []) + (spec.get("sidecars") or []):
+        if (extension or {}).get("stableServiceName"):
+            allowed.add(extension["stableServiceName"])
     if (spec.get("ingress") or {}).get("serviceName"):
         allowed.add(spec["ingress"]["serviceName"])
-    for sidecar in spec.get("sidecars") or []:
-        if (sidecar or {}).get("stableServiceName"):
-            allowed.add(sidecar["stableServiceName"])
+
+    # A profile with its own composition creates its own Services, and only
+    # that composition knows their names. openproject-ce is the case: it emits
+    # a Deployment and a Service for the portal bridge, and its two gateway
+    # backends point at that Service.
+    #
+    # Scanned rather than skipped. Skipping is what spec.compositionRef did,
+    # and it turned the whole check off for the three profiles most likely to
+    # get a backend wrong; reading the Service names out of the composition
+    # keeps the question being asked.
+    allowed |= _composition_services(REPO / path.parent / "composition.yaml")
 
     errors = []
     for backend in backends:
@@ -91,6 +132,10 @@ def check_ingress_service_name(path: pathlib.Path, doc: dict) -> list[str]:
     """
     meta, spec = doc.get("metadata") or {}, doc.get("spec") or {}
     if spec.get("compositionRef"):
+        # The old signal for "rendered by its own composition". AD-4 deletes
+        # the field -- the composition is chosen by the claim now -- so the
+        # sibling composition.yaml is what says it. Kept for an unconverted
+        # profile.
         return []
     svc = (spec.get("ingress") or {}).get("serviceName")
     if not svc:

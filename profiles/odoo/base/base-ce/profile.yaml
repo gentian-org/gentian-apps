@@ -1,9 +1,9 @@
-# AppProfile — Odoo Community base runtime (odoo-base-ce)
+# ComponentProfile — Odoo Community base runtime (odoo-base-ce)
 #
 # Deploys one Odoo OCB instance per tenant. Module profiles (odoo-crm, …) install
 # Odoo CE modules via app-odoo Jobs in a later phase. OIDC uses app-default Client MR.
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: odoo-base-ce
   labels:
@@ -17,110 +17,38 @@ metadata:
     gentianos.io/deployment-role: base
     gentianos.io/portal-auth-mode: oidc
 spec:
-  displayName: "Odoo Community Backport"
-  description: "Odoo Community ERP runtime — required base for Odoo module apps."
-  family: odoo
-  catalogueVersion: "1.0.0"
-  edition: ce
+  classes:
+    - app
   trustTier: platform
-  license: LGPL-3.0
-  author: OCA
-  tile:
-    icon: erp
-  compositionRef: app-odoo
+  version: "1.0.0"
+  package:
+    # The Composition that renders this chart AND the objects that have to
+    # exist beside it. A chart and a composition are the one legal pair in
+    # the package union: the chart is what is installed, the composition is
+    # what else is created.
+    composition: app-odoo
+    chart:
+      repository: oci://ghcr.io/gentian-org/charts
+      name: odoo
+      version: "0.1.24"
 
-  kernelRequirements:
-    identity:
+    valueMapping:
       oidc:
-        clientId: odoo-cb
-        name: Odoo
-        accessType: CONFIDENTIAL
-        redirectUris:
-          - "https://erp.${TENANT_DOMAIN}/auth_oauth/signin"
-        # No backchannelLogoutUrl: Odoo signs in through auth_oauth, an OAuth2
-        # module rather than an OIDC relying party, so there is nothing to send a
-        # logout_token to. Its session ends on its own timeout. Recorded rather
-        # than left blank, so the absence reads as a limit of the app.
-    database:
-      engine: postgresql
-      databasePerTenant: true
-      allowDynamicDatabaseCreation: false
-    mail:
-      smtp: {}
+        issuerKey: "oidc.issuer"
+        clientIdKey: "oidc.clientId"
+        clientSecretKey: "oidc.clientSecret"
+      database:
+        hostKey: "database.host"
+        portKey: "database.port"
+        nameKey: "database.name"
+        userKey: "database.user"
+        passwordKey: "database.password"
+      smtp:
+        passwordKey: "smtp.password"
 
-  optionalIntegrations:
-    - contract: file-store
-      provider: nextcloud
-      capabilities: [webdav:read, webdav:write]
-    - contract: central-navigation
-      provider: portal
-      capabilities: [navigation:register]
-
-  provides:
-    - name: erp-core
-      protocol: http-json
-
-  portalTiles:
-    - name: odoo-admin
-      displayName:
-        en_US: "Odoo Settings"
-        de_DE: "Odoo Einstellungen"
-      tile:
-        # Odoo's O, in Odoo purple, inside the catalogue's 52x52 frame. This is
-        # the tenant's way into Odoo itself rather than into one of its modules,
-        # so it carries the product's mark instead of a generic cog.
-        image: assets/settings-tile.svg
-        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSIjNzE0QjY3IiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xMiAxYTExIDExIDAgMSAwIDAgMjJhMTEgMTEgMCAxIDAgMCAtMjJaTTEyIDZhNiA2IDAgMSAxIDAgMTJhNiA2IDAgMSAxIDAgLTEyWiIvPjwvc3ZnPjwvc3ZnPgo=
-      linkSuffix: "/odoo/action-base_setup.action_general_configuration?gentian_embed=1"
-      # embedded, like every other Odoo tile: the suffix already asks for
-      # gentian_embed, and a new browser tab leaves the portal's window manager
-      # behind for a page that was rendered to sit inside it.
-      linkTarget: embedded
-      allowedGroup: "App Admins"
-
-  chart:
-    repository: oci://ghcr.io/gentian-org/charts
-    name: odoo
-    version: "0.1.24"
-
-  deploymentMethod: crossplane
-
-  valueMapping:
-    oidc:
-      issuerKey: "oidc.issuer"
-      clientIdKey: "oidc.clientId"
-      clientSecretKey: "oidc.clientSecret"
-    database:
-      hostKey: "database.host"
-      portKey: "database.port"
-      nameKey: "database.name"
-      userKey: "database.user"
-      passwordKey: "database.password"
-    smtp:
-      passwordKey: "smtp.password"
-
-  appSecrets:
-    - name: admin_password
-      valuePath: "odoo.adminPassword"
-
-  security:
-    egress:
-      - to:
-          - ipBlock:
-              cidr: 192.168.0.100/32
-        ports:
-          - protocol: TCP
-            port: 9418
-      - ports:
-          - protocol: TCP
-            port: 443
-
-  # No sidecars. git-modules used to be declared here as a standalone
-  # Deployment with its own ReadWriteMany PVC; it is now two containers inside
-  # Odoo's own pod, configured by extraValues.gentian.git above.
-  extraValues:
-    fullnameOverride: odoo
-    tenantId: "${TENANT_ID}"
+    extraValues:
+      fullnameOverride: odoo
+      tenantId: "${TENANT_ID}"
     # No extraVolumes here: the chart defaults extra-addons to an emptyDir and
     # mounts it at modulesPath, which is exactly what the in-pod git-sync writes
     # to. This used to point the volume at the shared RWX PVC.
@@ -131,20 +59,20 @@ spec:
     # so the git-sync containers mounted a volume nobody defined and every Helm
     # upgrade failed, freezing Odoo on its last good spec. 0.1.19 defines
     # extra-addons unless an entry of that name replaces it, and appends the rest.
-    resources:
-      requests:
-        cpu: 500m
-        memory: 2Gi
-      limits:
-        cpu: 2
-        memory: 4Gi
-    existingSecret:
-      name: odoo-base-ce-sensitive-values
-    ingress:
-      enabled: false
-    gentian:
-      initModules: "base,web,gentian_os,account"
-      modulesPath: /opt/odoo/custom-addons
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
+      existingSecret:
+        name: odoo-base-ce-sensitive-values
+      ingress:
+        enabled: false
+      gentian:
+        initModules: "base,web,gentian_os,account"
+        modulesPath: /opt/odoo/custom-addons
       # Where this tenant's Odoo is actually served — the subDomain from
       # spec.ingress above. Odoo keeps this in ir_config_parameter and builds
       # its OAuth redirect_uri from it; left at Odoo's http://localhost:8069
@@ -152,14 +80,14 @@ spec:
       # the redirectUris registered under kernelRequirements.identity, and every
       # login fails with oauth_error=3 — which on a website-enabled database
       # surfaces as a 500, because the login page itself cannot then render.
-      baseUrl: "https://erp.${TENANT_DOMAIN}"
-      oidc:
+        baseUrl: "https://erp.${TENANT_DOMAIN}"
+        oidc:
         # Where the pod validates a token. The browser still goes to the public
         # issuer; only auth_oauth's server-side userinfo call moves in-cluster,
         # so signing in no longer depends on a tenant pod being able to reach
         # the kernel gateway. ${TENANT_ID} is the realm, which matches the
         # public issuer's realm segment.
-        internalIssuer: "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}"
+          internalIssuer: "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}"
       # The chart's own git-sync, running in Odoo's pod: an init container that
       # clones once before Odoo starts, and a sidecar that re-syncs on the
       # interval. Both are upstream git-sync at 999:999, writing the emptyDir
@@ -176,13 +104,71 @@ spec:
       # It also removes what the split cost us: the gid 999/1000 mismatch that
       # crash-looped the clone 60 times, and the Job's five-minute wait racing
       # a clone in another pod. One pod, one fsGroup, ordered by initContainer.
-      git:
-        enabled: true
-        repo: "https://github.com/gentian-org/odoo-modules.git"
-        branch: "develop"
-        syncInterval: 60
+        git:
+          enabled: true
+          repo: "https://github.com/gentian-org/odoo-modules.git"
+          branch: "develop"
+          syncInterval: 60
 
-  ingress:
+  requires:
+    services:
+      identity:
+        oidc:
+          clientId: odoo-cb
+          name: Odoo
+          accessType: CONFIDENTIAL
+          redirectUris:
+            - "https://erp.${TENANT_DOMAIN}/auth_oauth/signin"
+        # No backchannelLogoutUrl: Odoo signs in through auth_oauth, an OAuth2
+        # module rather than an OIDC relying party, so there is nothing to send a
+        # logout_token to. Its session ends on its own timeout. Recorded rather
+        # than left blank, so the absence reads as a limit of the app.
+      database:
+        engine: postgresql
+        databasePerTenant: true
+        allowDynamicDatabaseCreation: false
+      mail:
+        smtp: {}
+    privileges:
+      egress:
+        - name: egress-1
+          rule:
+            to:
+              - ipBlock:
+                  cidr: 192.168.0.100/32
+            ports:
+              - protocol: TCP
+                port: 9418
+          reason: 'REVIEW: say what this component reaches and why'
+        - name: egress-2
+          rule:
+            ports:
+              - protocol: TCP
+                port: 443
+
+  # No sidecars. git-modules used to be declared here as a standalone
+  # Deployment with its own ReadWriteMany PVC; it is now two containers inside
+  # Odoo's own pod, configured by extraValues.gentian.git above.
+          reason: 'REVIEW: say what this component reaches and why'
+  provides:
+    - name: erp-core
+      protocol: http-json
+
+
+  integrations:
+    - contract: file-store
+      provider: nextcloud
+      capabilities: [webdav:read, webdav:write]
+    - contract: central-navigation
+      provider: portal
+      capabilities: [navigation:register]
+
+  secrets:
+    generated:
+      - name: admin_password
+        valuePath: "odoo.adminPassword"
+
+  expose:
     # Odoo's SSO callback exceeds Envoy's 15s default route timeout, so the
     # sign-in that gets a user into the app is the request that gets cut:
     #
@@ -199,16 +185,21 @@ spec:
     # rather than its 3600s: nothing here is a multi-hour upload, and a hung
     # backend should still surface within ten minutes rather than hold the
     # connection for an hour.
-    annotations:
-      gentianos.io/gateway-request-timeout: "600"
-    subDomain: erp
-    serviceName: odoo
-    servicePort: 8069
-    tlsEnabled: true
-    clusterIssuer: letsencrypt-http01
-
-  # Customization ladder — see customization.md and
-  # gentian-os/docs/app-customization.md
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: erp
+      backend:
+        service: odoo
+        port: 8069
+      tile:
+        displayName: "Odoo Settings"
+        displayNames:
+          de_DE: "Odoo Einstellungen"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSIjNzE0QjY3IiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xMiAxYTExIDExIDAgMSAwIDAgMjJhMTEgMTEgMCAxIDAgMCAtMjJaTTEyIDZhNiA2IDAgMSAxIDAgMTJhNiA2IDAgMSAxIDAgLTEyWiIvPjwvc3ZnPjwvc3ZnPgo=
+        image: assets/settings-tile.svg
+        path: /odoo/action-base_setup.action_general_configuration?gentian_embed=1
+        relation: can_launch
   customization:
     grade: A
     rubricScore: 8
@@ -276,3 +267,4 @@ spec:
       upstream: https://github.com/OCA/OCB
       owner: platform-erp
       cveWatch: true
+  launch: tile

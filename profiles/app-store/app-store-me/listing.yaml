@@ -1,0 +1,9 @@
+profile: app-store-me
+displayName: "App Store"
+description: "Browse the Gentian app catalogue and install or uninstall applications for your tenant."
+family: app-store
+edition: me
+author: Gentian
+tile:
+  icon: store
+

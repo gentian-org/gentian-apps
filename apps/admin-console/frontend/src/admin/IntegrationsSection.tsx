@@ -7,6 +7,7 @@ import {
   type ConsumeGrant,
 } from "@/api/admin";
 import "./admin.css";
+import { useTranslation } from "react-i18next";
 
 type IntegrationsSectionProps = {
   tenant: string;
@@ -24,6 +25,8 @@ function formatOpenfga(cap: string, granted: Record<string, boolean>): string {
 }
 
 export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const overviewQuery = useQuery({
     queryKey: ["admin", "integrations", tenant],
@@ -45,10 +48,10 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
   });
 
   if (overviewQuery.isLoading) {
-    return <p>Loading integrations…</p>;
+    return <p>{t("integrations.loadingIntegrations")}</p>;
   }
   if (overviewQuery.isError || !overviewQuery.data) {
-    return <p className="admin-console__error">Integrations overview is unavailable.</p>;
+    return <p className="admin-console__error">{t("integrations.integrationsOverviewIsUnavailable")}</p>;
   }
 
   const { bindings, grants, summary, effectiveAccess } = overviewQuery.data;
@@ -57,14 +60,10 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
     <section>
       <div className="admin-console__toolbar">
         <h2 className="admin-console__section-title">
-          Integrations &amp; grants
-        </h2>
+          {t("integrations.integrationsGrants")}</h2>
       </div>
       <p className="admin-console__hint" style={{ marginBottom: "1rem" }}>
-        Active IntegrationBindings are operator-wired. AppGrants are tenant-approved capability
-        subsets synced to OpenFGA. Contract NetworkPolicies allow egress only for granted
-        capabilities.
-      </p>
+        {t("integrations.activeIntegrationbindingsAreOperatorWired")}</p>
 
       <p className="admin-console__mono" style={{ fontSize: "0.8125rem", color: "var(--gtn-ink-4)", marginBottom: "1.5rem" }}>
         {summary.bindingCount} binding{summary.bindingCount === 1 ? "" : "s"} ·{" "}
@@ -72,22 +71,21 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
         {summary.grantReadyCount} OpenFGA-synced
       </p>
 
-      <h3 className="admin-console__subtitle">Effective access</h3>
+      <h3 className="admin-console__subtitle">{t("integrations.effectiveAccess")}</h3>
       {effectiveAccess.length === 0 ? (
         <p style={{ fontSize: "0.875rem", color: "var(--gtn-ink-4)", marginBottom: "1.5rem" }}>
-          No integration bindings to preview.
-        </p>
+          {t("integrations.noIntegrationBindingsToPreview")}</p>
       ) : (
         <table className="admin-console__table" style={{ marginBottom: "2rem" }}>
           <thead>
             <tr>
-              <th>Contract</th>
-              <th>Consumer → Provider</th>
-              <th>Bound</th>
-              <th>Granted</th>
-              <th>MAC egress</th>
-              <th>Grant phase</th>
-              <th>OpenFGA</th>
+              <th>{t("integrations.contract")}</th>
+              <th>{t("integrations.consumerProvider")}</th>
+              <th>{t("integrations.bound")}</th>
+              <th>{t("integrations.granted")}</th>
+              <th>{t("integrations.macEgress")}</th>
+              <th>{t("integrations.grantPhase")}</th>
+              <th>{t("integrations.openfga")}</th>
             </tr>
           </thead>
           <tbody>
@@ -114,20 +112,19 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
         </table>
       )}
 
-      <h3 className="admin-console__subtitle">Bindings</h3>
+      <h3 className="admin-console__subtitle">{t("integrations.bindings")}</h3>
       {bindings.length === 0 ? (
         <p style={{ fontSize: "0.875rem", color: "var(--gtn-ink-4)", marginBottom: "1.5rem" }}>
-          No active integration bindings.
-        </p>
+          {t("integrations.noActiveIntegrationBindings")}</p>
       ) : (
         <table className="admin-console__table" style={{ marginBottom: "2rem" }}>
           <thead>
             <tr>
-              <th>Contract</th>
-              <th>Consumer</th>
-              <th>Provider</th>
-              <th>Capabilities</th>
-              <th>State</th>
+              <th>{t("integrations.contract2")}</th>
+              <th>{t("integrations.consumer")}</th>
+              <th>{t("integrations.provider")}</th>
+              <th>{t("integrations.capabilities")}</th>
+              <th>{t("integrations.state")}</th>
             </tr>
           </thead>
           <tbody>
@@ -144,17 +141,16 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
         </table>
       )}
 
-      <h3 className="admin-console__subtitle">App grants</h3>
+      <h3 className="admin-console__subtitle">{t("integrations.appGrants")}</h3>
       {grants.length === 0 ? (
         <p style={{ fontSize: "0.875rem", color: "var(--gtn-ink-4)" }}>
-          No AppGrant objects yet (created when consumer bindings exist).
-        </p>
+          {t("integrations.noAppgrantObjectsYetCreated")}</p>
       ) : (
         <table className="admin-console__table" style={{ maxWidth: "36rem", marginBottom: "2rem" }}>
           <thead>
             <tr>
-              <th>App</th>
-              <th>Phase</th>
+              <th>{t("integrations.app")}</th>
+              <th>{t("integrations.phase")}</th>
               <th />
             </tr>
           </thead>
@@ -169,8 +165,7 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
                     className="admin-console__btn"
                     onClick={() => setEditing(grant)}
                   >
-                    Edit grant
-                  </button>
+                    {t("integrations.editGrant")}</button>
                 </td>
               </tr>
             ))}
@@ -183,15 +178,13 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
           <div className="admin-console__edit-panel-header">
             <div>
               <div style={{ fontWeight: 600, fontSize: "0.9375rem" }}>
-                Edit Grant
-              </div>
+                {t("integrations.editGrant2")}</div>
               <div className="admin-console__mono" style={{ fontSize: "0.8125rem", color: "var(--gtn-ink-4)" }}>
                 {editing.app}
               </div>
             </div>
             <button type="button" className="admin-console__btn" onClick={() => setEditing(null)}>
-              ✕ Close
-            </button>
+              {t("integrations.close")}</button>
           </div>
 
           <div className="admin-console__edit-panel-body" style={{ padding: "1rem" }}>
@@ -204,8 +197,7 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
               {editing.consume.map((entry, index) => (
                 <div key={entry.contract} className="admin-console__field" style={{ marginBottom: "1rem" }}>
                   <label htmlFor={`grant-${entry.contract}`}>
-                    {entry.contract} capabilities (comma-separated)
-                  </label>
+                    {entry.contract} {t("integrations.capabilitiesCommaSeparated")}</label>
                   <input
                     id={`grant-${entry.contract}`}
                     value={entry.granted.join(", ")}
@@ -232,8 +224,7 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
                   {saveMutation.isPending ? "Saving…" : "Save"}
                 </button>
                 <button type="button" className="admin-console__btn" onClick={() => setEditing(null)}>
-                  Cancel
-                </button>
+                  {t("integrations.cancel")}</button>
               </div>
             </form>
           </div>

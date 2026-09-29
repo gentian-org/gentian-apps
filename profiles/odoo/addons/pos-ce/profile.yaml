@@ -1,5 +1,5 @@
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: odoo-pos-ce
   labels:
@@ -10,49 +10,37 @@ metadata:
     gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["point_of_sale.group_pos_manager"],"gentianOdooGroupRoles":["point_of_sale.group_pos_user","point_of_sale.group_pos_manager","stock.group_stock_user","account.group_account_invoice"],"gentianOdooModules":["pos_restaurant"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
-  displayName: "Odoo Point of Sale"
-  description: "Point of Sale and Restaurant/Bar management module for Odoo."
-  family: odoo
-  catalogueVersion: "1.0.0"
-  edition: ce
+  classes:
+    - app
   trustTier: platform
-  license: LGPL-3.0
-  author: OCA
-  tile:
-    # Odoo's own icon, set inside the catalogue's 52x52 frame so it sits with
-    # the other tiles. point_of_sale's, not pos_restaurant's: this profile
-    # installs the restaurant extension, but the tile says Point of Sale and
-    # pos_restaurant's icon is the extension's own generic mark.
-    image: assets/tile.svg
-    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBkPSJNOS41IDggNiAzNmg2LjAxOWE2LjUgNi41IDAgMCAwIDEyLjk2MiAwSDI1YTYgNiAwIDAgMCAxMiAwaC4wMTlhNi41IDYuNSAwIDAgMCAxMi45NjIgMEg1MHYtMWwtLjA0NS0uMjczYTYuMjMxIDYuMjMxIDAgMCAwLS4wNTgtLjM4NmwtLjAyMy0uMTE4LS4wMi0uMS0zLjc5Ny0yMi43OEE0IDQgMCAwIDAgNDIuMTEyIDhIOS41WiIgZmlsbD0iIzk4NTE4NCIvPjxwYXRoIGQ9Im0xNCA4LTIgMjhhNiA2IDAgMCAxLTEyIDB2LTFsMy40OTQtMjMuNTg2QTQgNCAwIDAgMSA3LjQ1MSA4SDE0Wm0yMSAwIDIgMjhhNiA2IDAgMCAxLTEyIDBWOGgxMFoiIGZpbGw9IiNGQkI5NDUiLz48cGF0aCBkPSJNMTIgMzZhNiA2IDAgMSAxLTEyIDBoMTJabTI1IDBhNiA2IDAgMCAxLTEyIDBoMTJaIiBmaWxsPSIjRjc4NjEzIi8+PHBhdGggZD0iTTEyLjAyIDM2YTYuNSA2LjUgMCAwIDAgMTIuOTYxIDBIMTIuMDJabTI1IDBhNi41IDYuNSAwIDAgMCAxMi45NjEgMEgzNy4wMloiIGZpbGw9IiM3MTIyNTgiLz48L3N2Zz48L3N2Zz4K
-
-  portalTiles:
-    - name: odoo-pos
-      displayName:
-        en_US: "Odoo Point of Sale"
-        de_DE: "Odoo Point of Sale"
-      linkSuffix: "/odoo/action-point_of_sale.action_pos_config_kanban?gentian_embed=1"
-      linkTarget: embedded
-      allowedGroup: "App Users"
-
-  compositionRef: app-odoo
-  deploymentMethod: crossplane
-  chart:
-    repository: oci://ghcr.io/gentian-org/charts
-    name: odoo
-    version: "0.1.15"
-  # Odoo calls its addons "modules" — this maps the Gentian profile onto that name.
-  customization:
+  version: "1.0.0"
+  package:
+    extraValues:
+      odoo:
+        module: pos_restaurant
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 250m
+          memory: 256Mi
     addon:
       id: pos_restaurant
       of: odoo-base-ce
-  extraValues:
-    odoo:
-      module: pos_restaurant
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 250m
-        memory: 256Mi
+  expose:
+    - name: odoo-pos
+      surface: gateway
+      authMode: oidc
+      subDomain: erp
+      backend:
+        component: odoo-base-ce
+        service: odoo
+        port: 8069
+      tile:
+        displayName: "Odoo Point of Sale"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBkPSJNOS41IDggNiAzNmg2LjAxOWE2LjUgNi41IDAgMCAwIDEyLjk2MiAwSDI1YTYgNiAwIDAgMCAxMiAwaC4wMTlhNi41IDYuNSAwIDAgMCAxMi45NjIgMEg1MHYtMWwtLjA0NS0uMjczYTYuMjMxIDYuMjMxIDAgMCAwLS4wNTgtLjM4NmwtLjAyMy0uMTE4LS4wMi0uMS0zLjc5Ny0yMi43OEE0IDQgMCAwIDAgNDIuMTEyIDhIOS41WiIgZmlsbD0iIzk4NTE4NCIvPjxwYXRoIGQ9Im0xNCA4LTIgMjhhNiA2IDAgMCAxLTEyIDB2LTFsMy40OTQtMjMuNTg2QTQgNCAwIDAgMSA3LjQ1MSA4SDE0Wm0yMSAwIDIgMjhhNiA2IDAgMCAxLTEyIDBWOGgxMFoiIGZpbGw9IiNGQkI5NDUiLz48cGF0aCBkPSJNMTIgMzZhNiA2IDAgMSAxLTEyIDBoMTJabTI1IDBhNiA2IDAgMCAxLTEyIDBoMTJaIiBmaWxsPSIjRjc4NjEzIi8+PHBhdGggZD0iTTEyLjAyIDM2YTYuNSA2LjUgMCAwIDAgMTIuOTYxIDBIMTIuMDJabTI1IDBhNi41IDYuNSAwIDAgMCAxMi45NjEgMEgzNy4wMloiIGZpbGw9IiM3MTIyNTgiLz48L3N2Zz48L3N2Zz4K
+        image: assets/tile.svg
+        path: /odoo/action-point_of_sale.action_pos_config_kanban?gentian_embed=1
+        relation: can_launch
+  launch: tile

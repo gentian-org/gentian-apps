@@ -1,7 +1,10 @@
 import { useAuth } from "@/auth/AuthProvider";
 import { getOidcConfig } from "@/auth/oidc";
+import { Trans, useTranslation } from "react-i18next";
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
+
   const { isAuthenticated, isLoading, authDisabled, login } = useAuth();
   const config = getOidcConfig();
   // Under edge the bundle needs no issuer and no client of its own: the
@@ -13,21 +16,19 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-slate-600">
-        Checking session…
-      </div>
+        {t("requireAuth.checkingSession")}</div>
     );
   }
 
   if (!authDisabled && !oidcConfigured) {
     return (
       <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-2 p-8 text-slate-600">
-        <p className="font-medium text-slate-800">OIDC not configured</p>
+        <p className="font-medium text-slate-800">{t("requireAuth.oidcNotConfigured")}</p>
         <p className="text-sm">
-          Set <code className="text-xs">OIDC_ISSUER</code> and{" "}
-          <code className="text-xs">OIDC_CLIENT_ID</code> on the web container, or{" "}
-          <code className="text-xs">AUTH_DISABLED=true</code> for local dev. Behind the
-          platform&apos;s edge the platform sets <code className="text-xs">AUTH_MODE=edge</code>{" "}
-          and none of these is needed.
+          <Trans
+            i18nKey="requireAuth.howToConfigure"
+            components={{ code: <code className="text-xs" /> }}
+          />
         </p>
       </div>
     );
@@ -37,8 +38,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     login();
     return (
       <div className="flex min-h-screen items-center justify-center text-slate-600">
-        Redirecting to sign in…
-      </div>
+        {t("requireAuth.redirectingToSignIn")}</div>
     );
   }
 

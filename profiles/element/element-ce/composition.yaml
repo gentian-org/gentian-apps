@@ -22,8 +22,8 @@ spec:
         kind: Input
         spec:
           extraResources:
-            - kind: AppProfile
-              into: appProfile
+            - kind: ComponentProfile
+              into: componentProfile
               apiVersion: gentianos.io/v1alpha1
               type: Selector
               selector:
@@ -105,15 +105,16 @@ spec:
             {{- $tenant := trimPrefix "tenant-" $ns }}
 
             {{- $extraRes  := index .context "apiextensions.crossplane.io/extra-resources" }}
-            {{- $profiles  := dig "appProfile" list $extraRes }}
+            {{- $profiles  := dig "componentProfile" list $extraRes }}
             {{- if eq (len $profiles) 0 }}
-              {{- fail (printf "AppProfile %q not found in cluster" $spec.profileRef.name) }}
+              {{- fail (printf "ComponentProfile %q not found in cluster" $spec.profileRef.name) }}
             {{- end }}
             {{- $profile   := index $profiles 0 }}
             {{- $pSpec     := dig "spec" dict $profile }}
-            {{- $vm        := default dict $pSpec.valueMapping }}
-            {{- $appSecrets := default list $pSpec.appSecrets }}
-            {{- $chart     := $pSpec.chart }}
+            {{- $package   := dig "package" dict $pSpec }}
+            {{- $vm        := dig "valueMapping" dict $package }}
+            {{- $appSecrets := dig "secrets" "generated" list $pSpec }}
+            {{- $chart     := dig "chart" nil $package }}
 
             {{- $ccRes      := dig "clusterConfig" list $extraRes }}
             {{- $ccCM       := default dict (index $ccRes 0) }}
@@ -125,7 +126,7 @@ spec:
             {{- $cnpgHost      := dig "cnpg.host"      "" $ccData }}
             {{- $nodeIP        := dig "node.ip"        "" $ccData }}
             {{- $appInitImage  := dig "appInit.image"  "ghcr.io/gentian-org/gentian-app-init:develop" $ccData }}
-            {{- $kr            := default dict $pSpec.kernelRequirements }}
+            {{- $kr            := dig "requires" "services" dict $pSpec }}
             {{- $identity      := default dict $kr.identity }}
             {{- $oidcPackDefaultScopes := dict }}
             {{- $oidcPackFullScopeAllowed := dict }}

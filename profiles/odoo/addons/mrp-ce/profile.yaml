@@ -1,5 +1,5 @@
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: odoo-mrp-ce
   labels:
@@ -10,47 +10,39 @@ metadata:
     gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["mrp.group_mrp_manager"],"gentianOdooGroupRoles":["mrp.group_mrp_user","stock.group_stock_user"],"gentianOdooModules":["mrp"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
-  displayName: "Odoo Manufacturing"
-  description: "Manufacturing and Bill of Materials (BoM) recipe management module for Odoo."
-  family: odoo
-  catalogueVersion: "1.0.0"
-  edition: ce
+  classes:
+    - app
   trustTier: platform
-  license: LGPL-3.0
-  author: OCA
-  tile:
-    # Odoo's own icon for the module this profile installs, set inside the
-    # catalogue's 52x52 frame so it sits with the other tiles.
-    image: assets/tile.svg
-    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBkPSJNNTAgMTkuMDIzYzAtLjczNS0uNzM3LTEuMjMtMS4zOTgtLjkzOGwtMjggMTIuNDAzYTEuMDI2IDEuMDI2IDAgMCAwLS42MDIuOTM5djkuNTVjMCAuNTY1LjQ0OCAxLjAyMyAxIDEuMDIzaDI1YzIuMjEgMCA0LTEuODMgNC00LjA4OVYxOS4wMjNaIiBmaWxsPSIjRkJCOTQ1Ii8+PHBhdGggZD0iTTQyIDE0LjAxOGMwLS43MjItLjcxOS0xLjIxNC0xLjM3Ni0uOTQybC0zMCAxMi4zOTRhMS4wMTcgMS4wMTcgMCAwIDAtLjYyNC45NDN2MTQuNTdjMCAuNTYyLjQ0OCAxLjAxNyAxIDEuMDE3aDI3YzIuMjEgMCA0LTEuODIxIDQtNC4wNjhWMTQuMDE4WiIgZmlsbD0iI0ZDODY4QiIvPjxwYXRoIGQ9Im00MiAyMS4wMS0yMS4zOTggOS40NzhjLS4zNjUuMTYyLS42MDIuNTMtLjYwMi45Mzh2OS41NTJjMCAuNTY0LjQ0OCAxLjAyMiAxIDEuMDIyaDE3YzIuMjEgMCA0LTEuODIyIDQtNC4wNjhWMjEuMDFaIiBmaWxsPSIjRjg2MTI2Ii8+PHBhdGggZD0iTTMyIDkuMDE1YzAtLjcyLS43MTktMS4yMS0xLjM3Ni0uOTRsLTMwIDEyLjM2NGExLjAxNSAxLjAxNSAwIDAgMC0uNjI0Ljk0djE5LjYwN0MwIDQxLjU0Ni40NDggNDIgMSA0MmgyN2MyLjIxIDAgNC0xLjgxNyA0LTQuMDU4VjkuMDE1WiIgZmlsbD0iIzFBRDNCQiIvPjxwYXRoIGQ9Ik0zMiAxNi42MzkgMTAuNjI0IDI1LjQ3YTEuMDE3IDEuMDE3IDAgMCAwLS42MjQuOTQzdjE0LjU3YzAgLjU2Mi40NDggMS4wMTcgMSAxLjAxN2gxN2MyLjIxIDAgNC0xLjgxNyA0LTQuMDU4VjE2LjY0WiIgZmlsbD0iIzFBNkY2NiIvPjwvc3ZnPjwvc3ZnPgo=
-
-  portalTiles:
-    - name: odoo-mrp
-      displayName:
-        en_US: "Odoo Manufacturing"
-        de_DE: "Odoo Fertigung"
-      linkSuffix: "/odoo/action-mrp.mrp_production_action?gentian_embed=1"
-      linkTarget: embedded
-      allowedGroup: "App Users"
-
-  compositionRef: app-odoo
-  deploymentMethod: crossplane
-  chart:
-    repository: oci://ghcr.io/gentian-org/charts
-    name: odoo
-    version: "0.1.15"
-  # Odoo calls its addons "modules" — this maps the Gentian profile onto that name.
-  customization:
+  version: "1.0.0"
+  package:
+    extraValues:
+      odoo:
+        module: mrp
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 250m
+          memory: 256Mi
     addon:
       id: mrp
       of: odoo-base-ce
-  extraValues:
-    odoo:
-      module: mrp
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 250m
-        memory: 256Mi
+  expose:
+    - name: odoo-mrp
+      surface: gateway
+      authMode: oidc
+      subDomain: erp
+      backend:
+        component: odoo-base-ce
+        service: odoo
+        port: 8069
+      tile:
+        displayName: "Odoo Manufacturing"
+        displayNames:
+          de_DE: "Odoo Fertigung"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBkPSJNNTAgMTkuMDIzYzAtLjczNS0uNzM3LTEuMjMtMS4zOTgtLjkzOGwtMjggMTIuNDAzYTEuMDI2IDEuMDI2IDAgMCAwLS42MDIuOTM5djkuNTVjMCAuNTY1LjQ0OCAxLjAyMyAxIDEuMDIzaDI1YzIuMjEgMCA0LTEuODMgNC00LjA4OVYxOS4wMjNaIiBmaWxsPSIjRkJCOTQ1Ii8+PHBhdGggZD0iTTQyIDE0LjAxOGMwLS43MjItLjcxOS0xLjIxNC0xLjM3Ni0uOTQybC0zMCAxMi4zOTRhMS4wMTcgMS4wMTcgMCAwIDAtLjYyNC45NDN2MTQuNTdjMCAuNTYyLjQ0OCAxLjAxNyAxIDEuMDE3aDI3YzIuMjEgMCA0LTEuODIxIDQtNC4wNjhWMTQuMDE4WiIgZmlsbD0iI0ZDODY4QiIvPjxwYXRoIGQ9Im00MiAyMS4wMS0yMS4zOTggOS40NzhjLS4zNjUuMTYyLS42MDIuNTMtLjYwMi45Mzh2OS41NTJjMCAuNTY0LjQ0OCAxLjAyMiAxIDEuMDIyaDE3YzIuMjEgMCA0LTEuODIyIDQtNC4wNjhWMjEuMDFaIiBmaWxsPSIjRjg2MTI2Ii8+PHBhdGggZD0iTTMyIDkuMDE1YzAtLjcyLS43MTktMS4yMS0xLjM3Ni0uOTRsLTMwIDEyLjM2NGExLjAxNSAxLjAxNSAwIDAgMC0uNjI0Ljk0djE5LjYwN0MwIDQxLjU0Ni40NDggNDIgMSA0MmgyN2MyLjIxIDAgNC0xLjgxNyA0LTQuMDU4VjkuMDE1WiIgZmlsbD0iIzFBRDNCQiIvPjxwYXRoIGQ9Ik0zMiAxNi42MzkgMTAuNjI0IDI1LjQ3YTEuMDE3IDEuMDE3IDAgMCAwLS42MjQuOTQzdjE0LjU3YzAgLjU2Mi40NDggMS4wMTcgMSAxLjAxN2gxN2MyLjIxIDAgNC0xLjgxNyA0LTQuMDU4VjE2LjY0WiIgZmlsbD0iIzFBNkY2NiIvPjwvc3ZnPjwvc3ZnPgo=
+        image: assets/tile.svg
+        path: /odoo/action-mrp.mrp_production_action?gentian_embed=1
+        relation: can_launch
+  launch: tile

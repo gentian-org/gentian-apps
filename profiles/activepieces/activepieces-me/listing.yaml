@@ -1,0 +1,9 @@
+profile: activepieces-me
+displayName: Activepieces
+description: Open-source workflow automation with 200+ integrations, webhook triggers, and visual flow builder.
+family: activepieces
+edition: me
+author: Gentian
+license: MIT
+tile:
+  icon: analytics

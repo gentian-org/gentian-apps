@@ -1,22 +1,29 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  fetchPlatformAuthorizationSummary,
+  fetchAuthorization,
   fetchPlatformSecurityPolicy,
   updatePlatformSecurityPolicy,
   type MacWaiverEntry,
 } from "@/api/admin";
 import "./admin.css";
+import { Trans, useTranslation } from "react-i18next";
 
 export function PlatformSecuritySection() {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const policyQuery = useQuery({
     queryKey: ["admin", "platform", "security-policy"],
     queryFn: () => fetchPlatformSecurityPolicy(),
   });
-  const summaryQuery = useQuery({
-    queryKey: ["admin", "platform", "authorization-summary"],
-    queryFn: () => fetchPlatformAuthorizationSummary(),
+  // Who holds what on this cluster. Read under can_audit, which is the
+  // security officer's and the auditor's, so a tenant administrator opening
+  // this screen is refused this one query and still sees the rest.
+  const authzQuery = useQuery({
+    queryKey: ["admin", "platform", "authorization", "cluster"],
+    queryFn: () => fetchAuthorization("cluster"),
+    retry: false,
   });
   const [draft, setDraft] = useState<MacWaiverEntry[] | null>(null);
 
@@ -29,15 +36,15 @@ export function PlatformSecuritySection() {
   });
 
   if (policyQuery.isLoading) {
-    return <p className="admin-console__loading">Loading platform security policy…</p>;
+    return <p className="admin-console__loading">{t("platformSecurity.loadingPlatformSecurityPolicy")}</p>;
   }
   if (policyQuery.isError || !policyQuery.data) {
-    return <p className="admin-console__error">Platform security policy is unavailable.</p>;
+    return <p className="admin-console__error">{t("platformSecurity.platformSecurityPolicyIsUnavailable")}</p>;
   }
 
   const allowed = draft ?? policyQuery.data.allowedMacWaivers;
   const requests = policyQuery.data.catalogueRequests;
-  const summary = summaryQuery.data;
+  const authz = authzQuery.data;
 
   const toggleApproval = (profile: string, policy: string, scope: string) => {
     const key = `${profile}/${policy}/${scope}`;
@@ -55,67 +62,87 @@ export function PlatformSecuritySection() {
     <section>
       <header className="admin-console__section-head">
         <div>
-          <h2 className="admin-console__section-title">Platform security</h2>
+          <h2 className="admin-console__section-title">{t("platformSecurity.platformSecurity")}</h2>
           <p className="admin-console__lead">
-            Approve MAC waivers requested by catalogue AppProfiles. Workloads receive waiver pod
-            labels only when both the profile declares a request and the cluster allows it.
-          </p>
+            {t("platformSecurity.approveMacWaiversRequestedBy")}</p>
         </div>
         {draft !== null ? (
-          <span className="admin-console__badge admin-console__badge--warn">unsaved changes</span>
+          <span className="admin-console__badge admin-console__badge--warn">{t("platformSecurity.unsavedChanges")}</span>
         ) : null}
       </header>
 
-      {summary ? (
-        <div className="admin-console__stats">
-          <div className="admin-console__stat">
-            <div className="admin-console__stat-value">{summary.tenantCount}</div>
-            <div className="admin-console__stat-label">
-              Tenant{summary.tenantCount === 1 ? "" : "s"}
-            </div>
-          </div>
-          <div className="admin-console__stat">
-            <div className="admin-console__stat-value">{summary.bindingCount}</div>
-            <div className="admin-console__stat-label">
-              Integration binding{summary.bindingCount === 1 ? "" : "s"}
-            </div>
-          </div>
-          <div className="admin-console__stat">
-            <div className="admin-console__stat-value">
-              {summary.grantReadyCount}/{summary.grantCount}
-            </div>
-            <div className="admin-console__stat-label">AppGrants OpenFGA-synced</div>
-          </div>
-          <div
-            className={`admin-console__stat${
-              summary.allowedMacWaivers > 0 ? " admin-console__stat--alert" : ""
-            }`}
-          >
-            <div className="admin-console__stat-value">{summary.allowedMacWaivers}</div>
-            <div className="admin-console__stat-label">Approved MAC waivers</div>
-          </div>
-          <div className="admin-console__stat">
-            <div className="admin-console__stat-value">{summary.catalogueMacWaiverProfiles}</div>
-            <div className="admin-console__stat-label">Profiles requesting waivers</div>
-          </div>
-        </div>
-      ) : null}
+      <h3 className="admin-console__subsection-title">{t("platformSecurity.whoHoldsWhat")}</h3>
+      <p className="admin-console__hint">
+        {t("platformSecurity.readOnlyRolesAreGranted")}</p>
 
-      <h3 className="admin-console__subsection-title">Catalogue waiver requests</h3>
+      {authzQuery.isLoading ? (
+        <p className="admin-console__loading">{t("platformSecurity.readingTheAuthorizationGraph")}</p>
+      ) : authzQuery.isError || !authz ? (
+        <p className="admin-console__empty">
+          <Trans i18nKey="platformSecurity.needCanAudit" components={{ code: <code /> }} />
+        </p>
+      ) : (
+        <>
+          <div className="admin-console__table-wrap">
+            <table className="admin-console__table">
+              <thead>
+                <tr>
+                  <th>{t("platformSecurity.role")}</th>
+                  <th>{t("platformSecurity.heldBy")}</th>
+                  <th>{t("platformSecurity.carries")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {authz.bindings.map((binding) => (
+                  <tr key={binding.relation}>
+                    <td>
+                      <code>{binding.relation}</code>
+                    </td>
+                    <td>
+                      {binding.groups.length === 0 ? (
+                        <span className="admin-console__empty">{t("platformSecurity.nobody")}</span>
+                      ) : (
+                        binding.groups.map((group) => (
+                          <div key={group}>
+                            <code>{group}</code>
+                          </div>
+                        ))
+                      )}
+                    </td>
+                    <td>
+                      {binding.grants.map((grant) => (
+                        <span key={grant} className="admin-console__badge">
+                          {grant}
+                        </span>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {authz.unheld > 0 ? (
+            <p className="admin-console__hint">
+              {t("platformSecurity.unheldRoles", { count: authz.unheld })}
+            </p>
+          ) : null}
+        </>
+      )}
+
+      <h3 className="admin-console__subsection-title">{t("platformSecurity.catalogueWaiverRequests")}</h3>
 
       {requests.length === 0 ? (
         <p className="admin-console__empty">
-          No catalogue profiles currently request MAC waivers.
-        </p>
+          {t("platformSecurity.noCatalogueProfilesCurrentlyRequest")}</p>
       ) : (
         <div className="admin-console__table-wrap">
           <table className="admin-console__table">
             <thead>
               <tr>
-                <th>Profile</th>
-                <th>Policy</th>
-                <th>Scope</th>
-                <th>Approved</th>
+                <th>{t("platformSecurity.profile")}</th>
+                <th>{t("platformSecurity.policy")}</th>
+                <th>{t("platformSecurity.scope")}</th>
+                <th>{t("platformSecurity.approved")}</th>
               </tr>
             </thead>
             <tbody>
@@ -144,7 +171,7 @@ export function PlatformSecuritySection() {
                           <span className="admin-console__toggle-icon">
                             {approved ? "☑" : "☐"}
                           </span>
-                          {approved ? "Approved" : "Not approved"}
+                          {t(approved ? "platformSecurity.approved" : "platformSecurity.notApproved")}
                         </button>
                       </td>
                     </tr>
@@ -169,7 +196,7 @@ export function PlatformSecuritySection() {
           disabled={draft === null || saveMutation.isPending}
           onClick={() => saveMutation.mutate(allowed)}
         >
-          {saveMutation.isPending ? "Saving…" : "Save allowlist"}
+          {saveMutation.isPending ? "Saving…" : t("platformSecurity.saveAllowlist")}
         </button>
         {draft !== null ? (
           <button
@@ -177,8 +204,7 @@ export function PlatformSecuritySection() {
             className="admin-console__btn admin-console__btn--quiet"
             onClick={() => setDraft(null)}
           >
-            Discard changes
-          </button>
+            {t("platformSecurity.discardChanges")}</button>
         ) : null}
       </div>
     </section>

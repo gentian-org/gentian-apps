@@ -1,0 +1,10 @@
+profile: mathesar-ce
+displayName: "Mathesar"
+description: "Spreadsheet-like interface for viewing, editing, and querying Postgres data directly."
+family: mathesar
+edition: ce
+author: Mathesar Foundation
+license: GPL-3.0
+tile:
+  icon: database
+

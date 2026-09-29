@@ -1,386 +1,334 @@
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: activepieces-me
   labels:
     gentianos.io/profile-name: activepieces-me
 spec:
-  displayName: Activepieces
-  description: Open-source workflow automation with 200+ integrations, webhook triggers,
-    and visual flow builder.
-  family: activepieces
-  catalogueVersion: 1.0.0
-  edition: me
+  classes:
+    - app
   trustTier: certified
-  license: MIT
-  author: Gentian
-  tile:
-    icon: analytics
-  deploymentMethod: crossplane
-  kernelRequirements:
-    identity:
-      saml:
-        entityId: Activepieces
-        acsUrl: https://auto.${TENANT_DOMAIN}/api/v1/authn/saml/acs
-    database:
-      engine: postgresql
-      databasePerTenant: true
-      allowDynamicDatabaseCreation: false
-      # Activepieces' TypeORM migrations create tables in public and then query
-      # them unqualified, so public has to resolve first. Previously the operator
-      # inferred this by matching "activepieces" in the role name.
-      schemaPreference: public
-    cache:
-      engine: redis
-  portalTiles:
-  - name: activepieces-me
-    displayName:
-      de_DE: Automatisierung
-      en_US: Automation
-    linkTarget: embedded
-    allowedGroup: App Users
-  chart:
-    repository: oci://ghcr.io/gentian-org/charts
-    name: activepieces
-    version: 0.3.26
-  valueMapping:
-    database:
-      hostKey: activepieces.postgresql.host
-      portKey: activepieces.postgresql.port
-      nameKey: activepieces.postgresql.database
-      userKey: activepieces.postgresql.username
-      passwordKey: activepieces.postgresql.password
-    cache:
-      hostKey: activepieces.redis.host
-      portKey: activepieces.redis.port
-      passwordKey: activepieces.redis.password
-  appSecrets:
-  - name: encryption_key
-    valuePath: activepieces.encryption.connection
-  - name: jwt_secret
-    valuePath: activepieces.encryption.jwt
-  ingress:
-    subDomain: auto
-    serviceName: activepieces-me
-    servicePort: 8080
-    tlsEnabled: true
-    clusterIssuer: letsencrypt-http01
-  security:
-    egress:
-    # TCP/443 covers both the git-modules sidecar cloning from GitHub and the app's
-    # own outbound HTTPS. The git-daemon rule this replaced was pinned to a single
-    # workstation /32 and is no longer reachable or needed.
-    - ports:
-      - port: 443
-        protocol: TCP
-  extraValues:
-    fullnameOverride: activepieces-me
-    extraEnvVars:
-    - name: AP_TELEMETRY_ENABLED
-      value: 'false'
-    - name: AP_TEMPLATES_SOURCE_URL
-      value: http://127.0.0.1/custom-content/templates.json
-    ingress:
-      enabled: false
-      tls:
-      - hosts:
-        - auto.${TENANT_DOMAIN}
-    resources:
-      requests:
-        cpu: 100m
-        memory: 1Gi
-      limits:
-        cpu: 1
-        memory: 2Gi
-    podLabels:
-      mac-waiver.gentianos.io/gentian-restrict-capabilities: approved
-      mac-waiver.gentianos.io/gentian-require-non-root: approved
-    extraVolumes:
-    - name: nginx-log
-      emptyDir: {}
-    - name: nginx-lib
-      emptyDir: {}
-    - name: nginx-run
-      emptyDir: {}
+  version: 1.0.0
+  package:
+    chart:
+      repository: oci://ghcr.io/gentian-org/charts
+      name: activepieces
+      version: 0.3.26
+    valueMapping:
+      database:
+        hostKey: activepieces.postgresql.host
+        portKey: activepieces.postgresql.port
+        nameKey: activepieces.postgresql.database
+        userKey: activepieces.postgresql.username
+        passwordKey: activepieces.postgresql.password
+      cache:
+        hostKey: activepieces.redis.host
+        portKey: activepieces.redis.port
+        passwordKey: activepieces.redis.password
+    extraValues:
+      fullnameOverride: activepieces-me
+      extraEnvVars:
+        - name: AP_TELEMETRY_ENABLED
+          value: 'false'
+        - name: AP_TEMPLATES_SOURCE_URL
+          value: http://127.0.0.1/custom-content/templates.json
+      ingress:
+        enabled: false
+        tls:
+          - hosts:
+              - auto.${TENANT_DOMAIN}
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+        limits:
+          cpu: 1
+          memory: 2Gi
+      podLabels:
+        mac-waiver.gentianos.io/gentian-restrict-capabilities: approved
+        mac-waiver.gentianos.io/gentian-require-non-root: approved
+      extraVolumes:
+        - name: nginx-log
+          emptyDir: {}
+        - name: nginx-lib
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
     # emptyDir, filled by the git-sync init container and kept current by the
     # git-sync sidecar below -- both in this pod. It was a ReadWriteMany PVC
     # written by a standalone Deployment, which made an RWX StorageClass a hard
     # requirement for serving a few MB of public, reproducible git.
-    - name: custom-content
-      emptyDir: {}
+        - name: custom-content
+          emptyDir: {}
     # git-sync in this pod, replacing the standalone Deployment that wrote a
     # ReadWriteMany PVC. The content is public, reproducible git -- nothing to
     # share, and sharing it made an RWX StorageClass a hard requirement.
     #
     # Runs as 1000 to match fsGroup, so the emptyDir is writable without the
     # cross-pod gid negotiation the shared volume needed.
-    extraInitContainers:
-    - name: git-sync-init-content
-      image: registry.k8s.io/git-sync/git-sync:v4.2.3
-      securityContext:
-        runAsUser: 1000
-        runAsGroup: 1000
-        allowPrivilegeEscalation: false
-        capabilities:
-          drop: ["ALL"]
-        seccompProfile:
-          type: RuntimeDefault
-      args:
-      - --repo=https://github.com/gentian-org/gentian-pieces.git
-      - --branch=main
-      - --root=/usr/share/nginx/html/custom-content
-      - --dest=current
-      - --one-time
-      volumeMounts:
-      - name: custom-content
-        mountPath: /usr/share/nginx/html/custom-content
-    extraContainers:
-    - name: git-sync-content
-      image: registry.k8s.io/git-sync/git-sync:v4.2.3
-      securityContext:
-        runAsUser: 1000
-        runAsGroup: 1000
-        allowPrivilegeEscalation: false
-        capabilities:
-          drop: ["ALL"]
-        seccompProfile:
-          type: RuntimeDefault
-      args:
-      - --repo=https://github.com/gentian-org/gentian-pieces.git
-      - --branch=main
-      - --root=/usr/share/nginx/html/custom-content
-      - --dest=current
-      - --wait=60
-      - --stale-worktree-timeout=24h
-      resources:
-        requests: {cpu: 10m, memory: 32Mi}
-        limits: {cpu: 50m, memory: 128Mi}
-      volumeMounts:
-      - name: custom-content
-        mountPath: /usr/share/nginx/html/custom-content
-    extraVolumeMounts:
-    - mountPath: /var/log/nginx
-      name: nginx-log
-    - mountPath: /var/lib/nginx
-      name: nginx-lib
-    - mountPath: /run
-      name: nginx-run
-    - name: custom-content
-      mountPath: /usr/share/nginx/html/custom-content
-    postgresql:
-      enabled: false
-    redis:
-      enabled: false
-    activepieces:
-      domain: auto.${TENANT_DOMAIN}
-      database: postgres
-      queue:
-        mode: redis
+      extraInitContainers:
+        - name: git-sync-init-content
+          image: registry.k8s.io/git-sync/git-sync:v4.2.3
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          args:
+            - --repo=https://github.com/gentian-org/gentian-pieces.git
+            - --branch=main
+            - --root=/usr/share/nginx/html/custom-content
+            - --dest=current
+            - --one-time
+          volumeMounts:
+            - name: custom-content
+              mountPath: /usr/share/nginx/html/custom-content
+      extraContainers:
+        - name: git-sync-content
+          image: registry.k8s.io/git-sync/git-sync:v4.2.3
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          args:
+            - --repo=https://github.com/gentian-org/gentian-pieces.git
+            - --branch=main
+            - --root=/usr/share/nginx/html/custom-content
+            - --dest=current
+            - --wait=60
+            - --stale-worktree-timeout=24h
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 50m, memory: 128Mi}
+          volumeMounts:
+            - name: custom-content
+              mountPath: /usr/share/nginx/html/custom-content
+      extraVolumeMounts:
+        - mountPath: /var/log/nginx
+          name: nginx-log
+        - mountPath: /var/lib/nginx
+          name: nginx-lib
+        - mountPath: /run
+          name: nginx-run
+        - name: custom-content
+          mountPath: /usr/share/nginx/html/custom-content
+      postgresql:
+        enabled: false
       redis:
+        enabled: false
+      activepieces:
+        domain: auto.${TENANT_DOMAIN}
+        database: postgres
+        queue:
+          mode: redis
+        redis:
         # Must equal the kernel's redisACLUsername(tenant, app) = "<tenant>-<app>".
         # ${APP_ID} is the claim name, so this survives profile renames.
-        username: ${TENANT_ID}-${APP_ID}
-      sandbox:
-        executionMode: SANDBOXED
-      telemetry: false
-      templateSourceURL: ''
-      pieces:
-        source: FILE
-        syncMode: NONE
-      data:
+          username: ${TENANT_ID}-${APP_ID}
+        sandbox:
+          executionMode: SANDBOXED
+        telemetry: false
+        templateSourceURL: ''
+        pieces:
+          source: FILE
+          syncMode: NONE
+        data:
         # An empty mapping, not an absent one: the chart dereferences
         # .activepieces.data.pvc.existingClaim, so `pvc:` with no keys renders as
         # null and every template using it fails with a nil pointer. Dropping the
         # storageClass line without this left exactly that.
         #
         # No storageClass key: the cluster's default is the cluster's to choose.
-        pvc: {}
-    podSecurityContext:
-      fsGroup: 1000
-    securityContext:
-      runAsNonRoot: false
-      runAsUser: 0
-      allowPrivilegeEscalation: false
-      capabilities:
-        drop:
-        - ALL
-        add:
-        - NET_BIND_SERVICE
-        - CHOWN
-        - SETUID
-        - SETGID
-        - DAC_OVERRIDE
-      seccompProfile:
-        type: RuntimeDefault
+          pvc: {}
+      podSecurityContext:
+        fsGroup: 1000
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+          add:
+            - NET_BIND_SERVICE
+            - CHOWN
+            - SETUID
+            - SETGID
+            - DAC_OVERRIDE
+        seccompProfile:
+          type: RuntimeDefault
     # Gentian runtime: the chart owns the nginx config and the entrypoint
     # (patches 0005/0006). This profile passes values only — never a command.
     # See customizations/nginx-sso-routing.yaml.
-    gentian:
-      enabled: true
-      sso:
+      gentian:
+        enabled: true
+        sso:
         # Empty = discover the sidecar from *_SSO_SAML_SERVICE_HOST at startup.
-        host: ''
-      startup:
-        injectSessionScript: true
-        disableUpgradeBanner: true
-  postInstallJob:
-    image: ghcr.io/cloudnative-pg/postgresql:17.2
-    envFrom:
-    - activepieces-me-postgresql-credentials
-    # Seeds the CE platform row. Activepieces runs Community Edition here
-    # (no AP_EDITION / AP_LICENSE_KEY): SAML is terminated by the sso-saml
-    # sidecar, which creates ordinary CE users and mints a session JWT, so the
-    # platform's enterprise gates stay off and no IdP metadata is stored here.
-    script: |
-      set -eu
-
-      # Derive tenant + kernel domain from the namespace and the realm descriptor.
-      python3 -c '
-      import urllib.request, re
-      with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace") as f:
-          ns = f.read().strip()
-      tenant_id = ns.replace("tenant-", "")
-      url = (
-          "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080"
-          f"/auth/realms/{tenant_id}/protocol/saml/descriptor"
-      )
-      xml = urllib.request.urlopen(url).read().decode("utf-8")
-      match = re.search(r"https://id\.([^/\"]+)", xml)
-      kernel_domain = match.group(1) if match else "gentian.org"
-      with open("/tmp/env.sh", "w") as f:
-          f.write(f"export TENANT_ID={tenant_id}\n")
-          f.write(f"export KERNEL_DOMAIN={kernel_domain}\n")
-      '
-      . /tmp/env.sh
-
-      PSQL_HOST=postgres-rw.platform-kernel.svc.cluster.local
-      PSQL_DB="${TENANT_ID}_activepieces_me"
-
-      echo "Waiting for database..."
-      until pg_isready -h "$PSQL_HOST" -p 5432; do
-        sleep 2
-      done
-
-      # Activepieces owns its schema; only seed once its migrations have landed.
-      TABLES_COUNT=$(PGPASSWORD="$password" psql -h "$PSQL_HOST" -p 5432 -U "$username" \
-        -d "$PSQL_DB" -tAc "SELECT count(*) FROM information_schema.tables \
-        WHERE table_schema = 'public' AND table_name IN ('platform', 'project', 'user');")
-      if [ "$TABLES_COUNT" -ne 3 ]; then
-        echo "Activepieces migrations are not complete yet (found $TABLES_COUNT/3 required tables)."
-        exit 1
-      fi
-
-      PLATFORM_COUNT=$(PGPASSWORD="$password" psql -h "$PSQL_HOST" -p 5432 -U "$username" \
-        -d "$PSQL_DB" -tAc "SELECT count(*) FROM platform;")
-      if [ "$PLATFORM_COUNT" -eq 0 ]; then
-        echo "Seeding Activepieces database..."
-
-        printf "%s\n" \
-          'INSERT INTO "user" (id, created, updated, email, "firstName", "lastName", password, status, verified, "platformRole")' \
-          "VALUES ('usrActivepiecesAdmin1', now(), now(), 'admin-${TENANT_ID}@${KERNEL_DOMAIN}', 'Admin', '${TENANT_ID}', '\$2b\$10\$EPY9LjgjhWG./xyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxy', 'ACTIVE', true, 'ADMIN');" \
-          'INSERT INTO platform (id, created, updated, "ownerId", name, "primaryColor", "logoIconUrl", "fullLogoUrl", "favIconUrl", "filteredPieceNames", "filteredPieceBehavior", "showPoweredBy", "cloudAuthEnabled", "defaultLocale", "embeddingEnabled", "gitSyncEnabled", "allowedAuthDomains", "enforceAllowedAuthDomains", "ssoEnabled", "federatedAuthProviders", "emailAuthEnabled", "auditLogEnabled", "customDomainsEnabled", "customAppearanceEnabled", "manageProjectsEnabled", "managePiecesEnabled", "manageTemplatesEnabled", "apiKeysEnabled", "projectRolesEnabled", "flowIssuesEnabled", "alertsEnabled", "premiumPieces")' \
-          "VALUES ('plaActivepiecesPlatf1', now(), now(), 'usrActivepiecesAdmin1', 'Gentian', '#000000', '', '', '', '{}', 'ALLOWED', false, true, 'en', true, false, '{}', false, false, '{}'::jsonb, true, false, false, false, false, false, false, false, false, false, false, '{}');" \
-          'INSERT INTO project (id, created, updated, "ownerId", "displayName", "notifyStatus", "platformId")' \
-          "VALUES ('prjActivepiecesProje1', now(), now(), 'usrActivepiecesAdmin1', 'Default Project', 'ALWAYS', 'plaActivepiecesPlatf1');" \
-          | PGPASSWORD="$password" psql -v ON_ERROR_STOP=1 -h "$PSQL_HOST" -p 5432 -U "$username" -d "$PSQL_DB"
-        echo "Database seeded successfully."
-      else
-        echo "Database already seeded."
-      fi
-  sidecars:
-  - name: sso
-    chart:
-      repository: oci://ghcr.io/gentian-org/charts
-      name: gentian-sidecar-sso-saml
+          host: ''
+        startup:
+          injectSessionScript: true
+          disableUpgradeBanner: true
+  requires:
+    services:
+      identity:
+        saml:
+          entityId: Activepieces
+          acsUrl: https://auto.${TENANT_DOMAIN}/api/v1/authn/saml/acs
+      database:
+        engine: postgresql
+        databasePerTenant: true
+        allowDynamicDatabaseCreation: false
+      # Activepieces' TypeORM migrations create tables in public and then query
+      # them unqualified, so public has to resolve first. Previously the operator
+      # inferred this by matching "activepieces" in the role name.
+        schemaPreference: public
+      cache:
+        engine: redis
+    privileges:
+      egress:
+        - name: egress-1
+          rule:
+            ports:
+              - port: 443
+                protocol: TCP
+          reason: 'REVIEW: say what this component reaches and why'
+  secrets:
+    generated:
+      - name: encryption_key
+        valuePath: activepieces.encryption.connection
+      - name: jwt_secret
+        valuePath: activepieces.encryption.jwt
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      backend:
+        service: activepieces-me
+        port: 8080
+      tile:
+        displayName: Automation
+        displayNames:
+          de_DE: Automatisierung
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDx0aXRsZT5QbGFjZWhvbGRlciB0aWxlPC90aXRsZT4KICA8cmVjdCB3aWR0aD0iNTIiIGhlaWdodD0iNTIiIHJ4PSIxMCIgZmlsbD0iI0VDRThERiIvPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMjAsIDIxLCA0NiwgMC4wOCkiIHN0cm9rZS13aWR0aD0iMSIvPgogIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzE0MTUyRSIgc3Ryb2tlLW9wYWNpdHk9IjAuNDUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+CiAgICA8cmVjdCB4PSIxNiIgeT0iMTYiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgcng9IjQiLz4KICAgIDxwYXRoIGQ9Ik0xNiAyM2gyMCIvPgogIDwvZz4KICA8Y2lyY2xlIGN4PSIyMC41IiBjeT0iMTkuNSIgcj0iMS4yNSIgZmlsbD0iIzE0MTUyRSIgZmlsbC1vcGFjaXR5PSIwLjQ1Ii8+Cjwvc3ZnPgo=
+        image: assets/tile.svg
+        relation: can_launch
+  extensions:
+    - name: sso
+      chart:
+        repository: oci://ghcr.io/gentian-org/charts
+        name: gentian-sidecar-sso-saml
       # 0.1.7 + the rebuilt image is the release that verifies SAML assertion
       # signatures. Before it, the sidecar accepted any base64 XML carrying an
       # email attribute, so anything able to reach the ACS path could log in as
       # any user. acsPath is left unset so this keeps posting to
       # /api/v1/authn/saml/acs, which is where the app's own nginx fronts it.
-      version: 0.1.7
-    extraValues:
+        version: 0.1.7
+      extraValues:
       # latest is this image's only moving tag, and the node has a pre-fix copy
       # cached, so IfNotPresent (the chart default) would keep running the
       # vulnerable build. Always is what actually delivers the fix here.
-      image:
-        pullPolicy: Always
-      podLabels:
-        gentianos.io/app: activepieces-me
-      podAnnotations:
-        gentianos.io/restart-reason: saml-signature-validation-2026-08-12
-      sso:
-        tenantId: ${TENANT_ID}
-        kernelDomain: ${KERNEL_DOMAIN}
-        issuer: Activepieces
-      handlerScript: "const { Client } = require('pg');\nconst jwt = require('jsonwebtoken');\n\
-        \nasync function upsertUserAndProject(email, firstName, lastName) {\n    const\
-        \ client = new Client({\n        host: process.env.AP_POSTGRES_HOST,\n   \
-        \     port: parseInt(process.env.AP_POSTGRES_PORT || '5432'),\n        user:\
-        \ process.env.AP_POSTGRES_USERNAME,\n        password: process.env.AP_POSTGRES_PASSWORD\
-        \ || process.env.password,\n        database: process.env.AP_POSTGRES_DATABASE,\n\
-        \    });\n    \n    await client.connect();\n    try {\n        const resUser\
-        \ = await client.query('SELECT id FROM \"user\" WHERE email = $1', [email]);\n\
-        \        let userId;\n        \n        if (resUser.rows.length > 0) {\n \
-        \           userId = resUser.rows[0].id;\n        } else {\n            userId\
-        \ = 'usr_' + Math.random().toString(36).substring(2, 15).substring(0, 17);\n\
-        \            await client.query(\n                'INSERT INTO \"user\" (id,\
-        \ created, updated, email, \"firstName\", \"lastName\", password, status,\
-        \ verified, \"platformRole\", \"platformId\") VALUES ($1, now(), now(), $2,\
-        \ $3, $4, $5, $6, $7, $8, $9)',\n                [userId, email, firstName\
-        \ || 'SSO', lastName || 'User', '', 'ACTIVE', true, 'ADMIN', 'plaActivepiecesPlatf1']\n\
-        \            );\n            console.log(`User created: ${userId} (${email})`);\n\
-        \        }\n        \n        const resProj = await client.query('SELECT id\
-        \ FROM project WHERE \"ownerId\" = $1', [userId]);\n        let projectId;\n\
-        \        \n        if (resProj.rows.length > 0) {\n            projectId =\
-        \ resProj.rows[0].id;\n        } else {\n            projectId = 'prj_' +\
-        \ Math.random().toString(36).substring(2, 15).substring(0, 17);\n        \
-        \    await client.query(\n                'INSERT INTO project (id, created,\
-        \ updated, \"ownerId\", \"displayName\", \"notifyStatus\", \"platformId\"\
-        ) VALUES ($1, now(), now(), $2, $3, $4, $5)',\n                [projectId,\
-        \ userId, 'Default Project', 'ALWAYS', 'plaActivepiecesPlatf1']\n        \
-        \    );\n            console.log(`Project created: ${projectId} for user ${userId}`);\n\
-        \        }\n        \n        return { userId, projectId };\n    } finally\
-        \ {\n        await client.end();\n    }\n}\n\nfunction signJwt(userId, email,\
-        \ firstName, lastName, projectId) {\n    const payload = {\n        id: userId,\n\
-        \        type: 'USER',\n        projectId: projectId,\n        platform: {\n\
-        \            id: 'plaActivepiecesPlatf1'\n        }\n    };\n    \n    const secret = process.env.jwt;\n    return jwt.sign(payload, secret, { \n        algorithm: 'HS256',\n        issuer: 'activepieces',\n        expiresIn: '7d' \n    });\n}\n\n\
-        module.exports = {\n    onLogin: async (profile, req, res) => {\n        const\
-        \ { email, firstName, lastName } = profile;\n        const { userId, projectId\
-        \ } = await upsertUserAndProject(email, firstName, lastName);\n        const\
-        \ token = signJwt(userId, email, firstName, lastName, projectId);\n      \
-        \  \n        const userObj = {\n            id: userId,\n            email:\
-        \ email,\n            firstName: firstName || 'SSO',\n            lastName:\
-        \ lastName || 'User',\n            status: 'ACTIVE',\n            verified:\
-        \ true,\n            platformRole: 'ADMIN'\n        };\n        \n       \
-        \ res.writeHead(200, { \n            'Content-Type': 'text/html',\n      \
-        \      'Set-Cookie': [\n                `ap_token=${token}; Path=/; Secure;\
-        \ SameSite=Lax; Max-Age=604800`,\n                `ap_user=${encodeURIComponent(JSON.stringify(userObj))};\
-        \ Path=/; Secure; SameSite=Lax; Max-Age=604800`,\n                `ap_logged_in=true;\
-        \ Path=/; Secure; SameSite=Lax; Max-Age=604800`\n            ]\n        });\n\
-        \        res.end(`<!DOCTYPE html>\n<html>\n<head>\n    <title>Logging in...</title>\n\
-        </head>\n<body>\n    <script>\n        localStorage.setItem('token', '${token}');\n\
-        \        localStorage.setItem('currentUser', '${JSON.stringify(userObj)}');\n\
-        \        window.location.href = '/';\n    </script>\n</body>\n</html>`);\n\
-        \    }\n};\n"
-      envFrom:
-      - secretRef:
-          name: activepieces-me-postgresql-credentials
-      - secretRef:
-          name: activepieces-me-encryption-keys
-      extraEnvVars:
-      - name: AP_POSTGRES_HOST
-        value: postgres-rw.platform-kernel.svc.cluster.local
-      - name: AP_POSTGRES_PORT
-        value: '5432'
-      - name: AP_POSTGRES_USERNAME
-        value: ${TENANT_ID}_activepieces-me
-      - name: AP_POSTGRES_DATABASE
-        value: ${TENANT_ID}_activepieces_me
+        image:
+          pullPolicy: Always
+        podLabels:
+          gentianos.io/app: activepieces-me
+        podAnnotations:
+          gentianos.io/restart-reason: saml-signature-validation-2026-08-12
+        sso:
+          tenantId: ${TENANT_ID}
+          kernelDomain: ${KERNEL_DOMAIN}
+          issuer: Activepieces
+        handlerScript: "const { Client } = require('pg');\nconst jwt = require('jsonwebtoken');\n\nasync function upsertUserAndProject(email, firstName, lastName) {\n    const client = new Client({\n        host: process.env.AP_POSTGRES_HOST,\n        port: parseInt(process.env.AP_POSTGRES_PORT || '5432'),\n        user: process.env.AP_POSTGRES_USERNAME,\n        password: process.env.AP_POSTGRES_PASSWORD || process.env.password,\n        database: process.env.AP_POSTGRES_DATABASE,\n    });\n    \n    await client.connect();\n    try {\n        const resUser = await client.query('SELECT id FROM \"user\" WHERE email = $1', [email]);\n        let userId;\n        \n        if (resUser.rows.length > 0) {\n            userId = resUser.rows[0].id;\n        } else {\n            userId = 'usr_' + Math.random().toString(36).substring(2, 15).substring(0, 17);\n            await client.query(\n                'INSERT INTO \"user\" (id, created, updated, email, \"firstName\", \"lastName\", password, status, verified, \"platformRole\", \"platformId\") VALUES ($1, now(), now(), $2, $3, $4, $5, $6, $7, $8, $9)',\n                [userId, email, firstName || 'SSO', lastName || 'User', '', 'ACTIVE', true, 'ADMIN', 'plaActivepiecesPlatf1']\n            );\n            console.log(`User created: ${userId} (${email})`);\n        }\n        \n        const resProj = await client.query('SELECT id FROM project WHERE \"ownerId\" = $1', [userId]);\n        let projectId;\n        \n        if (resProj.rows.length > 0) {\n            projectId = resProj.rows[0].id;\n        } else {\n            projectId = 'prj_' + Math.random().toString(36).substring(2, 15).substring(0, 17);\n            await client.query(\n                'INSERT INTO project (id, created, updated, \"ownerId\", \"displayName\", \"notifyStatus\", \"platformId\") VALUES ($1, now(), now(), $2, $3, $4, $5)',\n                [projectId, userId, 'Default Project', 'ALWAYS', 'plaActivepiecesPlatf1']\n            );\n            console.log(`Project created: ${projectId} for user ${userId}`);\n        }\n        \n        return { userId, projectId };\n    } finally {\n        await client.end();\n    }\n}\n\nfunction signJwt(userId, email, firstName, lastName, projectId) {\n    const payload = {\n        id: userId,\n        type: 'USER',\n        projectId: projectId,\n        platform: {\n            id: 'plaActivepiecesPlatf1'\n        }\n    };\n    \n    const secret = process.env.jwt;\n    return jwt.sign(payload, secret, { \n        algorithm: 'HS256',\n        issuer: 'activepieces',\n        expiresIn: '7d' \n    });\n}\n\nmodule.exports = {\n    onLogin: async (profile, req, res) => {\n        const { email, firstName, lastName } = profile;\n        const { userId, projectId } = await upsertUserAndProject(email, firstName, lastName);\n        const token = signJwt(userId, email, firstName, lastName, projectId);\n        \n        const userObj = {\n            id: userId,\n            email: email,\n            firstName: firstName || 'SSO',\n            lastName: lastName || 'User',\n            status: 'ACTIVE',\n            verified: true,\n            platformRole: 'ADMIN'\n        };\n        \n        res.writeHead(200, { \n            'Content-Type': 'text/html',\n            'Set-Cookie': [\n                `ap_token=${token}; Path=/; Secure; SameSite=Lax; Max-Age=604800`,\n                `ap_user=${encodeURIComponent(JSON.stringify(userObj))}; Path=/; Secure; SameSite=Lax; Max-Age=604800`,\n                `ap_logged_in=true; Path=/; Secure; SameSite=Lax; Max-Age=604800`\n            ]\n        });\n        res.end(`<!DOCTYPE html>\n<html>\n<head>\n    <title>Logging in...</title>\n</head>\n<body>\n    <script>\n        localStorage.setItem('token', '${token}');\n        localStorage.setItem('currentUser', '${JSON.stringify(userObj)}');\n        window.location.href = '/';\n    </script>\n</body>\n</html>`);\n    }\n};\n"
+        envFrom:
+          - secretRef:
+              name: activepieces-me-postgresql-credentials
+          - secretRef:
+              name: activepieces-me-encryption-keys
+        extraEnvVars:
+          - name: AP_POSTGRES_HOST
+            value: postgres-rw.platform-kernel.svc.cluster.local
+          - name: AP_POSTGRES_PORT
+            value: '5432'
+          - name: AP_POSTGRES_USERNAME
+            value: ${TENANT_ID}_activepieces-me
+          - name: AP_POSTGRES_DATABASE
+            value: ${TENANT_ID}_activepieces_me
   # git-sync used to be declared here as a standalone Deployment writing a
   # ReadWriteMany PVC. It is now two containers in the app's own pod --
   # extraInitContainers/extraContainers in extraValues above. The sso sidecar
   # stays: it is a real service with its own endpoint, not a copy of shared
   # content every reader could produce for itself.
+  hooks:
+    postInstall:
+      image: ghcr.io/cloudnative-pg/postgresql:17.2
+      envFrom:
+        - activepieces-me-postgresql-credentials
+    # Seeds the CE platform row. Activepieces runs Community Edition here
+    # (no AP_EDITION / AP_LICENSE_KEY): SAML is terminated by the sso-saml
+    # sidecar, which creates ordinary CE users and mints a session JWT, so the
+    # platform's enterprise gates stay off and no IdP metadata is stored here.
+      script: |
+        set -eu
+
+        # Derive tenant + kernel domain from the namespace and the realm descriptor.
+        python3 -c '
+        import urllib.request, re
+        with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace") as f:
+            ns = f.read().strip()
+        tenant_id = ns.replace("tenant-", "")
+        url = (
+            "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080"
+            f"/auth/realms/{tenant_id}/protocol/saml/descriptor"
+        )
+        xml = urllib.request.urlopen(url).read().decode("utf-8")
+        match = re.search(r"https://id\.([^/\"]+)", xml)
+        kernel_domain = match.group(1) if match else "gentian.org"
+        with open("/tmp/env.sh", "w") as f:
+            f.write(f"export TENANT_ID={tenant_id}\n")
+            f.write(f"export KERNEL_DOMAIN={kernel_domain}\n")
+        '
+        . /tmp/env.sh
+
+        PSQL_HOST=postgres-rw.platform-kernel.svc.cluster.local
+        PSQL_DB="${TENANT_ID}_activepieces_me"
+
+        echo "Waiting for database..."
+        until pg_isready -h "$PSQL_HOST" -p 5432; do
+          sleep 2
+        done
+
+        # Activepieces owns its schema; only seed once its migrations have landed.
+        TABLES_COUNT=$(PGPASSWORD="$password" psql -h "$PSQL_HOST" -p 5432 -U "$username" \
+          -d "$PSQL_DB" -tAc "SELECT count(*) FROM information_schema.tables \
+          WHERE table_schema = 'public' AND table_name IN ('platform', 'project', 'user');")
+        if [ "$TABLES_COUNT" -ne 3 ]; then
+          echo "Activepieces migrations are not complete yet (found $TABLES_COUNT/3 required tables)."
+          exit 1
+        fi
+
+        PLATFORM_COUNT=$(PGPASSWORD="$password" psql -h "$PSQL_HOST" -p 5432 -U "$username" \
+          -d "$PSQL_DB" -tAc "SELECT count(*) FROM platform;")
+        if [ "$PLATFORM_COUNT" -eq 0 ]; then
+          echo "Seeding Activepieces database..."
+
+          printf "%s\n" \
+            'INSERT INTO "user" (id, created, updated, email, "firstName", "lastName", password, status, verified, "platformRole")' \
+            "VALUES ('usrActivepiecesAdmin1', now(), now(), 'admin-${TENANT_ID}@${KERNEL_DOMAIN}', 'Admin', '${TENANT_ID}', '\$2b\$10\$EPY9LjgjhWG./xyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxy', 'ACTIVE', true, 'ADMIN');" \
+            'INSERT INTO platform (id, created, updated, "ownerId", name, "primaryColor", "logoIconUrl", "fullLogoUrl", "favIconUrl", "filteredPieceNames", "filteredPieceBehavior", "showPoweredBy", "cloudAuthEnabled", "defaultLocale", "embeddingEnabled", "gitSyncEnabled", "allowedAuthDomains", "enforceAllowedAuthDomains", "ssoEnabled", "federatedAuthProviders", "emailAuthEnabled", "auditLogEnabled", "customDomainsEnabled", "customAppearanceEnabled", "manageProjectsEnabled", "managePiecesEnabled", "manageTemplatesEnabled", "apiKeysEnabled", "projectRolesEnabled", "flowIssuesEnabled", "alertsEnabled", "premiumPieces")' \
+            "VALUES ('plaActivepiecesPlatf1', now(), now(), 'usrActivepiecesAdmin1', 'Gentian', '#000000', '', '', '', '{}', 'ALLOWED', false, true, 'en', true, false, '{}', false, false, '{}'::jsonb, true, false, false, false, false, false, false, false, false, false, false, '{}');" \
+            'INSERT INTO project (id, created, updated, "ownerId", "displayName", "notifyStatus", "platformId")' \
+            "VALUES ('prjActivepiecesProje1', now(), now(), 'usrActivepiecesAdmin1', 'Default Project', 'ALWAYS', 'plaActivepiecesPlatf1');" \
+            | PGPASSWORD="$password" psql -v ON_ERROR_STOP=1 -h "$PSQL_HOST" -p 5432 -U "$username" -d "$PSQL_DB"
+          echo "Database seeded successfully."
+        else
+          echo "Database already seeded."
+        fi
   customization:
     grade: A
     rubricScore: 7
@@ -419,3 +367,4 @@ spec:
       requiresApproval: platform-team
     fork:
       allowed: false
+  launch: tile

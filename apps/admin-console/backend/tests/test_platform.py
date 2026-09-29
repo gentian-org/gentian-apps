@@ -132,3 +132,68 @@ def test_a_refused_waiver_change_is_the_models_answer(monkeypatch):
 
 def test_no_token_is_refused_before_anything_is_forwarded():
     assert TestClient(_app(_settings())).get("/api/v1/admin/integrations").status_code == 401
+
+
+def test_the_authorization_view_asks_the_right_scope(monkeypatch):
+    """Who holds what, read-only, at two scopes.
+
+    A tenant's bindings are the tenant's and are read under `can_view`; the
+    cluster's are read under `can_audit`. The console does not decide either —
+    it asks the right object and relays the director's answer, refusals
+    included.
+    """
+    seen: dict = {}
+    view = {
+        "object": "tenant:platform",
+        "bindings": [
+            {"relation": "admin", "groups": ["gentian:tenant:platform:admins"], "grants": ["can_view"]}
+        ],
+        "unheld": 0,
+    }
+    _fake_client(monkeypatch, view, seen)
+    client = TestClient(_app(_settings()))
+
+    r = client.get("/api/v1/admin/authorization", headers={"Authorization": "Bearer t"})
+    assert r.status_code == 200
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/authorization"
+    # The grants survive the relay: without them a reader sees "admin" and has
+    # to go and read the model to learn what it means.
+    assert r.json()["bindings"][0]["grants"] == ["can_view"]
+
+    r = client.get(
+        "/api/v1/admin/authorization?scope=cluster", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 200
+    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/authorization"
+
+
+def test_a_refusal_of_the_cluster_scope_is_relayed_not_hidden(monkeypatch):
+    """A tenant administrator holds no `can_audit`, and the director says so.
+
+    The console must pass that through rather than show an empty table: "you
+    may not read this" and "nobody holds anything" are different answers.
+    """
+    seen: dict = {}
+    _fake_client(monkeypatch, {"detail": "forbidden"}, seen, status=403)
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/authorization?scope=cluster", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 403
+
+
+def test_the_cluster_scope_needs_a_cluster_id(monkeypatch):
+    """No cluster id configured means no object to ask about, which is this
+    console's own gap and is said as one rather than asked of the director."""
+    seen: dict = {}
+    _fake_client(monkeypatch, {}, seen)
+    settings = Settings(
+        AUTH_DISABLED="true",
+        KERNEL_DOMAIN="desk.gentian.org",
+        TENANT_ID="platform",
+        DIRECTOR_URL="http://director.test:8080",
+    )
+    r = TestClient(_app(settings)).get(
+        "/api/v1/admin/authorization?scope=cluster", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 501
+    assert "GENTIAN_CLUSTER_ID" in r.json()["detail"]

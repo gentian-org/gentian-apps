@@ -7,16 +7,18 @@ import {
   type AuditEventCategory,
 } from "@/api/admin";
 import "./admin.css";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 
 type AuditSectionProps = {
   tenant: string;
 };
 
-const CATEGORY_OPTIONS: Array<{ value: "" | AuditEventCategory; label: string }> = [
-  { value: "", label: "All categories" },
-  { value: "sign_in", label: "Sign-in" },
-  { value: "admin_action", label: "Admin actions" },
-  { value: "entitlement", label: "Entitlements" },
+const CATEGORY_OPTIONS: Array<{ value: "" | AuditEventCategory; labelKey: string }> = [
+  { value: "", labelKey: "categoryAll" },
+  { value: "sign_in", labelKey: "categorySignIn" },
+  { value: "admin_action", labelKey: "categoryAdminAction" },
+  { value: "entitlement", labelKey: "categoryEntitlement" },
 ];
 
 function formatAuditTime(epochMs: number) {
@@ -26,8 +28,11 @@ function formatAuditTime(epochMs: number) {
   return new Date(epochMs).toLocaleString();
 }
 
-function categoryLabel(category: AuditEventCategory) {
-  return CATEGORY_OPTIONS.find((option) => option.value === category)?.label ?? category;
+// Takes t rather than holding a hook: a helper is not a component, and a
+// label resolved at module scope would freeze the language at import time.
+function categoryLabel(category: AuditEventCategory, t: TFunction) {
+  const option = CATEGORY_OPTIONS.find((o) => o.value === category);
+  return option ? t(`audit.${option.labelKey}`) : category;
 }
 
 /**
@@ -38,19 +43,21 @@ function categoryLabel(category: AuditEventCategory) {
  * list says in its own words what it does not cover.
  */
 function ChangeHistory({ tenant }: { tenant: string }) {
+  const { t } = useTranslation();
+
   const changesQuery = useQuery({
     queryKey: ["admin", "changes", tenant],
     queryFn: () => fetchChanges(tenant),
   });
 
   if (changesQuery.isLoading) {
-    return <p className="admin-console__hint">Reading the change history…</p>;
+    return <p className="admin-console__hint">{t("audit.readingTheChangeHistory")}</p>;
   }
   if (changesQuery.isError) {
     return (
       <p className="admin-console__hint">
-        The change history is not available:{" "}
-        {changesQuery.error instanceof Error ? changesQuery.error.message : "unknown error"}
+        {t("audit.theChangeHistoryIsNot")}{" "}
+        {changesQuery.error instanceof Error ? changesQuery.error.message : t("audit.unknownError")}
       </p>
     );
   }
@@ -58,18 +65,18 @@ function ChangeHistory({ tenant }: { tenant: string }) {
   const changes = changesQuery.data?.changes ?? [];
   return (
     <div style={{ marginBottom: "1.5rem" }}>
-      <h3 className="admin-console__subsection-title">Changes</h3>
+      <h3 className="admin-console__subsection-title">{t("audit.changes")}</h3>
       <p className="admin-console__hint">{changesQuery.data?.covers}</p>
       {changes.length === 0 ? (
-        <p className="admin-console__hint">Nothing has changed in this workspace yet.</p>
+        <p className="admin-console__hint">{t("audit.nothingHasChangedInThis")}</p>
       ) : (
         <table className="admin-console__table">
           <thead>
             <tr>
-              <th>When</th>
-              <th>What</th>
-              <th>Who</th>
-              <th>Under what authority</th>
+              <th>{t("audit.when")}</th>
+              <th>{t("audit.what")}</th>
+              <th>{t("audit.who")}</th>
+              <th>{t("audit.underWhatAuthority")}</th>
             </tr>
           </thead>
           <tbody>
@@ -92,7 +99,7 @@ function ChangeHistory({ tenant }: { tenant: string }) {
                   ) : (
                     /* Not a failure of this screen: a commit with no trailer
                        was pushed by hand, and saying so is the point. */
-                    <span className="admin-console__hint">pushed by hand — no record</span>
+                    <span className="admin-console__hint">{t("audit.pushedByHandNoRecord")}</span>
                   )}
                 </td>
               </tr>
@@ -105,6 +112,8 @@ function ChangeHistory({ tenant }: { tenant: string }) {
 }
 
 export function AuditSection({ tenant }: AuditSectionProps) {
+  const { t } = useTranslation();
+
   const [userFilter, setUserFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"" | AuditEventCategory>("");
@@ -135,16 +144,14 @@ export function AuditSection({ tenant }: AuditSectionProps) {
     <section>
       <div className="admin-console__toolbar">
         <h2 className="admin-console__section-title">
-          Audit log
-        </h2>
+          {t("audit.auditLog")}</h2>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <button
             type="button"
             className="admin-console__btn"
             onClick={() => auditQuery.refetch()}
           >
-            Refresh
-          </button>
+            {t("audit.refresh")}</button>
           <button
             type="button"
             className="admin-console__btn"
@@ -153,12 +160,11 @@ export function AuditSection({ tenant }: AuditSectionProps) {
                 setError(null);
                 await downloadAuditExport("csv", filters, tenant);
               } catch (err) {
-                setError(err instanceof Error ? err.message : "Export failed");
+                setError(err instanceof Error ? err.message : t("audit.exportFailed"));
               }
             }}
           >
-            Export CSV
-          </button>
+            {t("audit.exportCsv")}</button>
           <button
             type="button"
             className="admin-console__btn"
@@ -167,12 +173,11 @@ export function AuditSection({ tenant }: AuditSectionProps) {
                 setError(null);
                 await downloadAuditExport("json", filters, tenant);
               } catch (err) {
-                setError(err instanceof Error ? err.message : "Export failed");
+                setError(err instanceof Error ? err.message : t("audit.exportFailed"));
               }
             }}
           >
-            Export JSON
-          </button>
+            {t("audit.exportJson")}</button>
         </div>
       </div>
 
@@ -186,39 +191,39 @@ export function AuditSection({ tenant }: AuditSectionProps) {
         }}
       >
         <div className="admin-console__field">
-          <label htmlFor="audit-user">User / target</label>
+          <label htmlFor="audit-user">{t("audit.userTarget")}</label>
           <input
             id="audit-user"
             value={userFilter}
             onChange={(e) => setUserFilter(e.target.value)}
-            placeholder="email or username substring"
+            placeholder={t("audit.emailOrUsernameSubstring")}
           />
         </div>
         <div className="admin-console__field">
-          <label htmlFor="audit-action">Action</label>
+          <label htmlFor="audit-action">{t("audit.action")}</label>
           <input
             id="audit-action"
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
-            placeholder="e.g. member.invited, LOGIN"
+            placeholder={t("audit.eGMemberInvitedLogin")}
           />
         </div>
         <div className="admin-console__field">
-          <label htmlFor="audit-category">Category</label>
+          <label htmlFor="audit-category">{t("audit.category")}</label>
           <select
             id="audit-category"
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value as "" | AuditEventCategory)}
           >
             {CATEGORY_OPTIONS.map((option) => (
-              <option key={option.label} value={option.value}>
-                {option.label}
+              <option key={option.value} value={option.value}>
+                {t(`audit.${option.labelKey}`)}
               </option>
             ))}
           </select>
         </div>
         <div className="admin-console__field">
-          <label htmlFor="audit-from">From</label>
+          <label htmlFor="audit-from">{t("audit.from")}</label>
           <input
             id="audit-from"
             type="datetime-local"
@@ -227,7 +232,7 @@ export function AuditSection({ tenant }: AuditSectionProps) {
           />
         </div>
         <div className="admin-console__field">
-          <label htmlFor="audit-to">To</label>
+          <label htmlFor="audit-to">{t("audit.to")}</label>
           <input
             id="audit-to"
             type="datetime-local"
@@ -236,36 +241,35 @@ export function AuditSection({ tenant }: AuditSectionProps) {
           />
         </div>
         <button className="admin-console__btn admin-console__btn--primary" type="submit">
-          Apply filters
-        </button>
+          {t("audit.applyFilters")}</button>
       </form>
 
       {error && <p className="admin-console__error">{error}</p>}
 
       {auditQuery.isLoading ? (
-        <p>Loading audit events…</p>
+        <p>{t("audit.loadingAuditEvents")}</p>
       ) : auditQuery.isError ? (
-        <p className="admin-console__error">Audit log is not available.</p>
+        <p className="admin-console__error">{t("audit.auditLogIsNotAvailable")}</p>
       ) : events.length === 0 ? (
-        <p style={{ fontSize: "0.875rem" }}>No audit events match the current filters.</p>
+        <p style={{ fontSize: "0.875rem" }}>{t("audit.noAuditEventsMatchThe")}</p>
       ) : (
         <table className="admin-console__table">
           <thead>
             <tr>
-              <th>Time</th>
-              <th>Category</th>
-              <th>Action</th>
-              <th>Actor</th>
-              <th>Target</th>
-              <th>Result</th>
-              <th>IP</th>
+              <th>{t("audit.time")}</th>
+              <th>{t("audit.category2")}</th>
+              <th>{t("audit.action2")}</th>
+              <th>{t("audit.actor")}</th>
+              <th>{t("audit.target")}</th>
+              <th>{t("audit.result")}</th>
+              <th>{t("audit.ip")}</th>
             </tr>
           </thead>
           <tbody>
             {events.map((event) => (
               <tr key={event.id}>
                 <td>{formatAuditTime(event.occurredAt)}</td>
-                <td>{categoryLabel(event.category)}</td>
+                <td>{categoryLabel(event.category, t)}</td>
                 <td className="admin-console__mono">{event.action}</td>
                 <td>{event.actor ?? "—"}</td>
                 <td>{event.target ?? "—"}</td>

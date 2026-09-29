@@ -122,11 +122,18 @@ def test_without_a_director_the_console_says_so():
 def test_a_screen_not_yet_mapped_says_which_one():
     """Every route a not-yet-mapped screen calls answers 501 and names the
     screen, so the console shows that rather than a spinner. A route nobody
-    calls is a plain 404."""
+    calls is a plain 404.
+
+    Groups are no longer one of them: the director reads them through its
+    per-realm Keycloak credential and people.py serves them, so the entry was
+    removed rather than left to outlive its reason. What the Notifications
+    screen still lacks is narrower and belongs to the notify action, which
+    takes a tenant audience and no group.
+    """
     client = TestClient(_app(_settings()))
-    r = client.get("/api/v1/admin/groups", headers={"Authorization": "Bearer t"})
-    assert r.status_code == 501 and "Notifications" in r.json()["detail"]
     r = client.get("/api/v1/admin/audit-events", headers={"Authorization": "Bearer t"})
     assert r.status_code == 501 and "Audit" in r.json()["detail"]
+    r = client.post("/api/v1/admin/backup-keys", headers={"Authorization": "Bearer t"})
+    assert r.status_code == 501 and "Backup" in r.json()["detail"]
     r = client.get("/api/v1/admin/members", headers={"Authorization": "Bearer t"})
     assert r.status_code == 404

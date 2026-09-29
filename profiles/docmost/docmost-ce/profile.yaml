@@ -1,4 +1,4 @@
-# AppProfile — Docmost (self-hosted collaborative wiki & docs)
+# ComponentProfile — Docmost (self-hosted collaborative wiki & docs)
 #
 # Source: no upstream Helm chart exists for Docmost (docker-compose only), so
 #   this profile is backed by a first-party Gentian chart: charts/docmost/
@@ -117,7 +117,7 @@
 # in — this is intentional (the deterministic bridge password is a secret,
 # never displayed), not a bug.
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: docmost-ce
   labels:
@@ -156,121 +156,46 @@ metadata:
     # to /home anyway (apps/client/src/App.tsx), so nothing is lost.
     gentianos.io/gateway-root-redirect: /sso/login
 spec:
-  displayName: "Docmost"
-  description: "Open-source collaborative wiki and documentation — a self-hosted Confluence/Notion alternative."
-  family: docmost
-  catalogueVersion: "1.0.0"
-  edition: ce
+  classes:
+    - app
   trustTier: certified
-  license: AGPL-3.0-only
-  author: Docmost
-  # Docmost's own "D" mark rather than a catalogue glyph, so the tile is
-  # recognisable as the product. Traced from the app icon Docmost ships
-  # (apps/client/public/icons/app-icon-512x512.png — they publish no SVG) and
-  # redrawn in the design system's frame and glyph colour, so it still sits
-  # with the other tiles instead of importing a second visual language.
-  #
-  # tile.logo is the inlined asset: regenerate with
-  # scripts/sync-profile-tile.py after editing assets/tile.svg.
-  tile:
-    image: assets/tile.svg
-    logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMTAxIDg4IDMxOCAzNDgiIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaWRZTWlkIG1lZXQiPgogICAgPHBhdGggZD0iTTI3Ni4zLDQzNS40QzI4MS45LDQzMy41IDI5MC4xLDQyNi40IDI5Mi41LDQyMS40QzI5My43LDQxOC43IDI5NC4xLDQxNi4xIDI5My44LDQxMS42QzI5My40LDQwNS45IDI5Mi40LDQwMy44IDI3Ni42LDM3Ni4wQzI2Ny40LDM1OS44IDI1OC43LDM0NS4wIDI1Ny40LDM0My4yQzI1Mi45LDMzNy40IDI1MC4zLDMzNi42IDIzMS41LDMzNi4wQzIxNS44LDMzNS41IDIxNC4yLDMzNS4zIDIxMC4wLDMzMy4wQzIwNy42LDMzMS42IDIwNC4yLDMyOC41IDIwMi41LDMyNi4yTDE5OS41LDMyMS44TDE5OS4wLDIxNC43QzE5OC41LDEwOC41IDE5OC41LDEwNy41IDE5Ni40LDEwMy4wQzE5NC4wLDk3LjcgMTg5LjIsOTIuOCAxODQuMSw5MC4zQzE4MC45LDg4LjcgMTc3LjMsODguNSAxNDguNSw4OC41TDExNi41LDg4LjVMMTExLjcsOTEuM0MxMDkuMSw5Mi44IDEwNS43LDk2LjAgMTA0LjIsOTguMkwxMDEuNSwxMDIuNEwxMDEuMiwyNjAuMkMxMDEuMCw0MTUuMCAxMDEuMCw0MTguMSAxMDIuOSw0MjEuOUMxMDUuNSw0MjYuOCAxMTEuMCw0MzEuNiAxMTUuNyw0MzMuMEMxMTkuNSw0MzQuMSAyMDYuNiw0MzYuNiAyNDkuNiw0MzYuOUMyNjcuNCw0MzcuMCAyNzIuNSw0MzYuNyAyNzYuMyw0MzUuNFogTTQwNC4xLDM0NC41QzQxMC42LDM0MC4zIDQxNS43LDMyNi4wIDQxOS42LDMwMS4wQzQyMi4yLDI4NC42IDQyMi4zLDI0MS40IDQxOS43LDIyNS4wQzQxNC45LDE5NC4wIDQwOS4xLDE3My4xIDQwMC45LDE1Ni45QzM5NS4xLDE0NS4yIDM4OS45LDEzNy45IDM4MC45LDEyOC41QzM1OC40LDEwNS4xIDMyNy43LDkxLjkgMjg4LjUsODguOUMyNjAuMyw4Ni43IDI0Ny43LDg5LjcgMjQyLjMsMTAwLjBDMjQxLjEsMTAyLjUgMjMzLjksMTE3LjcgMjI2LjUsMTMzLjdDMjE0LjgsMTU5LjEgMjEzLjAsMTYzLjcgMjEzLjAsMTY4LjBDMjEzLjAsMTczLjYgMjE1LjQsMTc5LjEgMjE5LjIsMTgyLjdDMjI0LjEsMTg3LjMgMjI3LjEsMTg3LjggMjU0LjUsMTg4LjVDMjgzLjYsMTg5LjIgMjg5LjksMTkwLjMgMjk5LjQsMTk2LjRDMzA5LjYsMjAyLjkgMzEzLjgsMjA5LjcgMzE4LjAsMjI2LjRDMzIyLjUsMjQ0LjEgMzIzLjQsMjUyLjUgMzIyLjYsMjY5LjRDMzIxLjYsMjg5LjMgMzIxLjgsMjkxLjkgMzIzLjksMjk2LjBDMzI1LjIsMjk4LjUgMzMzLjksMzA1LjkgMzU0LjYsMzIxLjlDMzcwLjUsMzM0LjIgMzg1LjMsMzQ1LjEgMzg3LjUsMzQ2LjJDMzkyLjYsMzQ4LjYgMzk5LjAsMzQ3LjkgNDA0LjEsMzQ0LjVaIiBmaWxsPSIjMjYyNjk2IiBmaWxsLXJ1bGU9Im5vbnplcm8iLz4KICA8L3N2Zz4KPC9zdmc+Cg==
+  version: "1.0.0"
+  package:
+    chart:
+      repository: "oci://ghcr.io/gentian-org/charts"
+      name: docmost
+      version: "0.2.10"
 
-  kernelRequirements:
-    identity:
-      # SAML, not OIDC: see the header comment. Keycloak issues assertions to
-      # the sso-saml sidecar, never to Docmost itself.
-      saml:
-        entityId: Docmost
-        acsUrl: "https://docs.${TENANT_DOMAIN}/sso/acs"
-    database:
-      engine: postgresql
-      databasePerTenant: true
-    storage:
+    valueMapping:
+      database:
+        hostKey: "database.host"
+        portKey: "database.port"
+        nameKey: "database.name"
+        userKey: "database.user"
+        passwordKey: "database.password"
       s3:
-        bucketPerTenant: true
-    # No cache: requirement — Docmost runs its own dedicated in-pod Redis
-    # (charts/docmost, values.yaml "redis"). It cannot use the shared kernel
-    # Redis because parseRedisUrl drops the username and so can never
-    # authenticate as the per-app ACL user the kernel provisions; see the
-    # chart comment for the full reasoning. Requesting a cache here would
-    # provision an ACL user that nothing can ever use.
-    mail:
-      smtp: {}
+        endpointKey: "s3.endpoint"
+        bucketKey: "s3.bucket"
+        accessKeyKey: "s3.accessKeyId"
+        regionKey: "s3.region"
+        secretKeyKey: "s3.secretAccessKey"
+      smtp:
+        hostKey: "smtp.host"
+        portKey: "smtp.port"
+        userKey: "smtp.username"
+        passwordKey: "smtp.password"
 
-  provides:
-    - name: document-collaboration
-      protocol: http-html
+    extraValues:
+      appUrl: "https://docs.${TENANT_DOMAIN}"
 
-  optionalIntegrations:
-    - contract: central-navigation
-      provider: portal
-      capabilities:
-        - navigation:register
-
-  portalTiles:
-    - name: docmost-ce
-      displayName:
-        de_DE: "Docmost"
-        en_US: "Docmost"
-      # Not a Direct-OIDC-Flow app (§8a) — the operator must route the tile's
-      # launch URL to the Keycloak SAML IdP-initiated SSO endpoint for the
-      # `Docmost` SAML client, the same way it already does for
-      # activepieces-me's identity.saml tile, not to the bare app hostname.
-      linkTarget: embedded
-      allowedGroup: "App Users"
-
-  chart:
-    repository: "oci://ghcr.io/gentian-org/charts"
-    name: docmost
-    version: "0.2.10"
-
-  deploymentMethod: crossplane
-
-  valueMapping:
-    database:
-      hostKey: "database.host"
-      portKey: "database.port"
-      nameKey: "database.name"
-      userKey: "database.user"
-      passwordKey: "database.password"
-    s3:
-      endpointKey: "s3.endpoint"
-      bucketKey: "s3.bucket"
-      accessKeyKey: "s3.accessKeyId"
-      regionKey: "s3.region"
-      secretKeyKey: "s3.secretAccessKey"
-    smtp:
-      hostKey: "smtp.host"
-      portKey: "smtp.port"
-      userKey: "smtp.username"
-      passwordKey: "smtp.password"
-
-  appSecrets:
-    - name: app_secret
-      valuePath: "appSecret"
-    - name: admin_password
-      valuePath: "adminUser.password"
-    - name: bridge_secret
-      valuePath: "bridge.secret"
-
-  ingress:
-    subDomain: "docs"
-    serviceName: "docmost-ce"
-    servicePort: 3000
-    tlsEnabled: true
-
-  extraValues:
-    appUrl: "https://docs.${TENANT_DOMAIN}"
-
-    fullnameOverride: "docmost-ce"
+      fullnameOverride: "docmost-ce"
 
     # Shared space created at first start, named after the tenant and granted
     # to Docmost's default "Everyone" group so every user sees it. Each user
     # additionally gets a personal space named after them on first login —
     # see charts/docmost/templates/configmap-bridge.yaml.
-    tenantSpace:
-      name: "${TENANT_ID}"
+      tenantSpace:
+        name: "${TENANT_ID}"
 
     # database.* is deliberately absent here — all five fields come from
     # valueMapping above (the per-tenant Postgres the operator provisions),
@@ -279,31 +204,31 @@ spec:
     # docs/app-profile-guide.md §3 and §12 checklist. Redis needs nothing at
     # all: it is pod-local on 127.0.0.1 with no credentials (see the chart).
 
-    s3:
+      s3:
       # accessKeyId, region, bucket and endpoint are supplied by the platform
       # through valueMapping.s3 — this app does not name a bucket or an
       # object store.
-      forcePathStyle: true
+        forcePathStyle: true
 
-    smtp:
+      smtp:
       # host, port and username are supplied by the platform through
       # valueMapping.smtp — this app does not name a mail server.
-      secure: false
-      fromAddress: "docmost@${TENANT_DOMAIN}"
+        secure: false
+        fromAddress: "docmost@${TENANT_DOMAIN}"
 
     # docs.docmost.com/self-hosting/environment-variables lists an anonymous
     # usage-telemetry ping and (separately) SAML_DISABLE_REQUESTED_AUTHN_CONTEXT
     # as an ee/-adjacent knob; DISABLE_TELEMETRY is the only outbound-call
     # toggle confirmed in CE — audit for others (avatar/gravatar fetches,
     # update checks) per docs/app-profile-guide.md §6g before going live.
-    telemetry:
-      disabled: true
+      telemetry:
+        disabled: true
 
-    ingress:
-      enabled: false
+      ingress:
+        enabled: false
 
-    podAnnotations:
-      secret.reloader.stakater.com/reload: docmost-ce-sensitive-values
+      podAnnotations:
+        secret.reloader.stakater.com/reload: docmost-ce-sensitive-values
 
   # No postInstallJob: workspace bootstrap (POST /api/auth/setup) is done
   # lazily by the bridge container itself, the first time an admin login
@@ -314,7 +239,62 @@ spec:
   # comment; the bridge container already has it as a clean literal env var,
   # so it's simpler for it to own bootstrap too.
 
-  sidecars:
+  requires:
+    services:
+      identity:
+      # SAML, not OIDC: see the header comment. Keycloak issues assertions to
+      # the sso-saml sidecar, never to Docmost itself.
+        saml:
+          entityId: Docmost
+          acsUrl: "https://docs.${TENANT_DOMAIN}/sso/acs"
+      database:
+        engine: postgresql
+        databasePerTenant: true
+      storage:
+        s3:
+          bucketPerTenant: true
+    # No cache: requirement — Docmost runs its own dedicated in-pod Redis
+    # (charts/docmost, values.yaml "redis"). It cannot use the shared kernel
+    # Redis because parseRedisUrl drops the username and so can never
+    # authenticate as the per-app ACL user the kernel provisions; see the
+    # chart comment for the full reasoning. Requesting a cache here would
+    # provision an ACL user that nothing can ever use.
+      mail:
+        smtp: {}
+
+  provides:
+    - name: document-collaboration
+      protocol: http-html
+
+  integrations:
+    - contract: central-navigation
+      provider: portal
+      capabilities:
+        - navigation:register
+
+  secrets:
+    generated:
+      - name: app_secret
+        valuePath: "appSecret"
+      - name: admin_password
+        valuePath: "adminUser.password"
+      - name: bridge_secret
+        valuePath: "bridge.secret"
+
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: "docs"
+      backend:
+        service: "docmost-ce"
+        port: 3000
+      tile:
+        displayName: "Docmost"
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMTAxIDg4IDMxOCAzNDgiIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaWRZTWlkIG1lZXQiPgogICAgPHBhdGggZD0iTTI3Ni4zLDQzNS40QzI4MS45LDQzMy41IDI5MC4xLDQyNi40IDI5Mi41LDQyMS40QzI5My43LDQxOC43IDI5NC4xLDQxNi4xIDI5My44LDQxMS42QzI5My40LDQwNS45IDI5Mi40LDQwMy44IDI3Ni42LDM3Ni4wQzI2Ny40LDM1OS44IDI1OC43LDM0NS4wIDI1Ny40LDM0My4yQzI1Mi45LDMzNy40IDI1MC4zLDMzNi42IDIzMS41LDMzNi4wQzIxNS44LDMzNS41IDIxNC4yLDMzNS4zIDIxMC4wLDMzMy4wQzIwNy42LDMzMS42IDIwNC4yLDMyOC41IDIwMi41LDMyNi4yTDE5OS41LDMyMS44TDE5OS4wLDIxNC43QzE5OC41LDEwOC41IDE5OC41LDEwNy41IDE5Ni40LDEwMy4wQzE5NC4wLDk3LjcgMTg5LjIsOTIuOCAxODQuMSw5MC4zQzE4MC45LDg4LjcgMTc3LjMsODguNSAxNDguNSw4OC41TDExNi41LDg4LjVMMTExLjcsOTEuM0MxMDkuMSw5Mi44IDEwNS43LDk2LjAgMTA0LjIsOTguMkwxMDEuNSwxMDIuNEwxMDEuMiwyNjAuMkMxMDEuMCw0MTUuMCAxMDEuMCw0MTguMSAxMDIuOSw0MjEuOUMxMDUuNSw0MjYuOCAxMTEuMCw0MzEuNiAxMTUuNyw0MzMuMEMxMTkuNSw0MzQuMSAyMDYuNiw0MzYuNiAyNDkuNiw0MzYuOUMyNjcuNCw0MzcuMCAyNzIuNSw0MzYuNyAyNzYuMyw0MzUuNFogTTQwNC4xLDM0NC41QzQxMC42LDM0MC4zIDQxNS43LDMyNi4wIDQxOS42LDMwMS4wQzQyMi4yLDI4NC42IDQyMi4zLDI0MS40IDQxOS43LDIyNS4wQzQxNC45LDE5NC4wIDQwOS4xLDE3My4xIDQwMC45LDE1Ni45QzM5NS4xLDE0NS4yIDM4OS45LDEzNy45IDM4MC45LDEyOC41QzM1OC40LDEwNS4xIDMyNy43LDkxLjkgMjg4LjUsODguOUMyNjAuMyw4Ni43IDI0Ny43LDg5LjcgMjQyLjMsMTAwLjBDMjQxLjEsMTAyLjUgMjMzLjksMTE3LjcgMjI2LjUsMTMzLjdDMjE0LjgsMTU5LjEgMjEzLjAsMTYzLjcgMjEzLjAsMTY4LjBDMjEzLjAsMTczLjYgMjE1LjQsMTc5LjEgMjE5LjIsMTgyLjdDMjI0LjEsMTg3LjMgMjI3LjEsMTg3LjggMjU0LjUsMTg4LjVDMjgzLjYsMTg5LjIgMjg5LjksMTkwLjMgMjk5LjQsMTk2LjRDMzA5LjYsMjAyLjkgMzEzLjgsMjA5LjcgMzE4LjAsMjI2LjRDMzIyLjUsMjQ0LjEgMzIzLjQsMjUyLjUgMzIyLjYsMjY5LjRDMzIxLjYsMjg5LjMgMzIxLjgsMjkxLjkgMzIzLjksMjk2LjBDMzI1LjIsMjk4LjUgMzMzLjksMzA1LjkgMzU0LjYsMzIxLjlDMzcwLjUsMzM0LjIgMzg1LjMsMzQ1LjEgMzg3LjUsMzQ2LjJDMzkyLjYsMzQ4LjYgMzk5LjAsMzQ3LjkgNDA0LjEsMzQ0LjVaIiBmaWxsPSIjMjYyNjk2IiBmaWxsLXJ1bGU9Im5vbnplcm8iLz4KICA8L3N2Zz4KPC9zdmc+Cg==
+        image: assets/tile.svg
+        relation: can_launch
+  extensions:
     - name: sso
       chart:
         repository: "oci://ghcr.io/gentian-org/charts"
@@ -419,3 +399,4 @@ spec:
       requiresApproval: platform-team
     fork:
       allowed: false
+  launch: tile

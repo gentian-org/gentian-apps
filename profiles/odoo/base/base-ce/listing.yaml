@@ -1,0 +1,9 @@
+profile: odoo-base-ce
+displayName: "Odoo Community Backport"
+description: "Odoo Community ERP runtime — required base for Odoo module apps."
+family: odoo
+edition: ce
+author: OCA
+license: LGPL-3.0
+tile:
+  icon: erp
