@@ -8,16 +8,6 @@
 - requires.privileges.egress/egress-1: write the reason the tenant administrator will read, and give it a name that says where it goes
 - tile/activepieces-me: no SVG, so the placeholder was used. The old profile named the built-in glyph 'analytics'. Draw this component's own art into assets/tile.svg and re-run gentian-apps' scripts/sync-profile-tile.py
 
-## app-store-me
-
-- trustTier was absent; set to experimental, the tier that claims nothing
-- catalogueVersion was absent; version set to 0.0.0
-- package: dropped deploymentMethod 'crossplane' — delivery is read from which package kind is present and can no longer contradict it
-- browserProxy /api -> http://app-store-api:8000/api was DROPPED. The portal no longer proxies for apps, and an exposure's backend must be a Service in the tenant's namespace. If this route is still needed, the app has to serve that path itself or ship a Service for it
-- browserProxy /oauth -> http://app-store-api:8000/oauth was DROPPED. The portal no longer proxies for apps, and an exposure's backend must be a Service in the tenant's namespace. If this route is still needed, the app has to serve that path itself or ship a Service for it
-- tile/app-store-me: no SVG, so the placeholder was used. The old profile named the built-in glyph 'store'. Draw this component's own art into assets/tile.svg and re-run gentian-apps' scripts/sync-profile-tile.py
-- tile/app-store-me: allowedGroup was 'Tenant Admins'; relation is can_launch, which is entitlement to the app. Narrow it if that group meant something else
-
 ## docmost-ce
 
 - package: dropped deploymentMethod 'crossplane' — delivery is read from which package kind is present and can no longer contradict it

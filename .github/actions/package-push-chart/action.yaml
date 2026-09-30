@@ -3,7 +3,7 @@ description: >
   GHCR login + helm package + oci push, gated on the same publish condition
   every job here uses. Chart name/version come from the chart's own
   Chart.yaml, not the directory name — several charts here live at a path
-  like apps/app-store/chart, where the two differ.
+  like apps/admin-console/chart, where the two differ.
 inputs:
   chart-path:
     required: true

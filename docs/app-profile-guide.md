@@ -37,7 +37,7 @@ charts (Nextcloud, XWiki, OpenProject, Element) that this repo will never
 contain, 2 declare no chart at all, and the remaining 13 share just **three**
 in-repo charts — `charts/odoo` alone backs 10 profiles. The repo holds catalogue
 metadata and a little packaging, with exactly one first-party application
-(`apps/app-store/`). That is Debian's shape, not Google's.
+(`apps/admin-console/`). That is Debian's shape, not Google's.
 
 ### Consequence 1 — artifact types get their own flat, name-addressed trees
 
@@ -799,7 +799,7 @@ operator owns iframe policy for tenant app HTTPRoutes.
 
 These profiles rely on the operator and need **no** CSP annotations:
 
-- `app-store`, `nextcloud`, `openproject`, `xwiki`
+- `nextcloud`, `openproject`, `xwiki`
 
 Add only non-CSP `ingress.annotations` your chart needs (proxy timeouts, body size —
 bridged to Envoy `BackendTrafficPolicy`):
