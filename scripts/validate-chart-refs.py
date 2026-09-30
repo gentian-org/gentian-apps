@@ -6,9 +6,9 @@ only when a tenant clicks Install, because the Helm release is what resolves the
 reference. That is far too late to learn about a typo.
 
 This catches the specific failure that motivated the check: renaming a profile
-directory to carry an edition suffix (app-store -> app-store-me) and letting the
+directory to carry an edition suffix (xwiki -> xwiki-ce) and letting the
 substitution run through spec.chart.name as well. The chart is still published as
-`app-store`; only the catalogue entry moved. It is the same rule as elsewhere in
+`xwiki`; only the catalogue entry moved. It is the same rule as elsewhere in
 this repo — a profile references its chart by OCI coordinate, and that coordinate
 is not derived from the profile's own name.
 

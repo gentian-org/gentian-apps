@@ -64,9 +64,9 @@ Rung → where it lives here: L0 `spec.extraValues` · L1 `profiles/<n>/dropins/
 L2 `apps/<new>/` plus a contract · L3 the addon repo (`odoo-modules`, …) ·
 L4 `charts/` or `composition.yaml` · L5 the build repo (`ocb`) · L6 a fork repo.
 
-## First-party app development (`apps/app-store`, `apps/_template`)
+## First-party app development (`apps/admin-console`, `apps/_template`)
 
-Both first-party apps share the FastAPI + React + Helm stack from gentian-app-template.
+First-party apps share the FastAPI + React + Helm stack from gentian-app-template.
 
 ### Directory map
 
@@ -107,12 +107,11 @@ Production uses **Gateway API** (`chart/templates/httproute.yaml`), not nginx In
 Gateway routes `/api`, `/healthz`, `/readyz` to the API Service and `/` to the static web
 Service.
 
-### Auth model (app-store)
+### Auth model
 
-- **Embedded in portal:** `auth.disabled: true` — shell gates tenant-admin access; API uses a
-  synthetic admin user.
-- **Direct URL access:** backend `/oauth/*` BFF stores tokens in `localStorage`; iframe uses
-  popup sign-in.
+The gateway holds the session. An app behind it receives the identity the
+gateway asserts and runs no code flow of its own; what the caller may do is
+asked of the director, never read off the token.
 
 ### Publish a new app version
 
@@ -131,10 +130,10 @@ docker compose -f docker-compose.dev.yaml up --build
 
 ## Adding/editing profiles (`profiles/[<family>/]<name>/`, OSS or commercial)
 
-Each profile bundle holds `kustomization.yaml` (required), `profile.yaml` (the AppProfile CR —
+Each profile bundle holds `kustomization.yaml` (required), `profile.yaml` (the ComponentProfile —
 describe the app there, not in a separate catalogue doc), and optionally `oidc-catalog.yaml`,
-`composition.yaml`, `assets/`. Commercial profiles set `spec.license: proprietary`; the App
-Store surfaces those with a Buy button and the operator gates install on entitlement. See
+`composition.yaml`, `assets/`. The App Store runs outside the cluster and is not in this
+repository: it ingests the catalogue source this repository publishes. See
 [docs/app-profile-guide.md](docs/app-profile-guide.md) for the full workflow.
 
 **Layout rules — CI enforces both:**

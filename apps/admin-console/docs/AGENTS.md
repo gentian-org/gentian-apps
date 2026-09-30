@@ -43,7 +43,7 @@ client of the gentian-os director. Read the top-level README first.
 ## Build and publish
 
 By this repository's `.github/workflows/apps-ci.yaml`, job `build-admin-console`,
-the same way the app-store is built: images to `ghcr.io/gentian-org/admin-console-{api,web}`
+the way every first-party app is built: images to `ghcr.io/gentian-org/admin-console-{api,web}`
 tagged with the version in `chart/values.yaml`, and the chart to
 `oci://ghcr.io/gentian-org/charts` at the version in `chart/Chart.yaml`, published from
 main and develop only. Bump both together; the profile in gentian-os pins that version.

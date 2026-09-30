@@ -7,7 +7,7 @@ different name renders a Deployment whose envFrom points at a Secret nobody
 creates, and the pod sits in CreateContainerConfigError forever.
 
 This is not hypothetical. Renaming the singleton profiles to carry an edition
-suffix (app-store -> app-store-me, xwiki -> xwiki-ce, ...) left four profiles
+suffix (xwiki -> xwiki-ce, ...) left four profiles
 pointing at their pre-rename Secret names. Only one was installed, so only one
 broke visibly; the other three were waiting to fail on next install.
 

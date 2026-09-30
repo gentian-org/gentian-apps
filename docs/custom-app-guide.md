@@ -104,7 +104,7 @@ On merge to `main`:
 kubectl gentian apps install my-app --tenant gtn-demo
 ```
 
-**App Store UI:** open `https://store.<tenant>.<kernel-domain>` (when `app-store` is installed).
+**App Store:** the tile on an administrator's desktop. It opens the store, which runs outside the cluster.
 
 ## Admin vs user apps
 

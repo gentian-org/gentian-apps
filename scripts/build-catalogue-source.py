@@ -8,7 +8,8 @@ holding ``profile.yaml``, ``listing.yaml`` and whatever else it needs — becaus
 that is what Argo CD's ApplicationSet syncs, one Application per directory.
 
 A catalogue SOURCE is the other shape: a flat directory served over https,
-holding ``profiles/<name>.yaml``, ``listings/<name>.yaml`` and ``index.yaml``.
+holding ``profiles/<name>.yaml``, ``listings/<name>.yaml``,
+``packages/<name>.yaml`` and ``index.yaml``.
 That is what a director materialises an entry from (AD-3) and what the App
 Store ingests. The two shapes exist for two different consumers and neither is
 a mistake; this script turns the first into the second.
@@ -67,8 +68,24 @@ def load(path: Path) -> dict:
 def build(out: Path) -> tuple[list[dict], list[str]]:
     profiles_dir = out / "profiles"
     listings_dir = out / "listings"
-    for d in (profiles_dir, listings_dir):
+    packages_dir = out / "packages"
+    for d in (profiles_dir, listings_dir, packages_dir):
         d.mkdir(parents=True, exist_ok=True)
+
+    # Presets: a named selection of one family's add-ons. Not installable and
+    # not in the index -- a director never materialises one. Published because
+    # the App Store offers them in a base's add-on window, and the store runs
+    # outside the cluster: what it is to show has to be where it can read it.
+    for preset in sorted(REPO.glob("profiles/**/packages/*.yaml")):
+        if preset.name == "kustomization.yaml":
+            continue
+        try:
+            doc = load(preset)
+        except yaml.YAMLError:
+            continue
+        name = (doc.get("metadata") or {}).get("name")
+        if doc.get("kind") == "AppPackage" and name:
+            shutil.copyfile(preset, packages_dir / f"{name}.yaml")
 
     entries: list[dict] = []
     complaints: list[str] = []

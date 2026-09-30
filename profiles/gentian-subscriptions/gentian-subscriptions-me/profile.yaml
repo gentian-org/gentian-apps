@@ -1,12 +1,11 @@
-# ComponentProfile — Gentian Subscriptions (ApiProfile)
+# ComponentProfile — Gentian Subscriptions
 #
-# Reference ApiProfile (deploymentMethod: api): a catalogue entry backed by the
-# hosted gentian-corp commerce service. It runs NO workload pods in the tenant —
-# the operator creates no Helm release or App claim. The portal tile redirects
-# tenant admins to gentian-corp, keyed by the tenant effective domain.
+# A component that runs nothing: the service is hosted elsewhere and the
+# cluster's part is the link to it. No workload, no route, no session of the
+# cluster's -- the tile leads straight to the service, naming the tenant by
+# its domain, and is shown to whoever administers the tenant.
 #
-# Installed by default on new tenants (opt-out). See gentian-corp/foundations.md
-# section 2.1 (ApiProfile) and 1.2 (default tenant experience).
+# Installed by default on new tenants (opt-out).
 apiVersion: gentianos.io/v1alpha1
 kind: ComponentProfile
 metadata:
@@ -23,9 +22,20 @@ spec:
   version: 0.0.0
   package:
     api:
-      runtime: portal-proxy
+      # redirect, not portal-proxy: the proxy runtime needs something in the
+      # tenant's DMZ to hold a credential, which is not built, so the operator
+      # refused this entry and the tenant never had the tile.
+      runtime: redirect
       baseUrl: "https://corp.desk.gentian.org"
       tenantBinding: tenant-domain
+      tile:
+        displayName: "Subscriptions"
+        displayNames:
+          de_DE: "Abonnements"
+        description: "Billing and entitlements for this tenant."
+        logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPjxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+PHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMyNjI2OTYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTYiIGhlaWdodD0iMjAiIHg9IjQiIHk9IjIiIHJ4PSIyIiByeT0iMiIvPjxwYXRoIGQ9Ik05IDIydi00aDZ2NCIvPjxwYXRoIGQ9Ik04IDZoLjAxIi8+PHBhdGggZD0iTTE2IDZoLjAxIi8+PHBhdGggZD0iTTEyIDZoLjAxIi8+PHBhdGggZD0iTTEyIDEwaC4wMSIvPjxwYXRoIGQ9Ik0xMiAxNGguMDEiLz48cGF0aCBkPSJNMTYgMTBoLjAxIi8+PHBhdGggZD0iTTE2IDE0aC4wMSIvPjxwYXRoIGQ9Ik04IDEwaC4wMSIvPjxwYXRoIGQ9Ik04IDE0aC4wMSIvPjwvc3ZnPjwvc3ZnPg==
+        relation: can_administer
+        object: tenant
 
   customization:
     grade: B
@@ -57,4 +67,4 @@ spec:
       requiresApproval: platform-team
     fork:
       allowed: false
-  launch: none
+  launch: tile
