@@ -80,8 +80,8 @@ second.
 
 ## Components the platform ships itself
 
-The desktop (`gentian-ui`) and the administration console (`apps/admin-console`)
-are components, not catalogue apps: the platform installs one of each for every
+The desktop and the administration console (both in `gentian-ui`, under
+`apps/`) are components, not catalogue apps: the platform installs one of each for every
 tenant from a profile that declares `defaultForTenants`, rather than a tenant
 administrator picking them out of a catalogue.
 

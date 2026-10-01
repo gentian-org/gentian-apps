@@ -31,7 +31,6 @@ profiles/              # App catalogue bundles (OSS + commercial) — synced by 
   xwiki/               #   true singleton: stays flat
 apps/                  # first-party implementations (FastAPI + React + Helm)
   _template/           # copy of gentian-app-template
-  admin-console/       # the administration console
 charts/                # Helm charts published to oci://ghcr.io/gentian-org/charts
   activepieces/        # pinned upstream (adnoctem/helm) + patch series — no copy
   odoo/                # Gentian-authored chart for OCB — backs all 10 odoo profiles

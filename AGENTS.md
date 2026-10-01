@@ -64,7 +64,7 @@ Rung → where it lives here: L0 `spec.extraValues` · L1 `profiles/<n>/dropins/
 L2 `apps/<new>/` plus a contract · L3 the addon repo (`odoo-modules`, …) ·
 L4 `charts/` or `composition.yaml` · L5 the build repo (`ocb`) · L6 a fork repo.
 
-## First-party app development (`apps/admin-console`, `apps/_template`)
+## First-party app development (`apps/_template`)
 
 First-party apps share the FastAPI + React + Helm stack from gentian-app-template.
 

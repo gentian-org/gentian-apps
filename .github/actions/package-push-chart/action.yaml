@@ -2,8 +2,8 @@ name: Package and push Helm chart
 description: >
   GHCR login + helm package + oci push, gated on the same publish condition
   every job here uses. Chart name/version come from the chart's own
-  Chart.yaml, not the directory name — several charts here live at a path
-  like apps/admin-console/chart, where the two differ.
+  Chart.yaml, not the directory name — a chart may live at a path like
+  apps/<name>/chart, where the two differ.
 inputs:
   chart-path:
     required: true

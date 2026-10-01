@@ -36,8 +36,8 @@ decision follows from that one fact.
 charts (Nextcloud, XWiki, OpenProject, Element) that this repo will never
 contain, 2 declare no chart at all, and the remaining 13 share just **three**
 in-repo charts — `charts/odoo` alone backs 10 profiles. The repo holds catalogue
-metadata and a little packaging, with exactly one first-party application
-(`apps/admin-console/`). That is Debian's shape, not Google's.
+metadata and a little packaging, and no first-party application of its own
+(the platform's own UIs live in gentian-ui). That is Debian's shape, not Google's.
 
 ### Consequence 1 — artifact types get their own flat, name-addressed trees
 
