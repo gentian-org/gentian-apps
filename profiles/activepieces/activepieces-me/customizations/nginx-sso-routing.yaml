@@ -7,7 +7,8 @@ apiVersion: gentianos.io/v1alpha1
 kind: Customization
 metadata:
   name: nginx-sso-routing
-  namespace: gentian-system
+  # The operator's namespace in the v5 layout (gentian-system in v4).
+  namespace: kernel-control
 spec:
   summary: "Front Activepieces with a Gentian nginx config that routes SAML to the sso-saml sidecar"
 

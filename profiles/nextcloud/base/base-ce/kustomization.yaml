@@ -9,7 +9,9 @@ resources:
   - ../../packages
 configMapGenerator:
   - name: nextcloud-base-ce-portal-bridge-sso
-    namespace: crossplane-system
+    # Beside gentian-cluster-config, where the app composition reads it from:
+    # the provisioning namespace of the v5 layout (crossplane-system in v4).
+    namespace: kernel-provisioning
     files:
       - nextcloud-portal-sso.html=assets/nextcloud-portal-sso.html
 generatorOptions:

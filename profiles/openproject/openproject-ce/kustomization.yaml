@@ -6,7 +6,9 @@ resources:
   - oidc-catalog.yaml
 configMapGenerator:
   - name: openproject-portal-bridge-assets
-    namespace: crossplane-system
+    # Beside gentian-cluster-config, where the app composition reads it from:
+    # the provisioning namespace of the v5 layout (crossplane-system in v4).
+    namespace: kernel-provisioning
     files:
       - bridge.py=assets/portal_bridge.py
       - openproject-portal-sso.html=assets/openproject-portal-sso.html
