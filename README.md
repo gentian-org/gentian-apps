@@ -55,6 +55,13 @@ backs 10 profiles, and 7 profiles wrap external charts this repo never contains.
 [docs/app-profile-guide.md](docs/app-profile-guide.md) §0 for why this repo is organised as a
 distribution repo rather than an application monorepo.
 
+## Licensing
+
+There is no license for the repository as a whole: **every app carries its
+own.** It is the `license:` field (an SPDX identifier) of the app's
+`listing.yaml`, and it covers what this repository holds for that app — its
+profile, its chart and its image build. A new app is not accepted without one.
+
 ## Guides
 
 | Guide | Audience |
