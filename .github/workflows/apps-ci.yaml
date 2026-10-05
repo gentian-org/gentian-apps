@@ -43,19 +43,29 @@ env:
   IMAGE_ORG: gentian-org
 
 jobs:
-  # Computed once here instead of repeated on every job below (it used to be
-  # the exact same boolean expression pasted into ~13 places) — every
-  # image/chart job reads it via needs.should-publish.outputs.publish.
-  should-publish:
+  # Whether this run releases anything. Decided in one place and read by every
+  # job below as needs.release-gate.outputs.release: only main and develop
+  # release, and never from a pull request.
+  release-gate:
     runs-on: ubuntu-latest
     outputs:
-      publish: ${{ steps.check.outputs.publish }}
+      release: ${{ steps.decide.outputs.release }}
     steps:
-      - id: check
-        run: echo "publish=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}" >> "$GITHUB_OUTPUT"
+      - id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          release=false
+          if [ "${EVENT}" != "pull_request" ]; then
+            case "${REF}" in
+              refs/heads/main | refs/heads/develop) release=true ;;
+            esac
+          fi
+          echo "release=${release}" >> "$GITHUB_OUTPUT"
 
   build-nextcloud:
-    needs: [should-publish]
+    needs: [release-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -83,11 +93,11 @@ jobs:
           echo "spreed_version=${SPREED_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Nextcloud bundle image
-        uses: ./.github/actions/build-push-image
+        uses: ./.github/actions/image
         with:
-          context: images/nextcloud
-          push: ${{ needs.should-publish.outputs.publish }}
-          build-args: |
+          dir: images/nextcloud
+          publish: ${{ needs.release-gate.outputs.release }}
+          args: |
             NEXTCLOUD_VERSION=${{ steps.versions.outputs.nextcloud_version }}
             USER_OIDC_VERSION=${{ steps.versions.outputs.user_oidc_version }}
             RICHDOCUMENTS_VERSION=${{ steps.versions.outputs.richdocuments_version }}
@@ -99,12 +109,12 @@ jobs:
             DECK_VERSION=${{ steps.versions.outputs.deck_version }}
             COLLECTIVES_VERSION=${{ steps.versions.outputs.collectives_version }}
             SPREED_VERSION=${{ steps.versions.outputs.spreed_version }}
-          image-tags: |
+          refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ github.sha }}
 
   build-nextcloud-mcp:
-    needs: [should-publish]
+    needs: [release-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -119,22 +129,22 @@ jobs:
           echo "chart_version=${CHART_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push image
-        uses: ./.github/actions/build-push-image
+        uses: ./.github/actions/image
         with:
-          context: images/nextcloud-mcp
-          push: ${{ needs.should-publish.outputs.publish }}
-          image-tags: |
+          dir: images/nextcloud-mcp
+          publish: ${{ needs.release-gate.outputs.release }}
+          refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud-mcp:${{ steps.version.outputs.chart_version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud-mcp:${{ github.sha }}
 
       - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
+        uses: ./.github/actions/chart
         with:
-          chart-path: images/nextcloud-mcp/chart
-          push: ${{ needs.should-publish.outputs.publish }}
+          dir: images/nextcloud-mcp/chart
+          publish: ${{ needs.release-gate.outputs.release }}
 
   build-xwiki:
-    needs: [should-publish]
+    needs: [release-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -153,15 +163,15 @@ jobs:
           echo "oidc_version=${OIDC_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push XWiki bundle image
-        uses: ./.github/actions/build-push-image
+        uses: ./.github/actions/image
         with:
-          context: images/xwiki
-          push: ${{ needs.should-publish.outputs.publish }}
-          build-args: |
+          dir: images/xwiki
+          publish: ${{ needs.release-gate.outputs.release }}
+          args: |
             XWIKI_VERSION=${{ steps.versions.outputs.xwiki_version }}
             FLAVOR_XIP_SHA256=${{ steps.versions.outputs.flavor_xip_sha256 }}
             OIDC_VERSION=${{ steps.versions.outputs.oidc_version }}
-          image-tags: |
+          refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ github.sha }}
 
@@ -279,7 +289,7 @@ jobs:
         run: python3 scripts/customization-debt-report.py >> "$GITHUB_STEP_SUMMARY"
 
   build-odoo-chart:
-    needs: [should-publish]
+    needs: [release-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -287,13 +297,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
+        uses: ./.github/actions/chart
         with:
-          chart-path: charts/odoo
-          push: ${{ needs.should-publish.outputs.publish }}
+          dir: charts/odoo
+          publish: ${{ needs.release-gate.outputs.release }}
 
   build-activepieces-chart:
-    needs: [should-publish]
+    needs: [release-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -301,29 +311,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Install Helm
+      - name: Helm
         uses: azure/setup-helm@v4
+
+      - name: Registry login
+        if: needs.release-gate.outputs.release == 'true'
+        env:
+          TOKEN: ${{ github.token }}
+        run: echo "${TOKEN}" | helm registry login "${{ env.REGISTRY }}" --username "${{ github.actor }}" --password-stdin
 
       # The chart is not vendored: upstream is fetched at the pinned version and
       # the local patch series is applied on top. This step runs on pull requests
       # too — a series that no longer applies must fail review, not merge.
       #
-      # Not a package-push-chart candidate like the plain charts below: the tgz
-      # comes out of this build script directly, there's no separate `helm
-      # package` of a vendored directory.
+      # The chart action does not fit here: the script already produces the
+      # packaged chart, so there is no directory left to package.
       - name: Build chart from pinned upstream + patch series
         id: build
         run: scripts/build-activepieces-chart.sh --out /tmp/ap-dist
 
       - name: Push chart
-        if: needs.should-publish.outputs.publish == 'true'
+        if: needs.release-gate.outputs.release == 'true'
         run: |
           # shellcheck source=/dev/null
           source charts/activepieces/UPSTREAM
@@ -331,7 +339,7 @@ jobs:
             oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
 
   build-sso-saml-sidecar-chart:
-    needs: [should-publish]
+    needs: [release-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -339,13 +347,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
+        uses: ./.github/actions/chart
         with:
-          chart-path: charts/gentian-sidecar-sso-saml
-          push: ${{ needs.should-publish.outputs.publish }}
+          dir: charts/gentian-sidecar-sso-saml
+          publish: ${{ needs.release-gate.outputs.release }}
 
   build-git-modules-sidecar-chart:
-    needs: [should-publish]
+    needs: [release-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -353,13 +361,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
+        uses: ./.github/actions/chart
         with:
-          chart-path: charts/gentian-sidecar-git-modules
-          push: ${{ needs.should-publish.outputs.publish }}
+          dir: charts/gentian-sidecar-git-modules
+          publish: ${{ needs.release-gate.outputs.release }}
 
   build-mathesar-chart:
-    needs: [should-publish]
+    needs: [release-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -367,14 +375,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
+        uses: ./.github/actions/chart
         with:
-          chart-path: charts/mathesar
+          dir: charts/mathesar
           lint: "true"
-          push: ${{ needs.should-publish.outputs.publish }}
+          publish: ${{ needs.release-gate.outputs.release }}
 
   build-docmost-chart:
-    needs: [should-publish]
+    needs: [release-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -382,14 +390,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
+        uses: ./.github/actions/chart
         with:
-          chart-path: charts/docmost
+          dir: charts/docmost
           lint: "true"
-          push: ${{ needs.should-publish.outputs.publish }}
+          publish: ${{ needs.release-gate.outputs.release }}
 
   build-git-modules-sidecar-image:
-    needs: [should-publish]
+    needs: [release-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -397,16 +405,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build and push image
-        uses: ./.github/actions/build-push-image
+        uses: ./.github/actions/image
         with:
-          context: images/gentian-sidecar-git-modules
-          push: ${{ needs.should-publish.outputs.publish }}
-          image-tags: |
+          dir: images/gentian-sidecar-git-modules
+          publish: ${{ needs.release-gate.outputs.release }}
+          refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/gentian-sidecar-git-modules:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/gentian-sidecar-git-modules:${{ github.sha }}
 
   build-sso-saml-sidecar-image:
-    needs: [should-publish]
+    needs: [release-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -414,10 +422,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build and push image
-        uses: ./.github/actions/build-push-image
+        uses: ./.github/actions/image
         with:
-          context: images/gentian-sidecar-sso-saml
-          push: ${{ needs.should-publish.outputs.publish }}
-          image-tags: |
+          dir: images/gentian-sidecar-sso-saml
+          publish: ${{ needs.release-gate.outputs.release }}
+          refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:${{ github.sha }}

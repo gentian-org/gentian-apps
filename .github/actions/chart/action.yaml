@@ -1,14 +1,15 @@
-name: Package and push Helm chart
+name: Helm chart
 description: >
-  GHCR login + helm package + oci push, gated on the same publish condition
-  every job here uses. Chart name/version come from the chart's own
+  Packages one chart and, when asked to publish, pushes it to the registry's
+  charts repository. The chart's name and version are read from its own
   Chart.yaml, not the directory name — a chart may live at a path like
   apps/<name>/chart, where the two differ.
 inputs:
-  chart-path:
+  dir:
+    description: Directory holding Chart.yaml.
     required: true
   lint:
-    description: Run `helm lint` first (runs even when push is false).
+    description: '"true" lints the chart, whether or not it is published.'
     required: false
     default: "false"
   pin-image-tag:
@@ -40,25 +41,28 @@ inputs:
       one.
     required: false
     default: "false"
-  push:
+  publish:
+    description: '"true" pushes the chart; anything else stops before packaging.'
     required: true
 runs:
   using: composite
   steps:
-    - name: Log in to GHCR
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ github.token }}
-
-    - name: Install Helm
+    - name: Helm
       uses: azure/setup-helm@v4
 
-    - name: Lint chart
+    - name: Lint
       if: inputs.lint == 'true'
       shell: bash
-      run: helm lint "${{ inputs.chart-path }}"
+      run: helm lint "${CHART_DIR}"
+      env:
+        CHART_DIR: ${{ inputs.dir }}
+
+    - name: Registry login
+      if: inputs.publish == 'true'
+      shell: bash
+      run: echo "${TOKEN}" | helm registry login "${{ env.REGISTRY }}" --username "${{ github.actor }}" --password-stdin
+      env:
+        TOKEN: ${{ github.token }}
 
     # Before packaging and before linting reports success on it: a chart that
     # is published naming a tag that moves is the bug this prevents, and doing
@@ -68,7 +72,7 @@ runs:
       if: inputs.pin-image-tag != ''
       shell: bash
       run: |
-        values="${{ inputs.chart-path }}/values.yaml"
+        values="${{ inputs.dir }}/values.yaml"
         tag="${{ inputs.pin-image-tag }}"
         before="$(grep -cE '^[[:space:]]*tag: "' "${values}")"
         if [ "${before}" -lt 1 ]; then
@@ -83,12 +87,13 @@ runs:
         fi
         echo "pinned ${after} image tag(s) to ${tag}"
 
-    - name: Package and push chart
-      if: inputs.push == 'true'
+    - name: Package and publish
+      if: inputs.publish == 'true'
       shell: bash
       run: |
-        CHART_VERSION=$(grep '^version:' "${{ inputs.chart-path }}/Chart.yaml" | awk '{print $2}')
-        CHART_NAME=$(grep '^name:' "${{ inputs.chart-path }}/Chart.yaml" | awk '{print $2}')
+        chart_field() { helm show chart "${{ inputs.dir }}" | sed -n "s/^${1}:[[:space:]]*//p" | tr -d "\"'" | head -n 1; }
+        CHART_NAME="$(chart_field name)"
+        CHART_VERSION="$(chart_field version)"
         if [ "${{ inputs.branch-versions }}" = "true" ]; then
           BRANCH="${GITHUB_REF_NAME//\//-}"
           SHORT="${GITHUB_SHA::7}"
@@ -97,11 +102,11 @@ runs:
           # The immutable chart is the release; the moving one is a copy of it
           # that names it in appVersion, so whoever follows the branch can read
           # the pin off it and install the version that does not move.
-          helm package "${{ inputs.chart-path }}" --version "${IMMUTABLE}" --app-version "${IMMUTABLE}" -d /tmp
-          helm package "${{ inputs.chart-path }}" --version "${MOVING}" --app-version "${IMMUTABLE}" -d /tmp
+          helm package "${{ inputs.dir }}" --version "${IMMUTABLE}" --app-version "${IMMUTABLE}" -d /tmp
+          helm package "${{ inputs.dir }}" --version "${MOVING}" --app-version "${IMMUTABLE}" -d /tmp
           CHART_VERSIONS="${IMMUTABLE} ${MOVING}"
         else
-          helm package "${{ inputs.chart-path }}" -d /tmp
+          helm package "${{ inputs.dir }}" -d /tmp
           CHART_VERSIONS="${CHART_VERSION}"
         fi
 
