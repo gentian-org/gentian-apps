@@ -62,6 +62,11 @@ own.** It is the `license:` field (an SPDX identifier) of the app's
 `listing.yaml`, and it covers what this repository holds for that app — its
 profile, its chart and its image build. A new app is not accepted without one.
 
+What belongs to no single app is Apache-2.0
+([LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt)): `scripts/`,
+`contracts/`, `docs/`, `icons/`, the CI workflows, `apps/_template`, the
+sidecar charts and images, and `images/nextcloud-mcp`.
+
 ## Guides
 
 | Guide | Audience |
