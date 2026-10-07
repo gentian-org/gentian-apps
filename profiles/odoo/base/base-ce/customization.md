@@ -26,7 +26,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 | **L1** Drop-in | yes | `odoo-conf` (ini fragments merged into `odoo.conf` by an init container — Odoo has no native conf.d, so this is a Gentian mechanism, not an upstream promise) and `branding` (static files, tenant-editable) |
 | **L2** Companion | always | consume the `erp-core` contract from a separate app |
 | **L3** Extension | yes | Odoo addon in [`odoo-modules`](https://github.com/gentian-org/odoo-modules), synced by `gentian-sidecar-git-modules` into `/opt/odoo/custom-addons` |
-| **L4** Repackage | yes | `charts/odoo` (Gentian-owned) + `profiles/odoo/odoo-base-ce/composition.yaml` (`app-odoo`) |
+| **L4** Repackage | yes | `charts/odoo` (Gentian-owned) + `profiles/odoo/odoo-base-ce/composition.yaml` (`app-odoo-base-ce`) |
 | **L5** Patch | yes | patch series in [`ocb`](https://github.com/gentian-org/ocb) — platform approval required |
 | **L6** Fork | yes | `ocb` is the fork; owner `platform-erp` |
 
@@ -63,7 +63,7 @@ belong in `patches/` with DEP-3 headers, not in the tree — see `ocb/patches/RE
 ## Gotchas
 
 - Addon *installation* is a runtime operation, not a Helm one — modules land on disk via the
-  sidecar but are activated by the `app-odoo` composition Job.
+  sidecar but are activated by the `app-odoo-base-ce` composition Job.
 - `gentian.initModules` (`base,web,gentian_os`) is the bootstrap set; adding to it changes
   first-boot behaviour for every new tenant.
 - Assets are cached aggressively; a branding drop-in usually needs an asset regeneration.

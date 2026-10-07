@@ -4,7 +4,6 @@ kind: OIDCPackCatalog
 metadata:
   name: nextcloud-base-od-oidc
   labels:
-    gentianos.io/oidc-catalog: nextcloud-base-od
     gentianos.io/profile-name: nextcloud-base-od
 spec:
   extraManagedByAttributeGroups:

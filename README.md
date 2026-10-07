@@ -13,7 +13,7 @@ catalogue — it's being migrated to hold only those artifacts.
 ## Structure
 
 ```text
-profiles/              # App catalogue bundles (OSS + commercial) — synced by Argo CD gentian-catalogue
+profiles/              # App catalogue bundles (OSS + commercial) — published as the catalogue a cluster installs from
   odoo/                #   family with addons (L3)
     base/
       base-ce/         #       dir is short; the AppProfile is odoo-base-ce
@@ -42,11 +42,16 @@ icons/                 # shared SVG assets
 
 **Discovery:** catalogue = `profiles/` · implementation = `apps/<name>/` · chart = `charts/<name>/`
 
-A profile bundle is identified by its **`profile.yaml`**, at any depth. The catalogue
-ApplicationSet names each Application after the AppProfile's **`metadata.name`**, not after the
-directory — so directories can be short (`addons/crm-ce` holds `odoo-crm-ce`) and CI enforces
-that `metadata.name` is globally unique rather than that it matches the folder. Every bundle
-also needs a `kustomization.yaml`, since it is rendered with kustomize.
+A profile bundle is identified by its **`profile.yaml`**, at any depth. It is published under the
+profile's **`metadata.name`**, not under the directory's — so directories can be short
+(`addons/crm-ce` holds `odoo-crm-ce`) and CI enforces that `metadata.name` is globally unique
+rather than that it matches the folder.
+
+A bundle is published as **one file with one digest**: the profile and, after it, the other
+objects the app needs on a cluster (its Composition, its OIDC pack, the ConfigMaps its composition
+reads, its customization records). The bundle's `kustomization.yaml` lists what goes in; nothing
+else in the directory reaches a cluster. What a bundle may hold and how it is named:
+[docs/profile-bundles.md](docs/profile-bundles.md).
 
 `apps/` is only for first-party apps we build. A chart that wraps an upstream image — vendored
 or Gentian-authored — belongs in `charts/<name>/`, and its profile references it by OCI

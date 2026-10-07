@@ -3,8 +3,9 @@
 ## Project overview
 
 `gentian-apps` is **the single source of truth for AppProfile catalogue metadata** for Gentian
-OS — profile bundles (`profiles/[<family>/]<name>/`, synced to clusters by the ArgoCD ApplicationSet
-`gentian-catalogue`) plus first-party app implementations (`apps/<name>/`, FastAPI + React +
+OS — profile bundles (`profiles/[<family>/]<name>/`, published as the catalogue a cluster installs
+from, one file and one digest per profile: [docs/profile-bundles.md](docs/profile-bundles.md)) plus
+first-party app implementations (`apps/<name>/`, FastAPI + React +
 Helm — same stack as [gentian-app-template](https://github.com/gentian-org/gentian-app-template) /
 [gentian-ui](https://github.com/gentian-org/gentian-ui)). This includes commercial
 (`license: proprietary`) profiles, not just OSS ones — [gentian-pro](https://github.com/gentian-org/gentian-pro)

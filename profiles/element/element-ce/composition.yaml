@@ -1,11 +1,9 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: app-element
+  name: app-element-ce
   labels:
-    gentianos.io/composition: app
-    gentianos.io/profile: element-ce
-    gentianos.io/app-variant: element-ce
+    gentianos.io/profile-name: element-ce
 spec:
   compositeTypeRef:
     apiVersion: gentianos.io/v1alpha1
@@ -72,9 +70,12 @@ spec:
                 maxMatch: 1
                 minMatch: 0
                 matchLabels:
-                  - key: gentianos.io/config-type
+                  - key: gentianos.io/asset
                     type: Value
                     value: jitsi-oidc-overlays
+                  - key: gentianos.io/profile-name
+                    type: Value
+                    value: element-ce
             - kind: ConfigMap
               into: platformSecurity
               apiVersion: v1

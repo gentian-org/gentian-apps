@@ -1,10 +1,9 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: app-odoo
+  name: app-odoo-base-ce
   labels:
-    gentianos.io/composition: app
-    gentianos.io/profile: odoo
+    gentianos.io/profile-name: odoo-base-ce
 spec:
   compositeTypeRef:
     apiVersion: gentianos.io/v1alpha1

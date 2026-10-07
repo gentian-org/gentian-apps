@@ -1,10 +1,9 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: app-openproject
+  name: app-openproject-ce
   labels:
-    gentianos.io/composition: app
-    gentianos.io/profile: openproject-ce
+    gentianos.io/profile-name: openproject-ce
 spec:
   compositeTypeRef:
     apiVersion: gentianos.io/v1alpha1
@@ -86,7 +85,7 @@ spec:
                 matchLabels:
                   - key: gentianos.io/asset
                     type: Value
-                    value: openproject-portal-bridge
+                    value: portal-bridge
                   - key: gentianos.io/profile-name
                     type: Value
                     value: openproject-ce

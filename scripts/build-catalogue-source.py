@@ -21,13 +21,30 @@ screen (AD-14). The index is the technical half and nothing else: name,
 version, edition, trust tier, digest. Presentation belongs to the App Store,
 which keeps it current; a cluster copying it would go stale.
 
-The digest is the sha256 of the profile file AS PUBLISHED. It has to be taken
-here, on the flattened file, because that is the byte sequence a director
-fetches and hashes. Taking it on the bundle's own profile.yaml would name a
-number nothing serves.
+One profile, one file, one fingerprint. ``profiles/<name>.yaml`` is the
+profile's whole bundle: the ComponentProfile first and, after it, every other
+object the app needs on a cluster -- its Composition, its OIDC pack, the
+ConfigMaps its composition reads, its customization records. They are the
+profile's COMPANIONS. A profile with none is published byte for byte as its
+profile.yaml, as it always was.
+
+What goes in is what the bundle's ``kustomization.yaml`` lists: its
+``resources`` (one document a file) and its ``configMapGenerator``. What may go
+in is decided on the cluster, which refuses a bundle holding anything else
+(docs/profile-bundles.md here; gentian-os docs/custom-catalogues.md): a short
+list of kinds, each named after the profile so that no two bundles can claim
+one object. This script holds every bundle to the same rules, so that what is
+refused there is refused here first.
+
+The digest is the sha256 of the bundle file AS PUBLISHED, companions and all.
+It has to be taken here, on the assembled file, because that is the byte
+sequence a director fetches and hashes. The assembly is deterministic --
+profile.yaml unchanged, then the companions by kind and name, each source file
+unchanged -- so the same tree always gives the same digest.
 
 The format is the contract, and its reader is the authority:
-gentian-os ``internal/director/catalogue/index.go``. gentian-os also ships
+gentian-os ``internal/director/catalogue/index.go`` for the index and
+``internal/profilebundle/bundle.go`` for a bundle. gentian-os also ships
 ``scripts/tools/build-catalogue-index.py``, which indexes a catalogue
 directory somebody else assembled — it does not know about this repository's
 bundle layout, which is why the flattening lives here.
@@ -37,6 +54,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -65,6 +84,235 @@ def load(path: Path) -> dict:
     return yaml.safe_load(path.read_text()) or {}
 
 
+# ── Bundles ──────────────────────────────────────────────────────────────────
+#
+# The rules below are the cluster's, restated: gentian-os
+# internal/profilebundle/bundle.go is the authority, and a bundle that passes
+# here and fails there is a bug in this copy. gentian-os tests the bundles
+# this script builds against its own checks.
+
+# The largest bundle a cluster carries: it rides on the profile as an
+# annotation, base64, and an object's annotations may total 256 KiB.
+MAX_BUNDLE = 180 << 10
+
+PROFILE_LABEL = "gentianos.io/profile-name"
+ASSET_LABEL = "gentianos.io/asset"
+
+# The companion kinds, in the order they are written.
+COMPOSITION = ("apiextensions.crossplane.io/v1", "Composition")
+CONFIGMAP = ("v1", "ConfigMap")
+CUSTOMIZATION = ("gentianos.io/v1alpha1", "Customization")
+OIDC_PACKS = ("gentianos.io/v1alpha1", "OIDCPackCatalog")
+COMPANION_KINDS = (COMPOSITION, CONFIGMAP, CUSTOMIZATION, OIDC_PACKS)
+
+DNS_LABEL = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
+
+# What a bundle's kustomization.yaml may say. It is read here, not run: the
+# published profile has to be profile.yaml's own bytes, and kustomize would
+# re-serialise it.
+KUSTOMIZATION_KEYS = {"apiVersion", "kind", "resources", "configMapGenerator", "generatorOptions"}
+
+
+def scalar(value: str) -> str:
+    """A string as a YAML scalar that reads back as exactly that string.
+
+    JSON's quoting, which YAML reads, rather than a YAML library's: what a
+    library emits changes with its version, and these bytes are hashed.
+    """
+    return json.dumps(value, ensure_ascii=False)
+
+
+def render_configmap(name: str, labels: dict, data: dict) -> str:
+    out = ["apiVersion: v1", "kind: ConfigMap", "metadata:", f"  name: {scalar(name)}", "  labels:"]
+    out += [f"    {scalar(k)}: {scalar(v)}" for k, v in sorted(labels.items())]
+    out.append("data:")
+    out += [f"  {scalar(k)}: {scalar(v)}" for k, v in sorted(data.items())]
+    return "\n".join(out) + "\n"
+
+
+def strings_at(value, keys: tuple) -> set:
+    """Every string found under one of keys, anywhere in value."""
+    found: set = set()
+    if isinstance(value, dict):
+        for k, v in value.items():
+            if k in keys and isinstance(v, str) and v:
+                found.add(v)
+            found |= strings_at(v, keys)
+    elif isinstance(value, list):
+        for v in value:
+            found |= strings_at(v, keys)
+    return found
+
+
+def check_companion(profile_name: str, profile: dict, doc: dict) -> list:
+    """Why a companion may not travel with this profile; empty when it may."""
+    gvk = (doc.get("apiVersion"), doc.get("kind"))
+    if gvk not in COMPANION_KINDS:
+        return [f"a {doc.get('kind')!r} ({doc.get('apiVersion')}) is not a kind a bundle may hold"]
+    meta = doc.get("metadata") or {}
+    name = str(meta.get("name") or "")
+    what = f"{gvk[1]} {name!r}"
+    problems = []
+
+    body = {"data"} if gvk == CONFIGMAP else {"spec"}
+    extra = set(doc) - {"apiVersion", "kind", "metadata"} - body
+    if extra:
+        problems.append(f"{what} states {', '.join(sorted(extra))}, which a companion may not")
+    extra = set(meta) - {"name", "labels"}
+    if extra:
+        problems.append(
+            f"{what} states metadata.{', metadata.'.join(sorted(extra))}; "
+            "a companion states its name and labels and nothing else, no namespace"
+        )
+
+    labels = meta.get("labels") or {}
+    wanted = {PROFILE_LABEL: profile_name}
+    spec = doc.get("spec") or {}
+    if gvk == COMPOSITION:
+        if name != f"app-{profile_name}":
+            problems.append(f"{what} must be named app-{profile_name}")
+        ref = spec.get("compositeTypeRef") or {}
+        if (ref.get("apiVersion"), ref.get("kind")) != ("gentianos.io/v1alpha1", "XApp"):
+            problems.append(f"{what} composes {ref.get('kind')!r}, and a bundle's Composition composes XApp only")
+        stated = ((profile.get("spec") or {}).get("package") or {}).get("composition")
+        if stated != name:
+            problems.append(f"{what} is not the composition the profile names (spec.package.composition: {stated!r})")
+    elif gvk == OIDC_PACKS:
+        if name != f"{profile_name}-oidc":
+            problems.append(f"{what} must be named {profile_name}-oidc")
+        clients = strings_at(profile.get("spec") or {}, ("clientId", "oidcPackRef"))
+        for key, pack in sorted((spec.get("packs") or {}).items()):
+            if key not in clients:
+                problems.append(f"{what} holds a pack for {key!r}, which is not a client this profile declares")
+            if (pack or {}).get("serviceClient"):
+                problems.append(f"{what}: pack {key!r} is a serviceClient, which is the platform's to declare")
+    elif gvk == CONFIGMAP:
+        asset = str(labels.get(ASSET_LABEL) or "")
+        if not DNS_LABEL.match(asset):
+            problems.append(f"{what} needs the label {ASSET_LABEL}, a short lower-case name")
+        wanted[ASSET_LABEL] = asset
+        if name != f"{profile_name}.{asset}":
+            problems.append(f"{what} must be named {profile_name}.{asset}")
+        data = doc.get("data") or {}
+        if not all(isinstance(v, str) for v in data.values()):
+            problems.append(f"{what}: every value under data is a string")
+    elif gvk == CUSTOMIZATION:
+        prefix, _, record = name.partition(".")
+        if prefix != profile_name or not DNS_LABEL.match(record):
+            problems.append(f"{what} must be named {profile_name}.<record>")
+        if (spec.get("target") or {}).get("profile") != profile_name:
+            problems.append(f"{what} must target this profile (spec.target.profile)")
+        if spec.get("scope") != "profile":
+            problems.append(f"{what} must have scope: profile; a record of another scope is not a profile's to carry")
+    if labels != wanted:
+        said = ", ".join(f"{k}: {v}" for k, v in sorted(wanted.items()))
+        problems.append(f"{what} must carry exactly these labels: {said}")
+    return problems
+
+
+def companions(directory: Path, profile_name: str, profile: dict) -> tuple:
+    """The companions a bundle's kustomization.yaml lists, as (kind, name, text)."""
+    listing = directory / "kustomization.yaml"
+    if not listing.exists():
+        return [], []
+    try:
+        k = load(listing)
+    except yaml.YAMLError as exc:
+        return [], [f"kustomization.yaml does not parse: {exc}"]
+    problems = []
+    unknown = set(k) - KUSTOMIZATION_KEYS
+    if unknown:
+        problems.append(
+            f"kustomization.yaml uses {', '.join(sorted(unknown))}; a bundle is assembled from "
+            "resources and configMapGenerator only"
+        )
+    found = []
+    for entry in k.get("resources") or []:
+        if entry == "profile.yaml":
+            continue
+        source = directory / str(entry)
+        if ".." in Path(str(entry)).parts or not source.is_file():
+            problems.append(f"resource {entry!r} is not a file of this bundle")
+            continue
+        text = source.read_text()
+        try:
+            docs = [d for d in yaml.safe_load_all(text) if d is not None]
+        except yaml.YAMLError as exc:
+            problems.append(f"{entry} does not parse: {exc}")
+            continue
+        if len(docs) != 1 or not isinstance(docs[0], dict):
+            problems.append(f"{entry} holds {len(docs)} documents; a companion's source is one object a file")
+            continue
+        # The file as it is, comments and all. Only a leading document
+        # marker goes: the separator is written between companions here.
+        lines = text.splitlines(keepends=True)
+        while lines and lines[0].strip() in ("---", ""):
+            lines.pop(0)
+        text = "".join(lines)
+        found.append((docs[0], text if text.endswith("\n") else text + "\n"))
+
+    options = k.get("generatorOptions") or {}
+    labels = {str(a): str(b) for a, b in (options.get("labels") or {}).items()}
+    for gen in k.get("configMapGenerator") or []:
+        unknown = set(gen) - {"name", "files"}
+        if unknown:
+            problems.append(
+                f"configMapGenerator {gen.get('name')!r} uses {', '.join(sorted(unknown))}; "
+                "it states a name and files, and no namespace"
+            )
+            continue
+        data = {}
+        for item in gen.get("files") or []:
+            key, sep, rel = str(item).partition("=")
+            if not sep:
+                key, rel = Path(key).name, key
+            source = directory / rel
+            if ".." in Path(rel).parts or not source.is_file():
+                problems.append(f"configMapGenerator {gen.get('name')!r}: {rel!r} is not a file of this bundle")
+                continue
+            try:
+                data[key] = source.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                problems.append(f"configMapGenerator {gen.get('name')!r}: {rel} is not text")
+        text = render_configmap(str(gen.get("name") or ""), labels, data)
+        found.append((yaml.safe_load(text), text))
+
+    out = []
+    for doc, text in found:
+        problems += check_companion(profile_name, profile, doc)
+        out.append((doc.get("kind") or "", (doc.get("metadata") or {}).get("name") or "", doc, text))
+    names = [(kind, name) for kind, name, _, _ in out]
+    for pair in sorted({p for p in names if names.count(p) > 1}):
+        problems.append(f"{pair[0]} {pair[1]!r} is listed twice")
+    # By kind and name, so the bytes do not depend on the order of a list
+    # somebody edited.
+    out.sort(key=lambda c: (c[0], c[1]))
+    return out, problems
+
+
+def assemble(directory: Path, profile_name: str, profile: dict) -> tuple:
+    """A profile's published bundle, and why it cannot be published."""
+    body = (directory / "profile.yaml").read_bytes()
+    found, problems = companions(directory, profile_name, profile)
+    meta = profile.get("metadata") or {}
+    for key in list(meta.get("annotations") or {}) + list(meta.get("labels") or {}):
+        if str(key).startswith("argocd.argoproj.io/"):
+            problems.append(f"the profile states {key}, which is not a catalogue's to set")
+    stated = (meta.get("labels") or {}).get(PROFILE_LABEL)
+    if stated not in (None, profile_name):
+        problems.append(f"the profile carries the label {PROFILE_LABEL}: {stated}, which is another profile's name")
+    if found:
+        if len(list(yaml.safe_load_all(body))) != 1:
+            problems.append("profile.yaml holds more than one document")
+        if not body.endswith(b"\n"):
+            body += b"\n"
+        for _, _, _, text in found:
+            body += b"---\n" + text.encode()
+    if len(body) > MAX_BUNDLE:
+        problems.append(f"the bundle is {len(body)} bytes and a cluster carries at most {MAX_BUNDLE}")
+    return body, [(kind, name, doc) for kind, name, doc, _ in found], problems
+
+
 def build(out: Path) -> tuple[list[dict], list[str]]:
     profiles_dir = out / "profiles"
     listings_dir = out / "listings"
@@ -90,6 +338,7 @@ def build(out: Path) -> tuple[list[dict], list[str]]:
     entries: list[dict] = []
     complaints: list[str] = []
     seen: dict[str, Path] = {}
+    claimed: dict[tuple, str] = {}
 
     for bundle in sorted(REPO.glob("profiles/**/profile.yaml")):
         directory = bundle.parent
@@ -142,8 +391,24 @@ def build(out: Path) -> tuple[list[dict], list[str]]:
             )
             continue
 
+        body, held, problems = assemble(directory, name, profile)
+        # One object, one bundle, across the catalogue. The names make that
+        # so for the objects; a pack is found by its client's id, which two
+        # profiles could both declare.
+        for kind, companion, doc in held:
+            claims = [(kind, companion)]
+            if kind == "OIDCPackCatalog":
+                claims += [("OIDC pack", key) for key in ((doc.get("spec") or {}).get("packs") or {})]
+            for claim in claims:
+                if claim in claimed and claimed[claim] != name:
+                    problems.append(f"{claim[0]} {claim[1]!r} is also in the bundle of {claimed[claim]}")
+                claimed.setdefault(claim, name)
+        if problems:
+            complaints += [f"{name}: {problem}" for problem in problems]
+            continue
+
         published = profiles_dir / f"{name}.yaml"
-        shutil.copyfile(bundle, published)
+        published.write_bytes(body)
         if listing_path.exists():
             shutil.copyfile(listing_path, listings_dir / f"{name}.yaml")
 
@@ -151,7 +416,8 @@ def build(out: Path) -> tuple[list[dict], list[str]]:
             "name": name,
             "version": str(spec.get("version") or "0.0.0"),
             "edition": edition,
-            # Taken on the published file, which is the one a director fetches.
+            # Taken on the published file, which is the one a director
+            # fetches: the profile and its companions, one fingerprint.
             "digest": "sha256:" + hashlib.sha256(published.read_bytes()).hexdigest(),
         }
         if spec.get("trustTier"):
@@ -230,7 +496,7 @@ a Cluster claim under <code>spec.catalogue.sources</code>; the director fetches 
 entry at the digest the App Store states and refuses anything else.</p>
 <ul>
  <li><a href="index.yaml">index.yaml</a> — what is here, at which version and digest</li>
- <li><code>profiles/&lt;name&gt;.yaml</code> — the ComponentProfile</li>
+ <li><code>profiles/&lt;name&gt;.yaml</code> — the profile's bundle: the ComponentProfile and what travels with it</li>
  <li><code>listings/&lt;name&gt;.yaml</code> — how the App Store presents it</li>
 </ul>
 <p>{len(entries)} entries.</p>

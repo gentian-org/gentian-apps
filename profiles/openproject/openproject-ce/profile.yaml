@@ -40,7 +40,7 @@ spec:
     # exist beside it. A chart and a composition are the one legal pair in
     # the package union: the chart is what is installed, the composition is
     # what else is created.
-    composition: app-openproject
+    composition: app-openproject-ce
     chart:
       repository: "https://charts.openproject-ce.org/"
       name: openproject-ce

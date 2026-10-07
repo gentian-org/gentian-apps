@@ -1,7 +1,7 @@
 # ComponentProfile — Odoo Community base runtime (odoo-base-ce)
 #
 # Deploys one Odoo OCB instance per tenant. Module profiles (odoo-crm, …) install
-# Odoo CE modules via app-odoo Jobs in a later phase. OIDC uses app-default Client MR.
+# Odoo CE modules via app-odoo-base-ce Jobs in a later phase. OIDC uses app-default Client MR.
 apiVersion: gentianos.io/v1alpha1
 kind: ComponentProfile
 metadata:
@@ -26,7 +26,7 @@ spec:
     # exist beside it. A chart and a composition are the one legal pair in
     # the package union: the chart is what is installed, the composition is
     # what else is created.
-    composition: app-odoo
+    composition: app-odoo-base-ce
     chart:
       repository: oci://ghcr.io/gentian-org/charts
       name: odoo
@@ -249,7 +249,7 @@ spec:
 
     repackage:
       chartOwnership: gentian-owned
-      compositionRef: app-odoo
+      compositionRef: app-odoo-base-ce
 
     patch:
       allowed: true

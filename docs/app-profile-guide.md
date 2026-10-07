@@ -294,7 +294,7 @@ owned by the **operator** (gateway routes, OIDC fallbacks, auto-install base
 profiles), declare it on the **AppProfile metadata** using `gentianos.io/*`
 annotations. When behaviour is **deploy sequencing**, **one-off Jobs**, or
 **upstream-chart workarounds** that should eventually move upstream, put it in the
-profile's **`composition.yaml`** (`app-ox`, `app-element`, …).
+profile's **`composition.yaml`** (`app-ox`, `app-element-ce`, …).
 
 | Put it in… | When | Examples |
 |---|---|---|
@@ -1368,7 +1368,7 @@ Element room widgets and portal realtime links.
 2. The `element` AppProfile declares `spec.sidecars` with the `opendesk-jitsi`
    chart, OIDC client `opendesk-jitsi`, and `additionalIngresses` for
    `meet.<tenant>` → `jitsi-web`.
-3. The `app-element` composition deploys **Matrix User Verification Service**
+3. The `app-element-ce` composition deploys **Matrix User Verification Service**
    (UVS bootstrap Job + service) and the Jitsi sidecar release. Prosody uses
    `AUTH_TYPE=hybrid_matrix_token`, `JWT_APP_SECRET` (same value as
    `settings.jwtAppSecret` / keycloak adapter), and
@@ -1383,7 +1383,7 @@ Element room widgets and portal realtime links.
    with a local Matrix password after `register_new_matrix_user`. Do **not** set
    `password_config.enabled: false` on Synapse — that breaks the bootstrap Job
    (`Password login has been disabled`) and leaves the Element XApp Not Ready.
-   Human users still use OIDC: `app-element` sets `sso_redirect_options.immediate`
+   Human users still use OIDC: `app-element-ce` sets `sso_redirect_options.immediate`
    on the Element web `config.json` only.
 
 The bootstrap Job runs at post-install only; a failed or stale `@uvs` account after
@@ -1557,7 +1557,7 @@ CLI to report Ready or inspect `kubectl get app <app> -n tenant-<tenant>`.
 |---|---|
 | Native username/password form (XWiki, etc.) | `keycloak-bridge-auth` or missing `OIDCAuthServiceImpl` / `oidc.skipped: false` |
 | `redirect_uri` mismatch | `redirectUris` use wrong host (`chat.` vs `matrix.` for Element — §6d) or `${KERNEL_DOMAIN}` instead of `${TENANT_DOMAIN}` |
-| Element **“Invalid username or password”** after matrix host works | Wrong OIDC redirect URI (§6d), missing `opendesk_username` / Livecollaboration role (IAM), or Synapse token exchange still hitting public `id.<kernel>` on staging — operator `KEYCLOAK_INTERNAL_URL` + `app-element` reconcile (§6d, `security.md` §9.1) |
+| Element **“Invalid username or password”** after matrix host works | Wrong OIDC redirect URI (§6d), missing `opendesk_username` / Livecollaboration role (IAM), or Synapse token exchange still hitting public `id.<kernel>` on staging — operator `KEYCLOAK_INTERNAL_URL` + `app-element-ce` reconcile (§6d, `security.md` §9.1) |
 | Blank iframe / Firefox framing error | Missing IdP `frame-ancestors` — ensure `ingress.subDomain` + OIDC client declared; operator reconciles (§6e). **First** verify edge headers with `curl -sI https://<subDomain>.<tenant-domain>/ | grep -i content-security-policy` — a single `frame-ancestors 'self' https://portal.<kernel>` line means CSP is fine and the failure is elsewhere (often OIDC — next row). |
 | OpenProject login 404 on `/auth/keycloak` | OIDC auth provider not seeded — `openproject-oidc-seed` Job failed or ran before DB migrations. Not a CSP issue; fix the Job (see §6f). Portal iframe may look like a framing/CORS error when SSO never starts. |
 | HTTP 500 on OIDC callback (empty username claim) | Chart expects `opendesk_username` / `gentian_username` (or similar) but `clientId` not in OIDC pack / wrong mapper, or Keycloak User Profile schema configuration is missing the mapped attribute (e.g. `uid`), causing Keycloak to silently drop it during admin user updates/sync. Register custom attributes in the User Profile schema. |
@@ -1586,17 +1586,21 @@ extraValues:
 
 ## 10. Catalogue bundles (GitOps)
 
-Each app lives under `profiles/<name>/` with a `kustomization.yaml`. Argo CD
-ApplicationSet **`gentian-catalogue`** syncs one Application per bundle
-(`catalogue-<name>`): AppProfile, optional `composition.yaml`, optional cluster
-assets.
+Each app lives under `profiles/<name>/` with a `kustomization.yaml`. The
+catalogue build publishes each as **one bundle file with one digest** — the
+profile, then its companions: optional `composition.yaml`, `oidc-catalog.yaml`,
+customization records and asset ConfigMaps — and a cluster fetches that file
+when a tenant installs the app. What a bundle may hold, how each companion is
+named (`app-<profile>`, `<profile>-oidc`, `<profile>.<asset>`), and that a
+companion states no namespace: [profile-bundles.md](profile-bundles.md).
 
-Set `compositionRef` only when using a non-default composition:
+Set `spec.package.composition` only when the bundle brings its own composition,
+which is then named `app-<profile>`:
 
 | Composition | When to use |
 |---|---|
 | *(omit)* | Standard apps — `app-default` is used automatically |
-| `app-openproject` | OpenProject — custom composition in `profiles/openproject/composition.yaml` |
+| `app-openproject-ce` | OpenProject — custom composition in `profiles/openproject/openproject-ce/composition.yaml` |
 | `app-od-element` | Element (OpenDesk) — bundle in **gentian-pro** (proprietary catalogue) |
 | `app-od-ox` | OX App Suite — bundle in **gentian-pro** (proprietary catalogue) |
 

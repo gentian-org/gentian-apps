@@ -1,18 +1,19 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+# What this profile's published bundle holds beside profile.yaml
+# (scripts/build-catalogue-source.py reads this file; docs/profile-bundles.md).
 resources:
   - profile.yaml
   - composition.yaml
   - oidc-catalog.yaml
 configMapGenerator:
-  - name: gentian-jitsi-oidc-overlays
-    # Beside gentian-cluster-config, where the app composition reads it from:
-    # the provisioning namespace of the v5 layout (crossplane-system in v4).
-    namespace: kernel-provisioning
+  # Read by this profile's composition, which finds it by its two labels.
+  # Named <profile>.<asset>, and without a namespace: a companion states none.
+  - name: element-ce.jitsi-oidc-overlays
     files:
       - gentian-portal-sso.html=assets/gentian-portal-sso.html
 generatorOptions:
   disableNameSuffixHash: true
   labels:
-    gentianos.io/config-type: jitsi-oidc-overlays
-    app.kubernetes.io/managed-by: gentian-os
+    gentianos.io/profile-name: element-ce
+    gentianos.io/asset: jitsi-oidc-overlays

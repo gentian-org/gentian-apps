@@ -6,9 +6,12 @@
 apiVersion: gentianos.io/v1alpha1
 kind: Customization
 metadata:
-  name: nginx-sso-routing
-  # The operator's namespace in the v5 layout (gentian-system in v4).
-  namespace: kernel-control
+  # Named after the profile it travels with. No namespace: a companion in a
+  # profile bundle states none, and the cluster puts it where its catalogue
+  # is applied.
+  name: activepieces-me.nginx-sso-routing
+  labels:
+    gentianos.io/profile-name: activepieces-me
 spec:
   summary: "Front Activepieces with a Gentian nginx config that routes SAML to the sso-saml sidecar"
 

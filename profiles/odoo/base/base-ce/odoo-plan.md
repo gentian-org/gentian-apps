@@ -56,7 +56,7 @@ version line and one install path.
 | Configuration visible to tenant admin only | **Base profile** exposes admin-only portal tile; addon profiles expose user tiles only |
 | Tenant-defined groups control app + Odoo rights | Three-tier RBAC — Keycloak groups → portal visibility → Odoo `res.groups` (§4.3) |
 | Future integrations via Gentian contracts | `gentian_os` addon consumes `IntegrationBinding` secrets; base declares `optionalIntegrations` (§5.4, §8) |
-| Fits Gentian catalogue model | Profile bundles under `gentian-apps/profiles/`; `app-odoo` composition for non-default MR graph |
+| Fits Gentian catalogue model | Profile bundles under `gentian-apps/profiles/`; `app-odoo-base-ce` composition for non-default MR graph |
 
 ### Non-goals (this plan)
 
@@ -113,7 +113,7 @@ gentian-apps/profiles/
 ├── odoo-base-ce/          # platform tier — deploys Odoo runtime (this folder)
 │   ├── odoo-plan.md
 │   ├── profile.yaml         # base AppProfile (admin-only)
-│   ├── composition.yaml     # app-odoo
+│   ├── composition.yaml     # app-odoo-base-ce
 │   └── kustomization.yaml
 ├── odoo-crm/
 │   ├── profile.yaml         # thin addon profile
@@ -164,7 +164,7 @@ store can still show a dependency note in metadata.
 Addon profiles need **no chart / addon-only** behaviour without adding
 per-app fields to `AppProfile`. Use **generic annotations** on the profile
 metadata; app-specific install parameters live in `extraValues` and the
-profile-scoped composition (`app-odoo`).
+profile-scoped composition (`app-odoo-base-ce`).
 
 ```yaml
 # odoo-crm/profile.yaml (illustrative)
@@ -175,7 +175,7 @@ metadata:
 spec:
   family: odoo
   edition: crm
-  compositionRef: app-odoo
+  compositionRef: app-odoo-base-ce
   extraValues:
     odoo:
       module: crm
@@ -188,7 +188,7 @@ spec:
 | `gentianos.io/deployment-role: addon` | Composition runs the Odoo module install Job; portal tile only |
 | `gentianos.io/requires-profile` | Operator auto-installs named base profile |
 | `spec.family` | Groups profiles; shared DB name, ingress host, composition |
-| `spec.extraValues` (per profile) | App-specific install params (`odoo.module`, …) read by `app-odoo` |
+| `spec.extraValues` (per profile) | App-specific install params (`odoo.module`, …) read by `app-odoo-base-ce` |
 
 The operator understands only the **generic** annotations above. Odoo module
 technical names, depends-on lists, and Job commands are **not** platform CRD fields.
@@ -433,7 +433,7 @@ Both groups see the **same app** (tier 2); **different actions** inside it (tier
 | **`gentian_os`** Odoo addon (§5) | `odoo-modules/` | RBAC, embed UI, contract consumers — single integration surface |
 | Admin Console group extension | `gentian-os` | `gentianOdooModules` editor on Keycloak group objects |
 | Portal `allowedGroups` reconciler | `gentian-os` operator | Map `gentianOdooModules` → per-tile group IDs |
-| MBA / module install hook | `app-odoo` composition | Register module id in catalogue metadata for checkboxes |
+| MBA / module install hook | `app-odoo-base-ce` composition | Register module id in catalogue metadata for checkboxes |
 | OIDC on base profile | `odoo-base-ce/profile.yaml` | SSO configuration |
 
 #### Addon profile portal tile default
@@ -467,7 +467,7 @@ Gentian deploys Odoo as **platform-wired infrastructure** (IdM, portal, bindings
 AppProfile-driven addons). All custom Odoo code for that integration belongs in
 **one addon family** — not scattered `gentian_odoo_*` plugins.
 
-Think of it as the **Gentian OS driver for Odoo**: the Helm chart and `app-odoo`
+Think of it as the **Gentian OS driver for Odoo**: the Helm chart and `app-odoo-base-ce`
 composition deliver the runtime; `gentian_os` makes Odoo behave correctly inside
 the Gentian catalogue model.
 
@@ -475,7 +475,7 @@ the Gentian catalogue model.
 
 | Benefit | Detail |
 |---|---|
-| **One version line** | Chart / `app-odoo` pins `gentian_os` alongside Gentian OS releases — no drift between RBAC and embed logic. |
+| **One version line** | Chart / `app-odoo-base-ce` pins `gentian_os` alongside Gentian OS releases — no drift between RBAC and embed logic. |
 | **Shared primitives** | Tenant id, `IntegrationBinding` secret paths, OIDC config used by RBAC, embed mode, and integrations. |
 | **One install path** | Base deploy installs `gentian_os`; addon Jobs install only **Odoo CE modules** (`crm`, `account`, …). |
 | **AppProfile alignment** | Mounted config/env reflects installed `odoo-*` profiles and enabled contracts. |
@@ -644,7 +644,7 @@ ACLs stay declarative Odoo data** (`ir.model.access`, `ir.rule`).
 |---|---|
 | `gentian_os` core | Keycloak/OIDC bridge, embed mode, binding secrets, manifest loader |
 | Admin Console `gentianOdooModules` schema | Platform portal contract |
-| AppProfile / `app-odoo` | Catalogue and deploy |
+| AppProfile / `app-odoo-base-ce` | Catalogue and deploy |
 
 #### Anti-patterns
 
@@ -691,7 +691,7 @@ emits one `IntegrationBinding` per consumer.
 
 ### 5.6 Configuration from AppProfile / cluster
 
-`app-odoo` mounts a ConfigMap (or env vars from ESO) consumed by `gentian_os`:
+`app-odoo-base-ce` mounts a ConfigMap (or env vars from ESO) consumed by `gentian_os`:
 
 ```yaml
 # Illustrative — injected by composition, not in Git
@@ -708,7 +708,7 @@ embed actions and integration clients match installed profiles.
 
 | Concern | Owner |
 |---|---|
-| Helm, Postgres, ingress, ESO secrets | `app-odoo` + chart |
+| Helm, Postgres, ingress, ESO secrets | `app-odoo-base-ce` + chart |
 | Odoo CE module install (`crm`, `account`, …) | Crossplane Jobs from addon AppProfiles |
 | Portal tiles, `gentianOdooModules`, `allowedGroups` | **gentian-os operator** + Admin Console |
 | `IntegrationBinding` CR + OpenBao paths | **Operator** |
@@ -810,7 +810,7 @@ Odoo module install Jobs call `odoo-bin -i <technical_name> -d ${TENANT_ID}_odoo
 against the running service (or a one-shot install container), then invoke
 `gentian_os` post-install hooks (embed action registration).
 
-`compositionRef: app-odoo` handles:
+`compositionRef: app-odoo-base-ce` handles:
 
 1. ExternalSecret + Release (base only) — includes **`gentian_os`**
 2. Odoo module install Jobs (addon profiles)
@@ -890,7 +890,7 @@ profiles/odoo/odoo-base-ce/
 ├── odoo-plan.md           # this document
 ├── kustomization.yaml
 ├── profile.yaml             # base AppProfile
-├── composition.yaml         # Composition app-odoo
+├── composition.yaml         # Composition app-odoo-base-ce
 └── assets/                  # optional: gentian_os ConfigMap template, module install RBAC
 ```
 
@@ -902,8 +902,8 @@ profiles/odoo-crm/
 └── profile.yaml             # deploymentRole: addon, odooModule.technicalName: crm, portalTiles only
 ```
 
-No `composition.yaml` in addon bundles — they use `compositionRef: app-odoo`
-from the base bundle (cluster-scoped Composition name `app-odoo`).
+No `composition.yaml` in addon bundles — they use `compositionRef: app-odoo-base-ce`
+from the base bundle (cluster-scoped Composition name `app-odoo-base-ce`).
 
 **Odoo code** lives in `odoo-modules/gentian_os/`, not under `profiles/`.
 
@@ -920,7 +920,7 @@ from the base bundle (cluster-scoped Composition name `app-odoo`).
 ### Phase 1 — Base runtime + `gentian_os` core
 
 - [x] Gentian Helm chart `odoo` (Postgres via kernel, secrets via ESO)
-- [x] `app-odoo` composition + render goldens
+- [x] `app-odoo-base-ce` composition + render goldens
 - [x] `odoo-base-ce/profile.yaml` with OIDC + admin portal tile
 - [x] **`gentian_os` core**: OIDC auth & Keycloak claims mapper, binding secret reader, config from ConfigMap
 - [x] Manual smoke: SSO, admin settings, single `base,web` + `gentian_os`

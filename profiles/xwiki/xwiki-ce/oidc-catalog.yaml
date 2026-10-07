@@ -2,9 +2,8 @@
 apiVersion: gentianos.io/v1alpha1
 kind: OIDCPackCatalog
 metadata:
-  name: gentian-xwiki-oidc
+  name: xwiki-ce-oidc
   labels:
-    gentianos.io/oidc-catalog: xwiki-ce
     gentianos.io/profile-name: xwiki-ce
 spec:
   mapperTemplates:

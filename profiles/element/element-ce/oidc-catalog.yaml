@@ -2,9 +2,8 @@
 apiVersion: gentianos.io/v1alpha1
 kind: OIDCPackCatalog
 metadata:
-  name: gentian-element-oidc
+  name: element-ce-oidc
   labels:
-    gentianos.io/oidc-catalog: element-ce
     gentianos.io/profile-name: element-ce
 spec:
   mapperTemplates:
