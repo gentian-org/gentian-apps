@@ -30,7 +30,7 @@ const entryPoint = `https://id.${kernelDomain}/auth/realms/${tenantId}/protocol/
 // postInstallJob already uses to read this realm's descriptor.
 const descriptorUrl =
     process.env.SSO_IDP_DESCRIPTOR_URL ||
-    `http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080` +
+    `http://gentian-idp-keycloak-keycloakx-http.kernel-authentication.svc.cluster.local:8080` +
     `/auth/realms/${tenantId}/protocol/saml/descriptor`;
 
 // Keycloak SAML clients default to signing the *response* ("Sign documents")
