@@ -74,7 +74,7 @@ Gentian already references Odoo in two distinct roles:
 
 ```mermaid
 flowchart LR
-    subgraph platform ["Platform scope (gentian-corp / kernel)"]
+    subgraph platform ["Platform scope (aluvian / kernel)"]
         PO["Odoo — commerce CRM/ERP"]
         PO -->|entitlements, invoices| GD["gentian-deployments / App Store"]
     end
@@ -91,7 +91,7 @@ flowchart LR
 
 | Instance | Purpose | Git / deploy | Who uses it |
 |---|---|---|---|
-| **Platform Odoo** | Sell Gentian apps, subscriptions, invoices | `gentian-corp` or kernel extension; not an AppProfile | Gentian operators, billing |
+| **Platform Odoo** | Sell Gentian apps, subscriptions, invoices | `aluvian` or kernel extension; not an AppProfile | Gentian operators, billing |
 | **Tenant Odoo** | Customer organisation ERP (CRM, accounting, …) | `gentian-apps/profiles/odoo-*` | Tenant users + tenant admin |
 
 They must **not** share a database or Keycloak client. Contracts between them
