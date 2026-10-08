@@ -1,0 +1,31 @@
+{
+  "name": "gentian-sidecar-sso-saml",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Signs a person in to an app that speaks neither OIDC nor SAML: a SAML service provider towards the tenant's realm, and a per-app handler that establishes the app's session.",
+  "license": "Apache-2.0",
+  "main": "bridge.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node bridge.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@node-saml/node-saml": "5.1.0",
+    "@xmldom/xmldom": "0.8.15",
+    "jsonwebtoken": "9.0.3",
+    "mysql2": "3.24.5",
+    "pg": "8.23.1",
+    "xml-crypto": "6.3.3",
+    "xpath": "0.0.34"
+  },
+  "overrides": {
+    "@xmldom/xmldom": "0.8.15",
+    "xml-crypto": "6.3.3"
+  },
+  "devDependencies": {
+    "yaml": "2.9.1"
+  }
+}

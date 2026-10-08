@@ -1,0 +1,138 @@
+# gentian-sidecar-sso-saml — the platform's sign-in sidecar
+
+Signs a person in to an app that can do neither OIDC nor SAML itself, so that somebody who is
+signed in at the platform opens the app and is in: no second sign-in, no password.
+
+This directory is the one copy of it. The platform runs the image built here beside every app
+whose profile declares `requires.services.identity.sidecar`; nothing else deploys it, and it has
+no chart. The platform's side — the declaration, what is composed for it and how its two paths
+are routed — is in gentian-os: `docs/app-customization.md` ("The sign-in sidecar") and
+`docs/design/security.md`.
+
+## What it does
+
+It is a SAML service provider towards the tenant's realm, on the app's own host:
+
+| Path | Reached | Does |
+|---|---|---|
+| `GET /sso/login` | behind the front door, so only by a person who may use the app | sends the browser to the realm with a SAML request |
+| `POST /sso/acs` | without a session, because the realm posts its answer from its own address | checks the answer, then asks the app's **handler** to make a session |
+| `GET /healthz`, `GET /readyz` | by the kubelet | ready means the realm's signing certificate is known |
+
+The realm recognises the person from the sign-in at the platform and answers without asking.
+
+## What it accepts as an answer
+
+Everything in this list, or nothing (`lib/signin.js`; each line has a test in `test/`):
+
+- signed by a certificate of the realm, twice: the response as a whole and the assertion in it;
+- issued by the realm it was told about;
+- addressed to it: `Destination` and the assertion's `Recipient` are its own address, and the
+  audience is its own name;
+- an answer to a request this process sent (`InResponseTo`), not answered before, at most five
+  minutes old;
+- posted by the browser that was sent away with that request (a cookie set at that moment);
+- about the person the front door admitted when the request was sent (the address the realm
+  vouches for is the address in the front door's identity header);
+- inside its validity period, with exactly one assertion, in clear, not presented before, and
+  no document type declaration.
+
+A refusal spends the request it answered. The browser is told that the sign-in failed and a
+reference; the reason is in the log under that reference. The log names nobody: no address, no
+name, no assertion, no cookie, no token.
+
+Requests waiting for their answer are remembered in the process, so the sidecar runs as one
+replica, and a restart in the middle of a sign-in means that sign-in is started again.
+
+## Settings
+
+All given by the platform. Nothing is assembled from a tenant's name and a domain.
+
+| Variable | |
+|---|---|
+| `SSO_ENTITY_ID` | the sidecar's name at the realm, `https://<app host>/sso` |
+| `SSO_ACS_URL` | where the realm posts, `https://<app host>/sso/acs`; the app's host is taken from it |
+| `SSO_LOGIN_PATH` | `/sso/login` |
+| `SSO_IDP_ENTITY_ID` | the realm, as its answers name it |
+| `SSO_IDP_SSO_URL` | where browsers are sent |
+| `SSO_IDP_DESCRIPTOR_URL` | the realm's SAML descriptor inside the cluster, for its signing certificate |
+| `SSO_REALM` | the realm's name; a person of another realm begins no sign-in |
+| `SSO_HANDLER_SHA256` | sha256 of the handler; a file that is not that file is not loaded |
+| `SSO_SESSION_MAX_SECONDS` | optional; may lower the session's hour, never raise it |
+
+## A handler
+
+The app's part: one file, `handler.js`, from the app's catalogue entry. It knows how this app
+keeps a session and nothing about SAML.
+
+```js
+module.exports = {
+  // person: { email, name }   email is what the realm vouched for, in lower case.
+  //                           name is for display only (it comes from the front door).
+  // ctx:    { sessionSeconds, origin, log(event, fields) }
+  async onLogin(person, ctx) {
+    // find or make the person's account in the app; make a session that ends
+    // after ctx.sessionSeconds
+    return {
+      redirect: '/home',                                  // a path on the app's own host
+      cookies: [{ name: 'authToken', value: token }],     // the app's session cookies
+      // localStorage: { token: '…' },                    // for an app whose page keeps its session there
+    };
+    // or: return { refuse: true };                       // this person is not signed in
+  },
+};
+```
+
+**A handler never writes to the browser.** It answers a description and the sidecar writes the
+response, so these are the same for every app and are not a handler's to get wrong:
+
+- every cookie is `Secure; SameSite=Lax; Path=/`, lasts `ctx.sessionSeconds`, and is `HttpOnly`
+  unless the handler says `httpOnly: false` (only for an app whose own page must read it);
+- `redirect` is a path on the app's own host. An address, `//host`, a backslash or a control
+  character is refused;
+- `localStorage` is written by a page the sidecar generates: the values are data in it, never
+  code, whatever a person is called, and the page runs that one script and nothing else;
+- anything else in the answer is an error, and so is a cookie under a name the front door keeps
+  for itself. An error signs nobody in.
+
+**A session ends when the sidecar says.** `ctx.sessionSeconds` is at most an hour and never
+later than the realm session the answer came from. A handler that signs a token gives it that
+lifetime. When it has run out the app sends the browser back to the sign-in, which is silent
+while the person is still signed in at the platform. One hour bounds how long an app session can
+show the previous person to the next one at the same browser; it is not what keeps a person out
+who was removed — the front door does that, on every request, within minutes.
+
+**What a handler has** is what the app's profile declared for it and nothing else: the app's
+own database (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`), the app's own secrets
+(`SECRET_<NAME>`), and the app itself inside the cluster (`APP_URL`). The image carries `pg`,
+`mysql2` and `jsonwebtoken`; nothing is installed when the container starts, and the container
+reaches nothing but what was declared.
+
+**What a handler must not do:**
+
+- sign anybody in with a shared account, or give a person rights in the app that the app's own
+  free sign-up would not: an ordinary member, never an administrator;
+- give anybody a password, or keep one. Where the app's own calls demand one for a new account,
+  a random value is given and removed again;
+- log who signed in. `ctx.log` is for what happened, not to whom;
+- touch a licence check or a switch of a paid feature in the app.
+
+The two handlers in this catalogue are the reference:
+`profiles/docmost/docmost-ce/assets/sign-in-handler.js` and
+`profiles/activepieces/activepieces-me/assets/sign-in-handler.js`.
+
+## Tests
+
+```bash
+npm ci && npm test                 # the checks above, against responses signed in the test
+
+docker build -t sso-sidecar:e2e .  # then, with docker, against the real things:
+node --test e2e/sidecar.e2e.js       # Keycloak 26.8.0, at the three kinds of address an app has
+node --test e2e/docmost.e2e.js       # + Docmost 0.95.0, with the profile's handler
+node --test e2e/activepieces.e2e.js  # + Activepieces 0.28.0, started as the chart starts it
+```
+
+The end-to-end runs start their own containers and remove them. The browser and the front door
+in them are scripted (`e2e/lib/browser.js`): the cookie rules of a browser are followed, a real
+browser is not run. Run the app's one before moving the app's image tag: it is what notices
+that the app keeps its session differently now.

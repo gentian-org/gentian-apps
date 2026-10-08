@@ -11,11 +11,5 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
-    {{- if .Values.bridge.enabled }}
-    - port: {{ .Values.bridge.port }}
-      targetPort: bridge
-      protocol: TCP
-      name: bridge
-    {{- end }}
   selector:
     app.kubernetes.io/name: {{ include "docmost.name" . }}

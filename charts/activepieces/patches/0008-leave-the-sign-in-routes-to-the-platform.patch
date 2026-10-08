@@ -1,0 +1,304 @@
+Description: Leave the sign-in routes to the platform; serve a shim instead of rewriting the app
+ The platform now routes the sign-in sidecar itself: /sso/login and /sso/acs
+ of the app's host reach the sidecar at the platform's edge, and a page load of
+ /sign-in or /sign-up is redirected there. This nginx is therefore no longer in
+ the path of a sign-in, and three things 0005 and 0006 added for it go:
+ .
+  - the two locations that proxied /api/v1/authn/saml/{login,acs} to the
+    sidecar, and with them the lookup of the sidecar's address at start, which
+    ended the container when the sidecar's Service was not there yet;
+  - the redirect of every page to the sign-in unless a cookie named ap_token
+    was present, and the cookie set from a ?token= query parameter. The session
+    is not in a cookie any more: the sidecar writes it where Activepieces' page
+    keeps it, in localStorage, and no cookie carries the token;
+  - the rewrite of the shipped index.html at container start (the L5 residue
+    0006 recorded). nginx has ngx_http_sub_module in this image, so the one
+    script the page needs is served as a file and referenced by a sub_filter,
+    as 0006's own exit criterion asked.
+ .
+ What stays is that script (files/sign-in.js). Activepieces' page moves to its
+ own sign-in form by itself when it has no token or finds it run out, without a
+ request the edge could redirect, and nobody has a password to type there. The
+ script sends the browser to /sso/login instead.
+ .
+ gentian.sso.host and gentian.startup.injectSessionScript are removed with what
+ read them. Guarded by gentian.enabled as before: unset, output is unchanged.
+Author: Gentian Platform <platform@gentian.org>
+Origin: other, https://github.com/gentian-org/gentian-apps
+Forwarded: not-needed
+Reason: Gentian platform integration glue, as 0005 and 0006; upstream has no
+ reason to carry it.
+Applied-Upstream: no
+Last-Update: 2026-10-08
+---
+--- a/files/entrypoint.sh
++++ b/files/entrypoint.sh
+@@ -3,51 +3,17 @@
+ #
+ # Owns process startup so that the profile does not have to: the AppProfile passes
+ # values, never a command. See profiles/activepieces/customizations/ for the
+-# Customization records covering the two startup patches below.
++# Customization record covering the startup patch below.
+ #
+-# Note: the blocks below are deliberately left unindented — they carry heredocs
+-# whose terminators must sit at column 0.
++# Note: the block below is deliberately left unindented — it carries a heredoc
++# whose terminator must sit at column 0.
+ set -u
+ 
+ NGINX_CONF_SRC="${GENTIAN_NGINX_CONF:-/etc/activepieces/nginx.conf}"
+ NGINX_CONF=/tmp/nginx.conf
+ 
+ # ---------------------------------------------------------------------------
+-# 1. Session restore — sync the ap_token cookie into localStorage and send
+-#    sign-in/sign-up at the SAML gateway.
+-#
+-#    L5. The cookie outlives localStorage (new tab, browser restart), so the
+-#    shipped index.html needs the shim. Replace with an nginx sub_filter that
+-#    injects the same <script> into <head> on the fly once ngx_http_sub_module
+-#    is confirmed present in the image; then this block and its rung go away.
+-# ---------------------------------------------------------------------------
+-if [ "${GENTIAN_INJECT_SESSION_SCRIPT:-true}" = "true" ]; then
+-node -e "
+-const fs = require('fs');
+-const root = '/usr/share/nginx/html';
+-const files = ['/usr/share/nginx/html/index.html'];
+-try {
+-    fs.readdirSync(root).forEach(dir => {
+-        files.push(root + '/' + dir + '/index.html');
+-    });
+-} catch (e) {}
+-
+-files.forEach(file => {
+-    if (fs.existsSync(file) && !fs.lstatSync(file).isDirectory()) {
+-        let html = fs.readFileSync(file, 'utf8');
+-        if (!html.includes('ap_token')) {
+-            const script = '<script>(function(){const loginUrl=\'/api/v1/authn/saml/login\';if(!localStorage.getItem(\'token\')){const mT=document.cookie.match(/ap_token=([^;]+)/);const mU=document.cookie.match(/ap_user=([^;]+)/);if(mT&&mU){localStorage.setItem(\'token\',mT[1]);localStorage.setItem(\'currentUser\',decodeURIComponent(mU[1]));window.location.reload();}else{window.location.href=loginUrl;}}const intercept=function(url){if(url&&(url.includes(\'sign-in\')||url.includes(\'sign-up\'))){if(!localStorage.getItem(\'token\')){window.location.href=loginUrl;return true;}}return false;};const originalPush=window.history.pushState;window.history.pushState=function(state,title,url){if(intercept(url))return;return originalPush.apply(this,arguments);};const originalReplace=window.history.replaceState;window.history.replaceState=function(state,title,url){if(intercept(url))return;return originalReplace.apply(this,arguments);};})();</script>';
+-            html = html.replace('<head>', '<head>' + script);
+-            fs.writeFileSync(file, html, 'utf8');
+-            console.log('Injected token sync and history interceptor script into ' + file);
+-        }
+-    }
+-});
+-"
+-fi
+-
+-# ---------------------------------------------------------------------------
+-# 2. Upgrade banner — main.js asks raw.githubusercontent.com for the latest
++# 1. Upgrade banner — main.js asks raw.githubusercontent.com for the latest
+ #    release and renders a banner when it is newer than the running version.
+ #
+ #    L5, and the weakest link here: a literal string replace against a minified
+@@ -75,27 +41,12 @@
+ fi
+ 
+ # ---------------------------------------------------------------------------
+-# 3. Resolve the SAML gateway and start nginx with the Gentian config.
+-#
+-#    Prefer an explicit host from values (gentian.sso.host). The fallback reads
+-#    the Docker-link-style service env var, which Kubernetes only injects when
+-#    the Service already existed at pod creation — an ordering trap on cold
+-#    start. Setting gentian.sso.host in the profile avoids it entirely.
++# 2. Start nginx with the Gentian config. It serves the sign-in shim to every
++#    page (files/sign-in.js); nothing of the app's own pages is rewritten here.
+ # ---------------------------------------------------------------------------
+ cp "$NGINX_CONF_SRC" "$NGINX_CONF"
+ 
+-SSO_IP="${GENTIAN_SSO_HOST:-}"
+-if [ -z "$SSO_IP" ]; then
+-    SSO_IP=$(env | grep "_SSO_SAML_SERVICE_HOST=" | cut -d= -f2 | head -n 1)
+-fi
+-if [ -z "$SSO_IP" ]; then
+-    echo "FATAL: no SAML gateway host. Set gentian.sso.host, or ensure the" >&2
+-    echo "       sso-saml Service exists before this pod starts." >&2
+-    exit 1
+-fi
+-sed -i "s/SSO_IP_PLACEHOLDER/${SSO_IP}/g" "$NGINX_CONF"
+-
+ nginx -c "$NGINX_CONF" -g "daemon off;" &
+ 
+-# 4. Backend server (exec so signals reach it).
++# 3. Backend server (exec so signals reach it).
+ exec node --enable-source-maps /usr/src/app/dist/packages/server/api/main.js
+--- a/files/nginx.conf
++++ b/files/nginx.conf
+@@ -20,11 +20,6 @@
+         ~*^bg bg;
+     }
+ 
+-    map $arg_token $auth_cookie {
+-        default "";
+-        ~.+ "ap_logged_in=true; Path=/; Secure; SameSite=Lax";
+-    }
+-
+     server_tokens off;
+ 
+     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+@@ -36,18 +31,21 @@
+         root /usr/share/nginx/html;
+         index index.html;
+ 
+-        add_header Set-Cookie $auth_cookie always;
+-
+-        # Server-level cookie auth check (safe from try_files side effects)
+-        set $should_redirect "no";
+-        if ($request_uri ~* "^/(fr|de|it|pt|nl|ja|es|zh|vi|id|hu|uk|bg)?/?($|flows|connections|sign-in|sign-up|redirect)") {
+-            set $should_redirect "yes";
+-        }
+-        if ($http_cookie ~* "ap_token=") {
+-            set $should_redirect "no";
+-        }
+-        if ($should_redirect = "yes") {
+-            return 302 https://$host/api/v1/authn/saml/login;
++        # Sign-in. Activepieces keeps its session in the browser's localStorage
++        # and shows its own sign-in form when there is none. Nobody has a
++        # password here: the platform's sign-in sidecar makes the session, at
++        # /sso/login, which the platform routes and this nginx never sees. A
++        # page load of /sign-in is redirected at the platform's edge. What the
++        # edge cannot see is the page's own script moving to /sign-in without a
++        # request, so every page is served with the shim that sends a browser
++        # with no session, or one that has run out, to /sso/login.
++        sub_filter '<head>' '<head><script src="/gentian/sign-in.js"></script>';
++        sub_filter_once on;
++
++        location = /gentian/sign-in.js {
++            alias /etc/activepieces/sign-in.js;
++            default_type application/javascript;
++            add_header Cache-Control "no-cache" always;
+         }
+ 
+         error_page 404 /404.html;
+@@ -75,22 +73,6 @@
+             add_header Access-Control-Allow-Origin *;
+         }
+ 
+-        location = /api/v1/authn/saml/login {
+-            proxy_pass http://SSO_IP_PLACEHOLDER:8081/sso/login;
+-            proxy_set_header Host $host;
+-            proxy_set_header X-Real-IP $remote_addr;
+-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+-            proxy_set_header X-Forwarded-Proto https;
+-        }
+-
+-        location = /api/v1/authn/saml/acs {
+-            proxy_pass http://SSO_IP_PLACEHOLDER:8081/sso/acs;
+-            proxy_set_header Host $host;
+-            proxy_set_header X-Real-IP $remote_addr;
+-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+-            proxy_set_header X-Forwarded-Proto https;
+-        }
+-
+         location /api/ {
+             proxy_pass http://localhost:3000/;
+             proxy_http_version 1.1;
+@@ -113,14 +95,6 @@
+             try_files $uri $uri/ /index.html?$args;
+         }
+ 
+-        location = /sign-in {
+-            return 302 https://$host/api/v1/authn/saml/login;
+-        }
+-
+-        location = /sign-up {
+-            return 302 https://$host/api/v1/authn/saml/login;
+-        }
+-
+         location /redirect {
+             root /usr/share/nginx/html/en;
+             try_files $uri $uri/ /index.html?$args;
+--- /dev/null
++++ b/files/sign-in.js
+@@ -0,0 +1,50 @@
++// Served to every page of Activepieces by files/nginx.conf.
++//
++// Activepieces' page keeps its session in localStorage ("token") and moves to
++// its own sign-in form when it finds none or finds it run out. Nobody has a
++// password to type there. This sends the browser to the platform's sign-in
++// instead, which is silent for a person signed in at the platform:
++//   - when a page loads with no token, or with one that has run out;
++//   - when the page's own script is about to show /sign-in or /sign-up;
++//   - when the token runs out while the page is open.
++(function () {
++  var login = '/sso/login';
++  function over(token) {
++    try {
++      var body = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
++      var claims = JSON.parse(atob(body));
++      return !claims.exp || claims.exp * 1000 <= Date.now();
++    } catch (e) {
++      return true;
++    }
++  }
++  function signedIn() {
++    var token = window.localStorage.getItem('token');
++    return !!token && !over(token);
++  }
++  function go() {
++    window.localStorage.removeItem('token');
++    window.localStorage.removeItem('currentUser');
++    window.location.replace(login);
++  }
++  if (!signedIn()) {
++    go();
++    return;
++  }
++  function leaving(url) {
++    return /(^|\/)sign-(in|up)([/?#]|$)/.test(String(url || ''));
++  }
++  ['pushState', 'replaceState'].forEach(function (name) {
++    var original = window.history[name];
++    window.history[name] = function (state, title, url) {
++      if (leaving(url)) {
++        go();
++        return;
++      }
++      return original.apply(this, arguments);
++    };
++  });
++  window.setInterval(function () {
++    if (!signedIn()) go();
++  }, 30000);
++})();
+--- a/templates/nginx-config.yaml
++++ b/templates/nginx-config.yaml
+@@ -16,4 +16,6 @@
+ {{ .Files.Get "files/nginx.conf" | indent 4 }}
+   entrypoint.sh: |
+ {{ .Files.Get "files/entrypoint.sh" | indent 4 }}
++  sign-in.js: |
++{{ .Files.Get "files/sign-in.js" | indent 4 }}
+ {{- end }}
+--- a/templates/_podSpec.tpl
++++ b/templates/_podSpec.tpl
+@@ -111,10 +111,6 @@
+                 key: apiKey
+           {{- end }}
+           {{- if .Values.gentian.enabled }}
+-          - name: GENTIAN_SSO_HOST
+-            value: {{ .Values.gentian.sso.host | quote }}
+-          - name: GENTIAN_INJECT_SESSION_SCRIPT
+-            value: {{ .Values.gentian.startup.injectSessionScript | quote }}
+           - name: GENTIAN_DISABLE_UPGRADE_BANNER
+             value: {{ .Values.gentian.startup.disableUpgradeBanner | quote }}
+           {{- end }}
+--- a/values.yaml
++++ b/values.yaml
+@@ -737,18 +737,7 @@
+   ##
+   enabled: false
+ 
+-  sso:
+-    ## @param gentian.sso.host Host or ClusterIP of the gentian-sidecar-sso-saml Service.
+-    ## Empty falls back to discovering `*_SSO_SAML_SERVICE_HOST`, which Kubernetes only
+-    ## injects when that Service predates the pod — set this explicitly to avoid the
+-    ## cold-start ordering trap. Port is fixed at 8081 by the sidecar chart.
+-    ##
+-    host: ""
+-
+   startup:
+-    ## @param gentian.startup.injectSessionScript Inject the session-restore <script> into index.html (L5 — see files/entrypoint.sh)
+-    ##
+-    injectSessionScript: true
+     ## @param gentian.startup.disableUpgradeBanner Patch main.js to suppress the upgrade banner (L5 — replaceable by an egress rule)
+     ##
+     disableUpgradeBanner: true

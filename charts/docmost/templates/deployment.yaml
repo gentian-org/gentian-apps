@@ -16,21 +16,9 @@ spec:
         {{- if .Values.podLabels }}
         {{- toYaml .Values.podLabels | nindent 8 }}
         {{- end }}
-      {{- if or .Values.bridge.enabled .Values.podAnnotations }}
+      {{- if .Values.podAnnotations }}
       annotations:
-        {{- if .Values.bridge.enabled }}
-        # bridge.js is read once by node at process start, so updating the
-        # ConfigMap alone changes the file on disk and leaves the old code
-        # running -- the pod is never restarted and nobody re-reads it. A fix
-        # shipped this way appears deployed (Release updated, mounted file
-        # current) while the process still executes the previous version.
-        # Rolling on the ConfigMap's checksum is what makes an edit take
-        # effect, the same guard gentian-sidecar-sso-saml uses for its handler.
-        checksum/bridge: {{ include (print $.Template.BasePath "/configmap-bridge.yaml") . | sha256sum }}
-        {{- end }}
-        {{- if .Values.podAnnotations }}
         {{- toYaml .Values.podAnnotations | nindent 8 }}
-        {{- end }}
       {{- end }}
     spec:
       securityContext:
@@ -58,7 +46,7 @@ spec:
             # is assembled here from the pieces valueMapping.database delivers.
             # Assumes an alphanumeric generated password (no URL-reserved chars) —
             # consistent with how generated secrets are produced elsewhere in this
-            # catalogue (e.g. the openproject-ce portal-bridge password).
+            # catalogue.
             - name: DATABASE_URL
               value: >-
                 postgresql://{{ .Values.database.user }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}
@@ -177,63 +165,6 @@ spec:
           resources:
             {{- toYaml .Values.redis.resources | nindent 12 }}
         {{- end }}
-        {{- if .Values.bridge.enabled }}
-        # Same-pod companion: holds the SSO bridge's admin credentials and
-        # HMAC secret as plain literal env vars (proven-safe delivery — same
-        # mechanism as APP_SECRET above), and talks to the "docmost"
-        # container next to it over localhost. The gentian-sidecar-sso-saml
-        # sidecar (a *separate* Helm release/pod — see
-        # profiles/docmost/docmost-ce/profile.yaml) only ever calls this
-        # container's /ensure-session over the Service below; it never
-        # touches a Docmost secret itself, sidestepping the envFrom
-        # C_IDENTIFIER problem entirely rather than working around it.
-        - name: bridge
-          # Runs the *app* image rather than a bare node image: the credential
-          # re-sync in bridge.js needs bcrypt and postgres, and Docmost already
-          # ships both. Reusing the image also means no second pull. The script
-          # is mounted at /bridge, not /app, because /app is the application
-          # itself and mounting over it would hide those very modules --
-          # NODE_PATH is what lets a script outside /app still resolve them.
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.bridge.image.pullPolicy }}
-          securityContext:
-            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-          command: ["node", "/bridge/bridge.js"]
-          ports:
-            - name: bridge
-              containerPort: {{ .Values.bridge.port }}
-          env:
-            # Lets a script outside /app resolve the app image's node_modules.
-            - name: NODE_PATH
-              value: "/app/node_modules"
-            - name: PORT
-              value: {{ .Values.bridge.port | quote }}
-            - name: DOCMOST_URL
-              value: "http://localhost:{{ .Values.port }}"
-            - name: ADMIN_EMAIL
-              value: {{ .Values.adminUser.email | quote }}
-            - name: ADMIN_NAME
-              value: {{ .Values.adminUser.name | quote }}
-            - name: ADMIN_PASSWORD
-              value: {{ .Values.adminUser.password | quote }}
-            - name: BRIDGE_SECRET
-              value: {{ .Values.bridge.secret | quote }}
-            - name: WORKSPACE_NAME
-              value: {{ .Values.adminUser.workspaceName | quote }}
-            - name: TENANT_SPACE_NAME
-              value: {{ .Values.tenantSpace.name | default .Values.adminUser.workspaceName | quote }}
-            # Same connection string the app uses; only ever read to re-sync
-            # the bridge's own admin credential — see bridge.js.
-            - name: DATABASE_URL
-              value: >-
-                postgresql://{{ .Values.database.user }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}
-          volumeMounts:
-            - name: bridge-script
-              mountPath: /bridge
-              readOnly: true
-          resources:
-            {{- toYaml .Values.bridge.resources | nindent 12 }}
-        {{- end }}
       volumes:
         - name: data
           {{- if .Values.persistence.enabled }}
@@ -244,8 +175,3 @@ spec:
           {{- end }}
         - name: tmp
           emptyDir: {}
-        {{- if .Values.bridge.enabled }}
-        - name: bridge-script
-          configMap:
-            name: {{ include "docmost.fullname" . }}-bridge
-        {{- end }}

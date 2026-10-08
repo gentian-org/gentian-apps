@@ -583,20 +583,57 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/gentian-sidecar-git-modules:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/gentian-sidecar-git-modules:${{ github.sha }}
 
+  # The platform's sign-in sidecar. Its tests are what say that it refuses
+  # an answer it should refuse, so the image is not built from a tree in
+  # which they fail.
+  test-sso-saml-sidecar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: images/gentian-sidecar-sso-saml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm test
+
+  # The same sidecar against the real things: Keycloak, and the apps of this
+  # catalogue that are signed in to through it, each at the version its chart
+  # pins and with its profile's own handler. Not a gate of the image build: it
+  # pulls large images from registries this repository does not run.
+  e2e-sso-saml-sidecar:
+    needs: [test-sso-saml-sidecar]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Sign in through the sidecar, end to end
+        run: images/gentian-sidecar-sso-saml/e2e/run.sh sidecar
+
   build-sso-saml-sidecar-image:
-    needs: [release-gate]
+    needs: [release-gate, test-sso-saml-sidecar]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
+      - name: Read the sidecar's version
+        id: version
+        run: echo "version=$(node -p "require('./images/gentian-sidecar-sso-saml/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: Build and push image
         uses: ./.github/actions/image
         with:
           dir: images/gentian-sidecar-sso-saml
           publish: ${{ needs.release-gate.outputs.publish }}
           develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
+          # No "latest": the platform names the build it runs, and a name that
+          # moves is not one it could name.
           refs: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:${{ github.sha }}

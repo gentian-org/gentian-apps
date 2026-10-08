@@ -22,11 +22,24 @@ they are not committed either, for the same reason.
 | 0002 volumes/volumeMounts indentation | upstream bug | not-yet |
 | 0003 Redis username read from a nonexistent secret key | upstream bug | not-yet |
 | 0004 `extraEnvVars` / `extraVolumes` / `command` / `hostAliases` | Gentian extension points | no |
-| 0005 nginx ConfigMap for portal SSO | Gentian integration glue | not-needed |
+| 0005 nginx ConfigMap fronting the app | Gentian integration glue | not-needed |
+| 0006 mount the Gentian runtime, own the entrypoint | Gentian integration glue | not-needed |
+| 0007 `extraContainers` / `extraInitContainers` | Gentian extension points | no |
+| 0008 leave the sign-in routes to the platform; serve the sign-in shim | Gentian integration glue | not-needed |
 
 0001–0003 are genuine upstream defects and should be offered upstream; the
-`Forwarded:` header in each patch is the tracking record. 0004–0005 are
+`Forwarded:` header in each patch is the tracking record. 0004–0008 are
 Gentian-specific and are expected to stay.
+
+## A patch is a diff, and its numbers count
+
+A hunk header states how many lines follow (`@@ -0,0 +1,155 @@`), and `patch` applies
+that many and stops. Lines added to a patch by hand without correcting the header are
+dropped without an error: 0005 lost the end of `files/nginx.conf` that way, and nginx
+did not start in any chart built from it (0.3.26 and 0.3.27). Change the tree and
+regenerate the patch (`diff -ruN`), or count; then run the app's end-to-end test
+(`images/gentian-sidecar-sso-saml/e2e/activepieces.e2e.js`), which starts the real
+container with the chart's own files.
 
 ## Rules
 
