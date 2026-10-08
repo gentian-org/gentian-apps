@@ -1,0 +1,99 @@
+# Customization record — see gentian-os/docs/app-customization.md §5
+#
+# Covers the sign-in handler (assets/sign-in-handler.js): the code the
+# platform's sign-in sidecar runs to make an OpenProject session for a person.
+apiVersion: gentianos.io/v1alpha1
+kind: Customization
+metadata:
+  # Named after the profile it travels with. No namespace: a companion in a
+  # profile bundle states none, and the cluster puts it where its catalogue
+  # is applied.
+  name: openproject-ce.sign-in-sidecar
+  labels:
+    gentianos.io/profile-name: openproject-ce
+spec:
+  summary: "Sign people in to OpenProject through the platform's sign-in sidecar, with no password"
+
+  target:
+    family: openproject
+    profile: openproject-ce
+    appVersion: "16.6.10"
+    chartVersion: "12.0.0"
+
+  rung: L2
+  scope: profile
+
+  rungJustification:
+    L0: >-
+      OpenProject's community edition has no setting that takes a person from an
+      identity provider: OIDC and SAML are refused without a token of the paid
+      edition (modules/auth_plugins/lib/open_project/plugins/auth_plugin.rb). Its
+      sign-in from a proxy's header (OPENPROJECT_AUTH__SOURCE__SSO) only finds
+      people of an LDAP directory (app/controllers/concerns/auth_source_sso.rb
+      asks LdapAuthSource.find_user and nobody else), and the platform has none.
+    L1: >-
+      The branding drop-in is the only one, and it carries static files.
+
+  upstreamFirst:
+    attempted: true
+    forwarded: not-needed
+    reason: >-
+      Single sign-on is what upstream sells. A sign-in that goes around it is not
+      something to offer them; the tenant that wants OpenProject's own single
+      sign-on buys the edition that has it and a profile for that edition declares
+      identity.oidc.
+
+  artifacts:
+    - repo: gentian-org/gentian-apps
+      path: profiles/openproject/openproject-ce/assets/sign-in-handler.js
+      version: "1.0.0"
+    - repo: gentian-org/gentian-apps
+      path: images/gentian-sidecar-sso-saml
+      version: "0.2.0"
+
+  origin:
+    authorship: gentian
+    repoOwnership: gentian
+    reviewedBy: platform-team
+    supportContract: none
+
+  owner: platform-team
+  created: 2026-10-09
+  reviewBy: 2027-01-09
+  exitCriteria: >-
+    Gone when OpenProject can sign people in by a standard the platform serves in
+    the edition installed. Until then, on every OpenProject upgrade: run
+    images/gentian-sidecar-sso-saml/e2e/openproject.e2e.js against the new image
+    before the profile's image tag moves. It fails if the stay-signed-in token, the
+    way its value is hashed, the session table, the link between the two, the
+    interface that makes an account, or the setting that switches password sign-in
+    off have changed. The question under licensing is to be answered before this
+    record's review date, not at it.
+  upgradeRisk: high
+  testedAgainst: ["16.6.10"]
+
+  security:
+    macWaivers: []
+    newEgress: []
+    handlesPersonalData: true
+
+  licensing:
+    effect: none
+    notes: >-
+      OpenProject runs its community edition, unmodified. No enterprise token is
+      set or seeded, no check for one is touched, nothing of the OIDC, SAML or SCIM
+      modules is configured, and no file of OpenProject is patched. The handler uses
+      what the free edition has for everybody: an account, made through its own
+      APIv3 as the service account the profile configures (global basic auth); the
+      setting that switches password sign-in off (disable_password_login); and the
+      "stay signed in" token, which OpenProject itself turns into a session. OPEN,
+      for the owner. Three things are written to OpenProject's database instead of
+      through its interface: the token's row (and afterwards its stored value, so
+      that it works once); the removal of the password hash the interface demands
+      for a new account; and the status of an account somebody invited, when the
+      invited person first arrives. None of them is a paid feature. But the result —
+      a person signed in at an identity provider is in OpenProject without typing
+      anything — is what the paid edition sells as single sign-on, reached here
+      without it. OpenProject's code is under the GPL, version 3, which does not
+      restrict how the program is run; whether the vendor accepts this use of the
+      community edition is a judgement this record does not make.

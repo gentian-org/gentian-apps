@@ -158,7 +158,8 @@ function decodeHtml(s) {
 //                  headers of the person signed in at the front door;
 //   <ACS path>     POST only, no session: reaches the sidecar with no
 //                  identity header, whatever the browser sent;
-//   entry paths    redirected to the login path;
+//   entry paths    a page load (GET) is redirected to the login path; any
+//                  other method reaches the app;
 //   denied paths   refused;
 //   anything else  behind the session: reaches the app with the identity
 //                  headers, and without the front door's own cookies.
@@ -189,7 +190,7 @@ function frontDoor({ door, sidecar, app, entryPaths = [], denyPaths = [], realm 
             return { respond: { status: 403, headers: {}, body: 'path is not published' } };
         }
         if (req.pathname === '/sso/login') return { upstream: sidecar, headers: identity() };
-        if (entryPaths.includes(req.pathname)) {
+        if (req.method === 'GET' && entryPaths.includes(req.pathname)) {
             return { respond: { status: 302, headers: { location: '/sso/login' } } };
         }
         if (!app) return { respond: { status: 200, headers: {}, body: 'the app' } };

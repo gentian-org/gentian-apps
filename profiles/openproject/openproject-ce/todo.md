@@ -1,7 +1,7 @@
 # OpenProject community profile — follow-ups
 
 - [ ] E2E: port `e2e-tests/tests/test_openproject-ce*.py` to use `openproject-ce` profile name
-- [ ] Verify `openproject-ce/openproject-ce:16-slim` OIDC claim mapping vs `open_desk` image
 - [ ] Optional Nextcloud WebDAV integration binding on demo tenant
-- [ ] App administrator provisioner (privileged in-app role) when operator supports OpenProject OCS/API
-- [ ] First deploy: verify object storage still works after the S3 contract change (gentian-apps `ca59db0`). Endpoint, bucket, region and access key now arrive through `valueMapping.s3` instead of being literals, and `s3.host` — previously set to the same value as `s3.endpoint` — is no longer set at all, because only one endpoint key can be mapped. The upstream chart is third-party, so whether it reads `host` as well as `endpoint` is unverified. If it does, raise it upstream rather than substituting a hostname back in here. See the comment beside `s3:` in `profile.yaml`.
+- [ ] An administrator at install time. Nobody administers a new OpenProject until somebody is made one through APIv3 as the service account (`customization.md`, "Who administers OpenProject"); the platform has no way yet to name that person when the app is installed.
+- [ ] First deploy: confirm on a cluster what the end-to-end run shows in docker — the seeder and the web pod reach the platform's object store through `valueMapping.s3` alone (endpoint as a URL, path style, no `s3.host`).
+- [ ] The chart's collaboration server (`hocuspocus`, on by default in chart 12) is deployed and not routed: `/hocuspocus` leads to the web pod. Route it or switch it off.

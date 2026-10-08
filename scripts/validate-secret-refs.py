@@ -49,8 +49,8 @@ def check_gateway_backends(path: pathlib.Path, doc: dict) -> list[str]:
     Only profiles on app-default are checked. There the stable API alias name is
     fixed as `<profile>-api`, and the only other alias is spec.ingress.serviceName,
     which the composition creates verbatim. A profile with its own compositionRef
-    defines its own Service names — openproject-ce creates `openproject-portal-bridge`
-    literally — so guessing at those would produce false positives.
+    defines its own Service names, so guessing at those would produce false
+    positives.
 
     app-default also emits a stable ClusterIP alias for any sidecar declaring
     `stableServiceName` (see its "Emit sidecars" step), which is the only way to
@@ -94,9 +94,7 @@ def check_gateway_backends(path: pathlib.Path, doc: dict) -> list[str]:
         allowed.add(spec["ingress"]["serviceName"])
 
     # A profile with its own composition creates its own Services, and only
-    # that composition knows their names. openproject-ce is the case: it emits
-    # a Deployment and a Service for the portal bridge, and its two gateway
-    # backends point at that Service.
+    # that composition knows their names.
     #
     # Scanned rather than skipped. Skipping is what spec.compositionRef did,
     # and it turned the whole check off for the three profiles most likely to

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # The end-to-end runs: the sidecar built from this directory against Keycloak
-# 26.8.0, and against Docmost and Activepieces at the versions the catalogue
-# pins, each with its profile's own handler. Needs docker, node and helm.
+# 26.8.0, and against Docmost, Activepieces and OpenProject at the versions the
+# catalogue pins, each with its profile's own handler. Needs docker, node and
+# helm.
 #
 #   e2e/run.sh                 everything
-#   e2e/run.sh docmost         one of: sidecar, docmost, activepieces
+#   e2e/run.sh docmost         one of: sidecar, docmost, activepieces, openproject
 #
 # Every container it starts is removed again; E2E_KEEP=1 leaves them to look at.
 set -euo pipefail
@@ -14,7 +15,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 docker build -q -t "${E2E_SIDECAR_IMAGE:-sso-sidecar:e2e}" . >/dev/null
 
 runs=("$@")
-[ ${#runs[@]} -gt 0 ] || runs=(sidecar docmost activepieces)
+[ ${#runs[@]} -gt 0 ] || runs=(sidecar docmost activepieces openproject)
 status=0
 for run in "${runs[@]}"; do
     echo "=== ${run} ==="

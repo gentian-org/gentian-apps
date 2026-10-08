@@ -117,9 +117,12 @@ reaches nothing but what was declared.
 - log who signed in. `ctx.log` is for what happened, not to whom;
 - touch a licence check or a switch of a paid feature in the app.
 
-The two handlers in this catalogue are the reference:
+The handlers in this catalogue are the reference:
 `profiles/docmost/docmost-ce/assets/sign-in-handler.js` and
-`profiles/activepieces/activepieces-me/assets/sign-in-handler.js`.
+`profiles/activepieces/activepieces-me/assets/sign-in-handler.js`, which sign a session token
+with the app's own key, and `profiles/openproject/openproject-ce/assets/sign-in-handler.js`, for
+an app that keeps its sessions in its database: it signs nothing, and has the app make the
+session itself from a token that works once.
 
 ## Tests
 
@@ -130,6 +133,7 @@ docker build -t sso-sidecar:e2e .  # then, with docker, against the real things:
 node --test e2e/sidecar.e2e.js       # Keycloak 26.8.0, at the three kinds of address an app has
 node --test e2e/docmost.e2e.js       # + Docmost 0.95.0, with the profile's handler
 node --test e2e/activepieces.e2e.js  # + Activepieces 0.28.0, started as the chart starts it
+node --test e2e/openproject.e2e.js   # + OpenProject 16.6.10, started as its chart starts it with the profile's values
 ```
 
 The end-to-end runs start their own containers and remove them. The browser and the front door

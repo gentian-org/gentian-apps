@@ -1,54 +1,42 @@
-# ComponentProfile — OpenProject (per-tenant project management)
+# ComponentProfile — OpenProject, community edition (per-tenant project management)
 #
-# Source chart: https://charts.openproject-ce.org/ openproject-ce v12.0.0+
-#   Chart >= 12 applies commonLabels to pod templates (required for MAC kernel-access).
-#   Community-maintained chart; docker.io/openproject-ce/openproject-ce app image.
-#
-# For the OpenDesk supplier mirror (opencode registry), use profile `od-openproject`
-# in gentian-pro.
+# Source chart: https://charts.openproject.org/ openproject 12.0.0
+#   The chart puts commonLabels on its pods and takes no podLabels, so the
+#   platform's two labels are set as commonLabels below.
+#   Image: docker.io/openproject/openproject, one fixed version.
 #
 # Secret inventory:
-#   Kernel-provided:
-#     oidc_client_secret  → openproject-ce.oidc.secret
+#   Platform-provided:
 #     pg_*                → postgresql.auth.password / connection.*
 #     s3_secret_key       → s3.auth.secretAccessKey
 #     smtp_password       → environment.OPENPROJECT_SMTP__PASSWORD
-#   App-internal (2) → appSecrets:
-#     admin_password      → openproject-ce.admin_user.password
+#   App-internal (3) → secrets.generated:
+#     admin_password      → openproject.admin_user.password
 #     api_admin_password  → environment.OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_PASSWORD
+#     secret_key_base     → environment.SECRET_KEY_BASE
 #
-# Portal WinBox SSO uses the openproject-bridge (ticket + form login) and does not
-# require an OpenProject Enterprise token. Optional EE token still enables Keycloak
-# SSO redirect for new-tab / direct login when OPENPROJECT_ENTERPRISE_TOKEN is set
-# in install.secrets.env via gentian-kernel-services.
+# Sign-in: OpenProject's own single sign-on (OIDC, SAML) is part of its paid
+# edition and is not configured here. People are signed in by the platform's
+# sign-in sidecar with the handler in assets/sign-in-handler.js; see
+# customizations/sign-in-sidecar.yaml and customization.md.
 apiVersion: gentianos.io/v1alpha1
 kind: ComponentProfile
 metadata:
   name: openproject-ce
   labels:
     gentianos.io/profile-name: openproject-ce
-  annotations:
-    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/gentian-portal-bridge","serviceName":"openproject-portal-bridge","port":8080},{"pathPrefix":"/openproject-portal-sso.html","serviceName":"openproject-portal-bridge","port":8080}]'
-    gentianos.io/portal-auth-mode: openproject-bridge
 spec:
   classes:
     - app
   trustTier: certified
   version: "1.0.0"
   package:
-    # The Composition that renders this chart AND the objects that have to
-    # exist beside it. A chart and a composition are the one legal pair in
-    # the package union: the chart is what is installed, the composition is
-    # what else is created.
-    composition: app-openproject-ce
     chart:
-      repository: "https://charts.openproject-ce.org/"
-      name: openproject-ce
+      repository: "https://charts.openproject.org/"
+      name: openproject
       version: "12.0.0"
 
     valueMapping:
-      oidc:
-        clientSecretKey: "openproject-ce.oidc.secret"
       database:
         hostKey: "postgresql.connection.host"
         portKey: "postgresql.connection.port"
@@ -68,19 +56,21 @@ spec:
         passwordKey: "environment.OPENPROJECT_SMTP__PASSWORD"
 
     extraValues:
-      global:
-        domain: "${KERNEL_DOMAIN}"
-        hosts:
-          openproject-ce: "projects.${TENANT_DOMAIN}"
-          keycloak: "id"
-          nubus: "portal"
-
       fullnameOverride: "openproject-ce"
+
+      # The chart labels its pods with commonLabels and with nothing else.
+      # These two are how the platform finds an app's pods: its network paths
+      # to the database, and the sign-in sidecar's path to the app.
+      commonLabels:
+        gentianos.io/app: "${APP_ID}"
+        gentianos.io/tenant: "${TENANT_ID}"
 
       image:
         registry: "docker.io"
-        repository: "openproject-ce/openproject-ce"
-        tag: "16-slim"
+        repository: "openproject/openproject"
+        # One version, not the moving 16-slim: the sign-in handler was run
+        # against exactly this one (customizations/sign-in-sidecar.yaml).
+        tag: "16.6.10-slim"
         imagePullPolicy: "IfNotPresent"
 
       dbInit:
@@ -105,13 +95,11 @@ spec:
         enableSignatureV4Streaming: false
       # endpoint, bucketName, region and auth.accessKeyId are supplied by the
       # platform through valueMapping.s3 — this app does not name a bucket or
-      # an object store.
-      #
-      # s3.host was previously set to the same value as s3.endpoint. Only one
-      # endpoint key can be mapped, and the upstream chart is third-party, so
-      # whether it reads host as well as endpoint is unverified — check on the
-      # first deploy, and if it is required, raise it upstream rather than
-      # substituting a hostname back in here.
+      # an object store. The endpoint is all the chart needs: s3.host is not
+      # set, and OpenProject's seeder, which writes the demo project's
+      # pictures to the bucket and fails without one, runs against the
+      # platform's object store with these values
+      # (images/gentian-sidecar-sso-saml/e2e/openproject.e2e.js).
 
       persistence:
         enabled: false
@@ -161,11 +149,11 @@ spec:
       podAnnotations:
         secret.reloader.stakater.com/reload: openproject-ce-sensitive-values
 
+      # The seeder is an ordinary Job of the release, as the chart has it, and
+      # not a post-install hook: the platform's composition waits for the
+      # release's pods, the web pod waits for the database the seeder makes,
+      # and Helm runs a post-install hook only after that wait is over.
       seederJob:
-        annotations:
-          helm.sh/hook: post-install
-          helm.sh/hook-weight: "5"
-          helm.sh/hook-delete-policy: hook-succeeded,before-hook-creation
         resources:
           limits:
             cpu: "250m"
@@ -177,27 +165,19 @@ spec:
       serviceAccount:
         create: true
 
-      openproject-ce:
+      openproject:
         seed_locale: "de"
         host: "projects.${TENANT_DOMAIN}"
+        # The administrator OpenProject seeds on first start. Locked: nobody
+        # signs in with a password here, and the sign-in sidecar signs nobody
+        # in to a locked account, so no person at the platform becomes this
+        # administrator by holding its address. Who administers OpenProject
+        # is in customization.md.
         admin_user:
           name: "OpenProject Internal Admin"
           mail: "openproject-admin@${TENANT_DOMAIN}"
           password_reset: "false"
-          locked: false
-        oidc:
-          enabled: true
-          authorizationEndpoint: "/realms/${TENANT_ID}/protocol/openid-connect/auth"
-          endSessionEndpoint: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/logout"
-          host: "id.${KERNEL_DOMAIN}"
-          identifier: "gentian-openproject"
-          provider: "keycloak"
-          scope: "[openid,gentian-openproject-scope]"
-          tokenEndpoint: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/token"
-          userinfoEndpoint: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/userinfo"
-          attribute_map:
-            login: "gentian_username"
-            admin: "openproject-ce_admin"
+          locked: true
         useTmpVolumes: true
 
       ingress:
@@ -205,11 +185,17 @@ spec:
 
       environment:
         OPENPROJECT_LOGIN__REQUIRED: "true"
-        OPENPROJECT_OAUTH__ALLOW__REMAPPING__OF__EXISTING__USERS: "true"
+      # Nobody signs in to OpenProject with a password: its own form answers
+      # 404, and with it go registering and resetting a password. People come
+      # in through the platform's sign-in sidecar.
+        OPENPROJECT_DISABLE__PASSWORD__LOGIN: "true"
+      # OpenProject's "stay signed in" token is what the sign-in handler
+      # hands OpenProject to make a session; 0, the default, switches the
+      # token off. The number is its lifetime in days for a token OpenProject
+      # makes itself, which it does only from the password form that is off;
+      # the handler's own tokens end within the hour.
+        OPENPROJECT_AUTOLOGIN: "1"
         OPENPROJECT_EMAIL__DELIVERY__METHOD: "smtp"
-        OPENPROJECT_OPENID__CONNECT_KEYCLOAK_ISSUER: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}"
-        OPENPROJECT_OPENID__CONNECT_KEYCLOAK_POST__LOGOUT__REDIRECT__URI: "https://projects.${TENANT_DOMAIN}/"
-        OPENPROJECT_OPENID__CONNECT_KEYCLOAK_JWKS__URI: "https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/protocol/openid-connect/certs"
       # ADDRESS, PORT and USER__NAME are supplied by the platform through
       # valueMapping.smtp — this app does not name a mail server.
         OPENPROJECT_SMTP__SSL: "false"
@@ -221,9 +207,6 @@ spec:
         OPENPROJECT_MAIL__FROM: "noreply@${TENANT_DOMAIN}"
         OPENPROJECT_HOME__URL: "https://projects.${TENANT_DOMAIN}/"
         OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_USER: "api_admin"
-      # Portal bridge establishes sessions via password login; 2FA blocks cookie issuance.
-        OPENPROJECT_2FA_DISABLED: "true"
-        OPENPROJECT_2FA_ACTIVE__STRATEGIES: "[]"
         OPENPROJECT_LOG__LEVEL: "info"
         OPENPROJECT_APP__TITLE: "Projekte"
         OPENPROJECT_USER__DEFAULT__TIMEZONE: "Europe/Berlin"
@@ -234,15 +217,23 @@ spec:
   requires:
     services:
       identity:
-        oidc:
-          clientId: "gentian-openproject"
-          name: "OpenProject"
-          accessType: CONFIDENTIAL
-          redirectUris:
-            - "https://projects.${TENANT_DOMAIN}/auth/keycloak/callback"
-          postLogoutRedirectUris:
-            - "https://projects.${TENANT_DOMAIN}/"
-          backchannelLogoutUrl: "https://projects.${TENANT_DOMAIN}/auth/keycloak/backchannel-logout"
+      # OpenProject's own single sign-on needs its paid edition and is not
+      # used. Its people are signed in by the platform's sidecar, with the
+      # handler in assets/sign-in-handler.js. See
+      # customizations/sign-in-sidecar.yaml for the review.
+        sidecar:
+        # Where OpenProject sends a browser that has no session. Not "/",
+        # where the handler ends: OpenProject's front page stays its own.
+          entryPaths: ["/login"]
+        # The handler looks the person up and writes the one-time token
+        # OpenProject turns into a session.
+          database: true
+        # secret_key_base: OpenProject stores a token as a hash made with it.
+        # api_admin_password: OpenProject's own interface for making an
+        # account, called inside the cluster.
+          secrets: [secret_key_base, api_admin_password]
+        # That call, and the one that turns the token into a session.
+          appPort: 8080
       database:
         engine: postgresql
         databasePerTenant: true
@@ -271,15 +262,27 @@ spec:
   secrets:
     generated:
       - name: admin_password
-        valuePath: "openproject-ce.admin_user.password"
+        valuePath: "openproject.admin_user.password"
       - name: api_admin_password
         valuePath: "environment.OPENPROJECT_AUTHENTICATION_GLOBAL__BASIC__AUTH_PASSWORD"
+      # Rails' own key. The image ships a placeholder ("OVERWRITE_ME") and the
+      # chart sets none, so without this every install shares a public one.
+      - name: secret_key_base
+        valuePath: "environment.SECRET_KEY_BASE"
 
   expose:
     - name: web
       surface: gateway
       authMode: oidc
       subDomain: "projects"
+      # What is left of OpenProject's own ways in with a password, refused at
+      # the front door as well as switched off in OpenProject. Its form's own
+      # address, /login, is not here: it is where the sign-in begins, and
+      # OpenProject answers a password posted to it with 404.
+      denyPaths:
+        - /account/register
+        - /account/lost_password
+        - /account/change_password
       backend:
         service: "openproject-ce"
         port: 8080
@@ -309,7 +312,7 @@ spec:
       mechanism: openproject-plugin
       delivery: [image-layer]       # plugins resolve at build time
       apiStability: undocumented
-      apiDocs: https://www.openproject-ce.org/docs/development/
+      apiDocs: https://www.openproject.org/docs/development/
       perTenantAddons: false
       testMatrix: ["15"]
     publishes:

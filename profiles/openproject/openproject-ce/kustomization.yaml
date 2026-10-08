@@ -4,17 +4,16 @@ kind: Kustomization
 # (scripts/build-catalogue-source.py reads this file; docs/profile-bundles.md).
 resources:
   - profile.yaml
-  - composition.yaml
-  - oidc-catalog.yaml
+  - customizations/sign-in-sidecar.yaml
+# The handler of the platform's sign-in sidecar. It is part of the bundle, so
+# an install is pinned to it by the bundle's digest, and it is reviewed with
+# the profile. See customization.md.
 configMapGenerator:
-  # Read by this profile's composition, which finds it by its two labels.
-  # Named <profile>.<asset>, and without a namespace: a companion states none.
-  - name: openproject-ce.portal-bridge
+  - name: openproject-ce.sign-in-handler
     files:
-      - bridge.py=assets/portal_bridge.py
-      - openproject-portal-sso.html=assets/openproject-portal-sso.html
+      - handler.js=assets/sign-in-handler.js
 generatorOptions:
   disableNameSuffixHash: true
   labels:
     gentianos.io/profile-name: openproject-ce
-    gentianos.io/asset: portal-bridge
+    gentianos.io/asset: sign-in-handler

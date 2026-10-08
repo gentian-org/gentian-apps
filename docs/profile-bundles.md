@@ -39,17 +39,16 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - profile.yaml
-  - composition.yaml
-  - oidc-catalog.yaml
+  - customizations/sign-in-sidecar.yaml
 configMapGenerator:
-  - name: openproject-ce.portal-bridge
+  - name: openproject-ce.sign-in-handler
     files:
-      - bridge.py=assets/portal_bridge.py
+      - handler.js=assets/sign-in-handler.js
 generatorOptions:
   disableNameSuffixHash: true
   labels:
     gentianos.io/profile-name: openproject-ce
-    gentianos.io/asset: portal-bridge
+    gentianos.io/asset: sign-in-handler
 ```
 
 The file is read, not run: only `resources`, `configMapGenerator` (`name` and `files`) and

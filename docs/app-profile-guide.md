@@ -1577,7 +1577,7 @@ CLI to report Ready or inspect `kubectl get app <app> -n tenant-<tenant>`.
 
 ### 8e. An app that can do neither OIDC nor SAML — the sign-in sidecar
 
-Some apps have single sign-on only in a paid edition (Docmost, Activepieces). Declaring
+Some apps have single sign-on only in a paid edition (Docmost, Activepieces, OpenProject). Declaring
 `identity.oidc` for one does nothing, and working around the edition is forbidden (see "no
 licensing bypass" above). What the platform offers instead is its **sign-in sidecar**: a person
 who is signed in at the platform opens the app and is in, with no second sign-in and no password.
@@ -1622,7 +1622,13 @@ to, are in gentian-os, `docs/app-customization.md` ("The sign-in sidecar").
 
 What a handler is given, what it answers and what it must not do:
 [`images/gentian-sidecar-sso-saml/README.md`](../images/gentian-sidecar-sso-saml/README.md). The
-two in this catalogue are the reference.
+three in this catalogue are the reference. Docmost and Activepieces sign a session token with the
+app's own key; OpenProject keeps its sessions in its database, so its handler has OpenProject
+make the session itself from a one-time token and signs nothing.
+
+An entry path cannot also be under `denyPaths`: the front door refuses before it redirects, and
+it refuses a path for every method. Where an app's form posts to the address of its own page
+(OpenProject's `/login`), make the page the entry path and switch password sign-in off in the app.
 
 Before adding one:
 
@@ -1637,8 +1643,8 @@ Before adding one:
    sidecar says.
 4. **Refuse the app's own sign-in at the front door** (`denyPaths`) — above all a first-run or
    setup call that would hand the installation to whoever made it first.
-5. **Test against the real app** at the pinned version: add `e2e/<app>.e2e.js` beside the two that
-   exist, and run it again before the image tag moves.
+5. **Test against the real app** at the pinned version: add `e2e/<app>.e2e.js` beside the ones
+   that exist, and run it again before the image tag moves.
 
 ## 9. Secret rotation — Reloader annotation
 
@@ -1669,7 +1675,6 @@ which is then named `app-<profile>`:
 | Composition | When to use |
 |---|---|
 | *(omit)* | Standard apps — `app-default` is used automatically |
-| `app-openproject-ce` | OpenProject — custom composition in `profiles/openproject/openproject-ce/composition.yaml` |
 | `app-od-element` | Element (OpenDesk) — bundle in **gentian-pro** (proprietary catalogue) |
 | `app-od-ox` | OX App Suite — bundle in **gentian-pro** (proprietary catalogue) |
 
