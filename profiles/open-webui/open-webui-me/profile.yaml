@@ -18,8 +18,13 @@ metadata:
     # means "show without installing per tenant", which offered a tile pointing
     # at a host that resolves to nothing whenever spec.llm.enabled was off.
     gentianos.io/requires-capability: "llm"
-    # OpenWebUI needs network access to the platform-kernel namespace where LiteLLM resides
-    gentianos.io/kernel-egress-namespaces: platform-kernel,envoy-gateway-system
+    # The model gateway (LiteLLM) this app sends every completion to runs in
+    # system-llm. The platform hands the app that address and a key
+    # (llm-credentials-open-webui) but a profile has no requirement to declare
+    # for it, so nothing opens the path; this does. It is the one namespace
+    # named here: the edge and the identity provider are opened by
+    # requires.services.identity.
+    gentianos.io/kernel-egress-namespaces: system-llm
     gentianos.io/standard-image-pull-secrets: "true"
     # The portal opens this app hidden at desktop mount. The AI widget queries it
     # in the background, and a cold app answers with a login redirect instead of a
@@ -69,7 +74,7 @@ spec:
               name: open-webui-sensitive-values
               key: oidc-client-secret
         - name: OPENID_PROVIDER_URL
-          value: "http://gentian-idp-keycloak-keycloakx-http.platform-kernel.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
+          value: "http://gentian-idp-keycloak-keycloakx-http.kernel-authentication.svc.cluster.local:8080/auth/realms/${TENANT_ID}/.well-known/openid-configuration"
         - name: OAUTH_PROVIDER_NAME
           value: "Gentian SSO"
         - name: OAUTH_SCOPES
@@ -149,18 +154,18 @@ spec:
       # anyway.
         - name: OAUTH_ADMIN_ROLES
           value: "gentian:tenant:${TENANT_ID}:admins"
-    # The chart's own openai* values keys template literal env: entries,
-    # which win over extraEnvFrom's llm-credentials-open-webui Secret for
-    # the same names (chart's own docs: "extraEnvVars will take precedence
-    # over the value from extraEnvFrom") — without these, the chart's
-    # default openaiBaseApiUrl/openaiApiKey (real https://api.openai.com/v1
-    # + a placeholder key) silently win instead, and Open WebUI's model
-    # list request to that default times out reaching the public internet.
-    # extraEnvFrom stays wired for WEBUI_SECRET_KEY, which has no
-    # dedicated values key.
-      openaiBaseApiUrl: "http://litellm-proxy.platform-kernel.svc.cluster.local:4000/v1"
-      openaiApiKeyExistingSecret: "llm-credentials-open-webui"
-      openaiApiKeyExistingSecretKey: "OPENAI_API_KEY"
+    # Where the model gateway is and the key for it come from the Secret the
+    # platform writes for this app, llm-credentials-open-webui
+    # (OPENAI_API_BASE_URL, OPENAI_API_KEY), through extraEnvFrom below.
+    #
+    # The chart's own openaiBaseApiUrl templates a literal env: entry, and a
+    # literal wins over extraEnvFrom for the same name -- its default is
+    # https://api.openai.com/v1, which the model list request then times out
+    # trying to reach. Emptied, the chart emits neither OPENAI_API_BASE_URL nor
+    # OPENAI_API_KEY and the Secret's two are the only ones. The address used to
+    # be written here instead, and named the namespace the gateway ran in before
+    # the kernel was split up.
+      openaiBaseApiUrl: ""
       ingress:
         enabled: false
 
