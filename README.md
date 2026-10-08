@@ -4,10 +4,10 @@ App Store catalogue for Gentian OS — `AppProfile` CRs plus first-party app imp
 
 **This is the single source of truth for AppProfile catalogue metadata — OSS *and* commercial.**
 Commercial (OpenDesk-packaged) profiles live here too, marked `license: proprietary`; they
-render with a **Buy** button pointing at the Gentian organization's checkout (gentian-corp),
+render with a **Buy** button pointing at Aluvian's checkout,
 and the operator gates install on entitlement, not on catalogue visibility. The private
 chart/image artifacts those profiles reference come from
-[gentian-pro](https://github.com/gentian-org/gentian-pro), which does **not** sync its own
+[gentian-pro](https://github.com/aluvian-hq/gentian-pro), which does **not** sync its own
 catalogue — it's being migrated to hold only those artifacts.
 
 ## Structure
@@ -117,6 +117,6 @@ See [docs/custom-app-guide.md](docs/custom-app-guide.md).
 |------|---------|
 | [gentian-os](https://github.com/gentian-org/gentian-os) | Orchestrator, CRDs, kernel |
 | [gentian-deployments](https://github.com/gentian-org/gentian-deployments) | Per-environment tenant state |
-| [gentian-pro](https://github.com/gentian-org/gentian-pro) | Private chart/image artifacts for commercial (OpenDesk) profiles |
+| [gentian-pro](https://github.com/aluvian-hq/gentian-pro) | Private chart/image artifacts for commercial (OpenDesk) profiles |
 | [gentian-app-template](https://github.com/gentian-org/gentian-app-template) | Scaffold for new apps |
 | [gentian-ui](https://github.com/gentian-org/gentian-ui) | Portal shell |

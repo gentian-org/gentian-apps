@@ -89,7 +89,7 @@ doesn't own that code), and `spec.chart.repository` points at a **private** OCI
 registry host instead of `ghcr.io/gentian-org/charts`.
 
 This matches the target model already documented (but not yet executed) in
-`gentian-pro/README.md` and `gentian-corp/docs/architecture.md`:
+`gentian-pro/README.md` and `aluvian/docs/architecture.md`:
 
 - `gentian-apps/profiles/` stays the single source of truth for *all* catalogue
   metadata, free and commercial alike (commercial entries carry `license: proprietary`).
@@ -97,7 +97,7 @@ This matches the target model already documented (but not yet executed) in
   `chart.repository` coordinates reference — the `od-*` bundles currently living there
   in full (with `composition.yaml`) are a pending migration into `gentian-apps`, not the
   intended end state.
-- `gentian-corp` (+ `gentian-frontpage`) is the commercial/entitlement layer: Buy button
+- `aluvian` (+ `gentian-frontpage`) is the commercial/entitlement layer: Buy button
   → checkout → the operator verifies an install grant against it before pulling the
   private chart. Gating happens **at install time by the operator**, not by hiding
   catalogue metadata — pro/solid tiles stay visible in the Store, just locked until
