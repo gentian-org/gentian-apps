@@ -14,7 +14,7 @@ inputs:
     default: "false"
   pin-image-tag:
     description: >
-      Rewrite every `tag: "..."` in the chart's values.yaml to this value
+      Rewrite every `tag: ...` in the chart's values.yaml to this value
       before packaging, so the published chart names an immutable image
       instead of one that moves. A chart on a moving tag never rolls a
       Deployment by itself, and a node with the tag cached goes on serving an
@@ -23,8 +23,8 @@ inputs:
 
       ONLY for a chart whose every image this repository builds. It rewrites
       all of them, so a chart that also names an upstream image would have
-      that pinned to our git sha, which is worse than the problem. Pass
-      github.sha, not a branch name.
+      that pinned to our tag, which is worse than the problem. Pass a tag
+      that never moves (github.sha, develop-<sha7>), not a branch name.
     required: false
     default: ""
   branch-versions:
@@ -74,12 +74,12 @@ runs:
       run: |
         values="${{ inputs.dir }}/values.yaml"
         tag="${{ inputs.pin-image-tag }}"
-        before="$(grep -cE '^[[:space:]]*tag: "' "${values}")"
+        before="$(grep -cE '^[[:space:]]*tag: [^[:space:]#]' "${values}")"
         if [ "${before}" -lt 1 ]; then
           echo "::error::${values} names no image tag to pin; remove pin-image-tag or fix the chart" >&2
           exit 1
         fi
-        sed -i -E "s|^([[:space:]]*tag:) \".*\"$|\1 \"${tag}\"|" "${values}"
+        sed -i -E "s|^([[:space:]]*tag:) [^[:space:]#].*$|\1 \"${tag}\"|" "${values}"
         after="$(grep -cF "tag: \"${tag}\"" "${values}")"
         if [ "${before}" != "${after}" ]; then
           echo "::error::pinned ${after} of ${before} image tags in ${values}" >&2

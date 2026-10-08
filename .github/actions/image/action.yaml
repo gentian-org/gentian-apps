@@ -24,6 +24,15 @@ inputs:
       runner's own architecture only, which is all an amd64 image needs.
     required: false
     default: ""
+  develop-tag:
+    description: >
+      Set on a develop build, to `develop-<sha7>`. Every ref given is then
+      published under that one tag instead of its own: `refs` are the names a
+      RELEASE goes out under (a version, `latest`), and a build of the branch
+      work lands on must never write to one of them. Empty publishes `refs`
+      as given.
+    required: false
+    default: ""
   publish:
     description: '"true" pushes the image; anything else only builds it.'
     required: true
@@ -46,11 +55,31 @@ runs:
         username: ${{ github.actor }}
         password: ${{ github.token }}
 
+    - name: Refs
+      id: refs
+      shell: bash
+      env:
+        REFS: ${{ inputs.refs }}
+        DEVELOP_TAG: ${{ inputs.develop-tag }}
+      run: |
+        # A ref is <repository>:<tag>; the tag is what follows the last colon.
+        # On a develop build each repository keeps one ref, at the develop tag.
+        {
+          echo "refs<<__REFS__"
+          if [ -n "${DEVELOP_TAG}" ]; then
+            printf '%s\n' "${REFS}" | sed -E '/^[[:space:]]*$/d; s/^[[:space:]]+//; s/:[^:/]+[[:space:]]*$//' \
+              | sort -u | sed "s|\$|:${DEVELOP_TAG}|"
+          else
+            printf '%s\n' "${REFS}"
+          fi
+          echo "__REFS__"
+        } >> "$GITHUB_OUTPUT"
+
     - name: Build
       uses: docker/build-push-action@v6
       with:
         context: ${{ inputs.dir }}
-        tags: ${{ inputs.refs }}
+        tags: ${{ steps.refs.outputs.refs }}
         build-args: ${{ inputs.args }}
         platforms: ${{ inputs.platforms }}
         push: ${{ inputs.publish == 'true' }}

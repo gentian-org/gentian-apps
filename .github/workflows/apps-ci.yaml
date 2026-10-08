@@ -9,8 +9,9 @@ on:
   push:
     # Feature branches too, so a push is checked before a pull request exists.
     # Nothing here publishes from one: every image push and helm push is gated
-    # on the ref, not merely on "not a pull request" — a branch that pushed a
-    # chart version would overwrite a released one.
+    # on the ref, not merely on "not a pull request". main releases, under the
+    # names the files state; develop publishes the same artefacts under names
+    # marked develop, which no release ever carries (see release-gate).
     branches: [main, develop, "feat/**", "fix/**", "chore/**"]
     paths:
       - "apps/**"
@@ -43,13 +44,27 @@ env:
   IMAGE_ORG: gentian-org
 
 jobs:
-  # Whether this run releases anything. Decided in one place and read by every
-  # job below as needs.release-gate.outputs.release: only main and develop
-  # release, and never from a pull request.
+  # What this run publishes, and under which names. Decided in one place and
+  # read by every job below.
+  #
+  #   release      main only. Artefacts go out under the names the files
+  #                state: an image at its version, a chart at the version in
+  #                its Chart.yaml. Those names are what a released catalogue
+  #                pins, so nothing but main may write to them.
+  #   develop      develop only. The same artefacts, under names no release
+  #                carries: an image as develop-<sha7>, a chart as
+  #                <version>-develop.<sha7> (immutable) and <version>-develop
+  #                (moving, its appVersion naming the immutable one). The rule
+  #                is gentian-ui's, so one convention covers both repositories.
+  #   publish      either of the two. Every other branch, and every pull
+  #                request, builds and pushes nothing.
   release-gate:
     runs-on: ubuntu-latest
     outputs:
       release: ${{ steps.decide.outputs.release }}
+      develop: ${{ steps.decide.outputs.develop }}
+      publish: ${{ steps.decide.outputs.publish }}
+      develop_tag: ${{ steps.decide.outputs.develop_tag }}
     steps:
       - id: decide
         env:
@@ -57,12 +72,27 @@ jobs:
           REF: ${{ github.ref }}
         run: |
           release=false
+          develop=false
+          develop_tag=""
           if [ "${EVENT}" != "pull_request" ]; then
             case "${REF}" in
-              refs/heads/main | refs/heads/develop) release=true ;;
+              refs/heads/main) release=true ;;
+              refs/heads/develop)
+                develop=true
+                develop_tag="develop-${GITHUB_SHA::7}"
+                ;;
             esac
           fi
-          echo "release=${release}" >> "$GITHUB_OUTPUT"
+          publish=false
+          if [ "${release}" = "true" ] || [ "${develop}" = "true" ]; then
+            publish=true
+          fi
+          {
+            echo "release=${release}"
+            echo "develop=${develop}"
+            echo "publish=${publish}"
+            echo "develop_tag=${develop_tag}"
+          } >> "$GITHUB_OUTPUT"
 
   build-nextcloud:
     needs: [release-gate]
@@ -96,7 +126,8 @@ jobs:
         uses: ./.github/actions/image
         with:
           dir: images/nextcloud
-          publish: ${{ needs.release-gate.outputs.release }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
           args: |
             NEXTCLOUD_VERSION=${{ steps.versions.outputs.nextcloud_version }}
             USER_OIDC_VERSION=${{ steps.versions.outputs.user_oidc_version }}
@@ -132,7 +163,8 @@ jobs:
         uses: ./.github/actions/image
         with:
           dir: images/nextcloud-mcp
-          publish: ${{ needs.release-gate.outputs.release }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
           refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud-mcp:${{ steps.version.outputs.chart_version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud-mcp:${{ github.sha }}
@@ -141,7 +173,9 @@ jobs:
         uses: ./.github/actions/chart
         with:
           dir: images/nextcloud-mcp/chart
-          publish: ${{ needs.release-gate.outputs.release }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
+          pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
 
   build-xwiki:
     needs: [release-gate]
@@ -166,7 +200,8 @@ jobs:
         uses: ./.github/actions/image
         with:
           dir: images/xwiki
-          publish: ${{ needs.release-gate.outputs.release }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
           args: |
             XWIKI_VERSION=${{ steps.versions.outputs.xwiki_version }}
             FLAVOR_XIP_SHA256=${{ steps.versions.outputs.flavor_xip_sha256 }}
@@ -185,36 +220,146 @@ jobs:
   # where they came from (AD-3) -- so this host is not trusted, only
   # convenient.
   #
-  # Needs Pages enabled for the repository, with "GitHub Actions" as the
-  # source. Until it is, this job fails and nothing else does.
-  publish-catalogue:
+  # Two catalogues, one site. A repository has ONE Pages site and a deployment
+  # replaces all of it, so every deployment carries both:
+  #
+  #   /           the released catalogue, built from main
+  #   /develop/   the catalogue of the branch work lands on, built from develop
+  #
+  # Whichever branch was pushed is built at the pushed commit, the other at its
+  # head, each with its own copy of the build script -- the script is part of
+  # what a branch publishes. Nothing in the output names where it is served
+  # from: a director asks for <address>/index.yaml and
+  # <address>/profiles/<name>.yaml, so the same files work under either path.
+  assemble-catalogue-site:
     needs: [validate-profiles]
-    # main only, for two reasons that point the same way. A repository has ONE
-    # Pages site, so publishing from main and develop as well would make the
-    # catalogue whichever branch ran last. And a catalogue is what somebody's
-    # cluster installs from: it should follow releases, not the branch work is
-    # happening on. A cluster that wants the in-progress catalogue declares no
-    # source and syncs it wholesale from git, the way every cluster did before
-    # AD-3.
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name != 'pull_request'
+      && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      deployable: ${{ steps.policy.outputs.deployable }}
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref == 'refs/heads/main' && github.sha || 'main' }}
+          path: src/main
+      - name: Check out develop
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref == 'refs/heads/develop' && github.sha || 'develop' }}
+          path: src/develop
+      - name: Install PyYAML
+        run: pip install pyyaml
+      - name: Build both catalogues
+        run: |
+          # The root first: the script empties the directory it writes to.
+          (cd src/main && python3 scripts/build-catalogue-source.py --out "${GITHUB_WORKSPACE}/site" --with-landing-page)
+          (cd src/develop && python3 scripts/build-catalogue-source.py --out "${GITHUB_WORKSPACE}/site/develop" --with-landing-page)
+
+      # A push to develop must leave the released catalogue exactly as it is:
+      # what a cluster installs from changes when main does and at no other
+      # time. main has not moved, so its build has to come out as the bytes
+      # already served. If it does not -- a tool on the runner changed, the
+      # script reads something outside the tree -- this stops the deployment
+      # rather than publishing a release nobody made.
+      - name: The released catalogue is unchanged
+        if: github.ref == 'refs/heads/develop'
+        env:
+          LIVE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        run: |
+          cd site
+          checked=0
+          differ=0
+          while IFS= read -r f; do
+            checked=$((checked + 1))
+            if ! curl -fsS --retry 3 -o /tmp/live-file "${LIVE}/${f}"; then
+              echo "::error::${LIVE}/${f} is not served; refusing to replace the site" >&2
+              differ=$((differ + 1))
+              continue
+            fi
+            if ! cmp -s "${f}" /tmp/live-file; then
+              echo "::error::${f} built from main differs from ${LIVE}/${f}" >&2
+              differ=$((differ + 1))
+            fi
+          done < <(find . -path ./develop -prune -o -type f -print | sed 's|^\./||' | sort)
+          echo "compared ${checked} file(s) of the released catalogue with ${LIVE}: ${differ} differ"
+          [ "${differ}" = "0" ]
+
+      - name: The develop catalogue's digests are its files'
+        run: |
+          python3 - <<'PY'
+          import hashlib, pathlib, yaml
+          root = pathlib.Path("site/develop")
+          entries = yaml.safe_load((root / "index.yaml").read_text())["entries"]
+          for e in entries:
+              got = "sha256:" + hashlib.sha256((root / "profiles" / f"{e['name']}.yaml").read_bytes()).hexdigest()
+              assert got == e["digest"], f"{e['name']}: index says {e['digest']}, file is {got}"
+          print(f"{len(entries)} entries, every digest matches its file")
+          PY
+
+      # The github-pages environment says which branches may deploy to it. That
+      # is a repository setting, not something a workflow can grant itself: a
+      # deployment from a branch it does not name is rejected and the run goes
+      # red on every push. So ask first, and say what to change instead.
+      - name: May this branch deploy the site?
+        id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          gh api "repos/${REPO}/environments/github-pages" > /tmp/env.json
+          gh api "repos/${REPO}/environments/github-pages/deployment-branch-policies" > /tmp/policies.json
+          deployable="$(python3 - <<'PY'
+          import fnmatch, json, os
+          env = json.load(open("/tmp/env.json"))
+          policy = env.get("deployment_branch_policy")
+          branch = os.environ["BRANCH"]
+          if policy is None:
+              print("true")  # every branch may deploy
+          elif policy.get("custom_branch_policies"):
+              names = [p["name"] for p in json.load(open("/tmp/policies.json")).get("branch_policies", [])
+                       if p.get("type", "branch") == "branch"]
+              print("true" if any(fnmatch.fnmatchcase(branch, n) for n in names) else "false")
+          else:
+              # Protected branches only; the deployment itself is the test.
+              print("true" if branch == "main" else "false")
+          PY
+          )"
+          echo "deployable=${deployable}" >> "$GITHUB_OUTPUT"
+          if [ "${deployable}" != "true" ]; then
+            msg="The github-pages environment does not let '${BRANCH}' deploy, so the site was assembled and NOT published. Add '${BRANCH}' under Settings > Environments > github-pages > Deployment branches and tags, then re-run this workflow."
+            echo "::warning::${msg}"
+            echo "${msg}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  publish-catalogue:
+    needs: [assemble-catalogue-site]
+    if: needs.assemble-catalogue-site.outputs.deployable == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pages: write
       id-token: write
+    # One deployment at a time, and never a cancelled one: each replaces the
+    # whole site, and the later of two is the one that has seen both branches.
+    concurrency:
+      group: catalogue-site
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Install PyYAML
-        run: pip install pyyaml
-      - name: Build the catalogue source
-        run: python3 scripts/build-catalogue-source.py --out dist/catalogue --with-landing-page
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist/catalogue
       - id: deploy
         uses: actions/deploy-pages@v4
 
@@ -300,7 +445,8 @@ jobs:
         uses: ./.github/actions/chart
         with:
           dir: charts/odoo
-          publish: ${{ needs.release-gate.outputs.release }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
 
   build-activepieces-chart:
     needs: [release-gate]
@@ -315,7 +461,7 @@ jobs:
         uses: azure/setup-helm@v4
 
       - name: Registry login
-        if: needs.release-gate.outputs.release == 'true'
+        if: needs.release-gate.outputs.publish == 'true'
         env:
           TOKEN: ${{ github.token }}
         run: echo "${TOKEN}" | helm registry login "${{ env.REGISTRY }}" --username "${{ github.actor }}" --password-stdin
@@ -331,12 +477,29 @@ jobs:
         run: scripts/build-activepieces-chart.sh --out /tmp/ap-dist
 
       - name: Push chart
-        if: needs.release-gate.outputs.release == 'true'
+        if: needs.release-gate.outputs.publish == 'true'
+        env:
+          DEVELOP: ${{ needs.release-gate.outputs.develop }}
         run: |
           # shellcheck source=/dev/null
           source charts/activepieces/UPSTREAM
-          helm push "/tmp/ap-dist/activepieces-${CHART_VERSION}.tgz" \
-            oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+          if [ "${DEVELOP}" = "true" ]; then
+            # The chart action's develop rule, by hand: the script packaged the
+            # chart at its release version, which only main may push.
+            IMMUTABLE="${CHART_VERSION}-develop.${GITHUB_SHA::7}"
+            MOVING="${CHART_VERSION}-develop"
+            mkdir -p /tmp/ap-src /tmp/ap-develop
+            tar -xzf "/tmp/ap-dist/activepieces-${CHART_VERSION}.tgz" -C /tmp/ap-src
+            helm package /tmp/ap-src/activepieces --version "${IMMUTABLE}" --app-version "${IMMUTABLE}" -d /tmp/ap-develop
+            helm package /tmp/ap-src/activepieces --version "${MOVING}" --app-version "${IMMUTABLE}" -d /tmp/ap-develop
+            for version in "${IMMUTABLE}" "${MOVING}"; do
+              helm push "/tmp/ap-develop/activepieces-${version}.tgz" \
+                oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+            done
+          else
+            helm push "/tmp/ap-dist/activepieces-${CHART_VERSION}.tgz" \
+              oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
+          fi
 
   build-sso-saml-sidecar-chart:
     needs: [release-gate]
@@ -350,7 +513,9 @@ jobs:
         uses: ./.github/actions/chart
         with:
           dir: charts/gentian-sidecar-sso-saml
-          publish: ${{ needs.release-gate.outputs.release }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
+          pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
 
   build-git-modules-sidecar-chart:
     needs: [release-gate]
@@ -364,7 +529,9 @@ jobs:
         uses: ./.github/actions/chart
         with:
           dir: charts/gentian-sidecar-git-modules
-          publish: ${{ needs.release-gate.outputs.release }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
+          pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
 
   build-mathesar-chart:
     needs: [release-gate]
@@ -379,7 +546,8 @@ jobs:
         with:
           dir: charts/mathesar
           lint: "true"
-          publish: ${{ needs.release-gate.outputs.release }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
 
   build-docmost-chart:
     needs: [release-gate]
@@ -394,7 +562,8 @@ jobs:
         with:
           dir: charts/docmost
           lint: "true"
-          publish: ${{ needs.release-gate.outputs.release }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
 
   build-git-modules-sidecar-image:
     needs: [release-gate]
@@ -408,7 +577,8 @@ jobs:
         uses: ./.github/actions/image
         with:
           dir: images/gentian-sidecar-git-modules
-          publish: ${{ needs.release-gate.outputs.release }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
           refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/gentian-sidecar-git-modules:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/gentian-sidecar-git-modules:${{ github.sha }}
@@ -425,7 +595,8 @@ jobs:
         uses: ./.github/actions/image
         with:
           dir: images/gentian-sidecar-sso-saml
-          publish: ${{ needs.release-gate.outputs.release }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
           refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:${{ github.sha }}

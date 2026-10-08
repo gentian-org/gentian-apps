@@ -90,7 +90,8 @@ python3 -c "import yaml; yaml.safe_load(open('profiles/my-app.yaml'))"
 
 `.github/workflows/apps-ci.yaml` builds changed apps under `apps/`.
 
-On merge to `main`:
+On merge to `main` (from `develop` the same artefacts go out under develop names —
+[releasing.md](releasing.md)):
 
 1. Docker images → `ghcr.io/gentian-org/<app>-api:<version>`
 2. Helm chart → `oci://ghcr.io/gentian-org/charts/<app>:<version>`

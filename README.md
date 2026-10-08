@@ -60,6 +60,21 @@ backs 10 profiles, and 7 profiles wrap external charts this repo never contains.
 [docs/app-profile-guide.md](docs/app-profile-guide.md) §0 for why this repo is organised as a
 distribution repo rather than an application monorepo.
 
+## Branches
+
+Work lands on **`develop`**; **`main`** is what is released, and a release is a tag on it. `v05`,
+the branch the new architecture was built on, is merged into `develop` and **frozen** — do not
+push to it.
+
+| | Catalogue address | Images | Charts |
+|---|---|---|---|
+| `main` | `https://gentian-org.github.io/gentian-apps/` | version, `latest` | `<version>` |
+| `develop` | `https://gentian-org.github.io/gentian-apps/develop/` | `develop-<sha7>` | `<version>-develop.<sha7>` |
+
+A platform release is one tag `vX.Y.Z` on gentian-os, gentian-ui and gentian-apps, marking what
+was tested together. The catalogue may move between platform releases, so a newer catalogue has
+to stay readable by an older platform. The rules: [docs/releasing.md](docs/releasing.md).
+
 ## Licensing
 
 There is no license for the repository as a whole: **every app carries its

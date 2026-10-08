@@ -16,6 +16,8 @@ catalogue. See [README.md](README.md) for full scope and
 
 ## Build & deployment — CI/GitOps only
 
+* Work lands on `develop`; `main` is what is released; `v05` is frozen. What CI publishes from
+  each, and under which names: [docs/releasing.md](docs/releasing.md).
 * CI (`.github/workflows/apps-ci.yaml`) builds and pushes images + OCI charts for `apps/*`.
   `profiles/*` sync to clusters via the ArgoCD ApplicationSet `gentian-catalogue`.
 * **Don't build/push images or apply profile changes to a live cluster yourself.** Bump the
