@@ -109,7 +109,9 @@ Nobody, until somebody is made an administrator; the sign-in makes none.
   (`api_admin`, password in the vault under the app's `internal/api_admin_password`), for a
   person who has opened OpenProject once:
   `PATCH /api/v3/users/<id>` with `{"admin": true}`. From then on that person is signed in as
-  the administrator they are, and can make others in OpenProject's own pages.
+  the administrator they are, and can make others in OpenProject's own pages. The call was run
+  against OpenProject directly, as from inside the cluster; whether the front door passes a
+  Basic credential on to the app has not been tried.
 
 The profile declares no way for the platform to do this at install time. Until one exists it is a
 step for whoever operates the tenant.
