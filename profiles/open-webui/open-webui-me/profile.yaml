@@ -18,13 +18,6 @@ metadata:
     # means "show without installing per tenant", which offered a tile pointing
     # at a host that resolves to nothing whenever spec.llm.enabled was off.
     gentianos.io/requires-capability: "llm"
-    # The model gateway (LiteLLM) this app sends every completion to runs in
-    # system-llm. The platform hands the app that address and a key
-    # (llm-credentials-open-webui) but a profile has no requirement to declare
-    # for it, so nothing opens the path; this does. It is the one namespace
-    # named here: the edge and the identity provider are opened by
-    # requires.services.identity.
-    gentianos.io/kernel-egress-namespaces: system-llm
     gentianos.io/standard-image-pull-secrets: "true"
     # The portal opens this app hidden at desktop mount. The AI widget queries it
     # in the background, and a cold app answers with a login redirect instead of a
@@ -222,6 +215,11 @@ spec:
   # Not yet characterised against the customization ladder.
   requires:
     services:
+      # Every completion goes to the platform's model gateway. Declaring it is
+      # what gives this app its key there, the Secret llm-credentials-open-webui
+      # and a path to the gateway's port -- that port only, not the gateway's
+      # database and cache beside it.
+      llm: {}
       identity:
         oidc:
           clientId: "gentian-open-webui"
@@ -292,6 +290,18 @@ spec:
   # verifies incoming tokens with) and POSTs the correct config — idempotent,
   # and a no-op once the persisted config already matches. See
   # app-profile-guide.md, "Post-install bootstrap jobs".
+  #
+  # "Matches" means the address and the key, both. The platform can replace
+  # this app's key at the gateway, and the old one stops authenticating there;
+  # an instance that went on presenting the key it stored on first boot would
+  # get 401 for every model. The Job is deleted when it finishes and created
+  # again by the platform, so it runs repeatedly, each time with the Secret's
+  # current values, and a replaced key is written into the app by the next
+  # run. Open WebUI reads the connection from its database per request, so
+  # nothing has to restart. ENABLE_PERSISTENT_CONFIG=false is not used for
+  # this: it covers every setting, not these two, so whatever an administrator
+  # changed in the app would be gone at the next restart, and the environment
+  # is only read when the process starts.
   # NOTE: uses python:3.12-alpine, not alpine+apk-installed curl/sqlite/jq/
   # openssl -- the tenant namespace's NetworkPolicy blocks general internet
   # egress by default (only same-namespace and explicitly kernel-egress-
@@ -456,27 +466,72 @@ spec:
             print(f"[open-webui post-install] failed to read current config: {describe(e)}")
             sys.exit(1)
 
-        want_url = os.environ["OPENAI_API_BASE_URL"]
-        if current.get("ENABLE_OPENAI_API") is True and current.get("OPENAI_API_BASE_URLS", [None])[0] == want_url:
-            print("[open-webui post-install] openai config already correct -- skipping")
+        # The connection the platform hands this app, compared with the one
+        # the app has stored: the address AND the key. Comparing the address
+        # alone left a replaced key unnoticed.
+        #
+        # Only the platform's own connection is touched -- the entry that
+        # already names the gateway, or the first one. Connections and
+        # per-connection settings an administrator added stay as they are:
+        # this runs against live instances now, not just a fresh one.
+        want_url = os.environ["OPENAI_API_BASE_URL"].rstrip("/")
+        want_key = os.environ["OPENAI_API_KEY"]
+        if not want_url or not want_key:
+            print("[open-webui post-install] the platform's Secret carries no gateway address or no key")
+            sys.exit(1)
+
+        have_urls = [str(u) for u in (current.get("OPENAI_API_BASE_URLS") or [])]
+        have_keys = [str(k) for k in (current.get("OPENAI_API_KEYS") or [])]
+        have_keys = (have_keys + [""] * len(have_urls))[:len(have_urls)]
+
+        urls, keys = list(have_urls), list(have_keys)
+        if not urls:
+            urls, keys = [want_url], [want_key]
+        else:
+            idx = urls.index(want_url) if want_url in urls else 0
+            urls[idx], keys[idx] = want_url, want_key
+
+        url_differs = urls != have_urls
+        key_differs = keys != have_keys
+        if current.get("ENABLE_OPENAI_API") is True and not url_differs and not key_differs:
+            print("[open-webui post-install] openai address and key already correct -- skipping")
             sys.exit(0)
+
+        def redact(text):
+            # A refusal can quote the request back. No key, the stored ones
+            # included, is ever printed.
+            for k in set(keys + have_keys):
+                if k:
+                    text = text.replace(k, "***")
+            return text
 
         update = {
             "ENABLE_OPENAI_API": True,
-            "OPENAI_API_BASE_URLS": [want_url],
-            "OPENAI_API_KEYS": [os.environ["OPENAI_API_KEY"]],
-            "OPENAI_API_CONFIGS": {},
+            "OPENAI_API_BASE_URLS": urls,
+            "OPENAI_API_KEYS": keys,
+            "OPENAI_API_CONFIGS": current.get("OPENAI_API_CONFIGS") or {},
         }
         req_headers = dict(headers)
         req_headers["Content-Type"] = "application/json"
         try:
-            http_json(f"{base}/openai/config/update", method="POST",
-                      data=json.dumps(update).encode(), headers=req_headers)
+            stored = http_json(f"{base}/openai/config/update", method="POST",
+                               data=json.dumps(update).encode(), headers=req_headers)
         except (urllib.error.URLError, TimeoutError) as e:
-            print(f"[open-webui post-install] update failed: {describe(e)}")
+            print(f"[open-webui post-install] update failed: {redact(describe(e))}")
             sys.exit(1)
 
-        print("[open-webui post-install] openai config updated")
+        # The reply is what open-webui stored. Anything else is not a write.
+        if (not isinstance(stored, dict)
+                or stored.get("ENABLE_OPENAI_API") is not True
+                or stored.get("OPENAI_API_BASE_URLS") != urls
+                or stored.get("OPENAI_API_KEYS") != keys):
+            print("[open-webui post-install] update was accepted but open-webui did not store "
+                  "the address and key it was sent")
+            sys.exit(1)
+
+        changed = [what for what, differs in (("address", url_differs), ("key", key_differs)) if differs]
+        print("[open-webui post-install] openai config updated: "
+              + (" and ".join(changed) if changed else "connection enabled"))
         PYEOF
   customization:
     grade: unknown
