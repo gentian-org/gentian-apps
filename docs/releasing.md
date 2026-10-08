@@ -23,8 +23,12 @@ catalogue build, chart lint and packaging, image builds. What differs is what is
 name, so a build of `develop` cannot overwrite anything a released catalogue pins. The naming is
 [gentian-ui](https://github.com/gentian-org/gentian-ui)'s.
 
-A chart from `develop` whose only image is built here (the two sidecars, `nextcloud-mcp`) names
+A chart from `develop` whose only image is built here (the git-modules sidecar, `nextcloud-mcp`) names
 that commit's `develop-<sha7>` image instead of the tag in its `values.yaml`.
+
+The sign-in sidecar (`images/gentian-sidecar-sso-saml`) has no chart: the platform runs it, and
+names the build it runs. gentian-os is pointed at a new build of it the same way a profile is
+pointed at a new chart, in a commit there.
 
 **A profile pins a chart by version, and a profile on `develop` pins a released one.** A chart
 changed on `develop` is therefore not what a develop cluster installs until either the profile

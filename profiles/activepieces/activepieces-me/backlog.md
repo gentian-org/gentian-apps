@@ -45,8 +45,10 @@ Pieces are Activepieces' documented, versioned extension system, and
 above is the work to use it. But a piece extends **flows** — it contributes
 actions and triggers a user assembles inside the builder. It cannot register an
 HTTP route, intercept a request before the app's own router, or influence
-process startup. The SSO work needs exactly those: `/api/v1/authn/saml/{login,acs}`
-routed to the sso-saml sidecar, and an entrypoint that serves the config doing it.
+process startup. The sign-in work needs the last two: a script served to every
+page of the app, which sends a browser with no session to the platform's sign-in,
+and an entrypoint that serves the config doing it. (The routes to the sidecar are
+the platform's now, not this app's.)
 
 So the rung is not L4 because the app lacks an extension system. It is L4
 because this app's extension system extends the wrong layer, which is the

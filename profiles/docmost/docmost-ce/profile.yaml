@@ -6,155 +6,53 @@
 #   docs/app-profile-guide.md §0 Consequence 3). The chart wraps the official
 #   docker.io/docmost/docmost image unmodified.
 #
-# ── SSO: why there is no kernelRequirements.identity.oidc ───────────────────
+# ── Sign-in: the platform's sign-in sidecar ─────────────────────────────────
 # Docmost is dual-licensed (AGPL-3.0 core + a separate Enterprise/"ee" tree).
-# Verified directly against the docmost/docmost source (2026-08-11):
-#   - ALL SSO — SAML 2.0, OIDC, *and* LDAP — lives under apps/server/src/ee/
-#     and only activates with a paid Business/Enterprise subscription; the
-#     pricing page lists "SSO (SAML 2.0 / OIDC / LDAP)" as a Business-tier
-#     feature. There is no free/CE OIDC path the way there is for OpenProject
-#     or XWiki — declaring kernelRequirements.identity.oidc here and wiring a
-#     Keycloak client into Docmost's own OIDC settings would require an
-#     AP_LICENSE_KEY-equivalent Enterprise subscription, which the "no
-#     licensing bypass" prohibition above forbids us from working around.
-#   - What CE *does* ship, unlicensed, in apps/server/src/core/: a plain
-#     email+password AuthController (POST /api/auth/login), a workspace
-#     bootstrap endpoint (POST /api/auth/setup), and a self-hosted-only
-#     invite flow (POST /api/workspace/invites/{create,link,accept}) that
-#     lets an admin mint an invite *link* without sending an email
-#     (invites/link explicitly 403s on Docmost Cloud — it exists for exactly
-#     this self-hosted use case).
+# ALL of its single sign-on — SAML 2.0, OIDC and LDAP — lives under
+# apps/server/src/ee/ and needs a paid subscription. None of it is used,
+# configured or patched here. What the free edition has is an account per
+# person and a session: a token signed with the installation's APP_SECRET,
+# kept in the cookie "authToken" and recorded in the table user_sessions
+# (checked against the server build in docker.io/docmost/docmost:0.95.0).
 #
-# The SSO answer used here: real Keycloak authentication happens once, same
-# as every other app, but it is terminated by the existing generic
-# **gentian-sidecar-sso-saml** sidecar (charts/gentian-sidecar-sso-saml —
-# already shipped for activepieces-me's own Enterprise-gated SSO, see that
-# profile's header comment) instead of by Docmost's own SSO code. Keycloak
-# sees a SAML Service Provider (kernelRequirements.identity.saml below).
+# So this profile declares requires.services.identity.sidecar. The platform
+# then runs its sign-in sidecar beside Docmost, registers it at the tenant's
+# realm, and routes /sso/login and /sso/acs of this host to it. The sidecar
+# checks the realm's signed answer and runs this profile's handler,
+# assets/sign-in-handler.js, which makes the account if the person has none
+# and the session. A person who is signed in at the platform opens Docmost
+# and is in. Nobody has a password in Docmost, the account that owns the
+# workspace included.
 #
-# Where the SSO-→-CE-session translation actually happens is *not* inside
-# the sso-saml sidecar itself, deliberately:
+# What the handler is handed, and nothing else: Docmost's database, its
+# signing key (the generated secret app_secret), and the path to Docmost's own
+# port inside the cluster. customization.md beside this file has the review:
+# what the handler does, what it writes itself, and what remains weak.
 #
-#   1. The sidecar's onLogin handler (spec.sidecars[0].extraValues.handler
-#      Script) is a thin relay — it POSTs the SAML profile to an internal
-#      /ensure-session endpoint and forwards whatever Set-Cookie comes back.
-#      It holds no Docmost secret at all.
-#   2. That endpoint is a small companion container ("bridge") baked into
-#      this profile's *own* first-party chart (charts/docmost/templates/
-#      deployment.yaml + configmap-bridge.yaml), running in the same pod as
-#      Docmost itself, reachable only via the docmost-ce Service's internal
-#      "bridge" port — never exposed publicly. It holds the admin/HMAC
-#      secrets and does the actual work: log the target user into Docmost's
-#      own free CE POST /api/auth/login with a deterministic per-user
-#      password, and on first use only, provision the account via the
-#      self-hosted-only invite flow (POST /api/workspace/invites/
-#      {create,link,accept} — invites/link explicitly 403s on Docmost Cloud;
-#      it exists for exactly this kind of self-hosted, no-SMTP-needed use).
-#
-# Why split it this way rather than putting the provisioning logic straight
-# in the sidecar (simpler on paper): the sidecar is a *separate* Helm
-# release/pod from Docmost, so it needs its own way to reach the admin_
-# password/bridge_secret appSecrets. Kubernetes envFrom cannot deliver them —
-# gentian-os's own app-default composition documents that kubelet silently
-# drops any envFrom-materialized key that isn't a valid C_IDENTIFIER, and the
-# fixed "internal-<name>" flat-secret-key convention every appSecret gets is
-# never one (crossplane/compositions/app-default.yaml, "Individual
-# secretKeyRef env vars for postInstallJob" comment). The sso-saml chart's
-# only other value-injection surface, extraEnvVars, takes literal values, not
-# secretKeyRefs — and reaching for the one place literal secret injection
-# *would* land (a Helm --set on a specific array index, appSecrets.valuePath
-# = "extraEnvVars[N].value") turns out to be the same "values: + set: don't
-# reliably merge onto one array element" gotcha gentian-pro's own
-# od-element/composition.yaml has to explicitly filter *out* of its Synapse
-# release for identical reasons. This profile's own chart doesn't have any
-# of these constraints — it already delivers appSecret literally to
-# APP_SECRET with no issue (see deployment.yaml) — so the bridge lives there
-# instead, and the cross-release sidecar is kept deliberately secret-free.
-#
-# Session cookies are httpOnly + SameSite=Lax with no explicit cookie
-# `domain` attribute (Docmost source: apps/server/src/core/auth/
-# auth.controller.ts setAuthCookie) — they bind to whatever origin issues the
-# Set-Cookie response, which is why the SAML ACS endpoint must be same-origin
-# with the app (see the gateway-api-backends annotation below), not a
-# separate kernel-side redirect. The bridge container mints the cookie by
-# calling Docmost over localhost (same pod); the sidecar (different pod)
-# relays that cookie in *its own* response to the browser, which is what
-# actually makes it a same-origin cookie for docs.${TENANT_DOMAIN}.
+# Docmost's own sign-in is switched off at the front door rather than in the
+# app, which has no switch for it: its sign-in page leads to the platform's
+# sign-in (entryPaths), and the calls behind that page are refused
+# (expose[].denyPaths). The setup call is among them, and has to be: until the
+# first sign-in there is no workspace, and whoever called it first would own
+# the installation, with a password.
 #
 # Secret inventory:
-#   Kernel-provided:
-#     pg_*        → database.host/port/name/user/password (valueMapping)
-#     s3_secret_key → s3.secretAccessKey (valueMapping)
-#     smtp_password  → smtp.password (valueMapping)
+#   Platform-provided:
+#     database host/port/name/user/password (valueMapping.database)
+#     s3 secret key (valueMapping.s3), smtp password (valueMapping.smtp)
 #   (no Redis credentials: Docmost runs its own pod-local Redis with no auth —
-#    see kernelRequirements below and charts/docmost/values.yaml "redis")
-#   App-internal (3) → appSecrets, all three delivered as literal Helm
-#   values (same mechanism as OpenProject's admin_password / Mathesar's
-#   SECRET_KEY) and consumed only by charts/docmost's own "bridge" container
-#   — never by the "docmost" container itself except appSecret:
-#     app_secret     → appSecret (Docmost JWT session-signing key, min 32
-#                      chars — pinned so pod restarts don't invalidate every
-#                      session; see charts/docmost/values.yaml). This one
-#                      *is* consumed by the main "docmost" container.
-#     admin_password → adminUser.password (bridge-only machine admin
-#                      account; never signed in by a human).
-#     bridge_secret  → bridge.secret. HMACed with each user's email inside
-#                      the bridge container to derive a stable per-user
-#                      Docmost password nobody ever sees or needs to know.
-#                      If this secret is ever rotated, previously-
-#                      provisioned users' deterministic password changes too
-#                      and they cannot self-recover (Docmost CE has no admin
-#                      "reset another user's password" endpoint, only self-
-#                      service change-password/forgot-password) — treat it
-#                      as stable infrastructure, same assumption the
-#                      openproject-ce bridge already makes about its own
-#                      shared secret.
-#
-# Known limitation: because Docmost links no identity to an OIDC/SAML claim
-# (unlike Mathesar's SSO, which is CE and links by email — see
-# profiles/mathesar/mathesar-ce/profile.yaml), the bridge is the *only* login
-# path. A user who somehow reaches Docmost's native /login form has no way
-# in — this is intentional (the deterministic bridge password is a secret,
-# never displayed), not a bug.
+#    see requires below and charts/docmost/values.yaml "redis")
+#   Generated (1):
+#     app_secret → appSecret (Docmost's session-signing key, min 32 chars —
+#                  pinned so pod restarts don't invalidate every session).
+#                  Also given to the sign-in handler, which signs sessions
+#                  with it.
 apiVersion: gentianos.io/v1alpha1
 kind: ComponentProfile
 metadata:
   name: docmost-ce
   labels:
     gentianos.io/profile-name: docmost-ce
-  annotations:
-    # Routes the SAML ACS callback to the sso-saml sidecar's own Service on
-    # the SAME public hostname as Docmost itself — required so the session
-    # cookie the sidecar mints lands on the correct origin (see cookie note
-    # above). serviceName/port match spec.sidecars[0].stableServiceName /
-    # stableServicePort below — the gentian-os app-default composition's
-    # sidecar-emission step (crossplane/compositions/app-default.yaml, "Emit
-    # sidecars") gives the Helm-managed sidecar release an unpredictable
-    # generated name ({xrName}-{sidecar}-release), so it additionally emits a
-    # plain, predictably-named ClusterIP Service aliasing it whenever
-    # stableServiceName is set — precisely for cases like this one, where
-    # something outside the release (here, a Gateway route) needs to address
-    # the sidecar by a fixed name. Confirmed against a real, current worked
-    # example: profiles/nextcloud/base/base-ce/profile.yaml's "mcp" sidecar
-    # sets stableServiceName: nextcloud-mcp / stableServicePort: 8765 for the
-    # same reason (also gentian-pro/profiles/od-element/profile.yaml's
-    # "jitsi" sidecar → stableServiceName: jitsi-web, referenced directly by
-    # that profile's own additionalIngresses.serviceName).
-    # /sso covers both endpoints the sidecar serves: /sso/login (starts the
-    # SAML flow) and /sso/acs (consumes the assertion). These are the
-    # sidecar's real paths — see images/gentian-sidecar-sso-saml/bridge.js.
-    # There is no path rewrite available here, so the routed prefix and the
-    # sidecar's own routes have to be the same strings.
-    gentianos.io/gateway-api-backends: '[{"pathPrefix":"/sso","serviceName":"docmost-sso","port":8081}]'
-    # Auto-login: opening the app lands on Docmost's own login form, which is
-    # a dead end here because the per-user passwords are HMAC-derived secrets
-    # nobody is shown. Redirecting GET / into the SAML flow makes the tile (and
-    # the bare URL) authenticate instead of asking. This is safe from a
-    # redirect loop only because the loop is broken deliberately: the bridge
-    # handler finishes on /home rather than /, and this annotation matches
-    # exactly / and nothing else. Docmost's own router treats / as a redirect
-    # to /home anyway (apps/client/src/App.tsx), so nothing is lost.
-    gentianos.io/gateway-root-redirect: /sso/login
 spec:
   classes:
     - app
@@ -164,7 +62,7 @@ spec:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: docmost
-      version: "0.2.10"
+      version: "0.2.11-develop.6da5d99"
 
     valueMapping:
       database:
@@ -189,13 +87,6 @@ spec:
       appUrl: "https://docs.${TENANT_DOMAIN}"
 
       fullnameOverride: "docmost-ce"
-
-    # Shared space created at first start, named after the tenant and granted
-    # to Docmost's default "Everyone" group so every user sees it. Each user
-    # additionally gets a personal space named after them on first login —
-    # see charts/docmost/templates/configmap-bridge.yaml.
-      tenantSpace:
-        name: "${TENANT_ID}"
 
     # database.* is deliberately absent here — all five fields come from
     # valueMapping above (the per-tenant Postgres the operator provisions),
@@ -230,23 +121,29 @@ spec:
       podAnnotations:
         secret.reloader.stakater.com/reload: docmost-ce-sensitive-values
 
-  # No postInstallJob: workspace bootstrap (POST /api/auth/setup) is done
-  # lazily by the bridge container itself, the first time an admin login
-  # attempt fails — see charts/docmost/templates/configmap-bridge.yaml
-  # (ensureWorkspaceSetUp). A separate one-shot Job would need its own way
-  # to reach the same admin_password value the bridge container uses, which
-  # runs into the exact envFrom/C_IDENTIFIER problem explained in the header
-  # comment; the bridge container already has it as a clean literal env var,
-  # so it's simpler for it to own bootstrap too.
+  # No post-install job: the workspace is created by the sign-in handler, with
+  # Docmost's own setup call, at the first sign-in.
 
   requires:
     services:
       identity:
-      # SAML, not OIDC: see the header comment. Keycloak issues assertions to
-      # the sso-saml sidecar, never to Docmost itself.
-        saml:
-          entityId: Docmost
-          acsUrl: "https://docs.${TENANT_DOMAIN}/sso/acs"
+      # Docmost can do neither OIDC nor SAML in the free edition (see the
+      # header). Its people are signed in by the platform's sidecar, with
+      # the handler in assets/sign-in-handler.js.
+        sidecar:
+        # Docmost's front page, and the pages of its own sign-in: its form,
+        # its password reset and its first-run setup. Its page goes to
+        # /login by a page load when a session has run out, so that leads
+        # back to the sign-in too. Not /home, where the handler ends.
+          entryPaths: ["/", "/login", "/forgot-password", "/setup/register"]
+        # The handler looks the person up, and writes the session row
+        # Docmost itself writes at a sign-in.
+          database: true
+        # The key Docmost signs sessions with.
+          secrets: [app_secret]
+        # Docmost's own calls for creating the workspace and inviting a
+        # person, made inside the cluster.
+          appPort: 3000
       database:
         engine: postgresql
         databasePerTenant: true
@@ -276,16 +173,25 @@ spec:
     generated:
       - name: app_secret
         valuePath: "appSecret"
-      - name: admin_password
-        valuePath: "adminUser.password"
-      - name: bridge_secret
-        valuePath: "bridge.secret"
 
   expose:
     - name: web
       surface: gateway
       authMode: oidc
       subDomain: "docs"
+      # Docmost's own ways in, refused at the front door: signing in with a
+      # password, setting or changing one, creating the workspace, and
+      # accepting an invitation. The handler makes the last two calls itself, inside the
+      # cluster. Nobody has a password, so nothing is lost; and the setup
+      # call would hand the installation to whoever made it first.
+      denyPaths:
+        - /api/auth/login
+        - /api/auth/setup
+        - /api/auth/forgot-password
+        - /api/auth/password-reset
+        - /api/auth/change-password
+        - /api/auth/verify-token
+        - /api/workspace/invites/accept
       backend:
         service: "docmost-ce"
         port: 3000
@@ -294,92 +200,6 @@ spec:
         logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgdmlld0JveD0iMCAwIDUyIDUyIiByb2xlPSJpbWciPgogIDxyZWN0IHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjEwIiBmaWxsPSIjRUNFOERGIi8+CiAgPHJlY3Qgd2lkdGg9IjUyIiBoZWlnaHQ9IjUyIiByeD0iMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMCwgMjEsIDQ2LCAwLjA4KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHN2ZyB4PSIxNCIgeT0iMTQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMTAxIDg4IDMxOCAzNDgiIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaWRZTWlkIG1lZXQiPgogICAgPHBhdGggZD0iTTI3Ni4zLDQzNS40QzI4MS45LDQzMy41IDI5MC4xLDQyNi40IDI5Mi41LDQyMS40QzI5My43LDQxOC43IDI5NC4xLDQxNi4xIDI5My44LDQxMS42QzI5My40LDQwNS45IDI5Mi40LDQwMy44IDI3Ni42LDM3Ni4wQzI2Ny40LDM1OS44IDI1OC43LDM0NS4wIDI1Ny40LDM0My4yQzI1Mi45LDMzNy40IDI1MC4zLDMzNi42IDIzMS41LDMzNi4wQzIxNS44LDMzNS41IDIxNC4yLDMzNS4zIDIxMC4wLDMzMy4wQzIwNy42LDMzMS42IDIwNC4yLDMyOC41IDIwMi41LDMyNi4yTDE5OS41LDMyMS44TDE5OS4wLDIxNC43QzE5OC41LDEwOC41IDE5OC41LDEwNy41IDE5Ni40LDEwMy4wQzE5NC4wLDk3LjcgMTg5LjIsOTIuOCAxODQuMSw5MC4zQzE4MC45LDg4LjcgMTc3LjMsODguNSAxNDguNSw4OC41TDExNi41LDg4LjVMMTExLjcsOTEuM0MxMDkuMSw5Mi44IDEwNS43LDk2LjAgMTA0LjIsOTguMkwxMDEuNSwxMDIuNEwxMDEuMiwyNjAuMkMxMDEuMCw0MTUuMCAxMDEuMCw0MTguMSAxMDIuOSw0MjEuOUMxMDUuNSw0MjYuOCAxMTEuMCw0MzEuNiAxMTUuNyw0MzMuMEMxMTkuNSw0MzQuMSAyMDYuNiw0MzYuNiAyNDkuNiw0MzYuOUMyNjcuNCw0MzcuMCAyNzIuNSw0MzYuNyAyNzYuMyw0MzUuNFogTTQwNC4xLDM0NC41QzQxMC42LDM0MC4zIDQxNS43LDMyNi4wIDQxOS42LDMwMS4wQzQyMi4yLDI4NC42IDQyMi4zLDI0MS40IDQxOS43LDIyNS4wQzQxNC45LDE5NC4wIDQwOS4xLDE3My4xIDQwMC45LDE1Ni45QzM5NS4xLDE0NS4yIDM4OS45LDEzNy45IDM4MC45LDEyOC41QzM1OC40LDEwNS4xIDMyNy43LDkxLjkgMjg4LjUsODguOUMyNjAuMyw4Ni43IDI0Ny43LDg5LjcgMjQyLjMsMTAwLjBDMjQxLjEsMTAyLjUgMjMzLjksMTE3LjcgMjI2LjUsMTMzLjdDMjE0LjgsMTU5LjEgMjEzLjAsMTYzLjcgMjEzLjAsMTY4LjBDMjEzLjAsMTczLjYgMjE1LjQsMTc5LjEgMjE5LjIsMTgyLjdDMjI0LjEsMTg3LjMgMjI3LjEsMTg3LjggMjU0LjUsMTg4LjVDMjgzLjYsMTg5LjIgMjg5LjksMTkwLjMgMjk5LjQsMTk2LjRDMzA5LjYsMjAyLjkgMzEzLjgsMjA5LjcgMzE4LjAsMjI2LjRDMzIyLjUsMjQ0LjEgMzIzLjQsMjUyLjUgMzIyLjYsMjY5LjRDMzIxLjYsMjg5LjMgMzIxLjgsMjkxLjkgMzIzLjksMjk2LjBDMzI1LjIsMjk4LjUgMzMzLjksMzA1LjkgMzU0LjYsMzIxLjlDMzcwLjUsMzM0LjIgMzg1LjMsMzQ1LjEgMzg3LjUsMzQ2LjJDMzkyLjYsMzQ4LjYgMzk5LjAsMzQ3LjkgNDA0LjEsMzQ0LjVaIiBmaWxsPSIjMjYyNjk2IiBmaWxsLXJ1bGU9Im5vbnplcm8iLz4KICA8L3N2Zz4KPC9zdmc+Cg==
         image: assets/tile.svg
         relation: can_launch
-  extensions:
-    - name: sso
-      chart:
-        repository: "oci://ghcr.io/gentian-org/charts"
-        name: gentian-sidecar-sso-saml
-        # 0.1.6 adds the standard app.kubernetes.io/instance pod label that
-        # stableServiceName's alias Service selects on — 0.1.5 (which
-        # activepieces-me still pins, and does not need this since it reaches
-        # the sidecar through its own nginx instead) would yield an alias
-        # Service with no endpoints.
-        version: "0.1.7"
-      extraValues:
-        podLabels:
-          gentianos.io/app: docmost-ce
-        # latest is the only tag this image publishes, and the node already has
-        # it cached from activepieces-me, so IfNotPresent would keep serving a
-        # stale build that predates the configurable-ACS-path fix.
-        image:
-          pullPolicy: Always
-        sso:
-          tenantId: ${TENANT_ID}
-          kernelDomain: ${KERNEL_DOMAIN}
-          issuer: Docmost
-          # Must match kernelRequirements.identity.saml.acsUrl above and the
-          # routed prefix in gateway-api-backends. Without this the sidecar
-          # advertises Activepieces' /api/v1/authn/saml/acs to Keycloak, which
-          # routes nowhere on this host.
-          acsPath: /sso/acs
-        # Only non-secret config: BRIDGE_URL is the docmost-ce Service's
-        # internal-only "bridge" port (charts/docmost — see header comment
-        # for why the provisioning logic and its secrets live there instead
-        # of here). This sidecar never receives a Docmost secret.
-        extraEnvVars:
-          - name: BRIDGE_URL
-            value: "http://docmost-ce.${TENANT_NAMESPACE}.svc.cluster.local:8090/ensure-session"
-        # Deliberately thin: translates a Keycloak SAML assertion into a
-        # single call to this profile's own bridge container (charts/docmost
-        # /templates/configmap-bridge.yaml), which does the actual work
-        # against Docmost's free CE local-auth API — never
-        # apps/server/src/ee/. See header comment for the full design.
-        handlerScript: |
-          module.exports = {
-            onLogin: async (profile, req, res) => {
-              const email = String(profile.email || '').trim().toLowerCase();
-              if (!email) {
-                res.writeHead(400, { 'Content-Type': 'text/plain' });
-                res.end('Docmost bridge: SAML assertion has no email attribute');
-                return;
-              }
-              try {
-                const bridgeRes = await fetch(process.env.BRIDGE_URL, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    email,
-                    firstName: profile.firstName || '',
-                    lastName: profile.lastName || '',
-                  }),
-                });
-                const body = await bridgeRes.json();
-                if (!bridgeRes.ok || !body.cookie) {
-                  throw new Error(body.error || `bridge returned ${bridgeRes.status}`);
-                }
-                // /home, not / — the tenant gateway redirects GET / into
-                // /sso/login, so finishing on / would bounce the user straight
-                // back into the SAML flow forever. /home is where Docmost's
-                // own router sends / anyway.
-                res.writeHead(302, { Location: '/home', 'Set-Cookie': body.cookie });
-                res.end();
-              } catch (err) {
-                console.error('docmost sso bridge relay failed:', err);
-                res.writeHead(502, { 'Content-Type': 'text/plain' });
-                res.end('Docmost bridge: could not establish a session');
-              }
-            },
-          };
-      # Gives this sidecar's Service a fixed name the gateway-api-backends
-      # annotation above can reference — the sidecar's own Helm Release gets
-      # an unpredictable generated name ({xrName}-sso-release), same as any
-      # sidecar; see app-default.yaml's "Emit sidecars" step. Same field
-      # nextcloud/base/base-ce/profile.yaml's "mcp" sidecar and
-      # gentian-pro's od-element "jitsi" sidecar both already use for
-      # exactly this reason.
-      stableServiceName: docmost-sso
-      stableServicePort: 8081
-
   # Customization ladder — see customization.md
   customization:
     grade: D

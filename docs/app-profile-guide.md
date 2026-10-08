@@ -1575,6 +1575,71 @@ CLI to report Ready or inspect `kubectl get app <app> -n tenant-<tenant>`.
 
 ---
 
+### 8e. An app that can do neither OIDC nor SAML — the sign-in sidecar
+
+Some apps have single sign-on only in a paid edition (Docmost, Activepieces). Declaring
+`identity.oidc` for one does nothing, and working around the edition is forbidden (see "no
+licensing bypass" above). What the platform offers instead is its **sign-in sidecar**: a person
+who is signed in at the platform opens the app and is in, with no second sign-in and no password.
+
+A profile declares it and brings a **handler**, the piece of code that knows how this app keeps
+a session:
+
+```yaml
+spec:
+  requires:
+    services:
+      identity:
+        sidecar:
+          entryPaths: ["/", "/login"]   # the app's front page and its own sign-in page
+          database: true                # the handler is given the app's own database
+          secrets: [app_secret]         # and these of spec.secrets.generated
+          appPort: 3000                 # and may call the app inside the cluster
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      denyPaths: [/api/auth/login]      # the app's own ways in, refused at the front door
+```
+
+```yaml
+# kustomization.yaml — the handler travels in the bundle, under the bundle's digest
+configMapGenerator:
+  - name: <profile>.sign-in-handler
+    files:
+      - handler.js=assets/sign-in-handler.js
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    gentianos.io/profile-name: <profile>
+    gentianos.io/asset: sign-in-handler
+```
+
+The profile states no address, no client and no Secret: the platform derives all of them from
+where the app answers and what the app owns. What the platform does for the declaration, and the
+rule that a handler runs only from a bundle of a cluster-wide catalogue that the install is pinned
+to, are in gentian-os, `docs/app-customization.md` ("The sign-in sidecar").
+
+What a handler is given, what it answers and what it must not do:
+[`images/gentian-sidecar-sso-saml/README.md`](../images/gentian-sidecar-sso-saml/README.md). The
+two in this catalogue are the reference.
+
+Before adding one:
+
+1. **Is there a cleaner way?** OIDC in the edition installed; a licence the tenant holds; a
+   sign-in the app takes from a proxy's headers. A handler is the last resort: it is a program
+   that can become anybody in the app.
+2. **Write the `Customization` record first** (`customizations/sign-in-sidecar.yaml`, rung L2):
+   what the handler writes itself rather than through the app's own interface, and whether any of
+   it is more than the installed edition gives its users. That last question is the owner's to
+   answer, and the record must not answer it by silence.
+3. **Everybody is an ordinary member**, nobody gets a password, and the session lasts what the
+   sidecar says.
+4. **Refuse the app's own sign-in at the front door** (`denyPaths`) — above all a first-run or
+   setup call that would hand the installation to whoever made it first.
+5. **Test against the real app** at the pinned version: add `e2e/<app>.e2e.js` beside the two that
+   exist, and run it again before the image tag moves.
+
 ## 9. Secret rotation — Reloader annotation
 
 Add the Stakater Reloader annotation so pods restart automatically when the

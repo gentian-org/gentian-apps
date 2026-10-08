@@ -19,7 +19,6 @@ on:
       - "images/**"
       - "charts/odoo/**"
       - "charts/gentian-sidecar-git-modules/**"
-      - "charts/gentian-sidecar-sso-saml/**"
       - "charts/activepieces/**"
       - "charts/mathesar/**"
       - "charts/docmost/**"
@@ -33,7 +32,6 @@ on:
       - "images/**"
       - "charts/odoo/**"
       - "charts/gentian-sidecar-git-modules/**"
-      - "charts/gentian-sidecar-sso-saml/**"
       - "charts/activepieces/**"
       - "charts/mathesar/**"
       - "charts/docmost/**"
@@ -501,22 +499,6 @@ jobs:
               oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
           fi
 
-  build-sso-saml-sidecar-chart:
-    needs: [release-gate]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Package and push chart
-        uses: ./.github/actions/chart
-        with:
-          dir: charts/gentian-sidecar-sso-saml
-          publish: ${{ needs.release-gate.outputs.publish }}
-          branch-versions: ${{ needs.release-gate.outputs.develop }}
-          pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
-
   build-git-modules-sidecar-chart:
     needs: [release-gate]
     runs-on: ubuntu-latest
@@ -613,7 +595,7 @@ jobs:
         with:
           node-version: "22"
       - name: Sign in through the sidecar, end to end
-        run: images/gentian-sidecar-sso-saml/e2e/run.sh sidecar
+        run: images/gentian-sidecar-sso-saml/e2e/run.sh
 
   build-sso-saml-sidecar-image:
     needs: [release-gate, test-sso-saml-sidecar]

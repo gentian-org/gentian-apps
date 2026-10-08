@@ -1,0 +1,88 @@
+# Customization record — see gentian-os/docs/app-customization.md §5
+#
+# Covers the sign-in handler (assets/sign-in-handler.js): the code the
+# platform's sign-in sidecar runs to make an Activepieces session for a
+# person. The nginx side of it is nginx-sso-routing.yaml.
+apiVersion: gentianos.io/v1alpha1
+kind: Customization
+metadata:
+  # Named after the profile it travels with. No namespace: a companion in a
+  # profile bundle states none, and the cluster puts it where its catalogue
+  # is applied.
+  name: activepieces-me.sign-in-sidecar
+  labels:
+    gentianos.io/profile-name: activepieces-me
+spec:
+  summary: "Sign people in to Activepieces through the platform's sign-in sidecar, with no password"
+
+  target:
+    family: activepieces
+    profile: activepieces-me
+    appVersion: "0.28.0"
+    chartVersion: "0.3.28"
+
+  rung: L2
+  scope: profile
+
+  rungJustification:
+    L0: >-
+      Activepieces' community edition has no setting that takes a person from an
+      identity provider or from a proxy. Its single sign-on is behind a licence key.
+    L1: >-
+      The branding drop-in is the only one, and it carries static files.
+
+  upstreamFirst:
+    attempted: true
+    forwarded: not-needed
+    reason: >-
+      Single sign-on is what upstream sells. A sign-in that goes around it is not
+      something to offer them; the tenant that wants Activepieces' own single sign-on
+      supplies a licence key and the profile then declares identity.oidc.
+
+  artifacts:
+    - repo: gentian-org/gentian-apps
+      path: profiles/activepieces/activepieces-me/assets/sign-in-handler.js
+      version: "1.0.0"
+    - repo: gentian-org/gentian-apps
+      path: images/gentian-sidecar-sso-saml
+      version: "0.2.0"
+
+  origin:
+    authorship: gentian
+    repoOwnership: gentian
+    reviewedBy: platform-team
+    supportContract: none
+
+  owner: platform-team
+  created: 2026-10-08
+  reviewBy: 2027-01-08
+  exitCriteria: >-
+    Gone when Activepieces can sign people in by a standard the platform serves in
+    the edition installed. Until then, on every Activepieces upgrade: run
+    images/gentian-sidecar-sso-saml/e2e/activepieces.e2e.js against the new image
+    before the chart's image tag moves. It fails if the token's fields, the user or
+    project tables, or the first sign-up have changed. The open licensing question
+    below is to be answered before this record's review date, not at it.
+  upgradeRisk: high
+  testedAgainst: ["0.28.0"]
+
+  security:
+    macWaivers: []
+    newEgress: []
+    handlesPersonalData: true
+
+  licensing:
+    effect: none
+    notes: >-
+      Activepieces runs its community edition: no AP_EDITION, no AP_LICENSE_KEY, and
+      no row or switch of the platform table is written — the platform is created by
+      Activepieces' own first sign-up. The handler signs a session token with the
+      installation's own AP_JWT_SECRET. OPEN, for the owner: the community edition
+      (0.28.0) admits a second person only by invitation and then refuses the sign-in
+      with "No project found for user", because it creates a project for the first
+      account only and creating more is behind the manageProjectsEnabled switch. The
+      handler therefore writes the second person's account and a project of their own
+      into the database itself, as the handler before it did. That is one person, one
+      project — not shared projects, roles or any switch — but it is more than the
+      edition's own interface gives, and whether it is within the licence is a
+      judgement this record does not make.

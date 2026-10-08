@@ -3,3 +3,16 @@ kind: Kustomization
 resources:
   - profile.yaml
   - customizations/nginx-sso-routing.yaml
+  - customizations/sign-in-sidecar.yaml
+# The handler of the platform's sign-in sidecar. It is part of the bundle, so
+# an install is pinned to it by the bundle's digest, and it is reviewed with
+# the profile. See customizations/sign-in-sidecar.yaml.
+configMapGenerator:
+  - name: activepieces-me.sign-in-handler
+    files:
+      - handler.js=assets/sign-in-handler.js
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    gentianos.io/profile-name: activepieces-me
+    gentianos.io/asset: sign-in-handler

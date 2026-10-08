@@ -1,0 +1,85 @@
+# Customization record — see gentian-os/docs/app-customization.md §5
+#
+# Covers the sign-in handler (assets/sign-in-handler.js): the code the
+# platform's sign-in sidecar runs to make a Docmost session for a person.
+apiVersion: gentianos.io/v1alpha1
+kind: Customization
+metadata:
+  # Named after the profile it travels with. No namespace: a companion in a
+  # profile bundle states none, and the cluster puts it where its catalogue
+  # is applied.
+  name: docmost-ce.sign-in-sidecar
+  labels:
+    gentianos.io/profile-name: docmost-ce
+spec:
+  summary: "Sign people in to Docmost through the platform's sign-in sidecar, with no password"
+
+  target:
+    family: docmost
+    profile: docmost-ce
+    appVersion: "0.95.0"
+    chartVersion: "0.2.11"
+
+  rung: L2
+  scope: profile
+
+  rungJustification:
+    L0: >-
+      Docmost's free edition has no setting that takes a person from an identity
+      provider or from a proxy: SAML, OIDC and LDAP are all in its paid tree, and
+      there is no trusted-header sign-in in either.
+    L1: >-
+      Docmost has no drop-in surface at all — it is configured by environment
+      variables only.
+
+  upstreamFirst:
+    attempted: true
+    forwarded: not-needed
+    reason: >-
+      Single sign-on is what upstream sells. A sign-in that goes around it is not
+      something to offer them; the tenant that wants Docmost's own single sign-on
+      buys the edition that has it and the profile then declares identity.oidc.
+
+  artifacts:
+    - repo: gentian-org/gentian-apps
+      path: profiles/docmost/docmost-ce/assets/sign-in-handler.js
+      version: "1.0.0"
+    - repo: gentian-org/gentian-apps
+      path: images/gentian-sidecar-sso-saml
+      version: "0.2.0"
+
+  origin:
+    authorship: gentian
+    repoOwnership: gentian
+    reviewedBy: platform-team
+    supportContract: none
+
+  owner: platform-team
+  created: 2026-10-08
+  reviewBy: 2027-01-08
+  exitCriteria: >-
+    Gone when Docmost can sign people in by a standard the platform serves in the
+    edition installed (the profile then declares identity.oidc), or when it can take
+    the person from the front door's headers. Until then, on every Docmost upgrade:
+    run images/gentian-sidecar-sso-saml/e2e/docmost.e2e.js against the new image
+    before the chart's image tag moves. It fails if the session token, the
+    user_sessions table, the setup call or the invitation calls have changed.
+  upgradeRisk: high
+  testedAgainst: ["0.95.0"]
+
+  security:
+    macWaivers: []
+    newEgress: []
+    handlesPersonalData: true
+
+  licensing:
+    effect: none
+    notes: >-
+      Docmost runs its community edition. Nothing under apps/server/src/ee is
+      configured, called or patched, and no licence check is touched. The handler
+      uses what the free edition has for everybody: an account, made with the free
+      edition's own setup and invitation calls, and a session signed with the
+      installation's own APP_SECRET and recorded in user_sessions as Docmost records
+      one. Whether making that session from outside the app, in place of the paid
+      single sign-on, is acceptable to the vendor is the owner's judgement and is
+      not settled by this record.

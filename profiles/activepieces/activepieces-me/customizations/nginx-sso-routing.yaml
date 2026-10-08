@@ -1,8 +1,9 @@
 # Customization record — see gentian-os/docs/app-customization.md §5
 #
-# Covers patches 0005 and 0006 of the activepieces series: the nginx config that
-# fronts the app, the entrypoint that starts it, and the two startup patches that
-# entrypoint applies.
+# Covers patches 0005, 0006 and 0008 of the activepieces series: the nginx config
+# that fronts the app, the entrypoint that starts it, the one startup patch that
+# entrypoint still applies, and the script nginx serves to every page so that a
+# browser with no session goes to the platform's sign-in.
 apiVersion: gentianos.io/v1alpha1
 kind: Customization
 metadata:
@@ -13,13 +14,13 @@ metadata:
   labels:
     gentianos.io/profile-name: activepieces-me
 spec:
-  summary: "Front Activepieces with a Gentian nginx config that routes SAML to the sso-saml sidecar"
+  summary: "Front Activepieces with a Gentian nginx config, and send a browser with no session to the platform's sign-in"
 
   target:
     family: activepieces
     profile: activepieces-me
     appVersion: "0.28.0"
-    chartVersion: "0.3.24"
+    chartVersion: "0.3.28"
 
   rung: L4
   scope: profile
@@ -32,9 +33,10 @@ spec:
       Upstream exposes no conf.d drop-in directory, and the change overrides existing
       location blocks rather than adding new ones — L1 requires an upstream-promised path.
     L2: >-
-      The SAML gateway itself is a companion (gentian-sidecar-sso-saml) and is recorded
-      separately. What is left here is edge routing inside the app's own pod, which a
-      side-by-side deployable cannot express.
+      The sign-in itself is a companion (the platform's sign-in sidecar and this
+      profile's handler) and is recorded separately, in sign-in-sidecar.yaml. What is
+      left here is what the app's own pod serves, which a side-by-side deployable
+      cannot express.
     L3: >-
       Activepieces pieces extend flows, not HTTP routing or process startup. There is
       no in-app extension point for either.
@@ -43,19 +45,23 @@ spec:
     attempted: true
     forwarded: not-needed
     reason: >-
-      Both patches are Gentian portal integration glue — SAML route interception for
-      our IdP topology and the startup wiring that serves it — which upstream would
-      rightly decline. They are deliberately separate from 0001-0003, the three
-      generic upstream defects in the same series, which carry Forwarded: not-yet and
-      are tracked for submission on their own merits.
+      The patches are Gentian platform integration glue — the nginx config for our
+      edge, the startup wiring that serves it, and the script that leads a browser
+      with no session to the platform's sign-in — which upstream would rightly
+      decline. They are deliberately separate from 0001-0003, the three generic
+      upstream defects in the same series, which carry Forwarded: not-yet and are
+      tracked for submission on their own merits.
 
   artifacts:
     - repo: gentian-org/gentian-apps
       path: charts/activepieces/patches/0005-add-nginx-configmap-for-portal-sso-forwarding-and-ht.patch
-      version: "0.3.24"
+      version: "0.3.28"
     - repo: gentian-org/gentian-apps
       path: charts/activepieces/patches/0006-mount-the-gentian-runtime-and-own-the-entrypoint.patch
-      version: "0.3.24"
+      version: "0.3.28"
+    - repo: gentian-org/gentian-apps
+      path: charts/activepieces/patches/0008-leave-the-sign-in-routes-to-the-platform.patch
+      version: "0.3.28"
 
   # No delivery. The field describes how an L3 *module* reaches a running app —
   # git-sidecar, image-layer, addon-profile, app-store-api — and this record is
@@ -76,15 +82,16 @@ spec:
   created: 2026-08-06
   reviewBy: 2027-02-06
   exitCriteria: >-
-    The entrypoint's two startup patches are the L5 residue inside this L4 record and
-    should go first. gentian.startup.injectSessionScript is replaceable by an nginx
-    sub_filter injecting the same script into <head>, once ngx_http_sub_module is
-    confirmed present in the image. gentian.startup.disableUpgradeBanner is
-    replaceable by denying egress to raw.githubusercontent.com, since the fetch it
-    patches is already wrapped in a try/catch returning "0.0.0" — and that patch
-    matches a literal string in a minified bundle, so it fails silently on any
-    upstream rebuild. Both are values, so each can be switched off and verified
-    independently. The routing itself stays as long as SSO is terminated by a sidecar.
+    One startup patch is left as the L5 residue inside this L4 record and should go
+    first: gentian.startup.disableUpgradeBanner is replaceable by denying egress to
+    raw.githubusercontent.com, since the fetch it patches is already wrapped in a
+    try/catch returning "0.0.0" — and that patch matches a literal string in a
+    minified bundle, so it fails silently on any upstream rebuild. The other one is
+    gone: the page is no longer rewritten at start, nginx serves the sign-in script
+    (files/sign-in.js) and references it with a sub_filter. That script stays as long
+    as people are signed in by the sidecar, because Activepieces' page moves to its
+    own sign-in form without a request the edge could redirect. The nginx config
+    stays as long as the chart serves the app through it.
   upgradeRisk: medium
   testedAgainst: ["0.28.0"]
 
@@ -99,11 +106,11 @@ spec:
     effect: none
     notes: >-
       Activepieces runs Community Edition here — no AP_EDITION, no AP_LICENSE_KEY.
-      SAML is terminated by the sso-saml sidecar, which authenticates against
-      Keycloak and then creates an ordinary CE user row and signs a session JWT
-      with the instance's own secret; the app's licensed SSO code path is never
-      invoked, and nginx routes /api/v1/authn/saml/{login,acs} to the sidecar
-      rather than to the backend. The startup license patch and the placeholder
-      AP_LICENSE_KEY were removed in c5b0d4f, which also added the absolute
-      prohibition to docs/app-profile-guide.md. The postInstallJob seeds the
-      platform row with every enterprise gate off.
+      Nothing in these patches touches a licence check or a switch of the platform:
+      nginx serves the app and one script, and the entrypoint starts it. The startup
+      license patch and the placeholder AP_LICENSE_KEY were removed in c5b0d4f, which
+      also added the absolute prohibition to docs/app-profile-guide.md. The job that
+      seeded the platform row is gone as well: it wrote the row with
+      embeddingEnabled set, which the community edition leaves off, and the platform
+      is now created by Activepieces' own first sign-up. How people are signed in,
+      and the question that is open about it, is in sign-in-sidecar.yaml.
