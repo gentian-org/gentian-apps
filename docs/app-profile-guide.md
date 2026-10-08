@@ -434,11 +434,15 @@ That path has two traps for server-side HTTP clients:
   (`NODE_EXTRA_CA_CERTS`, JVM truststore, `SSL_CERT_FILE`), or set the app's
   documented "insecure SSL for testing" flag. See the ACME staging note below and §8a.
 
-**Cross-namespace reachability:** a kernel component calling a tenant app relies
-on the tenant baseline `tenant-isolation` NetworkPolicy allowing ingress from
-`platform-kernel` (operator default). A companion service that must reach the edge
-gateway for a browser-side flow (e.g. an editor fetching `https://<sub>.${TENANT_DOMAIN}`)
-declares `gentianos.io/kernel-egress-namespaces: envoy-gateway-system` on the profile.
+**Cross-namespace reachability:** a profile names no namespace. What an app may
+reach of the platform follows from what it declares under
+`spec.requires.services`: a database, cache or bucket opens that store and its
+port, mail the mail namespaces, and `identity` the edge gateway and the identity
+provider — which is also what a companion needs to fetch
+`https://<sub>.${TENANT_DOMAIN}` in-cluster. Every pod of the app gets these
+paths if it carries the label `gentianos.io/app: <profile>`.
+`gentianos.io/kernel-egress-namespaces` opens whole namespaces by name and is
+for what no declaration can express; an entry needs a comment saying why.
 
 ### Central IdP — required pattern (all profiles)
 
@@ -1072,9 +1076,9 @@ egress + host allowlist) recurs for any such companion:
 
 **Egress for HTTPS hairpin:** Collabora pods fetch Nextcloud settings/files via
 `https://cloud.<tenant_domain>` when opening documents in the browser. The
-CoreDNS hairpin resolves this to the tenant gateway in `envoy-gateway-system`.
-The profile sets `gentianos.io/kernel-egress-namespaces: envoy-gateway-system`
-so the operator grants egress to the gateway namespace.
+CoreDNS hairpin resolves this to the edge gateway. The profile's
+`requires.services.identity` is what opens that path, and the Collabora pod
+carries `gentianos.io/app: nextcloud-base-ce` so that it applies to it.
 
 #### Portal bridge — a kernel → tenant server-side call
 
@@ -1636,7 +1640,7 @@ Before opening a PR, verify:
 - [ ] If `global.hosts.keycloak` is present: `global.domain` is `${KERNEL_DOMAIN}`, tenant app hosts use `${TENANT_ID}` prefix
 - [ ] All IdP URLs use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`; redirect URIs use `${TENANT_DOMAIN}`
 - [ ] Server-side/in-cluster calls (companion callbacks, provisioning, token exchange) use internal `.svc.cluster.local` URLs, not public hostnames — §2. If a public host is unavoidable, staging CA is trusted.
-- [ ] Companion service that must reach the edge gateway sets `gentianos.io/kernel-egress-namespaces` — §2, §6g
+- [ ] No namespace is named: platform paths follow from `spec.requires.services`, companion pods carry `gentianos.io/app`, and any `gentianos.io/kernel-egress-namespaces` entry is commented — §2, §6g
 - [ ] Element *(gentian-pro)*: OIDC redirect is `https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback` (not `chat.`)
 - [ ] Element *(gentian-pro)*: `additionalIngresses` includes `matrix` → `synapse-web:8008` (required) — §6d
 - [ ] Element *(gentian-pro)*: `matrixIdLocalpart: "opendesk_username"` (not `preferred_username`) — §6d
