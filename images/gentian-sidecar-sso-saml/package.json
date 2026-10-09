@@ -1,6 +1,6 @@
 {
   "name": "gentian-sidecar-sso-saml",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Signs a person in to an app that speaks neither OIDC nor SAML: a SAML service provider towards the tenant's realm, and a per-app handler that establishes the app's session.",
   "license": "Apache-2.0",

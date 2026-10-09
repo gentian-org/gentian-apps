@@ -6,7 +6,7 @@ module.exports = {
     async onLogin(person, ctx) {
         return {
             redirect: '/signed-in',
-            cookies: [{ name: 'e2e_session', value: Buffer.from(`${person.email}|${ctx.sessionSeconds}`).toString('base64url') }],
+            cookies: [{ name: 'e2e_session', value: Buffer.from(`${person.email}|${ctx.sessionSeconds}|${person.appAdmin}`).toString('base64url') }],
         };
     },
 };

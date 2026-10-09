@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { test, before } = require('node:test');
-const { makeIdp, buildResponse, makeSignIn, begin, iso } = require('./helpers');
+const { makeIdp, buildResponse, makeSignIn, begin, iso, roleAttribute } = require('./helpers');
 
 let idp;
 let other;
@@ -28,7 +28,7 @@ async function attempt(responseOptions, { person, cookies, configOverrides } = {
 
 test('a signed answer to a request this sidecar sent signs the person in', async () => {
     const result = await attempt({});
-    assert.deepEqual({ ...result.person }, { email: 'anna@acme.example.org', name: 'Anna Example' });
+    assert.deepEqual({ ...result.person }, { email: 'anna@acme.example.org', name: 'Anna Example', appAdmin: false });
     assert.equal(result.sessionSeconds, 3600);
 });
 
@@ -221,4 +221,66 @@ test('no sign-in begins or completes while no certificate is known', async () =>
         samlResponse: buildResponse(idp, config, { requestId: started.requestId }),
         cookies: started.cookies,
     }), 'no-certificate');
+});
+
+// Who administers the app. The realm says it in the assertion it signs, and
+// nothing else is read.
+
+test('a person the realm lists the app administrator\'s role for is one', async () => {
+    const result = await attempt({ attributes: roleAttribute(['gentian-app-admin']) });
+    assert.equal(result.person.appAdmin, true);
+    // Among other roles, and whichever way the realm groups the values.
+    const among = await attempt({ attributes: roleAttribute(['something-else', 'gentian-app-admin']) });
+    assert.equal(among.person.appAdmin, true);
+    const apart = await attempt({ attributes: roleAttribute(['something-else']) + roleAttribute(['gentian-app-admin']) });
+    assert.equal(apart.person.appAdmin, true);
+});
+
+test('without the attribute nobody is an administrator', async () => {
+    assert.equal((await attempt({})).person.appAdmin, false);
+    assert.equal((await attempt({ attributes: roleAttribute([]) })).person.appAdmin, false);
+});
+
+test('another value, or the value under another name, makes no administrator', async () => {
+    for (const roles of [['app-admin'], ['admin'], ['true'], ['Gentian-App-Admin'], [' gentian-app-admin'], ['gentian-app-admin '],
+        ['gentian-app-admins'], ['gentian-app-admin,x'], ['']]) {
+        const result = await attempt({ attributes: roleAttribute(roles) });
+        assert.equal(result.person.appAdmin, false, JSON.stringify(roles));
+    }
+    for (const name of ['role', 'Roles', 'gentianAppAdmin', 'appAdmin', 'groups', 'memberOf']) {
+        const result = await attempt({ attributes: roleAttribute(['gentian-app-admin'], name) });
+        assert.equal(result.person.appAdmin, false, name);
+    }
+});
+
+test('the attribute counts only as the assertion\'s own, not inside something else it carries', async () => {
+    const real = roleAttribute(['gentian-app-admin']);
+    // Carried as the value of another attribute.
+    const nested = '<saml:AttributeStatement><saml:Attribute Name="note"><saml:AttributeValue>' +
+        real + '</saml:AttributeValue></saml:Attribute></saml:AttributeStatement>';
+    assert.equal((await attempt({ attributes: nested })).person.appAdmin, false);
+    // An attribute outside an attribute statement.
+    const loose = '<saml:Advice>' + real + '</saml:Advice>';
+    assert.equal((await attempt({ attributes: loose })).person.appAdmin, false);
+    // Elements of the same names in another namespace.
+    const foreign = real.replace(/saml:/g, 'x:').replace('<x:AttributeStatement>', '<x:AttributeStatement xmlns:x="urn:example:not-saml">');
+    assert.equal((await attempt({ attributes: foreign })).person.appAdmin, false);
+});
+
+test('the attribute added to an answer after the realm signed it gives nothing: the answer is refused', async () => {
+    const forged = roleAttribute(['gentian-app-admin']);
+    // Into the signed assertion.
+    await refused(attempt({ afterSigning: (xml) => xml.replace('</saml:AuthnStatement>', '</saml:AuthnStatement>' + forged) }), 'signature');
+    // Beside the assertion, in the response.
+    await refused(attempt({ afterSigning: (xml) => xml.replace('</samlp:Response>', forged + '</samlp:Response>') }), 'signature');
+    // In an assertion of its own, unsigned, beside the signed one.
+    await refused(attempt({
+        afterSigning: (xml) => xml.replace('</samlp:Response>',
+            '<saml:Assertion ID="_forged" Version="2.0">' + forged + '</saml:Assertion></samlp:Response>'),
+    }), 'signature');
+});
+
+test('the attribute in an assertion the realm did not sign gives nothing, whoever signed the response', async () => {
+    await refused(attempt({ signAssertion: false, attributes: roleAttribute(['gentian-app-admin']) }), 'invalid');
+    await refused(attempt({ assertionKey: other.key, attributes: roleAttribute(['gentian-app-admin']) }), 'invalid');
 });

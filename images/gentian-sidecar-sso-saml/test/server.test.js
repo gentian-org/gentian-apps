@@ -5,7 +5,7 @@ const http = require('node:http');
 const { test, before, after } = require('node:test');
 const zlib = require('node:zlib');
 const { createServer } = require('../lib/server');
-const { makeIdp, buildResponse, makeSignIn } = require('./helpers');
+const { makeIdp, buildResponse, makeSignIn, roleAttribute } = require('./helpers');
 
 let idp;
 let server;
@@ -123,7 +123,7 @@ test('a checked answer becomes the app session the handler described', async () 
     assert.ok(cookies.includes('authToken=abc.def.ghi; Path=/; Max-Age=3600; Secure; SameSite=Lax; HttpOnly'), cookies.join(' | '));
     assert.ok(cookies.some((c) => c.startsWith(started.cookiePair.split('=')[0] + '=; ') && c.includes('Max-Age=0')));
     assert.equal(handlerCalls.length, 1);
-    assert.deepEqual({ ...handlerCalls[0].person }, { email: 'anna@acme.example.org', name: 'Anna Example' });
+    assert.deepEqual({ ...handlerCalls[0].person }, { email: 'anna@acme.example.org', name: 'Anna Example', appAdmin: false });
     assert.equal(handlerCalls[0].ctx.sessionSeconds, 3600);
     assert.equal(handlerCalls[0].ctx.origin, 'https://app.acme.example.org');
 });
@@ -137,6 +137,39 @@ test('identity headers on the ACS request are not believed', async () => {
     });
     assert.equal(res.status, 403);
     assert.equal(handlerCalls.length, 0);
+});
+
+test('the handler is told the person administers the app when the realm\'s signed answer says so', async () => {
+    const started = await startSignIn();
+    const res = await post(buildResponse(idp, config, { requestId: started.requestId, attributes: roleAttribute(['gentian-app-admin']) }),
+        { cookie: started.cookiePair });
+    assert.equal(res.status, 303);
+    assert.equal(handlerCalls[0].person.appAdmin, true);
+    assert.ok(Object.isFrozen(handlerCalls[0].person));
+});
+
+test('nothing a request says about itself makes an administrator', async () => {
+    // At the front door's side of the sign-in: headers a person could try.
+    const claims = {
+        'x-gentian-app-admin': 'true', 'x-gentian-roles': 'gentian-app-admin', 'x-gentian-groups': 'gentian:tenant:acme:app-admins',
+        role: 'gentian-app-admin', 'x-forwarded-user': 'admin',
+    };
+    const started = await startSignIn({ ...FRONT_DOOR, ...claims });
+    // And where the answer is posted: headers, a cookie, the address, and
+    // fields of the form beside the realm's answer.
+    const samlResponse = buildResponse(idp, config, { requestId: started.requestId });
+    const res = await call({
+        method: 'POST', path: '/sso/acs?appAdmin=true&Role=gentian-app-admin',
+        headers: {
+            'content-type': 'application/x-www-form-urlencoded', ...claims,
+            cookie: started.cookiePair + '; appAdmin=true; Role=gentian-app-admin',
+        },
+        body: 'SAMLResponse=' + encodeURIComponent(samlResponse) + '&appAdmin=true&Role=gentian-app-admin',
+    });
+    assert.equal(res.status, 303);
+    assert.equal(handlerCalls.length, 1);
+    assert.equal(handlerCalls[0].person.appAdmin, false);
+    assert.deepEqual(Object.keys(handlerCalls[0].person).sort(), ['appAdmin', 'email', 'name']);
 });
 
 test('a refused answer says nothing of why and starts no session', async () => {

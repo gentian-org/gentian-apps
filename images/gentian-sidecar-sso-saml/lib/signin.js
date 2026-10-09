@@ -27,12 +27,24 @@ const { toPem } = require('./idp');
 //
 // Anything else is refused, and a refusal ends the request it answered: it
 // cannot be tried again with a corrected message.
+//
+// One more thing is read from the assertion, and from nowhere else: whether
+// the realm says this person administers the app (appAdminIn, below).
 
 const NS_PROTOCOL = 'urn:oasis:names:tc:SAML:2.0:protocol';
 const NS_ASSERTION = 'urn:oasis:names:tc:SAML:2.0:assertion';
 const STATUS_SUCCESS = 'urn:oasis:names:tc:SAML:2.0:status:Success';
 const NAMEID_EMAIL = 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress';
 const METHOD_BEARER = 'urn:oasis:names:tc:SAML:2.0:cm:bearer';
+
+// How the realm says that a person administers this app: the platform gives
+// the sidecar's client at the realm one role, grants it to the people who hold
+// the platform's App Admin role, and has the realm list a person's roles at
+// this client in the assertion (gentian-os,
+// crossplane/compositions/app-default.yaml). A client the platform composed
+// has that one role in scope and no other.
+const ROLE_ATTRIBUTE = 'Role';
+const APP_ADMIN_ROLE = 'gentian-app-admin';
 
 const REQUEST_TTL_MS = 5 * 60 * 1000;
 const MAX_PENDING = 5000;
@@ -87,6 +99,25 @@ function only(node, namespace, localName) {
 
 function text(node) {
     return node ? (node.textContent || '').trim() : '';
+}
+
+// appAdminIn answers whether the assertion says the person administers the
+// app. It is given the assertion as the realm signed it and reads nothing
+// else: no header, no form field, no cookie, nothing the browser can write.
+// The attribute has to be the assertion's own (a direct child of one of its
+// attribute statements), under exactly this name, with exactly this value.
+// Absent, under another name, with another value or encrypted: not an
+// administrator.
+function appAdminIn(assertion) {
+    for (const statement of children(assertion, NS_ASSERTION, 'AttributeStatement')) {
+        for (const attribute of children(statement, NS_ASSERTION, 'Attribute')) {
+            if (attribute.getAttribute('Name') !== ROLE_ATTRIBUTE) continue;
+            for (const value of children(attribute, NS_ASSERTION, 'AttributeValue')) {
+                if ((value.textContent || '') === APP_ADMIN_ROLE) return true;
+            }
+        }
+    }
+    return false;
 }
 
 class SignIn {
@@ -264,7 +295,7 @@ class SignIn {
         if (sessionSeconds < 1) throw new Refusal('session-over', 401);
 
         return {
-            person: Object.freeze({ email, name: waiting.name }),
+            person: Object.freeze({ email, name: waiting.name, appAdmin: appAdminIn(assertion) }),
             sessionSeconds,
             requestId,
             spentCookie: cookieNameFor(requestId),
@@ -280,4 +311,4 @@ class SignIn {
     }
 }
 
-module.exports = { SignIn, Refusal, cookieNameFor, REQUEST_TTL_MS, NAMEID_EMAIL };
+module.exports = { SignIn, Refusal, cookieNameFor, REQUEST_TTL_MS, NAMEID_EMAIL, ROLE_ATTRIBUTE, APP_ADMIN_ROLE };

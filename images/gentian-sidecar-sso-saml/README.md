@@ -37,6 +37,27 @@ Everything in this list, or nothing (`lib/signin.js`; each line has a test in `t
 - inside its validity period, with exactly one assertion, in clear, not presented before, and
   no document type declaration.
 
+## Who administers the app
+
+One more thing is read from the answer, and from nowhere else: whether the person administers the
+app. The platform's role for that is **App Admin** — membership of the tenant's group
+`gentian:tenant:<tenant>:app-admins`, which a tenant's administrator gives and takes away in the
+admin console. The platform gives the sidecar's client at the realm one role,
+`gentian-app-admin`, grants it to that group, and has the realm list a person's roles at this
+client in the assertion, in the attribute `Role` (gentian-os,
+`crossplane/compositions/app-default.yaml`). The client is not given the realm's other roles, so
+the list is that one role or nothing.
+
+The sidecar reads the attribute from the assertion as the realm signed it and hands the handler
+`person.appAdmin`: `true` when the assertion's own attribute `Role` has the value
+`gentian-app-admin`, `false` in every other case — no attribute, another name, another value. No
+header, form field, cookie or address is read for it: on the path the answer is posted to nothing
+has vouched for the request, and an answer changed after it was signed is refused whole
+(`test/signin.test.js`, `test/server.test.js`, and against Keycloak in `e2e/sidecar.e2e.js`).
+
+A tenant's administrator is not an app's administrator for being that, and neither is the first
+person to open the app.
+
 A refusal spends the request it answered. The browser is told that the sign-in failed and a
 reference; the reason is in the log under that reference. The log names nobody: no address, no
 name, no assertion, no cookie, no token.
@@ -67,11 +88,15 @@ keeps a session and nothing about SAML.
 
 ```js
 module.exports = {
-  // person: { email, name }   email is what the realm vouched for, in lower case.
+  // person: { email, name, appAdmin }
+  //                           email is what the realm vouched for, in lower case.
   //                           name is for display only (it comes from the front door).
+  //                           appAdmin is true when the realm's signed answer says the
+  //                           person holds the platform's App Admin role, else false.
   // ctx:    { sessionSeconds, origin, log(event, fields) }
   async onLogin(person, ctx) {
-    // find or make the person's account in the app; make a session that ends
+    // find or make the person's account in the app; make it an administrator's
+    // or an ordinary one, as person.appAdmin says; make a session that ends
     // after ctx.sessionSeconds
     return {
       redirect: '/home',                                  // a path on the app's own host
@@ -111,7 +136,13 @@ reaches nothing but what was declared.
 **What a handler must not do:**
 
 - sign anybody in with a shared account, or give a person rights in the app that the app's own
-  free sign-up would not: an ordinary member, never an administrator;
+  free sign-up would not;
+- make anybody an administrator of the app but a person whose `person.appAdmin` is `true`, or
+  leave one an administrator whose `person.appAdmin` is not: the role is given and taken away at
+  every sign-in, in the app's own way, before the session is made. A handler treats anything but
+  `true` as no — a sidecar built before this was added says nothing, and nothing is no. The
+  account the app keeps for itself (the one a workspace or an installation is created with) is
+  nobody's: its role is left alone, and a person who holds its address is refused;
 - give anybody a password, or keep one. Where the app's own calls demand one for a new account,
   a random value is given and removed again;
 - log who signed in. `ctx.log` is for what happened, not to whom;
@@ -122,7 +153,8 @@ The handlers in this catalogue are the reference:
 `profiles/activepieces/activepieces-me/assets/sign-in-handler.js`, which sign a session token
 with the app's own key, and `profiles/openproject/openproject-ce/assets/sign-in-handler.js`, for
 an app that keeps its sessions in its database: it signs nothing, and has the app make the
-session itself from a token that works once.
+session itself from a token that works once. Each settles who administers its app; what an
+administrator is in each app is in the profile's `customization.md`.
 
 ## Tests
 
@@ -131,7 +163,7 @@ npm ci && npm test                 # the checks above, against responses signed 
 
 docker build -t sso-sidecar:e2e .  # then, with docker, against the real things:
 node --test e2e/sidecar.e2e.js       # Keycloak 26.8.0, at the three kinds of address an app has
-node --test e2e/docmost.e2e.js       # + Docmost 0.95.0, with the profile's handler
+node --test e2e/docmost.e2e.js       # + Docmost 0.95.0, with the profile's handler and its post-install job
 node --test e2e/activepieces.e2e.js  # + Activepieces 0.28.0, started as the chart starts it
 node --test e2e/openproject.e2e.js   # + OpenProject 16.6.10, started as its chart starts it with the profile's values
 ```

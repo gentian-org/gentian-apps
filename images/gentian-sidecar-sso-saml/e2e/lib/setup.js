@@ -79,12 +79,20 @@ async function startKeycloak() {
     const headers = { host: IDP_HOST, 'x-forwarded-proto': 'https' };
     await waitFor('Keycloak', async () => (await call('GET', `${upstream}/auth/realms/master`, { headers })).status === 200);
 
-    const tokenRes = await call('POST', `${upstream}/auth/realms/master/protocol/openid-connect/token`, {
-        headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded' },
-        body: 'grant_type=password&client_id=admin-cli&username=admin&password=admin-e2e',
-    });
-    const token = JSON.parse(tokenRes.body).access_token;
+    // An administrator's token lasts a minute, and a run changes who is in
+    // which group long after it began: a new one is fetched when the last is
+    // half a minute old.
+    let token = '';
+    let tokenAt = 0;
     const admin = async (method, path, json) => {
+        if (Date.now() - tokenAt > 30000) {
+            const tokenRes = await call('POST', `${upstream}/auth/realms/master/protocol/openid-connect/token`, {
+                headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded' },
+                body: 'grant_type=password&client_id=admin-cli&username=admin&password=admin-e2e',
+            });
+            token = JSON.parse(tokenRes.body).access_token;
+            tokenAt = Date.now();
+        }
         const res = await call(method, `${upstream}/auth/admin${path}`, {
             headers: { ...headers, authorization: `Bearer ${token}`, 'content-type': 'application/json' },
             body: json === undefined ? undefined : JSON.stringify(json),
@@ -134,8 +142,72 @@ function sidecarClient(host) {
     };
 }
 
-async function ensureSidecarClient(kc, realm, host) {
+// The role the realm lists for a person who administers the app, the
+// attribute it is listed under, and the group whose members hold the
+// platform's App Admin role in a tenant. The names are the platform's
+// (gentian-os: app-default.yaml, internal/keycloak/groups.go) and the
+// sidecar's (lib/signin.js).
+const APP_ADMIN_ROLE = 'gentian-app-admin';
+const ROLE_ATTRIBUTE = 'Role';
+function appAdminsGroup(tenant) {
+    return `gentian:tenant:${tenant}:app-admins`;
+}
+
+async function groupId(kc, realm, name) {
+    await kc.admin('POST', `/realms/${realm}/groups`, { name });
+    const found = JSON.parse((await kc.admin('GET', `/realms/${realm}/groups?search=${encodeURIComponent(name)}&exact=true`)).body);
+    const group = found.find((g) => g.name === name);
+    if (!group) throw new Error(`no group ${name} in ${realm}`);
+    return group.id;
+}
+
+async function userId(kc, realm, email) {
+    const found = JSON.parse((await kc.admin('GET', `/realms/${realm}/users?email=${encodeURIComponent(email)}&exact=true`)).body);
+    if (found.length !== 1) throw new Error(`no person ${email} in ${realm}`);
+    return found[0].id;
+}
+
+// What the platform composes for an app's sign-in sidecar: the client above,
+// one role at it, that role granted to the tenant's app administrators'
+// group, and a mapper that lists a person's roles at this client in the
+// assertion. The scope the realm gives every new SAML client ("role_list")
+// is left as the realm made it, as it is on a cluster.
+async function ensureSidecarClient(kc, realm, host, { tenant = realm } = {}) {
+    const clientId = `https://${host}/sso`;
     await kc.admin('POST', `/realms/${realm}/clients`, sidecarClient(host));
+    const clients = JSON.parse((await kc.admin('GET', `/realms/${realm}/clients?clientId=${encodeURIComponent(clientId)}`)).body);
+    const id = clients[0].id;
+    await kc.admin('POST', `/realms/${realm}/clients/${id}/roles`, { name: APP_ADMIN_ROLE });
+    const role = JSON.parse((await kc.admin('GET', `/realms/${realm}/clients/${id}/roles/${APP_ADMIN_ROLE}`)).body);
+    const group = await groupId(kc, realm, appAdminsGroup(tenant));
+    await kc.admin('POST', `/realms/${realm}/groups/${group}/role-mappings/clients/${id}`, [{ id: role.id, name: role.name }]);
+    await kc.admin('POST', `/realms/${realm}/clients/${id}/protocol-mappers/models`, {
+        name: 'app-admin', protocol: 'saml', protocolMapper: 'saml-role-list-mapper',
+        config: { 'attribute.name': ROLE_ATTRIBUTE, 'attribute.nameformat': 'Basic', single: 'true' },
+    });
+    return id;
+}
+
+// setAppAdmin gives a person the platform's App Admin role in a tenant, or
+// takes it away: membership of the tenant's app administrators' group, which
+// is what a tenant's administrator changes in the admin console.
+async function setAppAdmin(kc, realm, email, member, { tenant = realm } = {}) {
+    const group = await groupId(kc, realm, appAdminsGroup(tenant));
+    const user = await userId(kc, realm, email);
+    await kc.admin(member ? 'PUT' : 'DELETE', `/realms/${realm}/users/${user}/groups/${group}`);
+}
+
+// The roles the realm listed in an answer it posted, read from the answer
+// as a browser carried it.
+function rolesIn(samlResponse) {
+    const xml = Buffer.from(samlResponse, 'base64').toString('utf8');
+    const out = [];
+    const attribute = /<(?:\w+:)?Attribute\b[^>]*\bName="([^"]*)"[^>]*>([\s\S]*?)<\/(?:\w+:)?Attribute>/g;
+    for (let m = attribute.exec(xml); m; m = attribute.exec(xml)) {
+        const value = /<(?:\w+:)?AttributeValue\b[^>]*>([^<]*)</g;
+        for (let v = value.exec(m[2]); v; v = value.exec(m[2])) out.push(`${m[1]}=${v[1]}`);
+    }
+    return out;
 }
 
 // The sidecar, with the settings the platform gives it for an app at host.
@@ -177,4 +249,5 @@ function logsOf(container) {
 module.exports = {
     NETWORK, IDP_HOST, IDP_BASE, docker, tryDocker, publishedPort, sleep, call, waitFor,
     startKeycloak, ensureRealm, ensureSidecarClient, sidecarClient, startSidecar, sidecarReady, logsOf,
+    setAppAdmin, groupId, userId, rolesIn, appAdminsGroup, APP_ADMIN_ROLE, ROLE_ATTRIBUTE,
 };

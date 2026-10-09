@@ -93,6 +93,9 @@ function buildResponse(idp, config, options) {
         responseKey: idp.key,
         subjectInResponseTo: undefined,
         secondAssertion: false,
+        // XML put inside the assertion, after the authentication statement
+        // and before the assertion is signed.
+        attributes: '',
         afterSigning: (xml) => xml,
         ...(options || {}),
     };
@@ -110,7 +113,7 @@ function buildResponse(idp, config, options) {
         `<saml:AudienceRestriction><saml:Audience>${o.audience}</saml:Audience></saml:AudienceRestriction></saml:Conditions>` +
         `<saml:AuthnStatement AuthnInstant="${iso(-5)}" SessionIndex="session::client"${session}>` +
         '<saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:unspecified</saml:AuthnContextClassRef></saml:AuthnContext>' +
-        '</saml:AuthnStatement></saml:Assertion>';
+        '</saml:AuthnStatement>' + o.attributes + '</saml:Assertion>';
 
     let assertion = assertionOf(o.assertionId);
     if (o.signAssertion) assertion = sign(assertion, o.assertionId, o.assertionKey);
@@ -126,6 +129,16 @@ function buildResponse(idp, config, options) {
         '</samlp:Response>';
     if (o.signResponse) response = sign(response, o.responseId, o.responseKey);
     return Buffer.from(o.afterSigning(response), 'utf8').toString('base64');
+}
+
+// roleAttribute is the attribute statement a realm writes for a person's
+// roles at the sidecar's client, one value per role.
+function roleAttribute(roles, name = 'Role') {
+    return '<saml:AttributeStatement>' +
+        `<saml:Attribute Name="${name}" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic">` +
+        roles.map((role) => '<saml:AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema" ' +
+            `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">${role}</saml:AttributeValue>`).join('') +
+        '</saml:Attribute></saml:AttributeStatement>';
 }
 
 // A SignIn with its certificates given directly, and a clock that can be moved.
@@ -158,4 +171,4 @@ async function begin(signIn, person) {
     return { requestId, request, url, cookies: { [started.cookie.name]: started.cookie.value }, cookie: started.cookie };
 }
 
-module.exports = { makeIdp, testConfig, buildResponse, makeSignIn, begin, iso, sign, ENV };
+module.exports = { makeIdp, testConfig, buildResponse, makeSignIn, begin, iso, sign, roleAttribute, ENV };
