@@ -21,5 +21,5 @@ for run in "${runs[@]}"; do
     echo "=== ${run} ==="
     node --test "e2e/${run}.e2e.js" || status=1
 done
-[ -n "${E2E_KEEP:-}" ] || docker rm -f sso-e2e-kc >/dev/null 2>&1 || true
+[ -n "${E2E_KEEP:-}" ] || docker rm -f "${E2E_NETWORK:-sso-e2e}-kc" >/dev/null 2>&1 || true
 exit "${status}"

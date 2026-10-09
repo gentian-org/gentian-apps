@@ -35,6 +35,11 @@
 // minute. OpenProject does the same when a token is destroyed through its own
 // pages; it has no lifetime of its own for a session.
 //
+// And when the person signs out at the platform (onLogout): their sessions
+// and the tokens they were made from are deleted, as they are when a token
+// has run out. OpenProject reads a session from its database on every
+// request, so the cookie is nobody's from then on.
+//
 // Nobody has a password. OpenProject's interface demands one for a new
 // account, so a random value is given and its stored hash is deleted again at
 // once; the profile switches password sign-in off altogether.
@@ -270,5 +275,21 @@ module.exports = {
             redirect: '/',
             cookies: [{ name: SESSION_COOKIE, value: session }],
         };
+    },
+    // The person signed out at the platform: their sessions in OpenProject
+    // end. All of them, in every browser -- password sign-in is switched
+    // off, so there is no session of theirs that was not made here. The
+    // sessions first and then the tokens they were made from, as for a token
+    // that has run out.
+    async onLogout(person, ctx) {
+        const user = await findUser(person.email);
+        // Two accounts under one address: nobody was signed in as either.
+        if (!user || user.ambiguous) return;
+        const linked = await pool.query(
+            'delete from sessions where id in (select l.session_id from autologin_session_links l ' +
+            'join tokens t on t.id = l.token_id where t.type = $1 and t.user_id = $2)', [AUTOLOGIN_TOKEN, user.id]);
+        const own = await pool.query('delete from sessions where user_id = $1', [user.id]);
+        await pool.query('delete from tokens where type = $1 and user_id = $2', [AUTOLOGIN_TOKEN, user.id]);
+        ctx.log('sessions-ended', { count: linked.rowCount + own.rowCount });
     },
 };

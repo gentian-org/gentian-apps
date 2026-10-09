@@ -8,6 +8,8 @@
 // under the cluster's domain, the one tenant of a single-tenancy cluster and
 // a tenant on a domain of its own, and only the platform knows which applies.
 
+// Optional: SSO_LOGOUT_URL, SSO_LOGIN_PATH, SSO_SESSION_MAX_SECONDS,
+// SSO_CLOCK_SKEW_MS, SSO_HANDLER_PATH, PORT.
 const REQUIRED = [
     'SSO_ENTITY_ID',
     'SSO_ACS_URL',
@@ -75,6 +77,37 @@ function loadConfig(env) {
         throw new Error('SSO_IDP_DESCRIPTOR_URL must be an http or https URL');
     }
 
+    // Where the realm tells this sidecar that a person signed out: an address
+    // inside the cluster, which the realm calls server to server, so it may be
+    // plain http and is not on the app's public host. Optional: a sidecar
+    // that is given none takes no sign-out at all.
+    let logoutUrl = null;
+    let logoutPath = null;
+    let logoutHost = null;
+    if (env.SSO_LOGOUT_URL) {
+        let url;
+        try {
+            url = new URL(env.SSO_LOGOUT_URL);
+        } catch {
+            throw new Error('SSO_LOGOUT_URL is not a URL');
+        }
+        if (!['http:', 'https:'].includes(url.protocol)) throw new Error('SSO_LOGOUT_URL must be an http or https URL');
+        if (url.username || url.password || url.hash || url.search) {
+            throw new Error('SSO_LOGOUT_URL must not carry credentials, a query or a fragment');
+        }
+        logoutPath = plainPath('SSO_LOGOUT_URL path', url.pathname);
+        if (logoutPath === acsPath || logoutPath === loginPath) {
+            throw new Error('the path of SSO_LOGOUT_URL is the sign-in\'s own');
+        }
+        logoutHost = url.host.toLowerCase();
+        if (logoutHost === acsUrl.host.toLowerCase()) {
+            throw new Error('SSO_LOGOUT_URL is on the app\'s public host: a sign-out is told inside the cluster');
+        }
+        // As written, not as a URL parser would write it again: the realm
+        // names this string in its request, and the two are compared.
+        logoutUrl = env.SSO_LOGOUT_URL;
+    }
+
     const handlerDigest = env.SSO_HANDLER_SHA256.replace(/^sha256:/, '').toLowerCase();
     if (!/^[0-9a-f]{64}$/.test(handlerDigest)) {
         throw new Error('SSO_HANDLER_SHA256 is not a sha256 digest');
@@ -96,6 +129,9 @@ function loadConfig(env) {
         idpEntityId: env.SSO_IDP_ENTITY_ID,
         idpSsoUrl: idpSsoUrl.toString(),
         descriptorUrl: descriptorUrl.toString(),
+        logoutUrl,
+        logoutPath,
+        logoutHost,
         realm: env.SSO_REALM,
         handlerPath: env.SSO_HANDLER_PATH || '/usr/src/app/custom/handler.js',
         handlerDigest,

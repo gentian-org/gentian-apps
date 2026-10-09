@@ -13,6 +13,7 @@ const { test, before, after } = require('node:test');
 const { Browser, frontDoor, keycloak } = require('./lib/browser');
 const setup = require('./lib/setup');
 const { signInOf, postInstallOf } = require('./lib/profile');
+const { refusedSignOuts } = require('./lib/signout');
 
 const IMAGE = 'docker.io/docmost/docmost:0.95.0';
 const HOST = 'docs.acme.e2e.test';
@@ -77,8 +78,8 @@ before(async () => {
     kc = await setup.startKeycloak();
     await setup.ensureRealm(kc, REALM, [ANNA, BEN, CARL, IMPOSTOR]);
     for (const person of [ANNA, BEN, CARL]) await setup.setAppAdmin(kc, REALM, person.email, false);
-    await setup.ensureSidecarClient(kc, REALM, HOST);
-    for (const name of Object.values(names)) setup.tryDocker('rm', '-f', name);
+    await setup.ensureSidecarClient(kc, REALM, HOST, { logoutUrl: setup.logoutUrlOf(names.sidecar) });
+    for (const name of Object.values(names)) setup.removeSidecar(name);
     setup.docker('run', '-d', '--name', names.pg, '--network', setup.NETWORK,
         '-e', 'POSTGRES_USER=docmost', '-e', 'POSTGRES_PASSWORD=dm-e2e', '-e', 'POSTGRES_DB=docmost', 'postgres:16-alpine');
     setup.docker('run', '-d', '--name', names.redis, '--network', setup.NETWORK, 'redis:7-alpine');
@@ -106,7 +107,7 @@ before(async () => {
 after(() => {
     if (scriptDir) fs.rmSync(scriptDir, { recursive: true, force: true });
     if (process.env.E2E_KEEP) return;
-    for (const name of Object.values(names)) setup.tryDocker('rm', '-f', name);
+    for (const name of Object.values(names)) setup.removeSidecar(name);
 });
 
 function browserAs(door) {
@@ -380,6 +381,53 @@ test('signing out in Docmost ends the session there', async () => {
     assert.equal(again.status, 401);
 });
 
+// Signing out at the platform. The realm tells the sidecar, and the handler
+// ends the person's sessions in Docmost.
+
+// The token as a browser would go on presenting it, straight to Docmost.
+async function tokenStatus(token) {
+    const res = await setup.call('POST', `${appUpstream}/api/users/me`, {
+        headers: { host: HOST, 'content-type': 'application/json', cookie: `authToken=${token}` }, body: '{}',
+    });
+    return res.status;
+}
+
+test('signing out at the platform ends the person\'s session in Docmost, and nobody else\'s', async () => {
+    const anna = (await signIn(ANNA)).browser;
+    const carl = (await signIn(CARL)).browser;
+    const annaToken = anna.cookie(HOST, 'authToken').value;
+    const carlToken = carl.cookie(HOST, 'authToken').value;
+    assert.equal(await tokenStatus(annaToken), 200);
+    assert.equal(await tokenStatus(carlToken), 200);
+
+    const posted = (await setup.signOutPosts(sidecar)).length;
+    await setup.signOutAtRealm(anna, REALM);
+    const posts = await setup.waitForSignOut(sidecar, posted + 1);
+    assert.equal(posts.length, posted + 1, 'the realm told the sidecar once');
+    assert.equal(posts[posts.length - 1].status, 200);
+    assert.equal(posts[posts.length - 1].host, sidecar.service.host);
+
+    // Her token, which has most of its hour left, opens nothing: the next
+    // person at this browser is not her.
+    assert.equal(await tokenStatus(annaToken), 401);
+    assert.equal((await whoAmI(anna)).status, 401);
+    assert.equal(psql(`select count(*) from user_sessions s join users u on u.id = s.user_id where u.email = '${ANNA.email}'`), '0');
+    // Carl is where he was.
+    assert.equal(await tokenStatus(carlToken), 200);
+    assert.equal((await whoAmI(carl)).body.data.user.email, CARL.email);
+
+    // Opening Docmost again leads to the realm, which asks who she is.
+    const again = await anna.navigate(`https://${HOST}/`);
+    assert.match(again.body, /kc-form-login/);
+});
+
+test('a sign-out the realm did not send, or sent before, ends no session in Docmost', async () => {
+    const carl = (await signIn(CARL)).browser;
+    const token = carl.cookie(HOST, 'authToken').value;
+    await refusedSignOuts(sidecar, { realm: REALM, email: CARL.email });
+    assert.equal(await tokenStatus(token), 200);
+});
+
 test('an account switched off in Docmost is not signed in', async () => {
     psql(`update users set deactivated_at = now() where email = '${BEN.email}'`);
     const browser = browserAs({ person: BEN });
@@ -392,5 +440,6 @@ test('an account switched off in Docmost is not signed in', async () => {
 test('the sidecar\'s log names nobody', () => {
     const logs = setup.logsOf(names.sidecar);
     assert.match(logs, /"event":"signed-in"/);
+    assert.match(logs, /"event":"signed-out"/);
     assert.doesNotMatch(logs, /anna|ben@|carl|dora|Example/i);
 });

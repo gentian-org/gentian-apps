@@ -298,6 +298,9 @@ class SignIn {
             person: Object.freeze({ email, name: waiting.name, appAdmin: appAdminIn(assertion) }),
             sessionSeconds,
             requestId,
+            // The realm session this sign-in came from, as the realm names it
+            // when that session ends (lib/signout.js).
+            sessionIndex: statement ? statement.getAttribute('SessionIndex') || '' : '',
             spentCookie: cookieNameFor(requestId),
         };
     }

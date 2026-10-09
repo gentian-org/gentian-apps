@@ -28,6 +28,10 @@
 //   5. a session row and the token that names it, both ending when the
 //      sidecar says the session ends.
 //
+// And when the person signs out at the platform (onLogout): their session
+// rows are deleted. Docmost looks a token's session up on every request, so
+// every token of theirs is refused from then on, in whichever browser it is.
+//
 // Nobody has a password. Docmost's calls demand one for a new account, so a
 // random value is given and the stored hash is removed again at once.
 //
@@ -262,5 +266,15 @@ module.exports = {
             redirect: '/home',
             cookies: [{ name: 'authToken', value: token }],
         };
+    },
+    // The person signed out at the platform: their sessions in Docmost end.
+    // All of them, in every browser -- nobody has a password, so there is no
+    // session of theirs that was not made here. Docmost reads a token's
+    // session from this table on every request and refuses a token whose
+    // session is gone, which is also how its own sign-out works.
+    async onLogout(person, ctx) {
+        const ended = await pool.query(
+            'delete from user_sessions where user_id in (select id from users where lower(email) = $1)', [person.email]);
+        ctx.log('sessions-ended', { count: ended.rowCount });
     },
 };

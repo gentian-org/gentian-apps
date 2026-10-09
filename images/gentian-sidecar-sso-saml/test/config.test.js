@@ -89,3 +89,35 @@ test('no certificate is known until the descriptor has been read', async () => {
     assert.equal(await certificates.refreshIfStale(), true, 'changed');
     assert.deepEqual(certificates.known(), ['TkVXSw==']);
 });
+
+test('the sign-out address is optional, inside the cluster, and never one of the sign-in\'s', () => {
+    assert.equal(loadConfig(ENV).logoutUrl, null);
+    const url = 'http://app-sign-in.tenant-acme.svc.cluster.local:8081/sso/logout';
+    const config = loadConfig({ ...ENV, SSO_LOGOUT_URL: url });
+    assert.equal(config.logoutUrl, url);
+    assert.equal(config.logoutPath, '/sso/logout');
+    assert.equal(config.logoutHost, 'app-sign-in.tenant-acme.svc.cluster.local:8081');
+    assert.throws(() => loadConfig({ ...ENV, SSO_LOGOUT_URL: 'app-sign-in/sso/logout' }), /not a URL/);
+    assert.throws(() => loadConfig({ ...ENV, SSO_LOGOUT_URL: 'ftp://app-sign-in/sso/logout' }), /http or https/);
+    assert.throws(() => loadConfig({ ...ENV, SSO_LOGOUT_URL: url + '?to=elsewhere' }), /query/);
+    assert.throws(() => loadConfig({ ...ENV, SSO_LOGOUT_URL: 'http://user:pw@app-sign-in:8081/sso/logout' }), /credentials/);
+    assert.throws(() => loadConfig({ ...ENV, SSO_LOGOUT_URL: 'http://app-sign-in:8081/sso/acs' }), /sign-in's own/);
+    assert.throws(() => loadConfig({ ...ENV, SSO_LOGOUT_URL: 'http://app-sign-in:8081/sso/login' }), /sign-in's own/);
+    assert.throws(() => loadConfig({ ...ENV, SSO_LOGOUT_URL: 'https://app.acme.example.org/sso/logout' }), /public host/);
+});
+
+test('a handler may bring onLogout, and it must be a function', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sso-handler-'));
+    try {
+        const load = (source) => {
+            const file = path.join(dir, crypto.randomBytes(4).toString('hex') + '.js');
+            fs.writeFileSync(file, source);
+            return loadHandler(file, crypto.createHash('sha256').update(source).digest('hex'));
+        };
+        assert.equal(typeof load('module.exports = { onLogin() {}, onLogout() {} };').onLogout, 'function');
+        assert.equal(load('module.exports = { onLogin() {} };').onLogout, undefined);
+        assert.throws(() => load('module.exports = { onLogin() {}, onLogout: true };'), /onLogout/);
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});

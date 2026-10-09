@@ -146,6 +146,17 @@ pinned to.
 
 - The token is in `localStorage`, where any script running on the app's pages can read it. That is
   how Activepieces is built. It is good for an hour, and only through the front door.
+- **Signing out at the platform does not end the session in Activepieces.** The realm tells the
+  sidecar, and the handler has nothing to end it with: at 0.28.0 Activepieces checks a token by
+  its signature and its end alone (`authentication/lib/access-token-manager.ts`) and looks
+  nothing up — no session row, no version of the token on the account, not even whether the
+  account is still active. The one thing that would refuse it is another signing key, which
+  would sign everybody out and restart the app. So the handler has no `onLogout`, the sidecar
+  logs `no-sign-out-handling`, and the token lasts what is left of its hour: on a shared
+  browser, the next person who opens Activepieces within that hour — through the front door, as
+  somebody who may use it — is shown the previous person's flows. Activepieces today checks a token
+  against a version kept with the account (`tokenVersion`); moving to such a release is what
+  would close this.
 - An account is found by e-mail address. A person given an address somebody else had before gets
   that account.
 - A person removed at the platform keeps their account and flows. Their flows keep running.

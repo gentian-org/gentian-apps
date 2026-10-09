@@ -17,6 +17,7 @@ It is a SAML service provider towards the tenant's realm, on the app's own host:
 |---|---|---|
 | `GET /sso/login` | behind the front door, so only by a person who may use the app | sends the browser to the realm with a SAML request |
 | `POST /sso/acs` | without a session, because the realm posts its answer from its own address | checks the answer, then asks the app's **handler** to make a session |
+| `POST /sso/logout` | by the realm only, inside the cluster, under the sidecar's own Service name; not routed from outside | checks the realm's sign-out request, then asks the handler to end that person's sessions in the app |
 | `GET /healthz`, `GET /readyz` | by the kubelet | ready means the realm's signing certificate is known |
 
 The realm recognises the person from the sign-in at the platform and answers without asking.
@@ -36,6 +37,42 @@ Everything in this list, or nothing (`lib/signin.js`; each line has a test in `t
   vouches for is the address in the front door's identity header);
 - inside its validity period, with exactly one assertion, in clear, not presented before, and
   no document type declaration.
+
+## Signing out
+
+When a person signs out at the platform, the realm ends its session and tells every client that
+session was used at. For the sidecar that is SAML single logout over the back channel: the realm
+posts a signed `LogoutRequest`, server to server, to the address the platform registered for the
+sidecar's client — `http://<app>-sign-in.<namespace>.svc.cluster.local:8081/sso/logout`, the
+sidecar's own Service. Nothing public is opened for it: the path is not among the routes of the
+app's host, and the sidecar answers it only under that Service name.
+
+Keycloak 26.8.0 posts the request once, when the person signs out or an administrator ends the
+session; not again if the sidecar did not answer, and not when a session merely runs out. It
+reads the answer's status and nothing else, so the sidecar answers `200` with no SAML message.
+
+What is accepted as such a request (`lib/signout.js`; each line has a test in `test/`):
+
+- signed by a certificate of the realm, over the request as a whole;
+- a `LogoutRequest`, issued by the realm the sidecar was told about;
+- addressed to it: `Destination` is its own sign-out address;
+- issued within the last two minutes and not in the future, and not past its `NotOnOrAfter`
+  where it carries one;
+- not presented before;
+- naming one person, by e-mail address (`NameID`), in clear — the same name the sign-in reads;
+- exactly one request in the post, and no document type declaration.
+
+The person is the one the request names. Its `SessionIndex` is the realm session; the sidecar
+remembers which person each realm session signed in here, and a request that names a session for
+somebody else is refused. That memory is the process's own: after a restart a request is taken
+on the person it names alone.
+
+The handler's `onLogout` is then called with that person. **A handler without `onLogout`** is a
+handler for an app whose session cannot be ended from outside: the realm is answered `200`, the
+log says `no-sign-out-handling`, and the app's session ends when its hour does.
+
+A request that is refused ends nobody's session. The most a forged one could do, were it
+accepted, is sign a person out of one app; it could never sign anybody in.
 
 ## Who administers the app
 
@@ -79,6 +116,7 @@ All given by the platform. Nothing is assembled from a tenant's name and a domai
 | `SSO_IDP_DESCRIPTOR_URL` | the realm's SAML descriptor inside the cluster, for its signing certificate |
 | `SSO_REALM` | the realm's name; a person of another realm begins no sign-in |
 | `SSO_HANDLER_SHA256` | sha256 of the handler; a file that is not that file is not loaded |
+| `SSO_LOGOUT_URL` | optional; where the realm tells the sidecar of a sign-out, `http://<app>-sign-in.<namespace>.svc.cluster.local:8081/sso/logout`. Plain http, because it is inside the cluster; never on the app's public host. Without it the sidecar has no sign-out path |
 | `SSO_SESSION_MAX_SECONDS` | optional; may lower the session's hour, never raise it |
 
 ## A handler
@@ -105,6 +143,14 @@ module.exports = {
     };
     // or: return { refuse: true };                       // this person is not signed in
   },
+
+  // Optional. The person signed out at the platform.
+  // person: { email }        the address the realm's signed request names, in lower case.
+  // ctx:    { origin, log(event, fields) }
+  async onLogout(person, ctx) {
+    // end every session this person has in the app, in every browser
+    // answers nothing; throwing tells the realm the sign-out failed here
+  },
 };
 ```
 
@@ -123,9 +169,22 @@ response, so these are the same for every app and are not a handler's to get wro
 **A session ends when the sidecar says.** `ctx.sessionSeconds` is at most an hour and never
 later than the realm session the answer came from. A handler that signs a token gives it that
 lifetime. When it has run out the app sends the browser back to the sign-in, which is silent
-while the person is still signed in at the platform. One hour bounds how long an app session can
-show the previous person to the next one at the same browser; it is not what keeps a person out
-who was removed — the front door does that, on every request, within minutes.
+while the person is still signed in at the platform.
+
+**A session ends when the person signs out, where the app can end one.** `onLogout` ends that
+person's sessions in the app: all of them, in every browser, because the handler is told who
+signed out and not which of their sessions came from which browser. A person signed in at two
+devices who signs out at one is asked nothing at the other — the app there sends the browser
+through the sign-in again, which is silent while that device is still signed in at the platform.
+`onLogout` creates nothing, changes no account and no role, and must be safe to call for a
+person the app has never seen. It is written so that it works whether or not it is ever called:
+a sidecar built before sign-out existed calls only `onLogin`.
+
+Where `onLogout` exists, a sign-out ends the app's session at once, and the hour is what is left
+when the realm's one notice did not arrive (the sidecar was restarting) or the realm session ran
+out without a sign-out. Where it does not, the hour bounds how long an app session can show the
+previous person to the next one at the same browser. Neither is what keeps a person out who was
+removed — the front door does that, on every request, within minutes.
 
 **What a handler has** is what the app's profile declared for it and nothing else: the app's
 own database (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`), the app's own secrets
@@ -156,19 +215,29 @@ an app that keeps its sessions in its database: it signs nothing, and has the ap
 session itself from a token that works once. Each settles who administers its app; what an
 administrator is in each app is in the profile's `customization.md`.
 
+Docmost's and OpenProject's end a person's sessions in `onLogout`: each app looks a session up
+in its database on every request, so deleting the rows ends it. Activepieces' has no `onLogout`:
+at 0.28.0 its token is checked by signature and end alone, against nothing a handler could
+change, so its session lasts its hour.
+
 ## Tests
 
 ```bash
 npm ci && npm test                 # the checks above, against responses signed in the test
 
 docker build -t sso-sidecar:e2e .  # then, with docker, against the real things:
-node --test e2e/sidecar.e2e.js       # Keycloak 26.8.0, at the three kinds of address an app has
+node --test e2e/sidecar.e2e.js       # Keycloak 26.8.0, at the three kinds of address an app has; sign-in and sign-out
 node --test e2e/docmost.e2e.js       # + Docmost 0.95.0, with the profile's handler and its post-install job
 node --test e2e/activepieces.e2e.js  # + Activepieces 0.28.0, started as the chart starts it
 node --test e2e/openproject.e2e.js   # + OpenProject 16.6.10, started as its chart starts it with the profile's values
 ```
 
-The end-to-end runs start their own containers and remove them. The browser and the front door
+Each app's run signs a person out at Keycloak and shows what became of the app's session: ended
+for that person and for nobody else in Docmost and OpenProject, still good until its hour in
+Activepieces; and that a sign-out request the realm did not send, or sent before, ends nothing.
+
+The end-to-end runs start their own containers and remove them. `E2E_NETWORK` names the docker
+network and prefixes Keycloak's container, for two runs on one machine. The browser and the front door
 in them are scripted (`e2e/lib/browser.js`): the cookie rules of a browser are followed, a real
 browser is not run. Run the app's one before moving the app's image tag: it is what notices
 that the app keeps its session differently now.

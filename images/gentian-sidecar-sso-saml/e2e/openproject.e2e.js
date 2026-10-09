@@ -20,6 +20,7 @@ const { test, before, after } = require('node:test');
 const YAML = require('yaml');
 const { Browser, frontDoor, keycloak } = require('./lib/browser');
 const setup = require('./lib/setup');
+const { refusedSignOuts } = require('./lib/signout');
 const { signInOf, REPO } = require('./lib/profile');
 
 const HOST = 'projects.acme.e2e.test';
@@ -158,9 +159,9 @@ before(async () => {
     chart = chartRuntime();
     kc = await setup.startKeycloak();
     await setup.ensureRealm(kc, REALM, [ANNA, BEN, CARLA, ERIK, SEEDED]);
-    await setup.ensureSidecarClient(kc, REALM, HOST);
+    await setup.ensureSidecarClient(kc, REALM, HOST, { logoutUrl: setup.logoutUrlOf(names.sidecar) });
     for (const person of [ANNA, BEN, CARLA, ERIK, SEEDED]) await setup.setAppAdmin(kc, REALM, person.email, false);
-    for (const name of Object.values(names)) setup.tryDocker('rm', '-f', name);
+    for (const name of Object.values(names)) setup.removeSidecar(name);
     setup.docker('run', '-d', '--name', names.pg, '--network', setup.NETWORK,
         '-e', `POSTGRES_USER=${DB.user}`, '-e', `POSTGRES_PASSWORD=${DB.password}`, '-e', `POSTGRES_DB=${DB.name}`, 'postgres:16-alpine');
     // Under the name the profile gives its cache.
@@ -190,7 +191,7 @@ before(async () => {
 
 after(() => {
     if (process.env.E2E_KEEP) return;
-    for (const name of Object.values(names)) setup.tryDocker('rm', '-f', name);
+    for (const name of Object.values(names)) setup.removeSidecar(name);
 });
 
 function browserAs(door) {
@@ -413,6 +414,55 @@ test('signing out in OpenProject ends the session there', async () => {
     assert.equal(again.status, 401);
 });
 
+// Signing out at the platform. The realm tells the sidecar, and the handler
+// ends the person's sessions in OpenProject.
+
+// The cookie as a browser would go on presenting it, straight to OpenProject.
+async function sessionStatus(session) {
+    const res = await setup.call('GET', `${appUpstream}/api/v3/users/me`, {
+        headers: { host: HOST, 'x-forwarded-proto': 'https', cookie: `_open_project_session=${session}` },
+    });
+    return res.status;
+}
+
+test('signing out at the platform ends the person\'s session in OpenProject, and nobody else\'s', async () => {
+    const anna = (await signIn(ANNA)).browser;
+    const ben = (await signIn(BEN)).browser;
+    const annaSession = anna.cookie(HOST, '_open_project_session').value;
+    const benSession = ben.cookie(HOST, '_open_project_session').value;
+    assert.equal(await sessionStatus(annaSession), 200);
+    assert.equal(await sessionStatus(benSession), 200);
+
+    const posted = (await setup.signOutPosts(sidecar)).length;
+    await setup.signOutAtRealm(anna, REALM);
+    const posts = await setup.waitForSignOut(sidecar, posted + 1);
+    assert.equal(posts.length, posted + 1, 'the realm told the sidecar once');
+    assert.equal(posts[posts.length - 1].status, 200);
+    assert.equal(posts[posts.length - 1].host, sidecar.service.host);
+
+    // Her cookie, which has most of its hour left, is nobody's: the next
+    // person at this browser is not her.
+    assert.equal(await sessionStatus(annaSession), 401);
+    assert.equal((await whoAmI(anna)).status, 401);
+    const annaId = `(select id from users where type = 'User' and lower(mail) = '${ANNA.email}')`;
+    assert.equal(psql(`select count(*) from sessions where user_id = ${annaId}`), '0');
+    assert.equal(psql(`select count(*) from tokens where type = 'Token::AutoLogin' and user_id = ${annaId}`), '0');
+    // Ben is where he was.
+    assert.equal(await sessionStatus(benSession), 200);
+    assert.equal((await whoAmI(ben)).user.email, BEN.email);
+
+    // Opening OpenProject again leads to the realm, which asks who she is.
+    const again = await anna.navigate(`https://${HOST}/`);
+    assert.match(again.body, /kc-form-login/);
+});
+
+test('a sign-out the realm did not send, or sent before, ends no session in OpenProject', async () => {
+    const ben = (await signIn(BEN)).browser;
+    const session = ben.cookie(HOST, '_open_project_session').value;
+    await refusedSignOuts(sidecar, { realm: REALM, email: BEN.email });
+    assert.equal(await sessionStatus(session), 200);
+});
+
 test('an account somebody in OpenProject invited the person to becomes theirs', async () => {
     const invited = ERIK;
     const made = await serviceAccount('POST', '/api/v3/users', { email: invited.email, status: 'invited' });
@@ -517,5 +567,6 @@ test('nothing a browser sends makes an administrator of OpenProject', async () =
 test('the sidecar\'s log names nobody', () => {
     const logs = setup.logsOf(names.sidecar);
     assert.match(logs, /"event":"signed-in"/);
+    assert.match(logs, /"event":"signed-out"/);
     assert.doesNotMatch(logs, /anna|ben@|carla|erik|Example|openproject-admin/i);
 });

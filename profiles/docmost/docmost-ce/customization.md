@@ -66,6 +66,12 @@ container (`images/gentian-sidecar-sso-saml/e2e/docmost.e2e.js`):
 The session lasts what the sidecar says: at most an hour, in the token and in the row. Signing out
 in Docmost revokes the row, and the token is then refused by Docmost itself.
 
+Signing out at the platform ends it too. The realm tells the sidecar, inside the cluster, and the
+handler's `onLogout` deletes the person's rows of `user_sessions` — all of them, in every
+browser. Docmost looks a token's session up on every request, so each of that person's tokens is
+refused from then on, with most of its hour still left. Nobody else's session is touched. The
+realm tells once: if the sidecar is not running at that moment the session lasts its hour.
+
 ### Who administers Docmost
 
 Who holds the platform's **App Admin** role, and nobody else: not the tenant's administrator for
@@ -157,5 +163,7 @@ first sign-in ("What a tenant's Docmost has from the start").
   `groups`, `group_users` and `spaces`, and the calls for spaces and groups.
 - The handler depends on two tables (`users`, `user_sessions`), on the invitation table, and on
   the token's fields. Docmost promises none of them. The end-to-end run is what notices.
+- A person signed in to Docmost at two devices who signs out at the platform at one is signed out
+  of Docmost at both; the other is taken through the sign-in again, silently.
 - After the hour the person is taken through the sign-in again and lands on the home page, not
   on the page they were on. What they typed is kept by Docmost as they type.

@@ -10,6 +10,7 @@ const path = require('node:path');
 const { test, before, after } = require('node:test');
 const { Browser, frontDoor, keycloak } = require('./lib/browser');
 const setup = require('./lib/setup');
+const { refusedSignOuts } = require('./lib/signout');
 
 const ANNA = { email: 'anna@acme.e2e.test', firstName: 'Anna', lastName: "O'Example", password: 'pw-anna-e2e', subject: 'sub-anna', name: "Anna O'Example" };
 const BEN = { email: 'ben@acme.e2e.test', firstName: 'Ben', lastName: 'Example', password: 'pw-ben-e2e', subject: 'sub-ben', name: 'Ben Example' };
@@ -32,7 +33,7 @@ before(async () => {
     kc = await setup.startKeycloak();
     for (const realm of ['acme', 'user']) await setup.ensureRealm(kc, realm, [ANNA, BEN, CARL]);
     for (const [i, place] of PLACES.entries()) {
-        await setup.ensureSidecarClient(kc, place.realm, place.host);
+        await setup.ensureSidecarClient(kc, place.realm, place.host, { logoutUrl: setup.logoutUrlOf(`sso-e2e-sidecar-${i}`) });
         place.sidecar = setup.startSidecar({
             name: `sso-e2e-sidecar-${i}`, host: place.host, realm: place.realm, kc,
             handlerFile: path.join(__dirname, 'handlers', 'echo.js'),
@@ -44,7 +45,7 @@ before(async () => {
 
 after(() => {
     if (process.env.E2E_KEEP) return;
-    for (const name of started) setup.tryDocker('rm', '-f', name);
+    for (const name of started) setup.removeSidecar(name);
 });
 
 function browserFor(place, door) {
@@ -261,10 +262,114 @@ test('nothing a browser sends makes an administrator', async () => {
     assert.equal(fresh.cookie(place.host, 'e2e_session'), undefined);
 });
 
+// Signing out. The realm tells the sidecar, inside the network, and the
+// sidecar tells the handler whom.
+
+function timesSignedOut(browser, host) {
+    return Number(Buffer.from(browser.cookie(host, 'e2e_session').value, 'base64url').toString().split('|')[3]);
+}
+
+for (const place of PLACES) {
+    test(`${place.label}: a sign-out at the realm reaches the handler, for that person and nobody else`, async () => {
+        const before = (await setup.signOutPosts(place.sidecar)).length;
+        const anna = await open(place, ANNA);
+        const ben = await open(place, BEN);
+        const annaBefore = timesSignedOut(anna, place.host);
+        const benBefore = timesSignedOut(ben, place.host);
+
+        await setup.signOutAtRealm(anna, place.realm);
+        const posts = await setup.waitForSignOut(place.sidecar, before + 1);
+        assert.equal(posts.length, before + 1, 'the realm told the sidecar once');
+        const post = posts[posts.length - 1];
+        assert.equal(post.status, 200);
+        assert.equal(post.host, place.sidecar.service.host, 'under the sidecar\'s name inside the network');
+        assert.equal(post.path, '/sso/logout');
+
+        // Anna is asked for her password again: the realm session is over.
+        const again = await anna.navigate(`https://${place.host}/`);
+        assert.match(again.body, /kc-form-login/, 'the realm asks who she is');
+        const back = await open(place, ANNA);
+        assert.equal(timesSignedOut(back, place.host), annaBefore + 1);
+
+        // Ben was not signed out: the realm asks him nothing, and the
+        // handler was not told about him.
+        ben.log.length = 0;
+        await ben.navigate(`https://${place.host}/`);
+        assert.ok(!ben.log.some((line) => line.includes('login-actions')), ben.log.join(' -> '));
+        assert.equal(timesSignedOut(ben, place.host), benBefore);
+    });
+}
+
+test('a sign-out the realm did not send, or sent before, reaches no handler', async () => {
+    const place = PLACES[0];
+    const ben = await open(place, BEN);
+    const benBefore = timesSignedOut(ben, place.host);
+    // The realm's own request, to have one to present again.
+    const anna = await open(place, ANNA);
+    const posted = (await setup.signOutPosts(place.sidecar)).length;
+    await setup.signOutAtRealm(anna, place.realm);
+    await setup.waitForSignOut(place.sidecar, posted + 1);
+
+    await refusedSignOuts(place.sidecar, { realm: place.realm, email: BEN.email });
+    await ben.navigate(`https://${place.host}/`);
+    assert.equal(timesSignedOut(ben, place.host), benBefore);
+});
+
+test('a sign-out for one app\'s sidecar is refused by another\'s', async () => {
+    const [one, , other] = PLACES; // both in realm acme
+    const anna = await open(one, ANNA);
+    const posted = (await setup.signOutPosts(one.sidecar)).length;
+    await setup.signOutAtRealm(anna, one.realm);
+    const posts = await setup.waitForSignOut(one.sidecar, posted + 1);
+    const res = await setup.postSignOut(other.sidecar, null, { body: posts[posts.length - 1].body });
+    assert.equal(res.status, 401);
+});
+
+test('the sign-out path does not answer under the app\'s public name', async () => {
+    const place = PLACES[0];
+    const res = await setup.call('POST', `${place.sidecar.upstream}/sso/logout`, {
+        headers: { host: place.host, 'content-type': 'application/x-www-form-urlencoded' }, body: 'SAMLRequest=x',
+    });
+    assert.equal(res.status, 404);
+});
+
+test('a handler with no sign-out handling: the realm is answered and the sign-out goes through', async () => {
+    const host = 'old.acme.e2e.test';
+    const name = 'sso-e2e-sidecar-old';
+    await setup.ensureSidecarClient(kc, 'acme', host, { logoutUrl: setup.logoutUrlOf(name) });
+    const sidecar = setup.startSidecar({ name, host, realm: 'acme', kc, handlerFile: path.join(__dirname, 'handlers', 'no-logout.js') });
+    started.push(name);
+    await setup.sidecarReady(sidecar);
+    const place = { host, realm: 'acme', sidecar };
+    const anna = await open(place, ANNA);
+    await setup.signOutAtRealm(anna, 'acme');
+    const posts = await setup.waitForSignOut(sidecar, 1);
+    assert.equal(posts[0].status, 200);
+    assert.match(setup.logsOf(name), /"event":"no-sign-out-handling"/);
+    const again = await anna.navigate(`https://${host}/`);
+    assert.match(again.body, /kc-form-login/);
+});
+
+test('a sidecar that is told no sign-out address: the realm\'s sign-out goes through all the same', async () => {
+    // The client names an address and nothing answers there as a sign-out:
+    // what a cluster has while its sidecar is the build before this one.
+    const host = 'older.acme.e2e.test';
+    const name = 'sso-e2e-sidecar-older';
+    await setup.ensureSidecarClient(kc, 'acme', host, { logoutUrl: `http://${name}:8081/sso/logout` });
+    const sidecar = setup.startSidecar({ name, host, realm: 'acme', kc, logout: false, handlerFile: path.join(__dirname, 'handlers', 'echo.js') });
+    started.push(name);
+    await setup.sidecarReady(sidecar);
+    const anna = await open({ host, realm: 'acme', sidecar }, ANNA);
+    await setup.signOutAtRealm(anna, 'acme');
+    const again = await anna.navigate(`https://${host}/`);
+    assert.match(again.body, /kc-form-login/, 'she is signed out at the realm');
+});
+
 test('the sidecar\'s log names nobody', async () => {
     for (const place of PLACES) {
         const logs = setup.logsOf(place.sidecar.name);
         assert.match(logs, /"event":"signed-in"/);
+        assert.match(logs, /"event":"signed-out"/);
         assert.doesNotMatch(logs, /anna|ben@|carl|Example|SAMLResponse/i);
     }
 });

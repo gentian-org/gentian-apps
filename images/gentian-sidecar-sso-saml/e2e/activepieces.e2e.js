@@ -69,9 +69,9 @@ before(async () => {
     runtime = chartRuntime();
     kc = await setup.startKeycloak();
     await setup.ensureRealm(kc, REALM, [ANNA, BEN, IMPOSTOR]);
-    await setup.ensureSidecarClient(kc, REALM, HOST);
+    await setup.ensureSidecarClient(kc, REALM, HOST, { logoutUrl: setup.logoutUrlOf(names.sidecar) });
     for (const person of [ANNA, BEN]) await setup.setAppAdmin(kc, REALM, person.email, false);
-    for (const name of Object.values(names)) setup.tryDocker('rm', '-f', name);
+    for (const name of Object.values(names)) setup.removeSidecar(name);
     setup.docker('run', '-d', '--name', names.pg, '--network', setup.NETWORK,
         '-e', 'POSTGRES_USER=activepieces', '-e', 'POSTGRES_PASSWORD=ap-e2e', '-e', 'POSTGRES_DB=activepieces', 'postgres:16-alpine');
     setup.docker('run', '-d', '--name', names.redis, '--network', setup.NETWORK, 'redis:7-alpine');
@@ -99,7 +99,7 @@ before(async () => {
 
 after(() => {
     if (process.env.E2E_KEEP) return;
-    for (const name of Object.values(names)) setup.tryDocker('rm', '-f', name);
+    for (const name of Object.values(names)) setup.removeSidecar(name);
     if (runtime) fs.rmSync(path.dirname(path.dirname(runtime)), { recursive: true, force: true });
 });
 
@@ -296,6 +296,34 @@ test('nothing a browser sends makes an administrator of Activepieces', async () 
     const self = await api(ben.browser, 'POST', `/api/v1/users/${id}`, { platformRole: 'ADMIN' });
     assert.equal(self.status, 403, self.body);
     assert.equal(roleOf(BEN), 'MEMBER');
+});
+
+// Signing out at the platform. Activepieces 0.28.0 has nothing a handler
+// could end a session with: its token is checked by its signature and its
+// end alone (authentication/lib/access-token-manager.ts), against nothing in
+// its database. So the handler has no onLogout, and what this shows is what
+// is true: the realm tells the sidecar, the sidecar answers it, and the
+// token goes on until the end the sidecar gave it, which is at most an hour.
+test('signing out at the platform does not end Activepieces\' token, which lasts its hour at most', async () => {
+    const browser = browserAs({ person: ANNA });
+    await browser.navigate(`https://${HOST}/`, { credentials: { username: ANNA.email, password: ANNA.password } });
+    const token = browser.storage[`https://${HOST}`].token;
+    const left = claims(token).exp - Math.floor(Date.now() / 1000);
+    assert.ok(left > 0 && left <= 3600, String(left));
+
+    const posted = (await setup.signOutPosts(sidecar)).length;
+    await setup.signOutAtRealm(browser, REALM);
+    const posts = await setup.waitForSignOut(sidecar, posted + 1);
+    assert.equal(posts[posts.length - 1].status, 200);
+    assert.match(setup.logsOf(names.sidecar), /"event":"no-sign-out-handling"/);
+
+    // The token itself still opens Activepieces...
+    const still = await setup.call('GET', `${appUpstream}/api/v1/flows?projectId=${claims(token).projectId}&limit=10`,
+        { headers: { host: HOST, authorization: `Bearer ${token}` } });
+    assert.equal(still.status, 200);
+    // ...and a page load leads to the realm, which asks who the person is.
+    const again = await browser.navigate(`https://${HOST}/`);
+    assert.match(again.body, /kc-form-login/);
 });
 
 test('a person at the platform who holds the installation account\'s address is not signed in as it', async () => {

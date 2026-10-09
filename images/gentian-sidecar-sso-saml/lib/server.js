@@ -57,7 +57,7 @@ function withTimeout(promise, ms) {
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-function createServer({ config, signIn, handler, certificates }) {
+function createServer({ config, signIn, signOut, handler, certificates }) {
     const expireCookie = (name) => `${name}=; Path=${config.acsPath}; Max-Age=0; Secure; HttpOnly; SameSite=None`;
 
     async function login(req, res, reference) {
@@ -122,8 +122,50 @@ function createServer({ config, signIn, handler, certificates }) {
             refusal.cookies = spent;
             throw refusal;
         }
+        if (signOut) signOut.remember(result.sessionIndex, result.person.email, result.sessionSeconds);
         writeAnswer(res, answer, { sessionSeconds: result.sessionSeconds, extraCookies: spent });
         log.info('signed-in', { reference, sessionSeconds: result.sessionSeconds });
+    }
+
+    // The realm says a person signed out. Called by the realm itself, inside
+    // the cluster; nothing a browser sends arrives here, and nothing this
+    // request says about itself is believed but the request the realm signed
+    // (lib/signout.js).
+    async function logout(req, res, reference) {
+        for (const name of IDENTITY_HEADERS) delete req.headers[name];
+
+        const type = (req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+        if (type !== 'application/x-www-form-urlencoded') throw new Refusal('not-a-form', 400);
+        const form = querystring.parse(await readBody(req), '&', '=', { maxKeys: 8 });
+        // Exactly one request: a field given twice is a list here.
+        const samlRequest = Array.isArray(form.SAMLRequest) ? '' : form.SAMLRequest;
+
+        const { person } = await signOut.check(samlRequest);
+
+        if (typeof handler.onLogout !== 'function') {
+            // The app's handler cannot end a session. The realm is answered
+            // that the request was taken: there is nothing it could do about
+            // it, and the app's session ends when its hour does.
+            log.warn('no-sign-out-handling', { reference });
+        } else {
+            try {
+                await withTimeout(
+                    Promise.resolve().then(() => handler.onLogout(person, Object.freeze({
+                        origin: config.origin,
+                        log: (event, fields) => log.info('handler', { reference, note: String(event).slice(0, 200), ...(fields || {}) }),
+                    }))),
+                    HANDLER_TIMEOUT_MS,
+                );
+            } catch (err) {
+                if (err instanceof Refusal) throw err;
+                throw new Refusal('handler-failed', 502, (err && err.code) || (err && err.name) || 'error');
+            }
+            log.info('signed-out', { reference });
+        }
+        // The realm reads the status and nothing else: it posts this request
+        // outside any SAML binding that would carry an answer back.
+        res.writeHead(200, { ...BASE_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('ok\n');
     }
 
     return http.createServer(async (req, res) => {
@@ -158,6 +200,15 @@ function createServer({ config, signIn, handler, certificates }) {
         }
 
         try {
+            if (signOut && config.logoutPath && path === config.logoutPath) {
+                // Its own host: the name the realm calls inside the cluster.
+                // A request that arrived under the app's public name did not
+                // come from the realm.
+                if ((req.headers.host || '').toLowerCase() !== config.logoutHost) throw new Refusal('other-host', 404);
+                if (req.method !== 'POST') throw new Refusal('method', 405);
+                await logout(req, res, reference);
+                return;
+            }
             if (path !== config.loginPath && path !== config.acsPath) {
                 writeRefusal(res, 404);
                 return;
@@ -172,7 +223,7 @@ function createServer({ config, signIn, handler, certificates }) {
             }
         } catch (err) {
             const refusal = err instanceof Refusal ? err : new Refusal('error', 502, (err && err.name) || 'error');
-            log.warn('sign-in-refused', { reference, reason: refusal.code, detail: refusal.detail, path });
+            log.warn(path === config.logoutPath ? 'sign-out-refused' : 'sign-in-refused', { reference, reason: refusal.code, detail: refusal.detail, path });
             if (res.headersSent) {
                 res.end();
                 return;

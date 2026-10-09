@@ -25,6 +25,9 @@ function loadHandler(path, digest) {
     if (!handler || typeof handler.onLogin !== 'function') {
         throw new Error(`the handler at ${path} exports no onLogin function`);
     }
+    if (handler.onLogout !== undefined && typeof handler.onLogout !== 'function') {
+        throw new Error(`the handler at ${path} exports an onLogout that is not a function`);
+    }
     return handler;
 }
 

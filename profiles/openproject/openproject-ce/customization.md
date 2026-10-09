@@ -85,6 +85,13 @@ no lifetime of its own for a session; it deletes a session when its token is des
 its own pages (`app/models/sessions/autologin_session_link.rb`), and the handler does the same
 for a token that has run out. Signing out in OpenProject deletes the person's sessions.
 
+Signing out at the platform ends it too. The realm tells the sidecar, inside the cluster, and the
+handler's `onLogout` deletes the person's sessions and the tokens they were made from — all of
+them, in every browser, as for a token that has run out. OpenProject reads a session from its
+database on every request, so the cookie is nobody's from then on, with most of its hour still
+left. Nobody else's session is touched. The realm tells once: if the sidecar is not running at
+that moment the session lasts its hour.
+
 ### OpenProject's own sign-in is off
 
 `OPENPROJECT_DISABLE__PASSWORD__LOGIN` is set: a password posted to `/login` is answered 404,
@@ -172,7 +179,9 @@ community edition's.
 - The handler depends on four tables (`users`, `user_passwords`, `tokens`, `sessions` with
   `autologin_session_links`) and on how a token's value is hashed. OpenProject promises none of
   them. The end-to-end run is what notices.
-- After the hour, or after signing out in OpenProject, the person is taken through the sign-in
+- A person signed in to OpenProject at two devices who signs out at the platform at one is signed
+  out of OpenProject at both; the other is taken through the sign-in again, silently.
+- After the hour, or after signing out in OpenProject or at the platform, the person is taken through the sign-in
   again and lands on the front page, not on the page they were on.
 - OpenProject's second factor is no longer switched off, and is never asked for: it belongs to
   the password form.

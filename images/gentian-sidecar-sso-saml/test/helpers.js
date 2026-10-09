@@ -13,6 +13,11 @@ const zlib = require('zlib');
 const { SignedXml } = require('xml-crypto');
 const { loadConfig } = require('../lib/config');
 const { SignIn } = require('../lib/signin');
+const { SignOut } = require('../lib/signout');
+
+// Where the realm tells the sidecar of a sign-out: its Service inside the
+// cluster.
+const LOGOUT_URL = 'http://app-sign-in.tenant-acme.svc.cluster.local:8081/sso/logout';
 
 const C14N = 'http://www.w3.org/2001/10/xml-exc-c14n#';
 
@@ -141,6 +146,44 @@ function roleAttribute(roles, name = 'Role') {
         '</saml:Attribute></saml:AttributeStatement>';
 }
 
+// buildLogoutRequest is the request a realm posts when a person signs out,
+// as Keycloak 26.8.0 writes it. Every field can be set wrong.
+function buildLogoutRequest(idp, config, options) {
+    const o = {
+        id: 'ID_' + crypto.randomBytes(8).toString('hex'),
+        email: 'anna@acme.example.org',
+        issuer: config.idpEntityId,
+        destination: config.logoutUrl,
+        issueInstant: iso(0),
+        notOnOrAfter: undefined,
+        nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+        sessionIndexes: ['session::client'],
+        element: 'LogoutRequest',
+        version: '2.0',
+        signed: true,
+        key: idp.key,
+        nameId: undefined,
+        afterSigning: (xml) => xml,
+        ...(options || {}),
+    };
+    const nameId = o.nameId !== undefined ? o.nameId : `<saml:NameID Format="${o.nameIdFormat}">${o.email}</saml:NameID>`;
+    let request =
+        `<samlp:${o.element} xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" Destination="${o.destination}" ID="${o.id}" IssueInstant="${o.issueInstant}"` +
+        (o.notOnOrAfter ? ` NotOnOrAfter="${o.notOnOrAfter}"` : '') + ` Version="${o.version}">` +
+        `<saml:Issuer>${o.issuer}</saml:Issuer>` + nameId +
+        o.sessionIndexes.map((index) => `<samlp:SessionIndex>${index}</samlp:SessionIndex>`).join('') +
+        `</samlp:${o.element}>`;
+    if (o.signed) request = sign(request, o.id, o.key);
+    return Buffer.from(o.afterSigning(request), 'utf8').toString('base64');
+}
+
+// A SignOut beside a SignIn, sharing its certificates and its clock.
+function makeSignOut(idp, configOverrides) {
+    const made = makeSignIn(idp, { SSO_LOGOUT_URL: LOGOUT_URL, ...(configOverrides || {}) });
+    const signOut = new SignOut({ config: made.config, certificates: made.certificates, now: () => Date.now() + made.clock.offset });
+    return { ...made, signOut };
+}
+
 // A SignIn with its certificates given directly, and a clock that can be moved.
 function makeSignIn(idp, configOverrides) {
     const config = testConfig(configOverrides);
@@ -171,4 +214,4 @@ async function begin(signIn, person) {
     return { requestId, request, url, cookies: { [started.cookie.name]: started.cookie.value }, cookie: started.cookie };
 }
 
-module.exports = { makeIdp, testConfig, buildResponse, makeSignIn, begin, iso, sign, roleAttribute, ENV };
+module.exports = { makeIdp, testConfig, buildResponse, buildLogoutRequest, makeSignIn, makeSignOut, begin, iso, sign, roleAttribute, ENV, LOGOUT_URL };
