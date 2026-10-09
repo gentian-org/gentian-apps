@@ -17,6 +17,7 @@ on:
       - "apps/**"
       - "profiles/**"
       - "images/**"
+      - "e2e/**"
       - "charts/odoo/**"
       - "charts/gentian-sidecar-git-modules/**"
       - "charts/activepieces/**"
@@ -30,6 +31,7 @@ on:
       - "apps/**"
       - "profiles/**"
       - "images/**"
+      - "e2e/**"
       - "charts/odoo/**"
       - "charts/gentian-sidecar-git-modules/**"
       - "charts/activepieces/**"
@@ -596,6 +598,27 @@ jobs:
           node-version: "22"
       - name: Sign in through the sidecar, end to end
         run: images/gentian-sidecar-sso-saml/e2e/run.sh
+
+  # The catalogue's apps that sign people in themselves and say where they are
+  # told of a sign-out, each as its real image against Keycloak: the notice
+  # arrives at the address the platform builds from the profile, and the
+  # app's session is over. Not a gate of any build: it pulls large images.
+  e2e-oidc-sign-out:
+    needs: [test-sso-saml-sidecar]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Log in to the registry the catalogue's own images are in
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Sign out of the apps, end to end
+        run: e2e/oidc-sign-out/run.sh
 
   build-sso-saml-sidecar-image:
     needs: [release-gate, test-sso-saml-sidecar]

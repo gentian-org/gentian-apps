@@ -490,10 +490,6 @@ spec:
                 validPostLogoutRedirectUris:
                   {{ toYaml $postLogout | nindent 18 }}
                 {{- end }}
-                {{- if and $oidcCl.backchannelLogoutUrl (ne $oidcCl.backchannelLogoutUrl "") }}
-                backchannelLogoutUrl: {{ $oidcCl.backchannelLogoutUrl | replace "${TENANT_DOMAIN}" $domain | quote }}
-                backchannelLogoutSessionRequired: true
-                {{- end }}
                 {{- if eq (default "PUBLIC" $oidcCl.accessType) "CONFIDENTIAL" }}
                 clientSecretSecretRef:
                   name: {{ $xrName }}-oidc-client-creds

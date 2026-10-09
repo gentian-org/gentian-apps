@@ -482,7 +482,7 @@ The operator seeds OIDC issuer/client credentials in OpenBao as
   `id.demo.desk.gentian.org` (404). Use `${KERNEL_DOMAIN}` instead.
 - Hardcoded realm names (`opendesk`, `souvap`) instead of `${TENANT_ID}`.
 - Redirect URIs on `${KERNEL_DOMAIN}` or portal host instead of `${TENANT_DOMAIN}`.
-- No `backchannelLogoutUrl`, so signing out of the portal leaves the app signed
+- No `backchannelLogout`, so signing out of the portal leaves the app signed
   in. See below.
 - Role settings pointed at group names the platform does not issue, so every
   member is refused after a successful sign-in. See below.
@@ -490,10 +490,9 @@ The operator seeds OIDC issuer/client credentials in OpenBao as
 ### Signing out — declare it, or the app keeps the session
 
 An app with its own OIDC client also keeps its own session cookie. Ending the
-identity session does not touch it. The portal's sign-out terminates every
-Keycloak session the user holds (it calls the admin `users/{id}/logout`), and
-Keycloak then notifies each client **that declared somewhere to be notified** —
-so a profile without that field simply is not told.
+identity session does not touch it. When a person signs out, Keycloak ends its
+session and notifies each client of that session **that has somewhere to be
+notified** — so a profile that declares nothing simply is not told.
 
 What that looks like: sign out, sign in as somebody else, open the app, and it is
 still serving the first account. On a shared machine, "log out" does not.
@@ -505,11 +504,41 @@ oidc:
     - "https://example.${TENANT_DOMAIN}/oauth/callback"
   postLogoutRedirectUris:
     - "https://example.${TENANT_DOMAIN}/"
-  backchannelLogoutUrl: "https://example.${TENANT_DOMAIN}/oauth/backchannel-logout"
+  backchannelLogout:
+    exposure: web                        # an entry of this profile's spec.expose
+    path: /oauth/backchannel-logout      # the app's endpoint, as a plain path
 ```
 
-`app-default.yaml` passes both through and sets
-`backchannelLogoutSessionRequired` itself; the profile only supplies the URLs.
+**A path, not an address.** The platform builds the address from the entry's own
+backend — `http://<backend.service>.<namespace>.svc.cluster.local:<backend.port><path>`
+— and registers that with the realm, with `backchannelLogoutSessionRequired`.
+Keycloak then calls the app inside the cluster, server to server. The older
+`backchannelLogoutUrl`, a free-form address, is refused: every profile wrote the
+app's public address there, where every path is behind a session and Keycloak's
+request was answered with a redirect to the sign-in; and a free-form address let
+a catalogue entry make the identity provider post to anywhere.
+
+The entry has to route to this component's own Service. The path is segments of
+letters, digits, `_`, `~` and `-`, with single dots inside a segment: no query,
+no `..`, no `//`.
+
+**The app sees its Service's name in the Host header**, not its public name. An
+app that refuses a host it does not know needs that name
+(`<service>.${TENANT_NAMESPACE}.svc.cluster.local`) among the hosts it trusts.
+Trusting a name opens no path to the app; it only lets the app answer a caller
+that could already reach it.
+
+**The app must check the token.** A logout token is a JWT the realm signs. Before
+it ends a session the app has to verify the signature against the realm's keys,
+the issuer, that the audience is its own client, and the back-channel logout
+event. An app that does not lets whoever can reach that path sign people out —
+never in. Read the app's code for this, and write into `customization.md` what it
+checks; `profiles/nextcloud/base/base-ce` and `profiles/xwiki/xwiki-ce` are the
+examples.
+
+**Prove it.** `e2e/oidc-sign-out/` runs the app's real image against Keycloak:
+sign in, sign out at Keycloak, and the app's cookie no longer works. A
+declaration that was never run is marked as such in the profile.
 
 **Backchannel, not frontchannel.** Keycloak drives frontchannel logout through
 hidden iframes, which makes it a third-party context — precisely the context
@@ -517,11 +546,21 @@ whose cookies browsers now withhold, and the reason sign-in itself must run in
 the top-level window rather than in the shell's frame. A server-to-server POST
 carrying a `logout_token` is unaffected by any of that.
 
+**Keycloak tells once.** It posts when a person signs out or an administrator
+ends the session. It does not post again if the app did not answer, and not when
+a session merely runs out.
+
 **The endpoint is the relying party's, which is not always the app you are
 packaging.** Element's client belongs to Synapse, so the endpoint is Synapse's
 and Synapse must also be configured to honour it. Look up the path in the
 project's own documentation rather than assuming `/oauth/backchannel-logout`;
-the ones already in this repo differ from each other.
+the ones already in this repo differ from each other. Some apps need more than
+the path: Open WebUI answers only with a switch on and can end a session only
+with Redis behind it.
+
+**A profile with its own Composition** registers its client itself: the address
+is built by the platform's Composition, and a Composition of the profile's own
+has to build it the same way or the declaration does nothing.
 
 **Not every app can.** django-allauth implements no logout-token endpoint, and an
 OAuth2 module such as Odoo's `auth_oauth` is not an OIDC relying party at all.
@@ -1432,7 +1471,9 @@ kernelRequirements:
         - "https://projects.${TENANT_DOMAIN}/auth/keycloak/callback"
       postLogoutRedirectUris:
         - "https://projects.${TENANT_DOMAIN}/"
-      backchannelLogoutUrl: "https://projects.${TENANT_DOMAIN}/auth/keycloak/backchannel-logout"
+      backchannelLogout:
+        exposure: web
+        path: /auth/keycloak/backchannel-logout
 ```
 
 **`PUBLIC` vs `CONFIDENTIAL`:**

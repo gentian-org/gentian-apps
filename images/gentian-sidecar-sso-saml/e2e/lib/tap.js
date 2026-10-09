@@ -1,7 +1,8 @@
 'use strict';
 
-// Stands where a cluster has the sidecar's Service: the name the realm calls
-// when a person signs out. It passes every request on to the sidecar as it
+// Stands where a cluster has a Service: the name the realm calls when a
+// person signs out -- the sidecar's, or the app's own for an app that signs
+// people in itself. It passes every request on to the sidecar as it
 // came, Host header included, and keeps what was posted, so that a run can
 // present the realm's own request a second time.
 
@@ -38,4 +39,4 @@ http.createServer((req, res) => {
         });
         out.end(body);
     });
-}).listen(8081, '0.0.0.0');
+}).listen(parseInt(process.env.TAP_PORT || '8081', 10), '0.0.0.0');

@@ -65,15 +65,21 @@ async function waitFor(what, probe, seconds = 180) {
 
 // Keycloak as the platform runs it: under /auth, told its public address, so
 // every address it writes is the public one whoever asks.
-async function startKeycloak() {
+//
+// backchannelDynamic is the platform's own setting for it
+// (--hostname-backchannel-dynamic=true): asked under its name inside the
+// network, it names its token and key addresses there, which is how an app
+// that signs people in itself reaches them. aliases are further names it
+// answers to inside the network.
+async function startKeycloak({ name = `${NETWORK}-kc`, backchannelDynamic = false, aliases = [] } = {}) {
     tryDocker('network', 'create', NETWORK);
-    const name = `${NETWORK}-kc`;
     if (!tryDocker('ps', '-q', '-f', `name=^${name}$`)) {
         tryDocker('rm', '-f', name);
-        docker('run', '-d', '--name', name, '--network', NETWORK, '-p', '127.0.0.1::8080',
+        docker('run', '-d', '--name', name, '--network', NETWORK, ...aliases.flatMap((alias) => ['--network-alias', alias]),
+            '-p', '127.0.0.1::8080',
             '-e', 'KC_BOOTSTRAP_ADMIN_USERNAME=admin', '-e', 'KC_BOOTSTRAP_ADMIN_PASSWORD=admin-e2e',
             '-e', 'KC_HTTP_RELATIVE_PATH=/auth', '-e', `KC_HOSTNAME=${IDP_BASE}`,
-            '-e', 'KC_HOSTNAME_BACKCHANNEL_DYNAMIC=false', '-e', 'KC_HTTP_ENABLED=true', '-e', 'KC_PROXY_HEADERS=xforwarded',
+            '-e', `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=${backchannelDynamic}`, '-e', 'KC_HTTP_ENABLED=true', '-e', 'KC_PROXY_HEADERS=xforwarded',
             KEYCLOAK_IMAGE, 'start-dev');
     }
     const upstream = `http://127.0.0.1:${publishedPort(name, 8080)}`;
@@ -180,9 +186,18 @@ async function userId(kc, realm, email) {
 // is left as the realm made it, as it is on a cluster.
 async function ensureSidecarClient(kc, realm, host, { tenant = realm, logoutUrl } = {}) {
     const clientId = `https://${host}/sso`;
-    await kc.admin('POST', `/realms/${realm}/clients`, sidecarClient(host, { logoutUrl }));
+    const created = await kc.admin('POST', `/realms/${realm}/clients`, sidecarClient(host, { logoutUrl }));
     const clients = JSON.parse((await kc.admin('GET', `/realms/${realm}/clients?clientId=${encodeURIComponent(clientId)}`)).body);
     const id = clients[0].id;
+    // A client an earlier run left at this address is made this run's: two
+    // runs share one Keycloak, and the sign-out address is the one thing
+    // about the client that differs between them.
+    if (created.status === 409) {
+        await kc.admin('PUT', `/realms/${realm}/clients/${id}`, {
+            ...clients[0],
+            attributes: { ...clients[0].attributes, 'saml_single_logout_service_url_post': logoutUrl || '' },
+        });
+    }
     await kc.admin('POST', `/realms/${realm}/clients/${id}/roles`, { name: APP_ADMIN_ROLE });
     const role = JSON.parse((await kc.admin('GET', `/realms/${realm}/clients/${id}/roles/${APP_ADMIN_ROLE}`)).body);
     const group = await groupId(kc, realm, appAdminsGroup(tenant));

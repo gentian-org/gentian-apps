@@ -47,3 +47,31 @@ companion, which survives major-version upgrades unchanged.
   re-renders, so it belongs in a post-install Job, not in values.
 - `appcodechecker` rejects apps using private APIs — a good early signal that a customization
   is reaching past the supported extension point.
+
+## Signing out
+
+When a person signs out at the platform, the realm tells Nextcloud, and Nextcloud ends that
+person's session: `requires.services.identity.oidc.backchannelLogout` names the path
+`/apps/user_oidc/backchannel-logout/gentian` on the entry `web`, and the platform registers it
+with the realm at Nextcloud's own Service inside the cluster
+(`http://nextcloud.<namespace>.svc.cluster.local:8080/…`), not at `cloud.<domain>`.
+
+What `user_oidc` 8.10.1 checks before it ends anything (`lib/Controller/LoginController.php`,
+`backChannelLogout`): the logout token's signature against the realm's published keys; that its
+audience is this client; that it carries the back-channel logout event and no nonce; and that a
+session it recorded at sign-in exists for the token's session id, person and issuer together. It
+then invalidates that one session's Nextcloud token. A token that fails any of these ends
+nothing.
+
+It ends the session of the browser that signed out, by the realm's session id; the same person
+signed in elsewhere from another realm session stays signed in there.
+
+Nextcloud answers under its Service's name without that name being listed under
+`trustedDomains`: `overwritehost` is set (`gentian-proxy.config.php`), and Nextcloud does not
+hold a request to that list then.
+
+Shown against the catalogue's image and Keycloak 26.8.0 in `e2e/oidc-sign-out/nextcloud.e2e.js`:
+the realm posts to the Service's address, the cookie of the person who signed out is refused
+afterwards, another person's is not, and a token signed with another key, an unsigned one and
+the realm's own token a second time end nothing. The realm posts once: if Nextcloud is not
+running at that moment the session lasts as long as Nextcloud keeps it.

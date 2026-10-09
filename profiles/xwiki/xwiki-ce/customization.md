@@ -37,3 +37,26 @@ are versioned artifacts loaded by the app, not configuration — and keep them i
 rather than editing pages in a live instance, which would be a Rung X hotfix in disguise.
 
 Extension installation is a runtime operation; drive it from `spec.postInstallJob`, not values.
+
+## Signing out
+
+When a person signs out at the platform, the realm tells XWiki, and XWiki ends that person's
+sessions: `requires.services.identity.oidc.backchannelLogout` names the path
+`/oidc/authenticator/backchannel_logout` on the entry `web`, and the platform registers it with
+the realm at XWiki's own Service inside the cluster
+(`http://xwiki-ce.<namespace>.svc.cluster.local:80/…`), not at `wiki.<domain>`.
+
+What the OIDC authenticator 2.20.2 checks before it ends anything
+(`BackChannelLogoutOIDCEndpoint`): with a provider configured (`oidc.provider`, which this
+profile sets) it validates the logout token — signature against the keys the realm publishes,
+issuer, audience — and then ends **every** session of the person the token names, not only the
+one that signed out. It reads the realm's keys at the realm's public address, so XWiki has to
+be able to reach `id.<domain>` from inside the cluster and trust its certificate, as it has to
+for signing in.
+
+Shown against the catalogue's image (`ghcr.io/gentian-org/xwiki`) and Keycloak 26.8.0 in
+`e2e/oidc-sign-out/xwiki.e2e.js`, with this profile's `oidc.*` settings: the realm posts to the
+Service's address, the session of the person who signed out is nobody's afterwards, another
+person's goes on, and a token signed with another key or not signed at all ends nothing. The
+realm posts once: if XWiki is not running at that moment the session lasts as long as XWiki
+keeps it.

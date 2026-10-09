@@ -286,7 +286,16 @@ spec:
       #       - "https://COMPONENT_ID.${TENANT_DOMAIN}/oauth/callback"
       #     postLogoutRedirectUris:
       #       - "https://COMPONENT_ID.${TENANT_DOMAIN}/"
-      #     backchannelLogoutUrl: "https://COMPONENT_ID.${TENANT_DOMAIN}/logout/backchannel"
+      #     Where the app is told that a person signed out, if it can be: a
+      #     path, and the entry (spec.expose) whose backend serves it. The
+      #     platform builds the address -- that entry's own Service, inside
+      #     the cluster -- and a profile states none. Declare it only for an
+      #     app that checks the logout token (signature, issuer, audience,
+      #     event) before it ends a session, and say in customization.md what
+      #     it checks.
+      #     backchannelLogout:
+      #       exposure: web
+      #       path: /logout/backchannel
       #     Enables the password grant, which hands a component the user's
       #     credentials directly. Leave it off unless a CLI really needs it.
       #     directAccessGrantsEnabled: false

@@ -238,9 +238,26 @@ spec:
         # frontchannel logout through hidden iframes, which makes it a
         # third-party context — the same context whose cookies browsers now
         # withhold, and the reason sign-in itself had to be moved out of a frame.
-        # A server-to-server POST does not care about any of that, and Open WebUI
-        # validates the logout_token and revokes the session behind it.
-          backchannelLogoutUrl: "https://ai-chat.${TENANT_DOMAIN}/oauth/backchannel-logout"
+        # A server-to-server POST does not care about any of that.
+        #
+        # The realm posts to this path at the Service and port of the entry
+        # "web", inside the cluster.
+        #
+        # NOT IN EFFECT. Open WebUI 0.10.2 answers this path only with
+        # ENABLE_OAUTH_BACKCHANNEL_LOGOUT=true, which this profile does not
+        # set -- and setting it would not be enough. Open WebUI checks the
+        # logout token properly (signature against the realm's keys, issuer,
+        # audience, the event), but its session is a signed token of its own
+        # that it can only refuse again through Redis: without one it deletes
+        # its OAuth session rows, answers 200, and goes on accepting the
+        # browser's cookie until that expires (utils/oauth.py,
+        # handle_backchannel_logout). This profile runs it without Redis. So
+        # until the profile gives it one (requires.services.cache, and the
+        # app's REDIS_URL) and the switch, a sign-out leaves this app's
+        # session as it is, and the realm's notice is answered with an error.
+          backchannelLogout:
+            exposure: web
+            path: /oauth/backchannel-logout
         # Where a logout initiated from this app is allowed to return to. Without
         # it Keycloak refuses the post_logout_redirect_uri and leaves the user on
         # an error page after an otherwise successful logout.
