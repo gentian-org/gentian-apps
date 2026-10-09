@@ -142,6 +142,16 @@ pinned to.
 - Activepieces' own nginx proxied the sign-in to the sidecar and rewrote the app's pages at start.
   The platform routes the sign-in now; nginx serves one script.
 
+### What it asks of the tenant's perimeter approver
+
+The profile's entry declares `clientAuthorization: app`: Activepieces' page sends its token to
+its own API in the `Authorization` header, and the front door removes that header on an entry
+that does not say so. Until the tenant's perimeter approver has approved the entry (`kubectl
+gentian exposures requests|approve --tenant <tenant>`, or the console's "Public addresses and
+requests"), a person can sign in and every call the page then makes is refused by Activepieces;
+the Component's `ClientAuthorization` condition says so. Approving it publishes nothing. Sign-in
+and the right to use the app stay required, and no token of the platform's reaches Activepieces.
+
 ### What remains weak
 
 - The token is in `localStorage`, where any script running on the app's pages can read it. That is
