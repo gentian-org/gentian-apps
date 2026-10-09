@@ -26,4 +26,19 @@ function signInOf(profileDir) {
     };
 }
 
-module.exports = { signInOf, REPO };
+// The profile's post-install job, with its script as the platform's
+// Composition writes it: the placeholders a profile may use filled in
+// (gentian-os, crossplane/compositions/app-default.yaml).
+function postInstallOf(profileDir, { tenant, domain, namespace, app }) {
+    const profile = YAML.parse(fs.readFileSync(path.join(REPO, profileDir, 'profile.yaml'), 'utf8'));
+    const job = profile.spec.hooks && profile.spec.hooks.postInstall;
+    if (!job) throw new Error(`${profileDir} declares no hooks.postInstall`);
+    const script = job.script
+        .replaceAll('${TENANT_DOMAIN}', domain)
+        .replaceAll('${TENANT_NAMESPACE}', namespace)
+        .replaceAll('${TENANT_ID}', tenant)
+        .replaceAll('${APP_ID}', app);
+    return { image: job.image, script };
+}
+
+module.exports = { signInOf, postInstallOf, REPO };

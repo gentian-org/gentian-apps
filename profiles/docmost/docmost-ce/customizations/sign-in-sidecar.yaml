@@ -43,10 +43,10 @@ spec:
   artifacts:
     - repo: gentian-org/gentian-apps
       path: profiles/docmost/docmost-ce/assets/sign-in-handler.js
-      version: "1.0.0"
+      version: "1.1.0"
     - repo: gentian-org/gentian-apps
       path: images/gentian-sidecar-sso-saml
-      version: "0.2.0"
+      version: "0.3.0"
 
   origin:
     authorship: gentian
@@ -62,8 +62,10 @@ spec:
     edition installed (the profile then declares identity.oidc), or when it can take
     the person from the front door's headers. Until then, on every Docmost upgrade:
     run images/gentian-sidecar-sso-saml/e2e/docmost.e2e.js against the new image
-    before the chart's image tag moves. It fails if the session token, the
-    user_sessions table, the setup call or the invitation calls have changed.
+    before the chart's image tag moves, and move the image of hooks.postInstall
+    with it. It fails if the session token, the user_sessions table, the setup
+    call, the invitation calls, the role call or the calls and tables for spaces
+    and groups have changed.
   upgradeRisk: high
   testedAgainst: ["0.95.0"]
 
@@ -80,6 +82,10 @@ spec:
       uses what the free edition has for everybody: an account, made with the free
       edition's own setup and invitation calls, and a session signed with the
       installation's own APP_SECRET and recorded in user_sessions as Docmost records
-      one. Whether making that session from outside the app, in place of the paid
+      one. A member's role is changed with the free edition's own call for it. OPEN,
+      for the owner: at a person's first sign-in the handler makes an ordinary space
+      with that person as its only member, through the free edition's own calls.
+      Docmost 0.95 sells "personal spaces" in its paid edition; that feature and its
+      switch are not used or touched, but what is made here resembles what it gives. Whether making that session from outside the app, in place of the paid
       single sign-on, is acceptable to the vendor is the owner's judgement and is
       not settled by this record.
