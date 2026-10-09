@@ -19,9 +19,15 @@
 //   3. a token for that account and project, ending when the sidecar says
 //      the session ends.
 //
-// Every person is an ordinary member. Nobody is an administrator of the
-// installation, and nobody has a password: the column cannot be empty of a
-// value, so it holds the empty string, which no password matches.
+//   4. who administers Activepieces: the person the sidecar says holds the
+//      platform's App Admin role has the installation's role ADMIN, and a
+//      person it does not say so of has MEMBER -- set through Activepieces'
+//      own interface (POST /api/v1/users/<id>), and only when the account is
+//      not already what it should be. Nobody is an administrator for having
+//      been the first, or for administering the tenant.
+//
+// Nobody has a password: the column cannot be empty of a value, so it holds
+// the empty string, which no password matches.
 //
 // What it is given (see the profile's requires.services.identity.sidecar):
 //   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD   Activepieces' own database
@@ -112,6 +118,44 @@ async function createUser(platformId, person) {
     return findUser(platformId, person.email);
 }
 
+// Who administers Activepieces is who holds the platform's App Admin role,
+// and it is settled at every sign-in: given to a person who holds it, taken
+// from a person who does not. person.appAdmin is the sidecar's reading of
+// the realm's signed answer; a sidecar that does not say is one that says no.
+//
+// Activepieces' own way: its interface for an administrator of the
+// installation to change a person's role. The call is made as the account
+// the installation was created with, with a token of a minute that this
+// handler signs and shows to nothing but Activepieces inside the cluster.
+// The token is made only once the account is what it should be, so a person
+// the role was withdrawn from is not signed in as an administrator because a
+// call failed.
+async function settleAdministrator(platformId, user, person) {
+    const wanted = person.appAdmin === true ? 'ADMIN' : 'MEMBER';
+    if (user.platformRole === wanted) return user;
+    const owner = await pool.query(
+        'select u.id, (select p.id from project p where p."ownerId" = u.id and p."platformId" = $1 and p.deleted is null ' +
+        'order by p.created asc limit 1) as "projectId" from platform pl join "user" u on u.id = pl."ownerId" where pl.id = $1',
+        [platformId]);
+    if (owner.rows.length !== 1 || !owner.rows[0].projectId) throw new Error('the installation has no account of its own to change a role as');
+    // The installation's own account keeps its role, whoever it is: it is
+    // the one a role is changed as.
+    if (owner.rows[0].id === user.id) return user;
+    const token = jwt.sign(
+        { id: owner.rows[0].id, type: 'USER', projectId: owner.rows[0].projectId, platform: { id: platformId } },
+        process.env.SECRET_JWT_SECRET,
+        { algorithm: 'HS256', issuer: 'activepieces', keyid: '1', expiresIn: 60 });
+    const res = await fetch(process.env.APP_URL + '/api/v1/users/' + encodeURIComponent(user.id), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ platformRole: wanted }),
+        signal: AbortSignal.timeout(10000),
+    });
+    const now = await findUser(platformId, user.email.toLowerCase());
+    if (!now || now.id !== user.id || now.platformRole !== wanted) throw new Error(`setting the role answered ${res.status}`);
+    return now;
+}
+
 // One account is made once, however many sign-ins of the same person arrive
 // together. The sidecar is a single process.
 const creating = new Map();
@@ -127,10 +171,17 @@ async function ensureUser(platformId, person) {
 
 module.exports = {
     async onLogin(person, ctx) {
+        // The account the installation was created with is nobody's: a person
+        // at the platform who holds its address is not signed in as it.
+        if (person.email === OWNER.email) return { refuse: true };
         const platformId = await ensurePlatform();
-        const user = await ensureUser(platformId, person);
+        let user = await ensureUser(platformId, person);
         // An account switched off in Activepieces stays off.
         if (!user || user.status !== 'ACTIVE') return { refuse: true };
+
+        const before = user.platformRole;
+        user = await settleAdministrator(platformId, user, person);
+        if (user.platformRole !== before) ctx.log(user.platformRole === 'ADMIN' ? 'administrator-made' : 'administrator-unmade');
 
         const project = await pool.query(
             'select id from project where "ownerId" = $1 and "platformId" = $2 and deleted is null order by created asc limit 1',

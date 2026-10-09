@@ -33,6 +33,10 @@ const JWT_SECRET = 'e2e-only-jwt-secret-0123456789abcdef';
 
 const ANNA = { email: 'anna@acme.e2e.test', firstName: 'Anna', lastName: "O'Example", password: 'pw-anna-e2e', subject: 'sub-anna', name: "Anna O'Example" };
 const BEN = { email: 'ben@acme.e2e.test', firstName: 'Ben', lastName: 'Example', password: 'pw-ben-e2e', subject: 'sub-ben', name: 'Ben Example' };
+const OWNER_EMAIL = 'config-account@activepieces.internal';
+// A person at the platform who holds the address of the account the
+// installation is created with.
+const IMPOSTOR = { email: OWNER_EMAIL, firstName: 'Dora', lastName: 'Example', password: 'pw-dora-e2e', subject: 'sub-dora', name: 'Dora Example' };
 
 let kc;
 let sidecar;
@@ -64,8 +68,9 @@ function claims(token) {
 before(async () => {
     runtime = chartRuntime();
     kc = await setup.startKeycloak();
-    await setup.ensureRealm(kc, REALM, [ANNA, BEN]);
+    await setup.ensureRealm(kc, REALM, [ANNA, BEN, IMPOSTOR]);
     await setup.ensureSidecarClient(kc, REALM, HOST);
+    for (const person of [ANNA, BEN]) await setup.setAppAdmin(kc, REALM, person.email, false);
     for (const name of Object.values(names)) setup.tryDocker('rm', '-f', name);
     setup.docker('run', '-d', '--name', names.pg, '--network', setup.NETWORK,
         '-e', 'POSTGRES_USER=activepieces', '-e', 'POSTGRES_PASSWORD=ap-e2e', '-e', 'POSTGRES_DB=activepieces', 'postgres:16-alpine');
@@ -217,8 +222,91 @@ test('an account switched off in Activepieces is not signed in', async () => {
     psql(`update "user" set status = 'ACTIVE' where email = '${BEN.email}'`);
 });
 
+// Who administers Activepieces: who holds the platform's App Admin role, and
+// nobody else.
+
+async function signIn(person, extraHeaders) {
+    const browser = browserAs({ person });
+    if (extraHeaders) {
+        const request = browser.request.bind(browser);
+        browser.request = (method, url, options = {}) => request(method, url, { ...options, headers: { ...(options.headers || {}), ...extraHeaders } });
+    }
+    const res = await browser.navigate(`https://${HOST}/${extraHeaders ? '?appAdmin=true' : ''}`, { credentials: { username: person.email, password: person.password } });
+    assert.equal(new URL(res.url).pathname, '/flows', browser.log.join(' -> '));
+    return { browser, user: JSON.parse(browser.storage[`https://${HOST}`].currentUser) };
+}
+
+function roleOf(person) {
+    return psql(`select "platformRole" from "user" where email = '${person.email}'`);
+}
+
+// The installation's list of all accounts, which Activepieces gives only to
+// an administrator of the installation.
+async function mayAdminister(browser) {
+    const res = await api(browser, 'GET', '/api/v1/users');
+    assert.ok([200, 403].includes(res.status), `the list of accounts answered ${res.status}: ${res.body}`);
+    return res.status === 200;
+}
+
+test('a person who holds the App Admin role administers Activepieces, and nobody else does', async () => {
+    await setup.setAppAdmin(kc, REALM, ANNA.email, true);
+    const anna = await signIn(ANNA);
+    assert.equal(anna.user.platformRole, 'ADMIN');
+    assert.equal(roleOf(ANNA), 'ADMIN');
+    assert.equal(await mayAdminister(anna.browser), true);
+    // She works in the project she had.
+    assert.equal(claims(anna.browser.storage[`https://${HOST}`].token).projectId, annaProject);
+
+    const ben = await signIn(BEN);
+    assert.equal(ben.user.platformRole, 'MEMBER');
+    assert.equal(await mayAdminister(ben.browser), false);
+    assert.equal(psql("select string_agg(email, ',' order by email) from \"user\" where \"platformRole\" = 'ADMIN'"), [ANNA.email, OWNER_EMAIL].sort().join(','));
+    // The installation is still its own account's, and nobody has a password.
+    assert.equal(psql('select u.email from platform p join "user" u on u.id = p."ownerId"'), OWNER_EMAIL);
+    assert.equal(psql("select count(*) from \"user\" where password <> ''"), '0');
+});
+
+test('withdrawing the role takes it away in Activepieces at the next sign-in', async () => {
+    const before = await signIn(ANNA);
+    assert.equal(await mayAdminister(before.browser), true);
+    await setup.setAppAdmin(kc, REALM, ANNA.email, false);
+    const after = await signIn(ANNA);
+    assert.equal(after.user.platformRole, 'MEMBER');
+    assert.equal(roleOf(ANNA), 'MEMBER');
+    assert.equal(await mayAdminister(after.browser), false);
+    // The token she still had from before is no administrator's either:
+    // Activepieces reads the role when it is asked.
+    assert.equal(await mayAdminister(before.browser), false);
+    assert.equal(psql("select string_agg(email, ',') from \"user\" where \"platformRole\" = 'ADMIN'"), OWNER_EMAIL);
+});
+
+test('an administrator made inside Activepieces who does not hold the role is one until the next sign-in', async () => {
+    psql(`update "user" set "platformRole" = 'ADMIN' where email = '${BEN.email}'`);
+    const ben = await signIn(BEN);
+    assert.equal(ben.user.platformRole, 'MEMBER');
+    assert.equal(roleOf(BEN), 'MEMBER');
+});
+
+test('nothing a browser sends makes an administrator of Activepieces', async () => {
+    const ben = await signIn(BEN, { 'x-gentian-app-admin': 'true', 'x-gentian-roles': setup.APP_ADMIN_ROLE, role: 'ADMIN' });
+    assert.equal(ben.user.platformRole, 'MEMBER');
+    assert.equal(roleOf(BEN), 'MEMBER');
+    // Activepieces' own call for it is not a member's to make.
+    const id = psql(`select id from "user" where email = '${BEN.email}'`);
+    const self = await api(ben.browser, 'POST', `/api/v1/users/${id}`, { platformRole: 'ADMIN' });
+    assert.equal(self.status, 403, self.body);
+    assert.equal(roleOf(BEN), 'MEMBER');
+});
+
+test('a person at the platform who holds the installation account\'s address is not signed in as it', async () => {
+    const browser = browserAs({ person: IMPOSTOR });
+    const res = await browser.navigate(`https://${HOST}/`, { credentials: { username: IMPOSTOR.email, password: IMPOSTOR.password } });
+    assert.equal(res.status, 403, browser.log.join(' -> '));
+    assert.equal(browser.storage[`https://${HOST}`], undefined);
+});
+
 test('the sidecar\'s log names nobody', () => {
     const logs = setup.logsOf(names.sidecar);
     assert.match(logs, /"event":"signed-in"/);
-    assert.doesNotMatch(logs, /anna|ben@|Example/i);
+    assert.doesNotMatch(logs, /anna|ben@|dora|Example/i);
 });

@@ -2,6 +2,5 @@
 
 - [ ] E2E: port `e2e-tests/tests/test_openproject-ce*.py` to use `openproject-ce` profile name
 - [ ] Optional Nextcloud WebDAV integration binding on demo tenant
-- [ ] An administrator at install time. Nobody administers a new OpenProject until somebody is made one through APIv3 as the service account (`customization.md`, "Who administers OpenProject"); the platform has no way yet to name that person when the app is installed.
 - [ ] First deploy: confirm on a cluster what the end-to-end run shows in docker — the seeder and the web pod reach the platform's object store through `valueMapping.s3` alone (endpoint as a URL, path style, no `s3.host`).
 - [ ] The chart's collaboration server (`hocuspocus`, on by default in chart 12) is deployed and not routed: `/hocuspocus` leads to the web pod. Route it or switch it off.

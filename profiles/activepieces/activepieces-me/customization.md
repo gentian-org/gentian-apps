@@ -79,7 +79,9 @@ the chart starts it (`images/gentian-sidecar-sso-saml/e2e/activepieces.e2e.js`):
 | The password column, which cannot be NULL | the empty string, which no password matches | no — the row is written |
 | The session | a token `{id, type: USER, projectId, platform: {id}}` signed with `AP_JWT_SECRET`, issuer `activepieces` | the token the sign-in call returns, made here |
 | Where the session is kept | `localStorage` (`token`, `currentUser`), written by a page the sidecar generates | where Activepieces' page keeps it. No cookie carries it |
+| Who administers Activepieces | `POST /api/v1/users/<id>` with `platformRole` `ADMIN` or `MEMBER`, inside the cluster, as the account the installation was created with (a one-minute token the handler signs), when the account is not what the platform's App Admin role says it should be | yes — the call an administrator of the installation changes a person's role with. The community edition has the two roles and gives `ADMIN` by invitation too |
 | An account that is not `ACTIVE` | refused | — |
+| A person who holds the address of the account the installation was created with | refused | — |
 
 ### What the handler writes itself — open, for the owner
 
@@ -94,6 +96,29 @@ around a paid feature is a judgement this catalogue cannot make for the owner. T
 repository is not to bypass licensing; until the question is answered this profile should be
 treated as not cleared for a tenant that has not been told.
 
+### Who administers Activepieces
+
+Who holds the platform's **App Admin** role, and nobody else: not the tenant's administrator for
+being that, not the first person in.
+
+The role is the tenant's group `gentian:tenant:<tenant>:app-admins`. A tenant's administrator
+gives it in the admin console — *Groups*, under *Roles*, the group `app-admins`: add the person;
+or the person's own page, under their groups — and takes it away in the same place. It is one role for
+the tenant: who holds it administers every app of the tenant that is signed in to this way.
+
+The sidecar tells the handler whether the realm's signed answer says the person holds the role
+(`person.appAdmin`). At every sign-in the handler makes the account what it should be, before it
+makes the token: the installation's role `ADMIN` for a person who holds the role, `MEMBER` for a
+person who does not. So the role given takes effect the next time the person opens Activepieces,
+and the role withdrawn at their next sign-in — within the hour a token lasts; Activepieces reads
+the role when it is asked, so a token from before administers nothing either. An administrator
+somebody made in Activepieces itself, who does not hold the role, is a member again at their next
+sign-in. The account the installation was created with keeps its role and is nobody's.
+
+An administrator of the installation sees its accounts and its settings pages, and — as
+Activepieces is built — may be taken to a project that is not their own
+(`project-service.ts`, `getOneForUser`). The handler signs them in to their own project.
+
 ### What it is handed
 
 Activepieces' database, its `AP_JWT_SECRET`, and its own port inside the cluster. With these the
@@ -103,7 +128,10 @@ pinned to.
 
 ### What is different from before
 
-- Every person was made an administrator of the whole installation. Everybody is a member now.
+- Every person was made an administrator of the whole installation. Now a person is one while
+  they hold the platform's App Admin role, and everybody else is a member. An installation that
+  kept its database from before has administrators from then: each becomes a member at their next
+  sign-in unless they hold the role.
 - The session lasted seven days and was also put in three cookies a page's script could read. It
   lasts at most an hour, and is in `localStorage` only.
 - The page that stored the session was built by pasting the person's name into a script. The
@@ -121,7 +149,8 @@ pinned to.
 - An account is found by e-mail address. A person given an address somebody else had before gets
   that account.
 - A person removed at the platform keeps their account and flows. Their flows keep running.
-- Nobody administers the installation: its owner is an account nobody can sign in as.
+- The installation's owner is an account nobody can sign in as. Who administers it is who holds
+  the platform's App Admin role, which is one role for all of the tenant's apps of this kind.
 - The handler depends on the `user` and `project` tables and on the token's fields. Activepieces
   promises none of them, and 0.28.0 is an old release. The end-to-end run is what notices.
 - After the hour the person is taken through the sign-in again and lands on the list of flows.

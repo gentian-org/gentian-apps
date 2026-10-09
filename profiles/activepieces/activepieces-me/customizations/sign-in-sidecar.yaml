@@ -42,10 +42,10 @@ spec:
   artifacts:
     - repo: gentian-org/gentian-apps
       path: profiles/activepieces/activepieces-me/assets/sign-in-handler.js
-      version: "1.0.0"
+      version: "1.1.0"
     - repo: gentian-org/gentian-apps
       path: images/gentian-sidecar-sso-saml
-      version: "0.2.0"
+      version: "0.3.0"
 
   origin:
     authorship: gentian
@@ -82,7 +82,10 @@ spec:
       with "No project found for user", because it creates a project for the first
       account only and creating more is behind the manageProjectsEnabled switch. The
       handler therefore writes the second person's account and a project of their own
-      into the database itself, as the handler before it did. That is one person, one
-      project — not shared projects, roles or any switch — but it is more than the
+      into the database itself, as the handler before it did. The installation's role
+      of a person (ADMIN or MEMBER, both of the community edition) is set through
+      Activepieces' own interface for it, for who holds the platform's App Admin
+      role. That is one person, one
+      project — not shared projects, project roles or any switch — but it is more than the
       edition's own interface gives, and whether it is within the licence is a
       judgement this record does not make.

@@ -69,7 +69,8 @@ that container, started with this profile's values as the chart starts it
 
 | Step | By | OpenProject's own way |
 |---|---|---|
-| An account for a person who has none | `POST /api/v3/users`, inside the cluster, as the service account the profile configures (global basic auth) | yes — its published interface. An ordinary account, never an administrator |
+| An account for a person who has none | `POST /api/v3/users`, inside the cluster, as the service account the profile configures (global basic auth) | yes — its published interface. An ordinary account |
+| Who administers OpenProject | `PATCH /api/v3/users/<id>` with `admin` true or false, as the same service account, when the account is not what the platform's App Admin role says it should be | yes — except taking the flag from the last active administrator, which OpenProject refuses and the handler writes (see "Who administers OpenProject") |
 | The password that call demands | a random value, then its row in `user_passwords` deleted | no — the row is deleted in the database |
 | An account somebody invited the person's address to | its status set from invited to active, with the name the platform knows the person by | no — written to `users`; OpenProject's own way is a form that sets a password |
 | A "stay signed in" token for the account | a row in `tokens` (`Token::AutoLogin`), its value stored as OpenProject stores one: SHA-256 of the value and `secret_key_base` (`app/models/token/hashed_token.rb`) | no — the row is written; the token itself is OpenProject's own feature |
@@ -100,21 +101,36 @@ form that is off.
 
 ### Who administers OpenProject
 
-Nobody, until somebody is made an administrator; the sign-in makes none.
+Who holds the platform's **App Admin** role, and nobody else: not the tenant's administrator for
+being that, not the first person in.
 
+The role is the tenant's group `gentian:tenant:<tenant>:app-admins`. A tenant's administrator
+gives it in the admin console — *Groups*, under *Roles*, the group `app-admins`: add the person;
+or the person's own page, under their groups — and takes it away in the same place. It is one role for
+the tenant: who holds it administers every app of the tenant that is signed in to this way.
+
+- The sidecar tells the handler whether the realm's signed answer says the person holds the role
+  (`person.appAdmin`). At every sign-in the handler makes the account what it should be, before
+  it makes the session: an administrator's for a person who holds the role, an ordinary one for
+  a person who does not. So the role given takes effect the next time the person opens
+  OpenProject, and the role withdrawn at their next sign-in — within the hour a session lasts.
+  An administrator somebody made in OpenProject's own pages, who does not hold the role, is an
+  ordinary account again at their next sign-in.
+- It is done through OpenProject's own interface, as the service account (`api_admin`, password in
+  the vault under the app's `internal/api_admin_password`), inside the cluster:
+  `PATCH /api/v3/users/<id>` with `{"admin": true}` or `{"admin": false}`, and only when the
+  account is not already what it should be.
+- One case is written to the database instead: OpenProject does not take the flag from its last
+  active administrator. Here it has to go — the role was withdrawn — and an installation without
+  an administrator is what a new one is anyway, until somebody is given the role. The handler
+  then sets `users.admin` to false itself.
 - The administrator OpenProject seeds (`admin`, `openproject-admin@<tenant domain>`) is created
   **locked**. It has a password in the vault that nothing accepts. A person at the platform who
-  holds that address is refused, like anybody whose account is locked.
-- An administrator is made through OpenProject's own interface, as the service account
-  (`api_admin`, password in the vault under the app's `internal/api_admin_password`), for a
-  person who has opened OpenProject once:
-  `PATCH /api/v3/users/<id>` with `{"admin": true}`. From then on that person is signed in as
-  the administrator they are, and can make others in OpenProject's own pages. The call was run
-  against OpenProject directly, as from inside the cluster; whether the front door passes a
-  Basic credential on to the app has not been tried.
+  holds that address is refused, like anybody whose account is locked. The handler leaves it as
+  it is.
 
-The profile declares no way for the platform to do this at install time. Until one exists it is a
-step for whoever operates the tenant.
+An administrator of OpenProject sees every project and every account in it, and changes its
+settings.
 
 ### What it is handed
 

@@ -1639,11 +1639,15 @@ Before adding one:
    what the handler writes itself rather than through the app's own interface, and whether any of
    it is more than the installed edition gives its users. That last question is the owner's to
    answer, and the record must not answer it by silence.
-3. **Everybody is an ordinary member**, nobody gets a password, and the session lasts what the
-   sidecar says.
-4. **Refuse the app's own sign-in at the front door** (`denyPaths`) — above all a first-run or
+3. **Nobody gets a password**, and the session lasts what the sidecar says.
+4. **Who administers the app is who holds the platform's App Admin role**, and nobody else. The
+   sidecar says it (`person.appAdmin`, read from the realm's signed answer); the handler gives
+   the app's own administrator role to that person and takes it from anybody else, in the app's
+   own way, at every sign-in and before the session is made. The account the app keeps for
+   itself keeps its role, and a person who holds its address is refused.
+5. **Refuse the app's own sign-in at the front door** (`denyPaths`) — above all a first-run or
    setup call that would hand the installation to whoever made it first.
-5. **Test against the real app** at the pinned version: add `e2e/<app>.e2e.js` beside the ones
+6. **Test against the real app** at the pinned version: add `e2e/<app>.e2e.js` beside the ones
    that exist, and run it again before the image tag moves.
 
 ## 9. Secret rotation — Reloader annotation

@@ -172,7 +172,7 @@ spec:
         # signs in with a password here, and the sign-in sidecar signs nobody
         # in to a locked account, so no person at the platform becomes this
         # administrator by holding its address. Who administers OpenProject
-        # is in customization.md.
+        # is who holds the platform's App Admin role: customization.md.
         admin_user:
           name: "OpenProject Internal Admin"
           mail: "openproject-admin@${TENANT_DOMAIN}"
@@ -230,7 +230,8 @@ spec:
           database: true
         # secret_key_base: OpenProject stores a token as a hash made with it.
         # api_admin_password: OpenProject's own interface for making an
-        # account, called inside the cluster.
+        # account and for making it an administrator's or an ordinary one,
+        # called inside the cluster.
           secrets: [secret_key_base, api_admin_password]
         # That call, and the one that turns the token into a session.
           appPort: 8080

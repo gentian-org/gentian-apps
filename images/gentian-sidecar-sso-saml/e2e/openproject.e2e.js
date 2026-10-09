@@ -159,6 +159,7 @@ before(async () => {
     kc = await setup.startKeycloak();
     await setup.ensureRealm(kc, REALM, [ANNA, BEN, CARLA, ERIK, SEEDED]);
     await setup.ensureSidecarClient(kc, REALM, HOST);
+    for (const person of [ANNA, BEN, CARLA, ERIK, SEEDED]) await setup.setAppAdmin(kc, REALM, person.email, false);
     for (const name of Object.values(names)) setup.tryDocker('rm', '-f', name);
     setup.docker('run', '-d', '--name', names.pg, '--network', setup.NETWORK,
         '-e', `POSTGRES_USER=${DB.user}`, '-e', `POSTGRES_PASSWORD=${DB.password}`, '-e', `POSTGRES_DB=${DB.name}`, 'postgres:16-alpine');
@@ -426,20 +427,91 @@ test('an account somebody in OpenProject invited the person to becomes theirs', 
     assert.equal(psql(`select count(*) from tokens t join users u on u.id = t.user_id where u.mail = '${invited.email}' and t.type = 'Token::Invitation'`), '0');
 });
 
-test('an administrator is made by OpenProject\'s own interface, and the sign-in makes none', async () => {
-    const id = psql(`select id from users where mail = '${BEN.email}'`);
-    const granted = await serviceAccount('PATCH', `/api/v3/users/${id}`, { admin: true });
-    assert.equal(granted.status, 200, granted.body);
-    const { browser } = await signIn(BEN);
-    assert.equal((await whoAmI(browser)).user.admin, true);
-    // OpenProject's list of all accounts, which only an administrator sees.
+// Who administers OpenProject: who holds the platform's App Admin role, and
+// nobody else.
+
+// OpenProject's list of all accounts, which only an administrator sees.
+async function mayAdminister(browser) {
     const page = await browser.request('GET', `https://${HOST}/users`);
-    assert.equal(page.status, 200);
-    // Nobody else became one.
+    assert.ok([200, 403].includes(page.status), `the list of accounts answered ${page.status}`);
+    return page.status === 200;
+}
+
+test('a person who holds the App Admin role administers OpenProject, and nobody else does', async () => {
+    await setup.setAppAdmin(kc, REALM, BEN.email, true);
+    const ben = await signIn(BEN);
+    assert.equal(new URL(ben.res.url).pathname, '/', ben.browser.log.join(' -> '));
+    assert.equal((await whoAmI(ben.browser)).user.admin, true);
+    assert.equal(await mayAdminister(ben.browser), true);
+    // Nobody else became one: not the first person in, not anybody.
     assert.equal(psql("select string_agg(mail, ',') from users where type = 'User' and admin and status = 1"), BEN.email);
     const anna = await signIn(ANNA);
     assert.equal((await whoAmI(anna.browser)).user.email, ANNA.email);
-    assert.equal((await anna.browser.request('GET', `https://${HOST}/users`)).status, 403);
+    assert.equal(await mayAdminister(anna.browser), false);
+    assert.deepEqual(account(ANNA), { status: 1, admin: false });
+    // The administrator OpenProject seeds is as it was: locked.
+    assert.equal(psql("select status, admin from users where login = 'admin'"), '3|t');
+});
+
+test('signing in again as the administrator one already is changes nothing', async () => {
+    const made = () => (setup.logsOf(names.sidecar).match(/administrator-made/g) || []).length;
+    const before = made();
+    assert.equal(before, 1);
+    const ben = await signIn(BEN);
+    assert.equal((await whoAmI(ben.browser)).user.admin, true);
+    assert.equal(made(), before);
+});
+
+test('withdrawing the role takes it away in OpenProject at the next sign-in', async () => {
+    const before = await signIn(BEN);
+    assert.equal(await mayAdminister(before.browser), true);
+    await setup.setAppAdmin(kc, REALM, BEN.email, false);
+    const after = await signIn(BEN);
+    assert.equal(new URL(after.res.url).pathname, '/', after.browser.log.join(' -> '));
+    assert.deepEqual(account(BEN), { status: 1, admin: false });
+    assert.equal(await mayAdminister(after.browser), false);
+    // The session he still had from before is no administrator's either.
+    assert.equal(await mayAdminister(before.browser), false);
+    // He was the only active administrator, and OpenProject's own interface
+    // does not take the flag from the last one: it is taken all the same.
+    assert.equal(psql("select count(*) from users where type = 'User' and admin and status = 1"), '0');
+});
+
+test('one of two administrators loses the role through OpenProject\'s own interface', async () => {
+    await setup.setAppAdmin(kc, REALM, BEN.email, true);
+    await setup.setAppAdmin(kc, REALM, CARLA.email, true);
+    for (const person of [BEN, CARLA]) assert.equal(await mayAdminister((await signIn(person)).browser), true);
+    await setup.setAppAdmin(kc, REALM, CARLA.email, false);
+    assert.equal(await mayAdminister((await signIn(CARLA)).browser), false);
+    assert.equal(psql("select string_agg(mail, ',') from users where type = 'User' and admin and status = 1"), BEN.email);
+    await setup.setAppAdmin(kc, REALM, BEN.email, false);
+    assert.equal(await mayAdminister((await signIn(BEN)).browser), false);
+});
+
+test('an administrator made inside OpenProject who does not hold the role is one until the next sign-in', async () => {
+    const id = psql(`select id from users where mail = '${ANNA.email}'`);
+    const granted = await serviceAccount('PATCH', `/api/v3/users/${id}`, { admin: true });
+    assert.equal(granted.status, 200, granted.body);
+    assert.deepEqual(account(ANNA), { status: 1, admin: true });
+    const anna = await signIn(ANNA);
+    assert.deepEqual(account(ANNA), { status: 1, admin: false });
+    assert.equal(await mayAdminister(anna.browser), false);
+});
+
+test('nothing a browser sends makes an administrator of OpenProject', async () => {
+    const browser = browserAs({ person: ANNA });
+    const request = browser.request.bind(browser);
+    const claims = { 'x-gentian-app-admin': 'true', 'x-gentian-roles': setup.APP_ADMIN_ROLE, role: 'admin' };
+    browser.request = (method, url, options = {}) => request(method, url, { ...options, headers: { ...(options.headers || {}), ...claims } });
+    const res = await browser.navigate(`https://${HOST}/?appAdmin=true`, { credentials: { username: ANNA.email, password: ANNA.password } });
+    assert.equal(new URL(res.url).pathname, '/', browser.log.join(' -> '));
+    assert.deepEqual(account(ANNA), { status: 1, admin: false });
+    assert.equal(await mayAdminister(browser), false);
+    // OpenProject's own call for it is not an ordinary account's to make.
+    const id = psql(`select id from users where mail = '${ANNA.email}'`);
+    const self = await browser.request('PATCH', `https://${HOST}/api/v3/users/${id}`, { json: { admin: true }, headers: { 'x-requested-with': 'XMLHttpRequest' } });
+    assert.ok(self.status >= 400, `changing one's own account answered ${self.status}`);
+    assert.deepEqual(account(ANNA), { status: 1, admin: false });
 });
 
 test('the sidecar\'s log names nobody', () => {

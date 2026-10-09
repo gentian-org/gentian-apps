@@ -46,10 +46,10 @@ spec:
   artifacts:
     - repo: gentian-org/gentian-apps
       path: profiles/openproject/openproject-ce/assets/sign-in-handler.js
-      version: "1.0.0"
+      version: "1.1.0"
     - repo: gentian-org/gentian-apps
       path: images/gentian-sidecar-sso-saml
-      version: "0.2.0"
+      version: "0.3.0"
 
   origin:
     authorship: gentian
@@ -86,12 +86,16 @@ spec:
       what the free edition has for everybody: an account, made through its own
       APIv3 as the service account the profile configures (global basic auth); the
       setting that switches password sign-in off (disable_password_login); and the
-      "stay signed in" token, which OpenProject itself turns into a session. OPEN,
-      for the owner. Three things are written to OpenProject's database instead of
-      through its interface: the token's row (and afterwards its stored value, so
-      that it works once); the removal of the password hash the interface demands
-      for a new account; and the status of an account somebody invited, when the
-      invited person first arrives. None of them is a paid feature. But the result —
+      "stay signed in" token, which OpenProject itself turns into a session. Who
+      administers it is set through the same APIv3, for the person who holds the
+      platform's App Admin role. OPEN, for the owner. Four things are written to
+      OpenProject's database instead of through its interface: the token's row (and
+      afterwards its stored value, so that it works once); the removal of the
+      password hash the interface demands for a new account; the status of an
+      account somebody invited, when the invited person first arrives; and the
+      administrator flag of the last active administrator when the role was
+      withdrawn from them, which the interface refuses to take. None of them is a
+      paid feature. But the result —
       a person signed in at an identity provider is in OpenProject without typing
       anything — is what the paid edition sells as single sign-on, reached here
       without it. OpenProject's code is under the GPL, version 3, which does not

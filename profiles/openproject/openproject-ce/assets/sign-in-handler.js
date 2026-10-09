@@ -13,8 +13,14 @@
 //
 //   1. the person's account, if they have none: OpenProject's own interface
 //      for making one (POST /api/v3/users), called inside the cluster as the
-//      service account the profile configures. An ordinary account: the
-//      handler never makes anybody an administrator.
+//      service account the profile configures. An ordinary account.
+//   1a. who administers OpenProject: the person the sidecar says holds the
+//      platform's App Admin role is made an administrator, and a person it
+//      does not say so of is made an ordinary account again -- both through
+//      OpenProject's own interface (PATCH /api/v3/users/<id>), as the same
+//      service account, and only when the account is not already what it
+//      should be. Nobody is an administrator for having been the first, or
+//      for administering the tenant.
 //   2. a token for that account, ending when the sidecar says the session
 //      ends. Its value is made here and stored the way OpenProject stores
 //      one: as a hash made with the installation's secret_key_base.
@@ -107,11 +113,43 @@ function names(person) {
 
 async function findUser(email) {
     const found = await pool.query(
-        "select id, status from users where type = 'User' and lower(mail) = $1 order by id asc limit 2", [email]);
+        "select id, status, admin from users where type = 'User' and lower(mail) = $1 order by id asc limit 2", [email]);
     // Two accounts under one address: OpenProject does not allow it, and
     // which of them the person is cannot be decided here.
     if (found.rows.length > 1) return { ambiguous: true };
     return found.rows[0] || null;
+}
+
+function serviceAccount() {
+    return { authorization: 'Basic ' + Buffer.from(`${API_USER}:${process.env.SECRET_API_ADMIN_PASSWORD}`).toString('base64') };
+}
+
+// Who administers OpenProject is who holds the platform's App Admin role,
+// and it is settled at every sign-in: given to a person who holds it, taken
+// from a person who does not. person.appAdmin is the sidecar's reading of
+// the realm's signed answer; a sidecar that does not say is one that says no.
+// The session is made only once the account is what it should be, so a
+// person the role was withdrawn from is not signed in as an administrator
+// because a call failed.
+async function settleAdministrator(user, person, origin) {
+    const wanted = person.appAdmin === true;
+    if (Boolean(user.admin) === wanted) return false;
+    const is = async () => {
+        const now = await pool.query("select admin from users where id = $1 and type = 'User'", [user.id]);
+        return now.rows.length === 1 && Boolean(now.rows[0].admin) === wanted;
+    };
+    const res = await app('PATCH', `/api/v3/users/${user.id}`, origin, { headers: serviceAccount(), json: { admin: wanted } });
+    if (await is()) return true;
+    // OpenProject does not take the flag from its last active administrator:
+    // it wants one to exist. Here one need not -- nobody administers a new
+    // installation either, and the platform makes one whenever somebody is
+    // given the role -- and a role that was withdrawn has to go. So for that
+    // one case, and only for taking away, the flag is written.
+    if (!wanted) {
+        await pool.query("update users set admin = false, updated_at = now() where id = $1 and type = 'User'", [user.id]);
+        if (await is()) return true;
+    }
+    throw new Error(`setting the administrator flag answered ${res.status}`);
 }
 
 async function createUser(person, origin) {
@@ -121,7 +159,7 @@ async function createUser(person, origin) {
     // password.
     const password = crypto.randomBytes(32).toString('base64url') + 'aZ9!';
     const res = await app('POST', '/api/v3/users', origin, {
-        headers: { authorization: 'Basic ' + Buffer.from(`${API_USER}:${process.env.SECRET_API_ADMIN_PASSWORD}`).toString('base64') },
+        headers: serviceAccount(),
         json: { login: person.email, email: person.email, firstName, lastName, status: 'active', password },
     });
     const user = await findUser(person.email);
@@ -220,6 +258,10 @@ module.exports = {
         // An account locked in OpenProject stays locked, and one that waits
         // for an administrator's approval goes on waiting.
         if (user.status !== ACTIVE) return { refuse: true };
+
+        if (await settleAdministrator(user, person, ctx.origin)) {
+            ctx.log(person.appAdmin === true ? 'administrator-made' : 'administrator-unmade');
+        }
 
         const session = await openSession(user, ctx);
         return {
