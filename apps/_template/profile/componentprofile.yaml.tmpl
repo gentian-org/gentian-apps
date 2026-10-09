@@ -117,7 +117,12 @@ spec:
       platform:
         issuerKey: "auth.issuer"
         zoneClientIdKey: "auth.clientId"
-        audienceKey: "auth.audience"
+        # Not audienceKey: that is the audience the zone's own token carries,
+        # the director's, and is for a platform-trust component that is
+        # handed that token (forwardToken below). This component is handed a
+        # token made out to itself, and requires its own name as the
+        # audience: auth.audience in extraValues.
+        # audienceKey: "auth.audience"
         tenantKey: "platform.tenant"
         kernelDomainKey: "platform.kernelDomain"
         realmKey: "platform.realm"
@@ -215,6 +220,10 @@ spec:
       auth:
         disabled: false
         mode: edge
+        # What a token must be made out to for this API to accept it: this
+        # component's own name, which is the audience of the token the front
+        # door exchanges for it (exchangeToken on the api entry below).
+        audience: COMPONENT_ID
       gateway:
         enabled: false
       rbac:
@@ -497,12 +506,19 @@ spec:
       # client IP:
       # source:
       #   cidrs: ["203.0.113.0/24"]
-      # Asks the gateway to hand the edge access token to this backend. Without
-      # it a backend gets identity headers, which is what most components
-      # should want: the edge token is also valid at the director and at every
-      # sibling, so forwarding it turns one compromised backend into all of
-      # them. It requires trustTier platform, and it is meaningless on a
-      # perimeter entry, which has no session.
+      # Asks the front door for a token of the signed-in person that is valid
+      # at this component and nowhere else. It exchanges the session's token
+      # at the tenant's realm for one whose audience is this component's name,
+      # and every request arrives with it as its bearer. The API verifies it
+      # (backend/app/core/auth.py) and takes nothing else for who is asking:
+      # not a header, which anything that reached the pod could have set.
+      exchangeToken: true
+      # The other way to be told, and not both: the session's own token,
+      # handed on as it is. That token is also valid at the director and at
+      # every sibling, so forwarding it turns one compromised backend into all
+      # of them. It is for a component that relays the caller's token to the
+      # director, requires trustTier platform, and then takes audienceKey
+      # above in place of auth.audience.
       # forwardToken: false
       # The Service this entry routes to, in the component's own namespace. The
       # name is the one the chart actually creates: <fullnameOverride>-api,

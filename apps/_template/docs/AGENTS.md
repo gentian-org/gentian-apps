@@ -91,15 +91,20 @@ an error anywhere; the value lands where nothing reads it. Rename a key in
 
 ## Auth mode: edge
 
-As shipped, the profile's `extraValues` set `auth.mode: edge`. The platform's Gateway
-holds the session with the zone's confidential client and, on an exposure that says
-`forwardToken`, puts the zone's token on the request. The bundle runs no code flow, holds
-no token and no client secret; `getAccessToken()` returns null and `apiFetch` sends no
-bearer. The API verifies the forwarded token against the zone's issuer and requires the
-director's audience, and relays it to the director (`backend/app/core/director.py`) when
-it needs an answer about the caller. What the caller may do is the director's answer,
-never this component's. `forwardToken` requires `trustTier: platform`; an ordinary app
-leaves it off and gets identity headers instead.
+As shipped, the profile's `extraValues` set `auth.mode: edge` and the api entry says
+`exchangeToken`. The platform's Gateway holds the session with the zone's confidential
+client. On every request the front door exchanges the session's token at the tenant's
+realm for one made out to this component alone, and puts it on the request. The bundle
+runs no code flow, holds no token and no client secret; `getAccessToken()` returns null
+and `apiFetch` sends no bearer. The API verifies that token against the zone's issuer and
+requires its own name as the audience (`auth.audience`). It reads no identity header: a
+header is whatever the sender wrote, and the token is the realm's word. What the caller
+may do with this component's data is this component's to decide.
+
+A component of platform trust that relays the caller's token to the director
+(`backend/app/core/director.py`) says `forwardToken` instead, maps `audienceKey`, and
+requires the director's audience. `forwardToken` requires `trustTier: platform`, and a
+profile says one of the two, never both.
 
 `pkce` remains for a component deployed outside the platform: the bundle runs the code
 flow itself (a stub in this template; a real app exchanges the code through its backend
