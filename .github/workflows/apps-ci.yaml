@@ -256,9 +256,26 @@ jobs:
       - name: Install PyYAML
         run: pip install pyyaml
       - name: Build both catalogues
+        env:
+          LIVE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
         run: |
           # The root first: the script empties the directory it writes to.
-          (cd src/main && python3 scripts/build-catalogue-source.py --out "${GITHUB_WORKSPACE}/site" --with-landing-page)
+          if [ -f src/main/scripts/build-catalogue-source.py ]; then
+            (cd src/main && python3 scripts/build-catalogue-source.py --out "${GITHUB_WORKSPACE}/site" --with-landing-page)
+          else
+            # main is at a commit from before the build script, so it cannot
+            # build a catalogue. The released catalogue stays the one being
+            # served: copy it as it is, and publish develop beside it.
+            echo "::warning::main has no scripts/build-catalogue-source.py; the released catalogue is kept as served at ${LIVE}"
+            mkdir -p site/profiles
+            curl -fsS --retry 3 -o site/index.yaml "${LIVE}/index.yaml"
+            curl -fsS --retry 3 -o site/index.html "${LIVE}/index.html"
+            python3 -c 'import sys, yaml; print("\n".join(e["name"] for e in yaml.safe_load(open("site/index.yaml"))["entries"]))' > /tmp/released-names
+            while IFS= read -r name; do
+              curl -fsS --retry 3 -o "site/profiles/${name}.yaml" "${LIVE}/profiles/${name}.yaml"
+            done < /tmp/released-names
+            echo "kept $(wc -l < /tmp/released-names) released profile(s) as served"
+          fi
           (cd src/develop && python3 scripts/build-catalogue-source.py --out "${GITHUB_WORKSPACE}/site/develop" --with-landing-page)
 
       # A push to develop must leave the released catalogue exactly as it is:
