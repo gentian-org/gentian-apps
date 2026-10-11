@@ -1,16 +1,22 @@
 """Who the caller is.
 
-The bearer on a request is verified here and nowhere else. Under edge it is
-the zone's token, put on the request by the platform's Gateway, minted for the
-director; under pkce it is the bundle's own. Both are RS256 tokens from the
-configured issuer and both are verified the same way: signature against the
-issuer's published keys, issuer, expiry, and the audience this component was
-told to require. Nothing about the mode changes the verification, only who
-put the header there.
+The bearer on a request is verified here and nowhere else, and nothing else
+says who is asking. Under edge it is a token of the signed-in person that the
+platform's front door obtained for this component alone: the session's token
+exchanged at the tenant's realm for one whose audience is this component's
+name (exchangeToken in the profile). Under pkce it is the bundle's own. Both
+are RS256 tokens from the configured issuer and both are verified the same
+way: signature against the issuer's published keys, issuer, expiry, and the
+audience this component was told to require. Nothing about the mode changes
+the verification, only who put the header there.
 
-What this does not do is decide what the caller may do. That is the director's
-answer, obtained by relaying the same token (see director.py). This module
-establishes who is asking; it grants nothing.
+The identity headers the front door also sets are not read. A header is a
+claim by whoever sent the request; a token is the realm's.
+
+A component of platform trust may be handed the session's own token instead
+(forwardToken), which is made out to the director, and relay it there (see
+director.py). It then requires the director's audience. Either way this
+module establishes who is asking; it grants nothing.
 """
 
 import time
@@ -63,6 +69,14 @@ def decode_token(token: str, settings: Settings) -> dict[str, Any]:
     header = jwt.get_unverified_header(token)
     public_key = _signing_key(issuer, header.get("kid"))
     audience = settings.expected_audience
+    if audience is None and settings.is_edge:
+        # Under edge every token of the zone's realm reaches somebody. With
+        # no audience to hold one against, this API would accept all of
+        # them, including one made out to another app.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="This component was not told which audience a token must carry.",
+        )
     return jwt.decode(
         token,
         public_key,

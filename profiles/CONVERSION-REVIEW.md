@@ -30,15 +30,6 @@
 - package: dropped deploymentMethod 'api' — delivery is read from which package kind is present and can no longer contradict it
 - portalTiles: an API-delivered entry has no Service, so there is no exposure to hang its tile on. The tile opens package.api.baseUrl through the portal-proxy runtime; decide how that is declared before this profile ships, or the entry installs and is invisible
 
-## litellm-me
-
-- trustTier was absent; set to experimental, the tier that claims nothing
-- catalogueVersion was absent; version set to 0.0.0
-- package: dropped deploymentMethod 'api' — delivery is read from which package kind is present and can no longer contradict it
-- expose/web: the ingress named no service; backend.service is a placeholder
-- expose/web: the profile requests no OIDC or SAML client, so authMode oidc is the edge session only — confirm the app needs no login of its own, or that it is an API that should be bearer/jwt
-- launch: none — the profile is reachable but advertises no tile; confirm that is intended rather than a tile that failed to convert
-
 ## mathesar-ce
 
 - package: dropped deploymentMethod 'crossplane' — delivery is read from which package kind is present and can no longer contradict it

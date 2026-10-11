@@ -77,10 +77,12 @@ auth:
   # The client whose tokens the API accepts: the bundle's own under pkce, the
   # zone's under edge.
   clientId: ""
-  # The audience the forwarded token must carry under edge: the director's,
-  # because that is who the zone's token is minted for. Requiring it is what
-  # stops a token the realm signed for some other purpose from being taken for
-  # the zone's session.
+  # The audience a token must carry under edge. For a component that asks for
+  # a token of its own (exchangeToken) it is the component's name, which the
+  # profile sets; for a platform-trust component handed the session's token
+  # (forwardToken) it is the director's, which the platform supplies.
+  # Requiring it is what stops a token the realm signed for somebody else
+  # from being taken for this component's.
   audience: ""
   # Scopes the bundle requests under pkce. Only scopes the realm defines.
   scopes: openid profile email

@@ -40,7 +40,8 @@ def assert_tenant_access(claims: dict[str, Any], settings: Settings) -> str:
     edge before the request arrived, from the authorization graph. Asking the
     token would refuse every caller in production, since the platform sets
     ENVIRONMENT=production and the claim is never there. Anything finer than
-    "may enter" is the director's answer, obtained by relaying the token.
+    "may enter" is this component's own to decide, or, for a component of
+    platform trust, the director's answer obtained by relaying the token.
     """
     if settings.is_edge:
         return settings.tenant_id

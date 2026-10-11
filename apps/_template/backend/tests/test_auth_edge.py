@@ -1,11 +1,10 @@
-"""Verifying the bearer the edge forwards.
+"""Verifying the bearer the front door hands on.
 
-Under edge the platform's Gateway puts the zone's token on the request. That
-token is minted for the director and signed by the zone's realm, and this API
-must accept exactly that and nothing else: not a token the same realm signed
-for some other purpose, not one from another issuer, and not a request with no
-bearer at all. What the caller may then do is the director's answer, obtained
-by relaying the same token; nothing here grants anything.
+Under edge the platform's front door exchanges the session's token for one
+made out to this component, signed by the zone's realm, and puts it on the
+request. This API must accept exactly that and nothing else: not the session's
+own token, not a token the same realm signed for another app, not one from
+another issuer, and not a request with no bearer at all.
 
 The identity provider is stood in for by a key generated here and a JWKS
 returned by a patched fetch, so these run with no network.
@@ -51,7 +50,7 @@ def settings(**over) -> Settings:
         "AUTH_MODE": "edge",
         "OIDC_ISSUER": ISSUER,
         "OIDC_CLIENT_ID": "gentian-edge-kernel",
-        "OIDC_AUDIENCE": "gentian-director",
+        "OIDC_AUDIENCE": "notes",
         "TENANT_ID": "platform",
         "ENVIRONMENT": "local",
     }
@@ -65,8 +64,8 @@ def token(keypair, **claims) -> str:
     payload = {
         "iss": ISSUER,
         "sub": "person",
-        "aud": "gentian-director",
-        "azp": "gentian-edge-kernel",
+        "aud": "notes",
+        "azp": "gentian-edge-exchange",
         "exp": now + 300,
         "iat": now,
         "tenant": "platform",
@@ -80,16 +79,37 @@ def token(keypair, **claims) -> str:
     return jwt.encode(payload, pem, algorithm="RS256", headers={"kid": KID})
 
 
-def test_the_zones_token_is_accepted(keypair):
+def test_a_token_made_out_to_this_component_is_accepted(keypair):
     claims = auth.decode_token(token(keypair), settings())
     assert claims["sub"] == "person"
 
 
+def test_the_sessions_own_token_is_refused(keypair):
+    """The session's token is made out to the director. It is what the front
+    door exchanges, not what a component is handed, and one that arrives here
+    is not this component's."""
+    session = token(keypair, aud=["gentian-director", "gentian-edge-exchange"], azp="gentian-edge-kernel")
+    with pytest.raises(jwt.InvalidAudienceError):
+        auth.decode_token(session, settings())
+
+
+def test_a_token_made_out_to_another_app_is_refused(keypair):
+    with pytest.raises(jwt.InvalidAudienceError):
+        auth.decode_token(token(keypair, aud="wiki"), settings())
+
+
+def test_under_edge_a_component_told_no_audience_accepts_nothing(keypair):
+    """With nothing to hold a token against, every token of the realm would
+    pass. That is a misconfiguration to report, not a token to accept."""
+    with pytest.raises(HTTPException) as refused:
+        auth.decode_token(token(keypair), settings(OIDC_AUDIENCE=None, OIDC_CLIENT_ID=None))
+    assert refused.value.status_code == 503
+
+
 def test_a_token_for_another_audience_is_refused(keypair):
-    """The same realm signs tokens for many purposes. Only the one minted for
-    the director is the zone's session; an app's own token or an
-    administration console's is not, and is refused here rather than accepted
-    as somebody's session."""
+    """The same realm signs tokens for many purposes. Only the one made out
+    to this component is this component's; an administration console's is
+    not, and is refused here rather than accepted as somebody's session."""
     with pytest.raises(jwt.InvalidAudienceError):
         auth.decode_token(token(keypair, aud=["realm-management", "account"], azp="security-admin-console"), settings())
 
@@ -111,7 +131,7 @@ def test_without_a_configured_audience_the_client_id_is_required(keypair):
     with pytest.raises(jwt.InvalidAudienceError):
         auth.decode_token(token(keypair, aud="something-else"), s)
     claims = auth.decode_token(token(keypair, aud="gentian-edge-kernel"), s)
-    assert claims["azp"] == "gentian-edge-kernel"
+    assert claims["aud"] == "gentian-edge-kernel"
 
 
 def test_an_unknown_signing_key_is_refused_after_one_refresh(keypair, monkeypatch):
