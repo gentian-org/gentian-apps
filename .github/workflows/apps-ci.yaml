@@ -7,12 +7,13 @@ on:
   # to test a commit without pushing an empty one.
   workflow_dispatch:
   push:
-    # Feature branches too, so a push is checked before a pull request exists.
-    # Nothing here publishes from one: every image push and helm push is gated
-    # on the ref, not merely on "not a pull request". main releases, under the
-    # names the files state; develop publishes the same artefacts under names
-    # marked develop, which no release ever carries (see release-gate).
-    branches: [main, develop, "feat/**", "fix/**", "chore/**"]
+    # What is merged, and nothing else: a branch is checked as a pull request,
+    # and one that ran on its push as well did the same work twice. A branch
+    # without a pull request is not checked; open one, as a draft if need be,
+    # or start the workflow by hand. main releases, under the names the files
+    # state; develop publishes the same artefacts under names marked develop,
+    # which no release ever carries (see release-gate).
+    branches: [main, develop]
     paths:
       - "apps/**"
       - "profiles/**"
@@ -37,6 +38,9 @@ on:
       - "charts/activepieces/**"
       - "charts/mathesar/**"
       - "charts/docmost/**"
+      # Since a branch is no longer checked on its push, this is the only run
+      # a change to the workflow gets before it is merged.
+      - ".github/workflows/apps-ci.yaml"
       - ".github/actions/**"
 
 env:
@@ -93,6 +97,55 @@ jobs:
             echo "publish=${publish}"
             echo "develop_tag=${develop_tag}"
           } >> "$GITHUB_OUTPUT"
+
+  # Whether this run has to sign anybody in. The two end-to-end jobs start
+  # Keycloak and the apps' real images and take longer than everything else in
+  # this workflow together, and what they exercise is the sign-in sidecar, the
+  # suites themselves and the profiles the suites read their handlers and
+  # clients from. A change to none of those — a chart, another image — cannot
+  # change their answer, so it does not wait for it.
+  #
+  # Asked of the API and not of a checkout: the comparison is with the commit
+  # the branch was at before the push, or with the base of the pull request.
+  # Whenever that cannot be answered — a new branch, a manual run, a comparison
+  # too large to list in full — the suites run.
+  e2e-scope:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          run=true
+          case "${EVENT}" in
+            pull_request) base="${PR_BASE}"; head="${PR_HEAD}" ;;
+            push) base="${BEFORE}"; head="${GITHUB_SHA}" ;;
+            *) base="" ;;
+          esac
+          if [ -n "${base}" ] && [ -z "${base//0/}" ]; then
+            base=""   # all zeros: the branch is new
+          fi
+          if [ -n "${base}" ] \
+            && gh api "repos/${GITHUB_REPOSITORY}/compare/${base}...${head}" \
+                 --jq '.files[].filename' > /tmp/changed \
+            && [ "$(wc -l < /tmp/changed)" -gt 0 ] \
+            && [ "$(wc -l < /tmp/changed)" -lt 300 ]; then
+            if ! grep -qE '^(images/gentian-sidecar-sso-saml/|e2e/|profiles/|\.github/workflows/apps-ci\.yaml$)' /tmp/changed; then
+              run=false
+            fi
+          fi
+          echo "run=${run}" >> "$GITHUB_OUTPUT"
+          if [ "${run}" = "false" ]; then
+            echo "Nothing the end-to-end suites exercise was changed; they are skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   build-nextcloud:
     needs: [release-gate]
@@ -605,7 +658,8 @@ jobs:
   # pins and with its profile's own handler. Not a gate of the image build: it
   # pulls large images from registries this repository does not run.
   e2e-sso-saml-sidecar:
-    needs: [test-sso-saml-sidecar]
+    needs: [test-sso-saml-sidecar, e2e-scope]
+    if: needs.e2e-scope.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -621,7 +675,8 @@ jobs:
   # arrives at the address the platform builds from the profile, and the
   # app's session is over. Not a gate of any build: it pulls large images.
   e2e-oidc-sign-out:
-    needs: [test-sso-saml-sidecar]
+    needs: [test-sso-saml-sidecar, e2e-scope]
+    if: needs.e2e-scope.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
