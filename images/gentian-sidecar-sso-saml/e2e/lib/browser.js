@@ -88,6 +88,8 @@ class Browser {
         const upstream = new URL(routed.upstream);
         return new Promise((resolve, reject) => {
             const out = http.request({
+                // A connection of its own: see call() in setup.js.
+                agent: false,
                 host: upstream.hostname, port: upstream.port, method, path: req.path,
                 headers: {
                     ...req.headers, ...(routed.headers || {}),

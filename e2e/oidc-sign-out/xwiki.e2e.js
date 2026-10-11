@@ -36,11 +36,14 @@ const CLIENT_SECRET = 'e2e-only-client-secret-0123456789';
 const APP_PORT = 8080;
 const PUBLIC_REALM = `${setup.IDP_BASE}/realms/${REALM}`;
 
-const ANNA = { uid: 'anna', email: 'anna@acme.e2e.test', firstName: 'Anna', lastName: 'Example', password: 'pw-anna-e2e' };
-const BEN = { uid: 'ben', email: 'ben@acme.e2e.test', firstName: 'Ben', lastName: 'Example', password: 'pw-ben-e2e' };
+// A person signs in with their workspace address; the other address is
+// their own, for the realm to mail a password reset to, and no app's to know.
+const ANNA = { uid: 'anna', address: `anna@${oidc.DOMAIN}`, recovery: 'anna@home.example', firstName: 'Anna', lastName: 'Example', password: 'pw-anna-e2e' };
+const BEN = { uid: 'ben', address: `ben@${oidc.DOMAIN}`, recovery: 'ben@home.example', firstName: 'Ben', lastName: 'Example', password: 'pw-ben-e2e' };
 
 const names = { pg: 'oidc-e2e-xwiki-pg', app: 'oidc-e2e-xwiki', service: 'oidc-e2e-xwiki-svc' };
 let kc;
+let clientUuid;
 let appUpstream;
 let service;
 
@@ -74,7 +77,7 @@ before(async () => {
     kc = await oidc.startKeycloak();
     const idp = oidc.startPublicIdp(kc);
     await oidc.ensureRealm(kc, REALM, [ANNA, BEN]);
-    await oidc.registerClient(kc, REALM, PROFILE, { secret: CLIENT_SECRET, signOutUrl: ADDRESS.url });
+    clientUuid = await oidc.registerClient(kc, REALM, PROFILE, { secret: CLIENT_SECRET, signOutUrl: ADDRESS.url });
 
     for (const name of Object.values(names)) setup.tryDocker('rm', '-f', name);
     setup.docker('run', '-d', '--name', names.pg, '--network', setup.NETWORK,
@@ -144,10 +147,18 @@ async function whoAmI(b) {
     return res.headers['xwiki-user'] || null;
 }
 
+// The address XWiki keeps for a person, read from where it keeps it: the
+// run installs no pages to ask it through.
+function addressHeld(person) {
+    return setup.docker('exec', names.pg, 'psql', '-U', 'xwiki', '-d', 'xwiki', '-At', '-c',
+        `select s.xws_value from xwikiobjects o join xwikistrings s on s.xws_id = o.xwo_id
+         where o.xwo_name = 'XWiki.${person.uid}' and o.xwo_classname = 'XWiki.XWikiUsers' and s.xws_name = 'email'`);
+}
+
 async function signIn(person) {
     const b = browser();
     // XWiki's own sign-in address: with this authenticator it leads to the realm.
-    const res = await b.navigate(`https://${HOST}/bin/login/XWiki/XWikiLogin?xredirect=%2Frest%2F`, { credentials: { username: person.uid, password: person.password } });
+    const res = await b.navigate(`https://${HOST}/bin/login/XWiki/XWikiLogin?xredirect=%2Frest%2F`, { credentials: { username: person.address, password: person.password } });
     assert.ok(b.log.includes(`GET ${HOST}/oidc/authenticator/callback`), `${res.status} after ${b.log.join(' -> ')}`);
     return b;
 }
@@ -164,9 +175,18 @@ test('the profile names a path on its own entry, and the address is the app\'s S
     assert.equal(CLIENT.backchannelLogoutUrl, undefined, 'the free-form address is withdrawn');
 });
 
-test('a person signs in to XWiki through the realm', async () => {
+test('every mapper that writes the e-mail claim for XWiki reads the workspace address', async () => {
+    const sources = await oidc.emailSources(kc, REALM, clientUuid);
+    assert.ok(sources.some((s) => s.from === PROFILE.catalog.spec.packs[CLIENT.clientId].scopeName), 'the profile\'s pack writes the claim');
+    assert.deepEqual(sources.filter((s) => s.reads !== 'username'), []);
+});
+
+test('a person signs in to XWiki through the realm, and XWiki holds their workspace address', async () => {
     const anna = await signIn(ANNA);
     assert.equal(await whoAmI(anna), `xwiki:XWiki.${ANNA.uid}`);
+    const held = addressHeld(ANNA);
+    assert.equal(held, ANNA.address);
+    assert.notEqual(held, ANNA.recovery, 'the address a password reset goes to is not XWiki\'s to know');
 });
 
 test('signing out at the realm ends that person\'s session in XWiki, and nobody else\'s', async () => {
@@ -201,7 +221,7 @@ test('a logout token the realm did not sign ends no session', async () => {
     const real = (await oidc.waitForPosts(service, before + 1)).pop();
     const realToken = new URLSearchParams(real.body).get('logout_token');
 
-    const id = await setup.userId(kc, REALM, BEN.email);
+    const id = await oidc.personId(kc, REALM, BEN);
     const sessions = JSON.parse((await kc.admin('GET', `/realms/${REALM}/users/${id}/sessions`)).body);
     assert.ok(sessions.length > 0);
     for (const session of sessions) {

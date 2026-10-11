@@ -32,11 +32,14 @@ const REALM = oidc.TENANT;
 const APP_PORT = 8080;
 const CLIENT_SECRET = 'e2e-only-client-secret-0123456789';
 
-const ANNA = { uid: 'anna', email: 'anna@acme.e2e.test', firstName: 'Anna', lastName: 'Example', password: 'pw-anna-e2e' };
-const BEN = { uid: 'ben', email: 'ben@acme.e2e.test', firstName: 'Ben', lastName: 'Example', password: 'pw-ben-e2e' };
+// A person signs in with their workspace address; the other address is
+// their own, for the realm to mail a password reset to, and no app's to know.
+const ANNA = { uid: 'anna', address: `anna@${oidc.DOMAIN}`, recovery: 'anna@home.example', firstName: 'Anna', lastName: 'Example', password: 'pw-anna-e2e' };
+const BEN = { uid: 'ben', address: `ben@${oidc.DOMAIN}`, recovery: 'ben@home.example', firstName: 'Ben', lastName: 'Example', password: 'pw-ben-e2e' };
 
 const names = { app: 'oidc-e2e-nextcloud', service: 'oidc-e2e-nextcloud-svc' };
 let kc;
+let clientUuid;
 let appUpstream;
 let service;
 let scratch;
@@ -48,7 +51,7 @@ function occ(...args) {
 before(async () => {
     kc = await oidc.startKeycloak();
     await oidc.ensureRealm(kc, REALM, [ANNA, BEN]);
-    await oidc.registerClient(kc, REALM, PROFILE, { secret: CLIENT_SECRET, signOutUrl: ADDRESS.url });
+    clientUuid = await oidc.registerClient(kc, REALM, PROFILE, { secret: CLIENT_SECRET, signOutUrl: ADDRESS.url });
 
     // What the chart gives the container from the profile's values: the host
     // it answers at and the names it trusts, and the profile's own settings
@@ -112,13 +115,13 @@ async function whoAmI(b) {
 async function signIn(person) {
     const b = browser();
     const provider = JSON.parse(occ('user_oidc:provider', '--output=json')).find((p) => p.identifier === 'gentian');
-    const res = await b.navigate(`https://${HOST}/apps/user_oidc/login/${provider.id}`, { credentials: { username: person.uid, password: person.password } });
+    const res = await b.navigate(`https://${HOST}/apps/user_oidc/login/${provider.id}`, { credentials: { username: person.address, password: person.password } });
     assert.ok(res.status < 400, `${res.status} after ${b.log.join(' -> ')}`);
     return b;
 }
 
 async function realmSessions(person) {
-    const id = await setup.userId(kc, REALM, person.email);
+    const id = await oidc.personId(kc, REALM, person);
     return { id, sessions: JSON.parse((await kc.admin('GET', `/realms/${REALM}/users/${id}/sessions`)).body) };
 }
 
@@ -134,16 +137,24 @@ test('the profile names a path on its own entry, and the address is the app\'s S
     assert.equal(CLIENT.backchannelLogoutUrl, undefined, 'the free-form address is withdrawn');
 });
 
-test('a person signs in to Nextcloud through the realm', async () => {
+test('every mapper that writes the e-mail claim for Nextcloud reads the workspace address', async () => {
+    const sources = await oidc.emailSources(kc, REALM, clientUuid);
+    assert.ok(sources.some((s) => s.from === PROFILE.catalog.spec.packs[CLIENT.clientId].scopeName), 'the profile\'s pack writes the claim');
+    assert.deepEqual(sources.filter((s) => s.reads !== 'username'), []);
+});
+
+test('a person signs in to Nextcloud through the realm, and Nextcloud holds their workspace address', async () => {
     const anna = await signIn(ANNA);
-    assert.deepEqual(await whoAmI(anna), { status: 200, email: ANNA.email });
+    const who = await whoAmI(anna);
+    assert.deepEqual(who, { status: 200, email: ANNA.address });
+    assert.notEqual(who.email, ANNA.recovery, 'the address a password reset goes to is not Nextcloud\'s to know');
 });
 
 test('signing out at the realm ends that person\'s session in Nextcloud, and nobody else\'s', async () => {
     const anna = await signIn(ANNA);
     const ben = await signIn(BEN);
-    assert.equal((await whoAmI(anna)).email, ANNA.email);
-    assert.equal((await whoAmI(ben)).email, BEN.email);
+    assert.equal((await whoAmI(anna)).email, ANNA.address);
+    assert.equal((await whoAmI(ben)).email, BEN.address);
 
     const before = (await oidc.posts(service)).length;
     await setup.signOutAtRealm(anna, REALM);
@@ -162,7 +173,7 @@ test('signing out at the realm ends that person\'s session in Nextcloud, and nob
     // Her cookies open nothing: the next person at this browser is not her.
     assert.equal((await whoAmI(anna)).status, 401);
     // Ben is where he was.
-    assert.deepEqual(await whoAmI(ben), { status: 200, email: BEN.email });
+    assert.deepEqual(await whoAmI(ben), { status: 200, email: BEN.address });
 });
 
 test('a logout token the realm did not sign, or sent before, ends no session', async () => {
@@ -186,5 +197,5 @@ test('a logout token the realm did not sign, or sent before, ends no session', a
     }
     const again = await postToken(realToken);
     assert.notEqual(again.status, 200, 'the realm\'s own token, a second time');
-    assert.deepEqual(await whoAmI(ben), { status: 200, email: BEN.email });
+    assert.deepEqual(await whoAmI(ben), { status: 200, email: BEN.address });
 });
