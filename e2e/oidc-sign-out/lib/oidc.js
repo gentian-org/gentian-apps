@@ -74,22 +74,63 @@ function startPublicIdp(kc) {
     return { name, certificate: path.join(dir, 'cert.pem') };
 }
 
-// The tenant's realm with its people. A person's account name is the
-// attribute "uid", which the platform's mappers read.
+// The tenant's realm with its people, as the platform holds them (gentian-os,
+// internal/registrar/identity/people.go and
+// internal/controller/keycloak_gentian_groups.go):
+//
+//   - a person's username is their workspace address, which is what they
+//     sign in with and where their mailbox is;
+//   - the account's e-mail field holds another address, a private one, which
+//     the realm mails a password reset to;
+//   - the realm's own "email" scope reads the username, so that the claim
+//     "email" is the workspace address. A profile's pack has a mapper of its
+//     own for that claim, and of two mappers that write one claim the realm
+//     lets either win: both have to read the username;
+//   - a person's account name in an app is the attribute "uid", which the
+//     packs' mappers read.
 async function ensureRealm(kc, realm, people) {
     await kc.admin('POST', '/realms', { realm, enabled: true, ssoSessionMaxLifespan: 43200, accessTokenLifespan: 300 });
     const profile = JSON.parse((await kc.admin('GET', `/realms/${realm}/users/profile`)).body);
     if (profile.unmanagedAttributePolicy !== 'ENABLED') {
         await kc.admin('PUT', `/realms/${realm}/users/profile`, { ...profile, unmanagedAttributePolicy: 'ENABLED' });
     }
+    const scopes = JSON.parse((await kc.admin('GET', `/realms/${realm}/client-scopes`)).body);
+    const scope = scopes.find((s) => s.name === 'email');
+    const mapper = scope.protocolMappers.find((m) => m.name === 'email');
+    await kc.admin('PUT', `/realms/${realm}/client-scopes/${scope.id}/protocol-mappers/models/${mapper.id}`,
+        { ...mapper, config: { ...mapper.config, 'user.attribute': 'username' } });
     for (const person of people) {
+        if (person.recovery === person.address) throw new Error(`${person.uid}: the recovery address has to differ from the workspace address`);
         await kc.admin('POST', `/realms/${realm}/users`, {
-            username: person.uid, email: person.email, emailVerified: true, enabled: true,
+            username: person.address, email: person.recovery, emailVerified: true, enabled: true,
             firstName: person.firstName, lastName: person.lastName,
             attributes: { uid: [person.uid] },
             credentials: [{ type: 'password', value: person.password, temporary: false }],
         });
     }
+}
+
+// A person of the realm, found by what they sign in with.
+async function personId(kc, realm, person) {
+    const found = JSON.parse((await kc.admin('GET', `/realms/${realm}/users?username=${encodeURIComponent(person.address)}&exact=true`)).body);
+    if (found.length !== 1) throw new Error(`no person ${person.address} in ${realm}`);
+    return found[0].id;
+}
+
+// What every mapper that writes the claim "email" for a client reads: the
+// client's own mappers and those of each scope it is given. The realm lets
+// either of two such mappers win, so what an app is told is only certain
+// when they all read the same.
+async function emailSources(kc, realm, clientUuid) {
+    const base = `/realms/${realm}`;
+    const effective = JSON.parse((await kc.admin('GET', `${base}/clients/${clientUuid}/evaluate-scopes/protocol-mappers?scope=openid`)).body);
+    const sources = [];
+    for (const m of effective) {
+        const owner = m.containerType === 'client' ? `clients/${clientUuid}` : `client-scopes/${m.containerId}`;
+        const model = JSON.parse((await kc.admin('GET', `${base}/${owner}/protocol-mappers/models/${m.mapperId}`)).body);
+        if (model.config && model.config['claim.name'] === 'email') sources.push({ from: m.containerName, reads: model.config['user.attribute'] });
+    }
+    return sources;
 }
 
 function fill(text, extra = {}) {
@@ -209,6 +250,6 @@ function logoutTokenOf(post) {
 module.exports = {
     setup, Browser, keycloak, YAML, REPO,
     TENANT, NAMESPACE, DOMAIN, KERNEL_DOMAIN, IDP_SERVICE,
-    startKeycloak, startPublicIdp, ensureRealm, fill, profileOf, signOutAddress, registerClient,
+    startKeycloak, startPublicIdp, ensureRealm, personId, emailSources, fill, profileOf, signOutAddress, registerClient,
     startService, posts, waitForPosts, logoutTokenOf,
 };

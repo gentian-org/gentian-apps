@@ -1485,6 +1485,16 @@ kernelRequirements:
 **Per-tenant realm:** All OIDC/LDAP URLs must use `${TENANT_ID}` as the Keycloak
 realm name. Never hardcode `souvap`, `opendesk`, or any literal realm name.
 
+**The `email` claim is the workspace address:** a person's Keycloak username is
+their workspace address — what they sign in with, and their mailbox. The
+account's e-mail field holds a different, private address, which the realm mails
+a password reset to and which no app is to be given. The realm's own `email`
+scope therefore reads the username, and an `email` mapper in an OIDC pack must
+read it as well (`user.attribute: username`, never `email`): when two mappers
+write the same claim Keycloak lets either one win, so a pack that reads the field
+hands the app the private address on some realms and not on others.
+`e2e/oidc-sign-out` checks this for the apps it runs.
+
 **Central IdP host:** Issuer, authorization, token, JWKS, and logout endpoints
 must use `https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}` (or path-only auth
 URLs resolved against `openproject.oidc.host: "id.${KERNEL_DOMAIN}"`). See §2.

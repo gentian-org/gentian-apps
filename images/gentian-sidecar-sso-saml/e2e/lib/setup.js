@@ -35,10 +35,15 @@ function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// One request on a connection of its own (agent: false). A run starts
+// containers and runs commands in them with calls that hold this process
+// still, sometimes for longer than a server keeps an idle connection open;
+// a connection kept for the next request would then be one the server has
+// closed, and the request on it fails with "socket hang up".
 function call(method, url, { headers, body } = {}) {
     const target = new URL(url);
     return new Promise((resolve, reject) => {
-        const req = http.request({ host: target.hostname, port: target.port, method, path: target.pathname + target.search, headers }, (res) => {
+        const req = http.request({ agent: false, host: target.hostname, port: target.port, method, path: target.pathname + target.search, headers }, (res) => {
             const chunks = [];
             res.on('data', (c) => chunks.push(c));
             res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }));

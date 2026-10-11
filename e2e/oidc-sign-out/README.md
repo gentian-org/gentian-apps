@@ -20,6 +20,12 @@ e2e/oidc-sign-out/run.sh            # both
 e2e/oidc-sign-out/run.sh nextcloud
 ```
 
+The people are the platform's too: each signs in with their workspace address, which is their
+Keycloak username, and has a different, private address in the account's e-mail field, where the
+realm mails a password reset. Each run also shows that every mapper writing the `email` claim
+for the app reads the username, and that the address the app holds for the person who signed in
+is the workspace address and not the private one.
+
 What stands in for the cluster (`lib/oidc.js`):
 
 - Keycloak with the platform's own hostname settings, answering inside the network under its
