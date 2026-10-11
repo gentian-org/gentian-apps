@@ -38,6 +38,9 @@ on:
       - "charts/activepieces/**"
       - "charts/mathesar/**"
       - "charts/docmost/**"
+      # Since a branch is no longer checked on its push, this is the only run
+      # a change to the workflow gets before it is merged.
+      - ".github/workflows/apps-ci.yaml"
       - ".github/actions/**"
 
 env:
