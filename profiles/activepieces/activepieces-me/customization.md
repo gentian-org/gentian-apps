@@ -37,7 +37,7 @@ chart is *packaging*, and patching packaging is what a distribution repo does.
 
 **L5 remains forbidden**, because at this rung the patch target would be the
 Activepieces application itself — its server bundles and database flags — and
-that is precisely where the licence-bypass temptation lives (see below). The
+that is precisely where the license-bypass temptation lives (see below). The
 distinction is the target, not the technique.
 
 ## L3 is the intended path
@@ -49,12 +49,12 @@ phrased as "add an integration/connector/step" is L3 here, not L2.
 ## Licensing — read before customizing
 
 Several capabilities (SSO, custom appearance, git sync of flows, advanced RBAC) are Enterprise
-features gated by a licence key. Configure them by supplying a valid `AP_LICENSE_KEY`, never by
+features gated by a license key. Configure them by supplying a valid `AP_LICENSE_KEY`, never by
 patching bundles or flipping database flags. This is an explicit absolute prohibition — see
 `app-profile-guide.md`. It is also why `patch.allowed` is `false` for this app: the temptation
 lives exactly here.
 
-Upstream chart provenance and licence terms are pinned in
+Upstream chart provenance and license terms are pinned in
 [`charts/activepieces/UPSTREAM`](../../charts/activepieces/UPSTREAM); the local delta is
 [`charts/activepieces/patches/`](../../charts/activepieces/patches/). Nothing about that
 series touches licensing — it is 3 upstream bug fixes plus 2 additive extension points.

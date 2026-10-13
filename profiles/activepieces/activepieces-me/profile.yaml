@@ -373,7 +373,7 @@ spec:
     repackage:
       chartOwnership: patched
     patch:
-      allowed: false      # enterprise features are licence-gated; never patch to unlock
+      allowed: false      # enterprise features are license-gated; never patch to unlock
       seriesPath: patches/series
       requiresApproval: platform-team
     fork:
