@@ -52,22 +52,22 @@ async function startKeycloak() {
 // cluster: by its public name, over TLS. An app that is told the realm's
 // public address and reads the realm's own description of itself there
 // needs it. Answers the certificate, for the app to trust as it trusts the
-// cluster's.
-function startPublicIdp(kc) {
-    const name = `${setup.NETWORK}-idp-tls`;
+// cluster's. host is that name: another cluster's realm is at another.
+function startPublicIdp(kc, host = setup.IDP_HOST) {
+    const name = host === setup.IDP_HOST ? `${setup.NETWORK}-idp-tls` : `${setup.NETWORK}-idp-tls-${host}`;
     const dir = path.join(os.tmpdir(), `${name}-tls`);
     if (!setup.tryDocker('ps', '-q', '-f', `name=^${name}$`) || !fs.existsSync(path.join(dir, 'cert.pem'))) {
         setup.tryDocker('rm', '-f', name);
         fs.rmSync(dir, { recursive: true, force: true });
         fs.mkdirSync(dir, { recursive: true });
-        execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '-subj', `/CN=${setup.IDP_HOST}`,
-            '-addext', `subjectAltName=DNS:${setup.IDP_HOST}`,
+        execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '-subj', `/CN=${host}`,
+            '-addext', `subjectAltName=DNS:${host}`,
             '-keyout', path.join(dir, 'key.pem'), '-out', path.join(dir, 'cert.pem')], { stdio: 'ignore' });
         fs.chmodSync(dir, 0o755);
         for (const f of ['key.pem', 'cert.pem']) fs.chmodSync(path.join(dir, f), 0o644);
-        setup.docker('run', '-d', '--name', name, '--network', setup.NETWORK, '--network-alias', setup.IDP_HOST,
+        setup.docker('run', '-d', '--name', name, '--network', setup.NETWORK, '--network-alias', host,
             '--read-only', '--cap-drop', 'ALL', '--cap-add', 'NET_BIND_SERVICE', '--security-opt', 'no-new-privileges', '--user', '0:0',
-            '-e', `FRONT_TARGET=http://${kc.name}:8080`, '-e', `FRONT_HOST=${setup.IDP_HOST}`,
+            '-e', `FRONT_TARGET=http://${kc.name}:8080`, '-e', `FRONT_HOST=${host}`,
             '-v', `${dir}:/tls:ro`, '-v', `${path.join(__dirname, 'tls-front.js')}:/tls-front.js:ro`,
             '--entrypoint', 'node', TAP_IMAGE, '/tls-front.js');
     }
