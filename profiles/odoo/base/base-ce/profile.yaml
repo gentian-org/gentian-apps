@@ -168,6 +168,122 @@ spec:
       - name: admin_password
         valuePath: "odoo.adminPassword"
 
+  # How this app is put back. The default capture (scale to zero, dump the
+  # database, archive the data volume) is right for Odoo; only the restore
+  # adds to it.
+  backup:
+    quiesce:
+      # Where the commands below run: the pod's other containers are git-sync.
+      container: odoo
+    restore:
+      # What the restored data remembers of where it ran. The database
+      # credentials, web.base.url and the sign-in provider need nothing: the
+      # chart and gentian_os set them again on every start from this pod's
+      # values. The data volume names the database (filestore/<database>), and
+      # the database names the old domain wherever else an address is kept.
+      # Idempotent; skips what a bundle that does not say where it was written
+      # (GENTIAN_RESTORE_SOURCE_* empty) cannot tell it. Odoo is resumed before
+      # these run, so they wait for its start-up to finish.
+      post:
+        - - sh
+          - -c
+          - |
+            set -eu
+            say() { echo "gentian-restore: $*"; }
+            data=$(sed -n 's/^[[:space:]]*data_dir[[:space:]]*=[[:space:]]*//p' /etc/odoo/odoo.conf | tail -n 1)
+            data=${data:-/opt/odoo/data}
+
+            # Odoo keeps a database's files in filestore/<database>. Restored under
+            # another name, they are moved to that name's folder. Odoo may already have
+            # written files there on starting; theirs are named by their content, so one
+            # already there is the same file.
+            for pair in ${GENTIAN_RESTORE_DATABASES:-}; do
+              from=${pair%%=*}
+              to=${pair#*=}
+              if [ -z "$from" ] || [ -z "$to" ] || [ "$from" = "$to" ] || [ ! -d "$data/filestore/$from" ]; then
+                continue
+              fi
+              if [ ! -e "$data/filestore/$to" ]; then
+                mv "$data/filestore/$from" "$data/filestore/$to"
+              else
+                for dir in "$data/filestore/$from"/*/; do
+                  [ -d "$dir" ] || continue
+                  name=$(basename "$dir")
+                  mkdir -p "$data/filestore/$to/$name"
+                  for file in "$dir"*; do
+                    [ -f "$file" ] || continue
+                    if [ -e "$data/filestore/$to/$name/$(basename "$file")" ]; then
+                      rm -f "$file"
+                    else
+                      mv "$file" "$data/filestore/$to/$name/"
+                    fi
+                  done
+                  rmdir "$dir" 2>/dev/null || true
+                done
+                rmdir "$data/filestore/$from" 2>/dev/null \
+                  || say "left in $data/filestore/$from: what is not a stored file"
+              fi
+              say "filestore of $from is now the filestore of $to"
+            done
+
+            # Addresses on the old domain. web.base.url and the sign-in provider are set
+            # again on every start from this pod's values; what else names the old
+            # domain is rewritten here.
+            src=${GENTIAN_RESTORE_SOURCE_DOMAIN:-}
+            dst=${GENTIAN_RESTORE_TARGET_DOMAIN:-}
+            if [ -z "$src" ] || [ -z "$dst" ] || [ "$src" = "$dst" ]; then
+              exit 0
+            fi
+            # After the start's own module update, so the two do not write at once.
+            i=0
+            until curl -fs -o /dev/null --max-time 5 http://127.0.0.1:8069/web/health; do
+              i=$((i + 1))
+              if [ "$i" -ge 120 ]; then
+                say "Odoo does not answer yet; rewriting addresses anyway"
+                break
+              fi
+              sleep 5
+            done
+            PGPASSWORD="$DB_PASSWORD" python3 /opt/odoo/src/odoo/odoo-bin shell \
+              -d "$DB_NAME" --db_host="$DB_HOST" --db_port="$DB_PORT" --db_user="$DB_USER" \
+              --config=/etc/odoo/odoo.conf --no-http --shell-interface=python \
+              --log-level=warn <<'PY'
+            import os, re
+            src = os.environ["GENTIAN_RESTORE_SOURCE_DOMAIN"].strip().lower()
+            dst = os.environ["GENTIAN_RESTORE_TARGET_DOMAIN"].strip().lower()
+            q = re.escape(src)
+            url = re.compile(r"(https?://)((?:[a-z0-9-]+\.)*)" + q + r"(?![a-z0-9-]|\.[a-z0-9])", re.I)
+            host = re.compile(r"^((?:[a-z0-9-]+\.)*)" + q + r"(:\d+)?$", re.I)
+
+            def rehost(value):
+                if not isinstance(value, str):
+                    return value
+                m = host.match(value)
+                if m:
+                    return m.group(1) + dst + (m.group(2) or "")
+                return url.sub(lambda m: m.group(1) + m.group(2) + dst, value)
+
+            changed = []
+            for model, fields in (
+                ("ir.config_parameter", ("value",)),
+                ("auth.oauth.provider", ("auth_endpoint", "validation_endpoint", "data_endpoint")),
+                ("mail.alias.domain", ("name",)),
+                ("website", ("domain",)),
+            ):
+                if model not in env:
+                    continue
+                for rec in env[model].sudo().with_context(active_test=False).search([]):
+                    vals = {f: rehost(rec[f]) for f in fields if f in rec._fields and rec[f] and rehost(rec[f]) != rec[f]}
+                    if vals:
+                        rec.write(vals)
+                        changed.append("%s %s" % (model, rec.key if model == "ir.config_parameter" else rec.id))
+            env.cr.commit()
+            env.registry.clear_all_caches()
+            env.registry.signal_changes()
+            for c in changed:
+                print("gentian-restore: %s now names %s" % (c, dst))
+            PY
+
   expose:
     # Odoo's SSO callback exceeds Envoy's 15s default route timeout, so the
     # sign-in that gets a user into the app is the request that gets cut:

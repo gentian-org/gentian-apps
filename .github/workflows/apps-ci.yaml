@@ -695,6 +695,28 @@ jobs:
       - name: Sign out of the apps, end to end
         run: e2e/oidc-sign-out/run.sh
 
+  # The apps whose data remembers where it ran, each as its real image: data
+  # written under one domain and database, put back under another as an
+  # import puts it back, and the profile's post-restore commands run as the
+  # platform runs them. Not a gate of any build: it pulls large images.
+  e2e-restore-rewrites:
+    needs: [e2e-scope]
+    if: needs.e2e-scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Log in to the registry the catalogue's own images are in
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Restore into another cluster and domain, end to end
+        run: e2e/restore-rewrites/run.sh
+
   build-sso-saml-sidecar-image:
     needs: [release-gate, test-sso-saml-sidecar]
     runs-on: ubuntu-latest

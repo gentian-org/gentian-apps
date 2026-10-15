@@ -550,6 +550,75 @@ spec:
         print("[open-webui post-install] openai config updated: "
               + (" and ".join(changed) if changed else "connection enabled"))
         PYEOF
+  # How this app is put back. The default capture (scale to zero, archive the
+  # data volume, where its SQLite database is) is right; only the restore adds
+  # to it.
+  backup:
+    quiesce:
+      # Where the command below runs.
+      container: open-webui
+    restore:
+      # Open WebUI stores its settings in its database at first start and
+      # prefers them to the environment from then on (oauth.* aside, which it
+      # always reads from the environment). Restored from another cluster or
+      # domain, webui.url names the old address, where it sends a person after
+      # signing in, and the gateway connection the old address and key. Set
+      # from this pod's environment; idempotent. It runs once the app is
+      # resumed, which reads its settings per request.
+      post:
+        - - python3
+          - -c
+          - |
+            import json, os, re, sqlite3, time
+
+            db = sqlite3.connect(os.path.join(os.environ.get("DATA_DIR") or "/app/backend/data", "webui.db"), timeout=60)
+            # A JSON column has numeric affinity in SQLite: a number comes back as one.
+            rows = {k: json.loads(v) if isinstance(v, (str, bytes)) else v
+                    for k, v in db.execute("SELECT key, value FROM config")}
+            new = {}
+
+            # Where it is served, which it sends a person back to after signing in.
+            if os.environ.get("WEBUI_URL"):
+                new["webui.url"] = os.environ["WEBUI_URL"]
+
+            # The platform's connection to the model gateway: the entry that names the
+            # gateway, or the first, as the post-install Job keeps it. A connection an
+            # administrator added stays as it is.
+            want_url = (os.environ.get("OPENAI_API_BASE_URL") or "").rstrip("/")
+            want_key = os.environ.get("OPENAI_API_KEY") or ""
+            urls = [str(u) for u in rows.get("openai.api_base_urls") or []]
+            if want_url and want_key and urls:
+                keys = ([str(k) for k in rows.get("openai.api_keys") or []] + [""] * len(urls))[:len(urls)]
+                i = urls.index(want_url) if want_url in urls else 0
+                urls[i], keys[i] = want_url, want_key
+                new["openai.api_base_urls"], new["openai.api_keys"] = urls, keys
+
+            # Every other address on the old domain.
+            src = os.environ.get("GENTIAN_RESTORE_SOURCE_DOMAIN", "").strip().lower()
+            dst = os.environ.get("GENTIAN_RESTORE_TARGET_DOMAIN", "").strip().lower()
+            if src and dst and src != dst:
+                url = re.compile(r"(https?://)((?:[a-z0-9-]+\.)*)" + re.escape(src) + r"(?![a-z0-9-]|\.[a-z0-9])", re.I)
+
+                def rehost(v):
+                    if isinstance(v, str):
+                        return url.sub(lambda m: m.group(1) + m.group(2) + dst, v)
+                    if isinstance(v, list):
+                        return [rehost(x) for x in v]
+                    if isinstance(v, dict):
+                        return {k: rehost(x) for k, x in v.items()}
+                    return v
+
+                for key, value in rows.items():
+                    if key not in new and rehost(value) != value:
+                        new[key] = rehost(value)
+
+            changed = [k for k, v in new.items() if k in rows and rows[k] != v]
+            for key in changed:
+                db.execute("UPDATE config SET value = ?, updated_at = ? WHERE key = ?",
+                           (json.dumps(new[key]), int(time.time()), key))
+            db.commit()
+            # Names only: two of these hold a key.
+            print("gentian-restore: " + (", ".join(changed) + " rewritten" if changed else "settings already name this domain and gateway"))
   customization:
     grade: unknown
     supportedRungs: [L0, L4]

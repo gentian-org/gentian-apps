@@ -479,9 +479,248 @@ spec:
     # Nextcloud writes instanceid, secret and passwordsalt into config.php on
     # the volume above, so they travel with the data.
     restore:
-      # Tells connected clients their cached view is stale; without it, desktop
-      # and mobile clients can keep serving pre-restore state.
+      # What the restored data remembers of where it ran, rewritten from what
+      # this pod is given now: a restore may come from another cluster or
+      # domain, and there every credential the platform makes is new. Each
+      # command is idempotent, and skips what a bundle that does not say where
+      # it was written (GENTIAN_RESTORE_SOURCE_* empty) cannot tell it. They run
+      # in maintenance mode, users held out, and the pod is rolled afterwards.
       post:
+        # config.php: the database and its credentials (POSTGRES_* in this
+        # container), and every address and host on the old domain.
+        - - php
+          - -r
+          - |
+            // config.php remembers the database it was installed against, credentials
+            // included, and the addresses it was reached at. Rewritten from what this pod
+            // is given now. Read and written directly: occ would merge the other
+            // *.config.php files into config.php on writing.
+            $file = '/var/www/html/config/config.php';
+            $CONFIG = null;
+            include $file;
+            if (!is_array($CONFIG)) {
+                fwrite(STDERR, "gentian-restore: $file defines no \$CONFIG\n");
+                exit(1);
+            }
+            $changed = [];
+            $env = [
+                'pgsql' => ['dbhost' => 'POSTGRES_HOST', 'dbname' => 'POSTGRES_DB', 'dbuser' => 'POSTGRES_USER', 'dbpassword' => 'POSTGRES_PASSWORD'],
+                'mysql' => ['dbhost' => 'MYSQL_HOST', 'dbname' => 'MYSQL_DATABASE', 'dbuser' => 'MYSQL_USER', 'dbpassword' => 'MYSQL_PASSWORD'],
+            ][$CONFIG['dbtype'] ?? ''] ?? [];
+            foreach ($env as $key => $var) {
+                $value = getenv($var);
+                if (is_string($value) && $value !== '' && ($CONFIG[$key] ?? null) !== $value) {
+                    $CONFIG[$key] = $value;
+                    $changed[] = $key;
+                }
+            }
+            $src = strtolower(trim((string)getenv('GENTIAN_RESTORE_SOURCE_DOMAIN')));
+            $dst = strtolower(trim((string)getenv('GENTIAN_RESTORE_TARGET_DOMAIN')));
+            if ($src !== '' && $dst !== '' && $src !== $dst) {
+                $q = preg_quote($src, '/');
+                $rehost = function (string $s) use ($q, $dst): string {
+                    // A value that is a host under the old domain, as trusted_domains holds them.
+                    if (preg_match('/^((?:[a-z0-9-]+\.)*)' . $q . '(:\d+)?$/i', $s, $m)) {
+                        return $m[1] . $dst . ($m[2] ?? '');
+                    }
+                    // An address on it.
+                    return preg_replace_callback(
+                        '/(https?:(?:\/\/|\\\\\/\\\\\/))((?:[a-z0-9-]+\.)*)' . $q . '(?![a-z0-9-]|\.[a-z0-9])/i',
+                        fn ($m) => $m[1] . $m[2] . $dst,
+                        $s
+                    );
+                };
+                foreach ($CONFIG as $key => $value) {
+                    if (in_array($key, ['dbhost', 'dbname', 'dbuser', 'dbpassword', 'secret', 'passwordsalt', 'instanceid'], true)) {
+                        continue;
+                    }
+                    $new = $value;
+                    if (is_string($new)) {
+                        $new = $rehost($new);
+                    } elseif (is_array($new)) {
+                        array_walk_recursive($new, function (&$v) use ($rehost) {
+                            if (is_string($v)) {
+                                $v = $rehost($v);
+                            }
+                        });
+                    }
+                    if ($new !== $value) {
+                        $CONFIG[$key] = $new;
+                        $changed[] = $key;
+                    }
+                }
+            }
+            if (!$changed) {
+                echo "gentian-restore: config.php already names this database and domain\n";
+                exit(0);
+            }
+            $tmp = $file . '.gentian-restore';
+            if (file_put_contents($tmp, "<?php\n\$CONFIG = " . var_export($CONFIG, true) . ";\n") === false
+                || !chmod($tmp, 0640) || !rename($tmp, $file)) {
+                fwrite(STDERR, "gentian-restore: could not write $file\n");
+                exit(1);
+            }
+            if (function_exists('opcache_invalidate')) {
+                opcache_invalidate($file, true);
+            }
+            echo 'gentian-restore: config.php: ' . implode(', ', array_unique($changed)) . "\n";
+        # The database: addresses on the old domain in every app's settings;
+        # the sign-in provider's realm and client secret; the IMAP credential
+        # and address of each mail account the platform provisioned.
+        - - php
+          - -r
+          - |
+            // What Nextcloud's database remembers of where it ran, rewritten while users
+            // are still held out. In maintenance mode occ offers no app's commands, so
+            // the apps' own commands are run here, with the values passed in memory.
+            require_once '/var/www/html/lib/base.php';
+            use Symfony\Component\Console\Application;
+            use Symfony\Component\Console\Input\ArrayInput;
+            use Symfony\Component\Console\Output\BufferedOutput;
+
+            $say = fn (string $m) => print("gentian-restore: $m\n");
+            $src = strtolower(trim((string)getenv('GENTIAN_RESTORE_SOURCE_DOMAIN')));
+            $dst = strtolower(trim((string)getenv('GENTIAN_RESTORE_TARGET_DOMAIN')));
+            $tenant = trim((string)getenv('GENTIAN_RESTORE_TARGET_TENANT'));
+            $moved = $src !== '' && $dst !== '' && $src !== $dst;
+            $q = preg_quote($src, '/');
+            $rehost = fn (string $s): string => $moved ? preg_replace_callback(
+                '/(https?:(?:\/\/|\\\\\/\\\\\/))((?:[a-z0-9-]+\.)*)' . $q . '(?![a-z0-9-]|\.[a-z0-9])/i',
+                fn ($m) => $m[1] . $m[2] . $dst,
+                $s
+            ) : $s;
+
+            // Every app's settings: an address on the old domain becomes the same
+            // address on the new one, stored with the type and flags it had.
+            if ($moved) {
+                $config = \OCP\Server::get(\OCP\IAppConfig::class);
+                foreach ($config->getApps() as $app) {
+                    foreach ($config->getKeys($app) as $key) {
+                        $d = $config->getDetails($app, $key);
+                        if (!is_string($d['value']) || ($new = $rehost($d['value'])) === $d['value']) {
+                            continue;
+                        }
+                        $type = $d['type'] & ~\OCP\IAppConfig::VALUE_SENSITIVE;
+                        if ($type === \OCP\IAppConfig::VALUE_STRING) {
+                            $config->setValueString($app, $key, $new, $d['lazy'], $d['sensitive']);
+                        } elseif ($type === \OCP\IAppConfig::VALUE_MIXED) {
+                            $config->setValueMixed($app, $key, $new, $d['lazy'], $d['sensitive']);
+                        } elseif ($type === \OCP\IAppConfig::VALUE_ARRAY) {
+                            $config->setValueArray($app, $key, json_decode($new, true) ?? [], $d['lazy'], $d['sensitive']);
+                        } else {
+                            continue;
+                        }
+                        $say("setting $app/$key now names $dst");
+                    }
+                }
+            }
+
+            // An app's own occ commands, as occ would register them.
+            $appManager = \OCP\Server::get(\OCP\App\IAppManager::class);
+            $command = function (string $app, string $name) use ($appManager) {
+                if (!$appManager->isEnabledForAnyone($app)) {
+                    return null;
+                }
+                $appManager->loadApp($app);
+                $console = new Application();
+                $console->setAutoExit(false);
+                foreach ($appManager->getAppInfo($app)['commands'] ?? [] as $class) {
+                    $console->add(\OCP\Server::get($class));
+                }
+                return $console->has($name) ? $console->find($name) : null;
+            };
+            $run = function ($cmd, array $args): string {
+                $out = new BufferedOutput();
+                if ($cmd->run(new ArrayInput($args), $out) !== 0) {
+                    throw new RuntimeException($cmd->getName() . " failed: " . trim($out->fetch()));
+                }
+                return $out->fetch();
+            };
+
+            // Sign-in: the provider the post-installation hook made, pointed at this
+            // tenant's realm and given the client secret this cluster made.
+            if ($oidc = $command('user_oidc', 'user_oidc:provider')) {
+                try {
+                    $found = json_decode($run($oidc, ['identifier' => 'gentian', '--output' => 'json']), true);
+                } catch (RuntimeException $e) {
+                    $found = null; // not made yet: nothing to point anywhere
+                }
+                if (is_array($found) && isset($found['identifier'])) {
+                    $args = ['identifier' => 'gentian'];
+                    $secret = '/etc/gentian/oidc-client-secret';
+                    if (is_file($secret) && is_readable($secret)) {
+                        $args['--clientsecret-file'] = $secret;
+                    } else {
+                        $say("no $secret: the sign-in client secret is left as it was");
+                    }
+                    $discovery = (string)($found['discoveryEndpoint'] ?? '');
+                    if ($tenant !== '' && $discovery !== '') {
+                        $args['--discoveryuri'] = preg_replace('#/realms/[^/]+/#', '/realms/' . $tenant . '/', $discovery);
+                    }
+                    foreach (['--endsessionendpointuri' => 'endSessionEndpoint', '--postlogouturi' => 'postLogoutUri'] as $opt => $field) {
+                        if (is_string($found[$field] ?? null) && $found[$field] !== '') {
+                            $args[$opt] = $rehost($found[$field]);
+                        }
+                    }
+                    $run($oidc, $args);
+                    $say('sign-in provider gentian set to this realm and client secret');
+                }
+            }
+
+            // Mail: the accounts the platform provisioned, given this cluster's IMAP
+            // credential and, where the domain changed, the person's new address. An
+            // account a person added themselves is not touched.
+            $dir = '/etc/gentian-mail';
+            if (is_dir($dir) && ($export = $command('mail', 'mail:account:export'))) {
+                $update = $command('mail', 'mail:account:update');
+                $users = \OCP\Server::get(\OCP\IUserManager::class);
+                foreach (scandir($dir) as $key) {
+                    $path = "$dir/$key";
+                    if ($key[0] === '.' || !is_file($path)) {
+                        continue;
+                    }
+                    $addr = preg_replace('/_/', '@', $key, 1);
+                    $local = explode('@', $addr)[0];
+                    if (!$users->userExists($local)) {
+                        continue;
+                    }
+                    $accounts = json_decode($run($export, ['user-id' => $local, '--output' => 'json']), true) ?: [];
+                    foreach ($accounts as $account) {
+                        $email = strtolower((string)($account['email'] ?? ''));
+                        if ($email !== strtolower($addr) && !($src !== '' && $email === strtolower("$local@$src"))) {
+                            continue;
+                        }
+                        $args = [
+                            'account-id' => (string)$account['id'],
+                            '--email' => $addr,
+                            '--imap-user' => $addr,
+                            '--imap-password' => rtrim((string)file_get_contents($path), "\n"),
+                            '--imap-host' => getenv('GENTIAN_IMAP_HOST') ?: 'dovecot-prod.platform-kernel.svc.cluster.local',
+                            '--imap-port' => getenv('GENTIAN_IMAP_PORT') ?: '143',
+                            '--imap-ssl-mode' => getenv('GENTIAN_IMAP_SSL') ?: 'none',
+                        ];
+                        if (getenv('SMTP_HOST')) {
+                            $args['--smtp-host'] = getenv('SMTP_HOST');
+                            $args['--smtp-port'] = getenv('SMTP_PORT') ?: '587';
+                        }
+                        if (strtolower((string)($account['name'] ?? '')) === $email) {
+                            $args['--name'] = $addr;
+                        }
+                        $run($update, $args);
+                        // mail:account:update sets the IMAP user only together with an
+                        // SMTP user, and these accounts have none.
+                        if (strtolower((string)($account['imap']['user'] ?? '')) !== strtolower($addr)) {
+                            $mapper = \OCP\Server::get(\OCA\Mail\Db\MailAccountMapper::class);
+                            $row = $mapper->findById((int)$account['id']);
+                            $row->setInboundUser($addr);
+                            $mapper->save($row);
+                        }
+                        $say("mail account {$account['id']} of $local set to this cluster's credential");
+                    }
+                }
+            }
+        # Tells connected clients their cached view is stale; without it, desktop
+        # and mobile clients can keep serving pre-restore state.
         - [php, /var/www/html/occ, "maintenance:data-fingerprint"]
       verify: [php, /var/www/html/occ, status]
   customization:
