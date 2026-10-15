@@ -1,6 +1,15 @@
 profile: nextcloud-deck-ce
 displayName: "Deck"
-description: "Kanban-style project boards."
+summary: "Kanban boards for planning team work, with cards, labels, assignees, due dates and comments."
+description: |
+  Deck is a Kanban-style organisation tool for Nextcloud, used for personal planning and team projects. Teams put tasks on cards in shared boards and add Markdown notes, labels, assignees, due dates, attachments and comments, with an activity stream of changes. Cards with due dates also show up in Calendar.
+categories: [project-management, collaboration]
+links:
+  - rel: homepage
+    url: https://apps.nextcloud.com/apps/deck
+  - rel: support
+    label: "Support the project"
+    url: https://nextcloud.com/contribute/
 family: nextcloud
 edition: ce
 author: Nextcloud

@@ -1,6 +1,15 @@
 profile: odoo-purchase-ce
-displayName: "Odoo Purchase"
-description: "Purchase and vendor management module for Odoo."
+displayName: "Purchase"
+summary: "Send requests for quotation and purchase orders to vendors, then match receipts and vendor bills."
+description: |
+  Odoo Purchase manages buying from vendors: requests for quotation, purchase orders, vendor prices and purchase agreements. It links to Inventory for receiving goods and to Invoicing for checking vendor bills against what was ordered and received.
+categories: [operations, erp-finance]
+links:
+  - rel: homepage
+    url: https://www.odoo.com/app/purchase
+  - rel: donate
+    label: "Donate to the Odoo Community Association"
+    url: https://www.odoo-community.org/oca-donations
 family: odoo
 edition: ce
 author: OCA

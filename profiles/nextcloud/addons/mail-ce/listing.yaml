@@ -1,6 +1,15 @@
 profile: nextcloud-mail-ce
 displayName: "Mail"
-description: "IMAP mail client integrated with the Nextcloud contacts."
+summary: "Web mail client that connects your existing IMAP accounts in a unified inbox, linked to contacts and calendar."
+description: |
+  Mail is the Nextcloud mail client. It connects to existing IMAP/SMTP servers and does not include a mail server itself. Teams use it to read several accounts in a unified inbox, share mailboxes, and work with contacts, calendar invitations and file attachments from Nextcloud. It supports encrypted mail with OpenPGP and S/MIME.
+categories: [communication, collaboration]
+links:
+  - rel: homepage
+    url: https://nextcloud.com/groupware/
+  - rel: support
+    label: "Support the project"
+    url: https://nextcloud.com/contribute/
 family: nextcloud
 edition: ce
 author: Nextcloud

@@ -1,6 +1,15 @@
 profile: odoo-project-ce
-displayName: "Odoo Project"
-description: "Project and task management module for Odoo."
+displayName: "Project"
+summary: "Organise work into projects and tasks on kanban boards, with stages, assignees, deadlines and milestones."
+description: |
+  Odoo Project plans work as projects broken into tasks, shown in kanban, list and calendar views with custom stages. Tasks carry assignees, deadlines, sub-tasks and discussion threads, and customers can follow them through the portal. Gantt planning is an Enterprise feature.
+categories: [project-management, collaboration]
+links:
+  - rel: homepage
+    url: https://www.odoo.com/app/project
+  - rel: donate
+    label: "Donate to the Odoo Community Association"
+    url: https://www.odoo-community.org/oca-donations
 family: odoo
 edition: ce
 author: OCA

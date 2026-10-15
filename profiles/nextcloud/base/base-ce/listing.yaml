@@ -1,6 +1,15 @@
 profile: nextcloud-base-ce
-displayName: Nextcloud
-description: Self-hosted file sync and share with OIDC SSO.
+displayName: "Nextcloud"
+summary: "Self-hosted file storage, sync and sharing for teams, with desktop and mobile clients."
+description: |
+  Nextcloud is a self-hosted content collaboration platform built around **Files**: store, sync and share files and folders on your own server. Teams use it for shared folders, password-protected or expiring share links, version history and automatic photo upload from phones. It works with native desktop clients and Android/iOS apps, and is the base for add-ons such as Calendar, Talk and Office.
+categories: [files, collaboration]
+links:
+  - rel: homepage
+    url: https://nextcloud.com/
+  - rel: support
+    label: "Support the project"
+    url: https://nextcloud.com/contribute/
 family: nextcloud
 edition: ce
 author: Nextcloud

@@ -1,6 +1,15 @@
 profile: odoo-crm-ce
-displayName: "Odoo CRM"
-description: "Customer Relationship Management module for Odoo."
+displayName: "CRM"
+summary: "Track leads and sales opportunities through a pipeline from first contact to won or lost deals."
+description: |
+  Odoo CRM manages leads and opportunities in a kanban pipeline by stage, with planned activities, meetings and expected revenue. Sales teams use it to qualify leads, follow up and forecast; won opportunities flow into quotations when Sales is installed.
+categories: [crm-sales]
+links:
+  - rel: homepage
+    url: https://www.odoo.com/app/crm
+  - rel: donate
+    label: "Donate to the Odoo Community Association"
+    url: https://www.odoo-community.org/oca-donations
 family: odoo
 edition: ce
 author: OCA

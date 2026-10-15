@@ -1,6 +1,15 @@
 profile: nextcloud-richdocuments-ce
-displayName: "Nextcloud Office"
-description: "Collabora-backed document, spreadsheet and presentation editing."
+displayName: "Office"
+summary: "Edit documents, spreadsheets and presentations together in the browser, using Collabora Online."
+description: |
+  This add-on (Nextcloud's `richdocuments` app, "Nextcloud Office (Collabora)") connects Nextcloud to a Collabora Online server so people can edit text documents, spreadsheets and presentations directly in the browser. Several people can edit the same file in real time. It handles Microsoft Office and OpenDocument formats, and the Collabora Office apps for Android and iOS can edit the same files.
+categories: [office, collaboration]
+links:
+  - rel: homepage
+    url: https://www.collaboraoffice.com/
+  - rel: support
+    label: "Support the project"
+    url: https://www.collaboraoffice.org/
 family: nextcloud
 edition: ce
 author: Nextcloud

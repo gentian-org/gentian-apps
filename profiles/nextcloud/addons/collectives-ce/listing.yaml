@@ -1,6 +1,15 @@
 profile: nextcloud-collectives-ce
 displayName: "Collectives"
-description: "Collaborative wiki pages for teams."
+summary: "Shared wiki spaces where a team writes and organises its knowledge together in Markdown pages."
+description: |
+  Collectives is a Nextcloud app that gives groups a shared space to write and organise knowledge, such as notes, how-tos and documentation. Each collective belongs to a Nextcloud Team, so the content is owned by the group rather than by one user. Pages are edited together in real time through the Text app, written in Markdown, and covered by full-text search.
+categories: [knowledge, collaboration]
+links:
+  - rel: homepage
+    url: https://collectives.cloud/
+  - rel: support
+    label: "Support the project"
+    url: https://nextcloud.com/contribute/
 family: nextcloud
 edition: ce
 author: Nextcloud
