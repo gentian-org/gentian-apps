@@ -100,6 +100,15 @@ spec:
     - name: chat
       protocol: matrix
 
+  backup:
+    restore:
+      # Synapse writes the server name -- the tenant's domain -- into every
+      # user, room and event id it stores, and refuses to start under
+      # another. A restore onto another domain leaves its data out and
+      # leaves the app as it is installed there; on the same domain it is
+      # restored as any app is.
+      domainBound: true
+
   secrets:
     generated:
       - name: registration_shared_secret

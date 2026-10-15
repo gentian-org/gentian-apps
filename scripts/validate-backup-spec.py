@@ -183,6 +183,14 @@ def check_restore(where: str, restore: object) -> list[str]:
                         f"an argv (a list of strings), not a shell line."
                     )
 
+    # A string "true" would be pruned or refused by the API server, and the
+    # app's data restored onto a domain it cannot run on.
+    if "domainBound" in restore and not isinstance(restore["domainBound"], bool):
+        errors.append(
+            f"{where}: backup.restore.domainBound must be true or false, not "
+            f"{restore['domainBound']!r}."
+        )
+
     verify = restore.get("verify")
     if verify is not None and not _is_argv(verify):
         errors.append(
