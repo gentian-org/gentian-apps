@@ -84,7 +84,6 @@ LOGOS = {
 #   profile dir -> {"tile": name, "portalTiles": {portal tile name: tile name}}
 ASSIGNMENTS = {
     "base/base-ce": {"tile": "files", "portalTiles": {"nextcloud-base-ce": "files"}},
-    "base/base-od": {"tile": "files"},
     "addons/collectives-ce": {"tile": "collectives"},
     "addons/spreed-ce": {"tile": "talk"},
     "addons/calendar-ce": {"tile": "calendar"},

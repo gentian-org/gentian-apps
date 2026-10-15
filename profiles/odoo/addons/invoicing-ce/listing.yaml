@@ -1,4 +1,4 @@
-profile: odoo-accounting-ce
+profile: odoo-invoicing-ce
 displayName: "Invoicing"
 summary: "Create and send customer invoices, record vendor bills, and track payments; full accounting reports are not included."
 description: |
