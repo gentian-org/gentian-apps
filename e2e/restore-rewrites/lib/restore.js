@@ -57,16 +57,18 @@ function profileOf(profileDir) {
     return YAML.parse(fs.readFileSync(path.join(REPO, profileDir, 'profile.yaml'), 'utf8'));
 }
 
-// The variables a restore is run with: both ends, and each store's name in
-// the bundle and here. A bundle that does not say where it was written has
+// The variables a restore is run with: both ends, each store's name in the
+// bundle and here, and the app's database login's. A bundle that does not say where it was written has
 // the source values empty.
-function restoreEnv({ app, source = {}, target = {}, databases = [], buckets = [], volumes = [] }) {
+function restoreEnv({ app, source = {}, target = {}, databases = [], roles = [], buckets = [], volumes = [] }) {
     const vars = {
         APP: app,
         SOURCE_TENANT: source.tenant || '',
         TARGET_TENANT: target.tenant || '',
         SOURCE_DOMAIN: source.domain || '',
         TARGET_DOMAIN: target.domain || '',
+        SOURCE_KERNEL_DOMAIN: source.kernelDomain || '',
+        TARGET_KERNEL_DOMAIN: target.kernelDomain || '',
         SOURCE_PLATFORM_VERSION: source.platformVersion || '',
         TARGET_PLATFORM_VERSION: target.platformVersion || '0.5',
         SOURCE_CLUSTER: source.cluster || '',
@@ -74,6 +76,7 @@ function restoreEnv({ app, source = {}, target = {}, databases = [], buckets = [
         SOURCE_CHART_VERSION: source.chartVersion || '',
         TARGET_CHART_VERSION: target.chartVersion || '',
         DATABASES: databases.map(([from, to]) => `${from}=${to}`).join(' '),
+        ROLES: roles.map(([from, to]) => `${from}=${to}`).join(' '),
         BUCKETS: buckets.map(([from, to]) => `${from}=${to}`).join(' '),
         VOLUMES: volumes.map(([from, to]) => `${from}=${to}`).join(' '),
     };
@@ -94,10 +97,13 @@ function runRestore(profile, container, env, { user } = {}) {
     return out.join('\n');
 }
 
-function startPostgres(name) {
+// aliases: further host names it answers to, as one server is called on two
+// clusters.
+function startPostgres(name, { aliases = [] } = {}) {
     tryDocker('network', 'create', NETWORK);
     tryDocker('rm', '-f', name);
-    docker('run', '-d', '--name', name, '--network', NETWORK, '-e', 'POSTGRES_PASSWORD=e2e-postgres-admin', POSTGRES_IMAGE);
+    docker('run', '-d', '--name', name, '--network', NETWORK, ...aliases.flatMap((a) => ['--network-alias', a]),
+        '-e', 'POSTGRES_PASSWORD=e2e-postgres-admin', POSTGRES_IMAGE);
     return waitFor('PostgreSQL', () => tryDocker('exec', name, 'pg_isready', '-U', 'postgres').includes('accepting'), 120);
 }
 
