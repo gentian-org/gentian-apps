@@ -180,6 +180,14 @@ spec:
       # the old domain name the new one. Idempotent; skips what a bundle that
       # does not say where it was written (GENTIAN_RESTORE_* empty) cannot
       # tell it. Nothing secret is passed in argv or printed.
+      #
+      # What a restore does not bring back, even on the same cluster: the
+      # tables' data returns intact, but Mathesar keys its saved explorations,
+      # forms, column order and display settings by PostgreSQL table OIDs, and
+      # a restore recreates the tables with new ones, so that metadata is lost.
+      # Database roles created inside Mathesar are not restored either: only
+      # this app's own login is recreated, and connections using such a role
+      # must be set up again (the command below names each one).
       post:
         - - python3
           - -c

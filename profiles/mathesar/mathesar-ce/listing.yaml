@@ -3,6 +3,8 @@ displayName: "Mathesar"
 summary: "View, edit and query PostgreSQL data through a spreadsheet-like interface, without writing SQL."
 description: |
   Mathesar is an open-source, self-hosted, spreadsheet-like interface for working with PostgreSQL data. Teams use it to build and run small data-driven tools such as inventories, grant trackers, timesheets and shareable dashboards, and to explore data with a visual query builder. It works directly on existing databases and respects Postgres's own schemas, tables and permissions rather than adding its own abstraction layer.
+
+  After a restore, even on the same cluster, the data in your tables comes back, but saved explorations, forms, column order and display settings do not, and database roles created in Mathesar must be set up again.
 categories: [analytics, developer-tools, office]
 links:
   - rel: homepage

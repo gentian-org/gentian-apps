@@ -64,3 +64,12 @@ supported — it never was; that section has been corrected).
 
 The technical account is excluded from its own sync (matched by the fixed username
 `gentian-bootstrap-admin`, not group membership) so the reconciler can never lock itself out.
+
+## Restore
+
+A restore, even on the same cluster, brings back the data in every table, but not Mathesar's
+saved explorations, forms, column order and display settings: Mathesar keys that metadata by
+PostgreSQL table OIDs, and a restore recreates the tables with new OIDs. Database roles created
+inside Mathesar are not brought back either; the restore recreates only the app's own login, so
+connections that use such a role must be set up again. The `spec.backup.restore.post` command
+names each of them in its output.
