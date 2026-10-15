@@ -41,5 +41,5 @@ are signed in to through the platform's sign-in sidecar have their runs beside t
 `images/gentian-sidecar-sso-saml/e2e`.
 
 An app is added here before its profile declares `backchannelLogout`. Not yet run, and marked so
-in their profiles: `nextcloud-base-od`, `open-webui` (which also needs Redis and a switch to end a
+in their profiles: `open-webui` (which also needs Redis and a switch to end a
 session at all).

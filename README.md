@@ -19,12 +19,11 @@ profiles/              # App catalogue bundles (OSS + commercial) — published 
       base-ce/         #       dir is short; the AppProfile is odoo-base-ce
     addons/
       crm-ce/          #       -> odoo-crm-ce
-      accounting-ce/   #       -> odoo-accounting-ce
+      invoicing-ce/    #       -> odoo-invoicing-ce
     packages/          #       AppPackage presets (not deployable)
   nextcloud/           #   family with addons (L3)
     base/
       base-ce/         #       -> nextcloud-base-ce
-      base-od/         #       -> nextcloud-base-od (openDesk, ee)
     addons/            #       9 addons, enabled per tenant
       calendar-ce/     #       -> nextcloud-calendar-ce
     packages/          #       AppPackage presets: office, suite

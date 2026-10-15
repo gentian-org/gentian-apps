@@ -1,7 +1,7 @@
 # Nextcloud base — follow-ups
 
 - [ ] Direct (bind) mounting for Collabora document jails, instead of the
-      `mount_jail_tree=false` copy fallback in `base-ce`/`base-od`. Seccomp
+      `mount_jail_tree=false` copy fallback in `base-ce`. Seccomp
       `Unconfined` is already in place and is a real prerequisite, but not
       sufficient: `coolmount`'s mount namespace creation happens in a forked
       child that deliberately drops all capabilities first (mirroring the

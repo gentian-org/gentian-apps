@@ -92,7 +92,7 @@ def check_surface(path: pathlib.Path, doc: dict) -> list[str]:
         # same plugin API, so the base's ladder is its ladder by construction, and it
         # names that base in spec.customization.addon.of.
         #
-        # An edition shares only a family name. nextcloud-base-od deploys the OpenDesk
+        # An edition shares only a family name. the former nextcloud-base-od deployed the OpenDesk
         # AIO chart from a credentialed registry — a locked-down bundle with a fixed
         # app set — and nextcloud-base-ce deploys the community chart with a Gentian
         # image that stages addons for `occ app:enable`. Treating the second as

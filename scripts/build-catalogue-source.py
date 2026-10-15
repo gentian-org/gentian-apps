@@ -53,6 +53,7 @@ bundle layout, which is why the flattening lives here.
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import re
@@ -313,11 +314,42 @@ def assemble(directory: Path, profile_name: str, profile: dict) -> tuple:
     return body, [(kind, name, doc) for kind, name, doc, _ in found], problems
 
 
-def build(out: Path) -> tuple[list[dict], list[str]]:
+ICON_SIZE = 512
+
+
+def tile_svg(directory: Path, profile: dict, listing: dict) -> bytes | None:
+    """The SVG an entry's tile is drawn from: the listing's tile, else the
+    profile's first exposure tile or its API package's tile, else the
+    bundle's assets/tile.svg."""
+    spec = profile.get("spec") or {}
+    candidates = [(listing.get("tile") or {}).get("logo")]
+    for entry in spec.get("expose") or []:
+        candidates.append(((entry or {}).get("tile") or {}).get("logo"))
+    # A package that is an API has its one tile there, not on an exposure.
+    candidates.append((((spec.get("package") or {}).get("api") or {}).get("tile") or {}).get("logo"))
+    for logo in candidates:
+        if isinstance(logo, str) and logo.startswith("data:image/svg+xml;base64,"):
+            return base64.b64decode(logo.split(",", 1)[1])
+    asset = directory / "assets" / "tile.svg"
+    return asset.read_bytes() if asset.is_file() else None
+
+
+def render_icon(svg: bytes, path: Path) -> None:
+    """The tile as a PNG, ICON_SIZE square. An SVG is the template an app is
+    drawn from, and the App Store shows the PNG: an image a browser only
+    paints, where an SVG is a document that may carry script or fetch from
+    elsewhere."""
+    import cairosvg  # only where icons are asked for: CI's site build
+
+    cairosvg.svg2png(bytestring=svg, write_to=str(path), output_width=ICON_SIZE, output_height=ICON_SIZE)
+
+
+def build(out: Path, icons: bool = False) -> tuple[list[dict], list[str]]:
     profiles_dir = out / "profiles"
     listings_dir = out / "listings"
     packages_dir = out / "packages"
-    for d in (profiles_dir, listings_dir, packages_dir):
+    icons_dir = out / "icons"
+    for d in (profiles_dir, listings_dir, packages_dir) + ((icons_dir,) if icons else ()):
         d.mkdir(parents=True, exist_ok=True)
 
     # Presets: a named selection of one family's add-ons. Not installable and
@@ -411,6 +443,15 @@ def build(out: Path) -> tuple[list[dict], list[str]]:
         published.write_bytes(body)
         if listing_path.exists():
             shutil.copyfile(listing_path, listings_dir / f"{name}.yaml")
+        if icons:
+            svg = tile_svg(directory, profile, listing)
+            if svg is None:
+                complaints.append(f"{name}: no tile to draw an icon from")
+            else:
+                try:
+                    render_icon(svg, icons_dir / f"{name}.png")
+                except Exception as exc:  # a tile that does not draw is a complaint, not a crash
+                    complaints.append(f"{name}: its tile does not draw: {exc}")
 
         entry = {
             "name": name,
@@ -445,6 +486,11 @@ def main() -> int:
         help="build into a temporary directory and report, writing nothing lasting",
     )
     ap.add_argument(
+        "--with-icons",
+        action="store_true",
+        help=f"also draw icons/<name>.png, {ICON_SIZE}px square, from each entry's tile (needs cairosvg)",
+    )
+    ap.add_argument(
         "--with-landing-page",
         action="store_true",
         help="also write index.html, so a person who opens the site sees what it is",
@@ -454,7 +500,7 @@ def main() -> int:
     out = args.out
     if out.exists():
         shutil.rmtree(out)
-    entries, complaints = build(out)
+    entries, complaints = build(out, icons=args.with_icons)
 
     for complaint in complaints:
         print(f"  REFUSED  {complaint}", file=sys.stderr)
