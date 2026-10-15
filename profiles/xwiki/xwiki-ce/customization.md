@@ -1,4 +1,4 @@
-# Customization ladder — XWiki (family `xwiki-ce`)
+# Customization ladder — XWiki (family `xwiki`)
 
 **Grade: A** · rubric score **7/8** · characterised 2026-08-06
 
@@ -8,8 +8,8 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 
 | Criterion | Score | Evidence |
 |---|---|---|
-| Documented config reference | 1 | `xwiki-ce.cfg` / `xwiki-ce.properties` reference |
-| Declared drop-in directories | 1 | `/usr/local/xwiki-ce/data/` config and `lib/` extension dirs |
+| Documented config reference | 1 | `xwiki.cfg` / `xwiki.properties` reference |
+| Declared drop-in directories | 1 | `/usr/local/xwiki/data/` config and `lib/` extension dirs |
 | Documented plugin/addon API | 1 | XWiki components + XAR extensions |
 | Plugin API versioned + deprecation policy | 1 | XWiki keeps a long deprecation cycle and documents it per release |
 | Published HTTP API with a spec | 1 | REST API |
@@ -22,7 +22,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 | Rung | Available | How, here |
 |---|---|---|
 | **L0** Configure | yes | `spec.extraValues` → upstream `xwiki-contrib/xwiki-helm` values |
-| **L1** Drop-in | yes | `xwiki-properties` (`/usr/local/xwiki-ce/data/`, properties) and `skin` (static assets, tenant-editable) |
+| **L1** Drop-in | yes | `xwiki-properties` (`/usr/local/xwiki/data/`, properties) and `skin` (static assets, tenant-editable) |
 | **L2** Companion | always | consume the XWiki REST API from a separate app |
 | **L3** Extension | yes | XAR extension installed through the Extension Manager, or a wiki-page-as-code import |
 | **L4** Repackage | yes | upstream chart + `extraValues` + composition |

@@ -138,8 +138,10 @@ jobs:
                  --jq '.files[].filename' > /tmp/changed \
             && [ "$(wc -l < /tmp/changed)" -gt 0 ] \
             && [ "$(wc -l < /tmp/changed)" -lt 300 ]; then
-            # The charts are those the restore suites render (odoo, mathesar).
-            if ! grep -qE '^(images/gentian-sidecar-sso-saml/|e2e/|profiles/|charts/(odoo|mathesar)/|\.github/workflows/apps-ci\.yaml$)' /tmp/changed; then
+            # The charts are those the restore suites render (odoo, mathesar);
+            # XWiki's chart is upstream, and its suites run the image built
+            # from images/xwiki.
+            if ! grep -qE '^(images/gentian-sidecar-sso-saml/|images/xwiki/|e2e/|profiles/|charts/(odoo|mathesar)/|\.github/workflows/apps-ci\.yaml$)' /tmp/changed; then
               run=false
             fi
           fi

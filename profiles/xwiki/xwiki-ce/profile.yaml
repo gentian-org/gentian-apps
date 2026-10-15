@@ -1,11 +1,11 @@
 # ComponentProfile — XWiki (per-tenant enterprise wiki)
 #
-# Source chart: https://xwiki-contrib.github.io/xwiki-helm/ xwiki-ce v1.6.8
-#   Community-maintained chart by xwiki-contrib; Docker Official Image xwiki-ce.
+# Source chart: https://xwiki-contrib.github.io/xwiki-helm/ xwiki v1.6.8
+#   Community-maintained chart by xwiki-contrib; Docker Official Image xwiki.
 #   Chart uses StatefulSet by default (workloadStateful: true).
 #
-# Docker image: ghcr.io/gentian-org/xwiki-ce (see images/xwiki-ce/BUNDLE.md)
-#   Gentian bundle over xwiki-ce:17.10.9-postgres-tomcat. Bakes the Standard Flavor
+# Docker image: ghcr.io/gentian-org/xwiki (see images/xwiki/BUNDLE.md)
+#   Gentian bundle over xwiki:17.10.9-postgres-tomcat. Bakes the Standard Flavor
 #   offline repository (XIP, staged into the PVC and installed headlessly on
 #   first boot) plus the OIDC authenticator + deps as core extensions — so a
 #   fresh wiki works fully offline: no Distribution Wizard, no Extension Manager
@@ -13,15 +13,15 @@
 #
 # Secret inventory:
 #   Kernel-provided:
-#     oidc_client_secret  → customConfigsSecrets (xwiki-ce.properties oidc.secret)
+#     oidc_client_secret  → customConfigsSecrets (xwiki.properties oidc.secret)
 #     pg_*                → externalDB.{host,database,user,password}
-#     smtp_password       → (future: mail.smtp.password via xwiki-ce.properties)
+#     smtp_password       → (future: mail.smtp.password via xwiki.properties)
 #   App-internal (1) → appSecrets:
-#     superadmin_password → customConfigsSecrets (xwiki-ce.cfg xwiki-ce.superadminpassword)
+#     superadmin_password → customConfigsSecrets (xwiki.cfg xwiki.superadminpassword)
 #
 # Bootstrap: none required. On first boot the headless Distribution Job installs
 # the baked Standard Flavor from the staged offline repository, and the OIDC
-# authenticator ships as a core extension — so SSO (xwiki-ce.cfg authclass + the
+# authenticator ships as a core extension — so SSO (xwiki.cfg authclass + the
 # oidc.* properties below) is active from the first start, with no egress.
 apiVersion: gentianos.io/v1alpha1
 kind: ComponentProfile
@@ -37,7 +37,7 @@ spec:
   package:
     chart:
       repository: "https://xwiki-contrib.github.io/xwiki-helm"
-      name: xwiki-ce
+      name: xwiki
       version: "1.6.8"
 
     valueMapping:
@@ -55,10 +55,10 @@ spec:
       fullnameOverride: "xwiki-ce"
 
     # Gentian pre-flavored bundle (Standard Flavor XIP + OIDC authenticator baked
-    # in) — chart's xwiki-ce.imageName is `printf "%s:%s" image.name image.tag`, so
-    # image.name carries the full ghcr path. Bump tag with images/xwiki-ce/versions.env.
+    # in) — chart's xwiki.imageName is `printf "%s:%s" image.name image.tag`, so
+    # image.name carries the full ghcr path. Bump tag with images/xwiki/versions.env.
       image:
-        name: ghcr.io/gentian-org/xwiki-ce
+        name: ghcr.io/gentian-org/xwiki
         tag: "17.10.9-gentian1"
         pullPolicy: IfNotPresent
 
@@ -134,26 +134,26 @@ spec:
           enabled: true
           httpGet:
             enabled: true
-            path: /rest/wikis/xwiki-ce/spaces
+            path: /rest/wikis/xwiki/spaces
           initialDelaySeconds: 30
           timeoutSeconds: 5
           periodSeconds: 30
           failureThreshold: 10
           successThreshold: 1
 
-    # OIDC authenticator config (org.xwiki-ce.contrib.oidc:oidc-authenticator).
+    # OIDC authenticator config (org.xwiki.contrib.oidc:oidc-authenticator).
     # Explicit Keycloak endpoints (not just discovery) so token exchange works on
     # ACME staging where the JVM trusts the injected staging CA truststore.
     # Property names/format per the extension docs: comma-separated scopes, the
-    # authclass in xwiki-ce.cfg, and secret via customConfigsSecrets (never inline).
+    # authclass in xwiki.cfg, and secret via customConfigsSecrets (never inline).
       properties:
-        "property:xwiki-ce:XWiki.XWikiPreferences^XWiki.XWikiPreferences.authenticate_view": 1
-        "property:xwiki-ce:XWiki.XWikiPreferences^XWiki.XWikiPreferences.authenticate_edit": 1
+        "property:xwiki:XWiki.XWikiPreferences^XWiki.XWikiPreferences.authenticate_view": 1
+        "property:xwiki:XWiki.XWikiPreferences^XWiki.XWikiPreferences.authenticate_edit": 1
 
       customConfigs:
-        xwiki-ce.cfg:
-          xwiki-ce.authentication.authclass: "org.xwiki-ce.contrib.oidc.auth.OIDCAuthServiceImpl"
-        xwiki-ce.properties:
+        xwiki.cfg:
+          xwiki.authentication.authclass: "org.xwiki.contrib.oidc.auth.OIDCAuthServiceImpl"
+        xwiki.properties:
           oidc.provider: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}"
           oidc.endpoint.authorization: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}/protocol/openid-connect/auth"
           oidc.endpoint.token: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}/protocol/openid-connect/token"
@@ -179,17 +179,17 @@ spec:
           extension.repositories: ""
           distribution.job.interactive: "false"
           distribution.job.interactive.wiki: "false"
-          distribution.defaultUI: "org.xwiki-ce.platform:xwiki-platform-distribution-flavor-mainwiki"
-          distribution.defaultWikiUI: "org.xwiki-ce.platform:xwiki-platform-distribution-flavor-wiki"
+          distribution.defaultUI: "org.xwiki.platform:xwiki-platform-distribution-flavor-mainwiki"
+          distribution.defaultWikiUI: "org.xwiki.platform:xwiki-platform-distribution-flavor-wiki"
 
       customConfigsSecrets:
-        xwiki-ce.properties:
+        xwiki.properties:
           oidc.secret:
             secret:
               name: xwiki-ce-sensitive-values
               key: oidc-client-secret
-        xwiki-ce.cfg:
-          xwiki-ce.superadminpassword:
+        xwiki.cfg:
+          xwiki.superadminpassword:
             secret:
               name: xwiki-ce-sensitive-values
               key: internal-superadmin_password
@@ -239,7 +239,7 @@ spec:
           name: "XWiki"
           accessType: CONFIDENTIAL
         # XWiki OIDC authenticator callback endpoint (image serves at ROOT context,
-        # so no /xwiki-ce prefix — chart probes /rest, not /xwiki-ce/rest).
+        # so no /xwiki prefix — chart probes /rest, not /xwiki/rest).
           redirectUris:
             - "https://wiki.${TENANT_DOMAIN}/oidc/authenticator/callback"
           postLogoutRedirectUris:
@@ -274,6 +274,188 @@ spec:
       - name: superadmin_password
         valuePath: "superadminPassword"
 
+  backup:
+    quiesce:
+      container: xwiki
+    restore:
+      # What the restored data remembers of where it ran. The database
+      # connection needs nothing: the image writes it again on every start
+      # from this pod's DB_* values, and nothing in the wiki names the
+      # database or its role. What does name the old cluster and domain:
+      #   - XWiki finds a returning person by the issuer and subject of their
+      #     sign-in (XWiki.OIDC.UserClass); the issuer is the realm's address,
+      #     https://id.<kernel domain>/auth/realms/<tenant>. Left as it was,
+      #     everybody gets a new, empty account on their next sign-in.
+      #   - the wiki descriptors (XWiki.XWikiServerClass) name the host a wiki
+      #     answers at, and XWiki builds the addresses in its mails from them;
+      #   - the address of each account (XWiki.XWikiUsers), when on the old
+      #     domain;
+      #   - addresses on the old domains in the wiki's settings
+      #     (XWiki.XWikiPreferences) and descriptors.
+      # Rewritten in the database, in every wiki's schema, with the JDBC
+      # driver and Groovy of XWiki's own libraries; page text, comments and
+      # history are left as written. An account made by a sign-in between the
+      # restore and these commands is named, and left. Idempotent; skips what
+      # a bundle that does not say where it was written (GENTIAN_RESTORE_*
+      # empty) cannot tell it. The database password is read from the pod's
+      # environment, never passed in argv or printed. XWiki is started again
+      # afterwards (the default scaleDown pause), so it reads what was written.
+      post:
+        - - sh
+          - -c
+          - |
+            set -eu
+            lib=/usr/local/tomcat/webapps/${CONTEXT_PATH:-ROOT}/WEB-INF/lib
+            cp=
+            for jar in groovy groovy-sql postgresql; do
+              found=$(ls "$lib/$jar"-[0-9]*.jar 2>/dev/null | head -n 1)
+              [ -n "$found" ] || { echo "gentian-restore: no $jar library in $lib" >&2; exit 1; }
+              cp="$cp${cp:+:}$found"
+            done
+            # A small heap: it runs beside XWiki, in the same memory limit.
+            exec java -Xmx128m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 \
+              -cp "$cp" groovy.ui.GroovyMain -e "$1"
+          - gentian-restore
+          - |
+            import groovy.sql.Sql
+
+            def say = { String m -> println("gentian-restore: " + m) }
+            def given = { String n -> (System.getenv("GENTIAN_RESTORE_" + n) ?: "").trim() }
+
+            // Old domain -> new one, the more specific first: a tenant's
+            // domain is often under the cluster's own.
+            def pairs = ["DOMAIN", "KERNEL_DOMAIN"]
+                .collect { [given("SOURCE_" + it).toLowerCase(), given("TARGET_" + it).toLowerCase()] }
+                .findAll { it[0] && it[1] && it[0] != it[1] }
+                .sort { -it[0].length() }
+
+            // The issuer people signed in with, and the one they sign in with
+            // here: the realm of the tenant, at id.<kernel domain>. A bundle
+            // that does not name its tenant was written by this one.
+            String oldIssuer = null
+            String newIssuer = null
+            def kernel = [given("SOURCE_KERNEL_DOMAIN").toLowerCase(), given("TARGET_KERNEL_DOMAIN").toLowerCase()]
+            def tenant = [given("SOURCE_TENANT"), given("TARGET_TENANT")]
+            if (kernel[0] && kernel[1] && tenant[1]) {
+                oldIssuer = "https://id." + kernel[0] + "/auth/realms/" + (tenant[0] ?: tenant[1])
+                newIssuer = "https://id." + kernel[1] + "/auth/realms/" + tenant[1]
+                if (oldIssuer == newIssuer) {
+                    oldIssuer = null
+                }
+            }
+            if (!oldIssuer && !pairs) {
+                say("the bundle names no other cluster or domain than this one; nothing to rewrite")
+                return
+            }
+
+            def rehost = { String host ->
+                def h = host.toLowerCase()
+                def p = pairs.find { h == it[0] || h.endsWith("." + it[0]) }
+                p ? h.substring(0, h.length() - p[0].length()) + p[1] : host
+            }
+            def rewrite = [
+                issuer : { String v ->
+                    oldIssuer && v.trim().replaceAll('/+$', "").equalsIgnoreCase(oldIssuer) ? newIssuer : v
+                },
+                host   : { String v ->
+                    def m = v =~ /^([A-Za-z0-9.-]+)(:[0-9]+)?$/
+                    m.matches() ? rehost(m.group(1)) + (m.group(2) ?: "") : v
+                },
+                address: { String v ->
+                    def m = v =~ /^([^@\s]+)@([A-Za-z0-9.-]+)$/
+                    m.matches() ? m.group(1) + "@" + rehost(m.group(2)) : v
+                },
+                urls   : { String v ->
+                    v.replaceAll(~/(?i)\b(https?:\/\/)([a-z0-9.-]+)(?![a-z0-9.-])/) { all, scheme, host -> scheme + rehost(host) }
+                },
+            ]
+            // Which rewrite applies to what, by class and property; a class
+            // named with "*" has every property of its rewritten.
+            def rules = [
+                "XWiki.OIDC.UserClass"  : [issuer: "issuer"],
+                "XWiki.XWikiUsers"      : [email: "address"],
+                "XWiki.XWikiServerClass": [server: "host", "*": "urls"],
+                "XWiki.XWikiPreferences": ["*": "urls"],
+            ]
+            def classes = rules.keySet().collect { "'" + it + "'" }.join(", ")
+
+            def db = { String n ->
+                def v = System.getenv(n)
+                if (!v) {
+                    System.err.println("gentian-restore: " + n + " is not set in this container")
+                    System.exit(1)
+                }
+                v
+            }
+            def sql = Sql.newInstance("jdbc:postgresql://" + db("DB_HOST") + "/" + db("DB_DATABASE"), db("DB_USER"), db("DB_PASSWORD"))
+            def quote = { String id -> '"' + id.replace('"', '""') + '"' }
+            int changes = 0
+            sql.withTransaction {
+                // Every wiki: the main one in the database's own schema,
+                // each other in a schema of its own.
+                def schemas = sql.rows("SELECT table_schema AS s FROM information_schema.tables WHERE table_name = 'xwikiobjects' ORDER BY 1")*.s
+                for (String schema in schemas) {
+                    def wiki = schema == "public" ? "" : "wiki " + schema + ": "
+                    def q = quote(schema)
+                    def issuers = []
+                    int addresses = 0
+                    def settings = []
+                    for (store in [["xwikistrings", "xws"], ["xwikilargestrings", "xwl"]]) {
+                        def table = q + "." + store[0]
+                        def c = store[1]
+                        def rows = sql.rows("SELECT o.xwo_name AS doc, o.xwo_classname AS cls, v." + c + "_id AS id, v." + c
+                            + "_name AS prop, v." + c + "_value AS val FROM " + q + ".xwikiobjects o JOIN " + table + " v ON v."
+                            + c + "_id = o.xwo_id WHERE o.xwo_classname IN (" + classes + ")")
+                        for (row in rows) {
+                            String value = row.val
+                            def rule = rules[row.cls]
+                            def how = rule[row.prop] ?: rule["*"]
+                            if (value == null || !how) {
+                                continue
+                            }
+                            String next = rewrite[how].call(value)
+                            if (next == value) {
+                                continue
+                            }
+                            sql.executeUpdate("UPDATE " + table + " SET " + c + "_value = ? WHERE " + c + "_id = ? AND " + c + "_name = ?",
+                                [next, row.id, row.prop])
+                            changes++
+                            if (how == "issuer") {
+                                issuers << row.doc
+                            } else if (how == "address") {
+                                addresses++
+                            } else {
+                                settings << row.doc + " (" + row.prop + ")"
+                            }
+                        }
+                    }
+                    if (issuers) {
+                        say(wiki + issuers.size() + " account(s) now sign in through " + newIssuer)
+                    }
+                    if (addresses) {
+                        say(wiki + addresses + " account address(es) moved to the new domain")
+                    }
+                    settings.unique().each { say(wiki + it + " now names the new domain") }
+                    // A person who signed in after the restore and before
+                    // these commands got an account of their own; they are
+                    // now two accounts of one person, and XWiki signs them
+                    // in as either. Named, not merged.
+                    if (newIssuer) {
+                        sql.rows("SELECT o.xwo_name AS doc, s.xws_value AS sub FROM " + q + ".xwikiobjects o JOIN " + q
+                            + ".xwikistrings i ON i.xws_id = o.xwo_id AND i.xws_name = 'issuer' JOIN " + q
+                            + ".xwikistrings s ON s.xws_id = o.xwo_id AND s.xws_name = 'subject'"
+                            + " WHERE o.xwo_classname = 'XWiki.OIDC.UserClass' AND i.xws_value = ?", [newIssuer])
+                            .groupBy { it.sub }.values().findAll { it.size() > 1 }.each { same ->
+                                say(wiki + same*.doc.sort().join(" and ") + " are one person at the realm; XWiki may sign them in as either. Left as they are.")
+                            }
+                    }
+                }
+            }
+            sql.close()
+            if (!changes) {
+                say("the wiki already names this cluster and domain")
+            }
+
   expose:
     - name: web
       surface: gateway
@@ -291,19 +473,19 @@ spec:
     grade: A
     rubricScore: 7
     supportedRungs: [L0, L1, L3, L4]
-    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/xwiki-ce/customization.md
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/xwiki/xwiki-ce/customization.md
     configure:
       hotReload: false
     dropIns:
       - name: xwiki-properties
-        path: /usr/local/xwiki-ce/data
+        path: /usr/local/xwiki/data
         format: properties
         source: configMap
         maxBytes: 262144
         upstreamDocumented: true
         tenantEditable: false
       - name: skin
-        path: /usr/local/xwiki-ce/data/skins/gentian
+        path: /usr/local/xwiki/data/skins/gentian
         format: files
         source: configMap
         upstreamDocumented: true
@@ -312,9 +494,9 @@ spec:
     extension:
       mechanism: xwiki-extension
       delivery: [app-store-api, image-layer]
-      registry: https://extensions.xwiki-ce.org
+      registry: https://extensions.xwiki.org
       apiStability: stable
-      apiDocs: https://extensions.xwiki-ce.org/xwiki-ce/bin/view/Documentation/
+      apiDocs: https://extensions.xwiki.org/xwiki/bin/view/Documentation/
       perTenantAddons: true
       testMatrix: ["16"]
     publishes:
