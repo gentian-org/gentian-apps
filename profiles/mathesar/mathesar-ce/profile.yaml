@@ -166,6 +166,132 @@ spec:
         # only via existingSecret key internal-bootstrap_admin_password, by
         # spec.postInstallJob and spec.provisioning.syncJob.
 
+  backup:
+    restore:
+      # What the restored data remembers of where it ran. Mathesar's own
+      # database keeps, for every database it connects to, the server's host
+      # and port, the database's name, the role it connects as and that role's
+      # password (encrypted with SECRET_KEY, which a bundle brings back). The
+      # databases it made itself are on the platform's server, as this app's
+      # role; a restore puts them back under the names it reports and makes the
+      # role's password new. Those entries are pointed at the server, role and
+      # password this pod is given and at the databases' names here; a
+      # connection to any other server is left as it was. Form redirects on
+      # the old domain name the new one. Idempotent; skips what a bundle that
+      # does not say where it was written (GENTIAN_RESTORE_* empty) cannot
+      # tell it. Nothing secret is passed in argv or printed.
+      post:
+        - - python3
+          - -c
+          - |
+            import os, re, sys
+            os.chdir("/code")
+            sys.path.insert(0, "/code")
+            os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
+            import django
+            django.setup()
+            from django.db import connection, transaction
+            from config.database_config import get_internal_database_config
+            from mathesar.models.base import ConfiguredRole, Database, Form, Server
+
+            def say(m):
+                print("gentian-restore: " + m)
+
+            def pairs(var):
+                out = {}
+                for p in os.environ.get(var, "").split():
+                    old, _, new = p.partition("=")
+                    if old and new:
+                        out[old] = new
+                return out
+
+            here = get_internal_database_config()
+            databases = pairs("GENTIAN_RESTORE_DATABASES")
+            roles = pairs("GENTIAN_RESTORE_ROLES")
+            with connection.cursor() as c:
+                c.execute("SELECT datname FROM pg_database")
+                present = {r[0] for r in c.fetchall()}
+                c.execute("SELECT rolname FROM pg_roles")
+                logins = {r[0] for r in c.fetchall()}
+
+            def where(s):
+                return "%s:%s" % (s.host, s.port)
+
+            # The platform's server: the one this pod connects to, or one the
+            # bundle's own databases and login were on.
+            ours_dbs = set(databases) | set(databases.values())
+            ours_roles = set(roles) | set(roles.values()) | {here.role}
+            def ours(s):
+                if s.host == here.host and s.port == here.port:
+                    return True
+                return (s.roles.filter(name__in=ours_roles).exists()
+                        and s.databases.filter(name__in=ours_dbs).exists())
+
+            # An entry under a name in the bundle takes its name here, once that
+            # is on this server. A name here that is another's name in the bundle
+            # could not tell a second run that it was already renamed, so such an
+            # entry is left as it is and named.
+            def rename(rows, mapping, there, what):
+                rows = list(rows)
+                taken = {r.name for r in rows}
+                for r in rows:
+                    new = mapping.get(r.name)
+                    if not new or new == r.name or new not in there:
+                        continue
+                    if mapping.get(new, new) != new:
+                        say("%s %s would be named %s, itself a name in the bundle; left as it is" % (what, r.name, new))
+                    elif new in taken:
+                        say("%s %s would be named %s, which Mathesar already has; left as it is" % (what, r.name, new))
+                    else:
+                        taken.discard(r.name)
+                        taken.add(new)
+                        say("%s %s is now %s" % (what, r.name, new))
+                        r.name = new
+                        r.save(update_fields=["name"])
+
+            with transaction.atomic():
+                servers = [s for s in Server.objects.all() if ours(s)]
+                target = next((s for s in servers if s.host == here.host and s.port == here.port), None)
+                for s in servers:
+                    if s is target:
+                        continue
+                    if target is not None:
+                        say("Mathesar connects to %s and to %s, the server here; %s is left as it is" % (where(s), where(target), where(s)))
+                        continue
+                    old = where(s)
+                    s.host, s.port = here.host, here.port
+                    s.save(update_fields=["host", "port"])
+                    target = s
+                    say("connections to %s now go to %s" % (old, where(s)))
+
+                if target is not None:
+                    rename(target.databases.all(), databases, present, "database")
+                    rename(target.roles.all(), roles, logins, "role")
+                    for r in target.roles.all():
+                        if r.name == here.role:
+                            try:
+                                same = r.password == here.password
+                            except Exception:
+                                same = False  # not readable with this SECRET_KEY
+                            if not same:
+                                r.password = here.password
+                                r.save(update_fields=["password"])
+                                say("role %s connects with the password this pod is given" % r.name)
+                        elif r.name not in logins:
+                            say("role %s is not on this server: a restore brings back only this app's own login, "
+                                "so what connects as it fails until an administrator creates it again" % r.name)
+
+                src = os.environ.get("GENTIAN_RESTORE_SOURCE_DOMAIN", "").strip().lower()
+                dst = os.environ.get("GENTIAN_RESTORE_TARGET_DOMAIN", "").strip().lower()
+                if src and dst and src != dst:
+                    url = re.compile(r"(https?://)((?:[a-z0-9-]+\.)*)" + re.escape(src) + r"(?![a-z0-9-]|\.[a-z0-9])", re.I)
+                    for f in Form.objects.exclude(submit_redirect_url=None):
+                        new = url.sub(lambda m: m.group(1) + m.group(2) + dst, f.submit_redirect_url)
+                        if new != f.submit_redirect_url:
+                            f.submit_redirect_url = new
+                            f.save(update_fields=["submit_redirect_url"])
+                            say("form %d redirects to %s" % (f.id, dst))
+
   # Maps gentian:tenant:<t>:app-admins members to Mathesar is_superuser —
   # never the portalTiles allowedGroup above, which only gates the tile/OIDC
   # entitlement.

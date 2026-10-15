@@ -8,7 +8,7 @@
 # here. Needs docker and node.
 #
 #   e2e/restore-rewrites/run.sh              everything
-#   e2e/restore-rewrites/run.sh nextcloud    one of: nextcloud, odoo, open-webui
+#   e2e/restore-rewrites/run.sh nextcloud    one of: nextcloud, odoo, open-webui, mathesar
 #
 # Every container and volume it starts is removed again; E2E_KEEP=1 leaves
 # them to look at.
@@ -20,7 +20,7 @@ sidecar=images/gentian-sidecar-sso-saml
 [ -d "${sidecar}/node_modules" ] || (cd "${sidecar}" && npm ci)
 
 runs=("$@")
-[ ${#runs[@]} -gt 0 ] || runs=(nextcloud odoo open-webui)
+[ ${#runs[@]} -gt 0 ] || runs=(nextcloud odoo open-webui mathesar)
 status=0
 for run in "${runs[@]}"; do
     echo "=== ${run} ==="
