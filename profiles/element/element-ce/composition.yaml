@@ -639,14 +639,19 @@ spec:
                   version: "3.12.30"
                 namespace: {{ $ns }}
                 wait: false
+                # The tenant's namespace exists, and the account the release
+                # is installed as may not create one.
+                skipCreateNamespace: true
                 values:
                   {{ toYaml $synapseVals | nindent 18 }}
                 {{- if gt (len $relSet) 0 }}
                 set:
                   {{ toYaml $relSet | nindent 18 }}
                 {{- end }}
+              # A tenant's chart is installed as the narrow account, not as the
+              # kernel's cluster-admin one (gentian-os provider-configs.yaml).
               providerConfigRef:
-                name: kubernetes
+                name: tenant-apps
 
     # ── Step 3: Mark XR Ready when all composed resources are Ready ───────────
     - step: automatically-detect-ready-composed-resources

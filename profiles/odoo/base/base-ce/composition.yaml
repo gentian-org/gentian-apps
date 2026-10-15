@@ -633,6 +633,9 @@ spec:
                 wait: true
                 waitTimeout: "10m"
                 skipCRDs: true
+                # The tenant's namespace exists, and the account the release
+                # is installed as may not create one.
+                skipCreateNamespace: true
                 {{- if gt (len $extraVals) 0 }}
                 values:
                   {{ toYaml $extraVals | nindent 18 }}
@@ -641,8 +644,10 @@ spec:
                 set:
                   {{ toYaml $relSet | nindent 18 }}
                 {{- end }}
+              # A tenant's chart is installed as the narrow account, not as the
+              # kernel's cluster-admin one (gentian-os provider-configs.yaml).
               providerConfigRef:
-                name: kubernetes
+                name: tenant-apps
 
             {{- /* ── Emit stable service alias ─────────────────────────────────── */}}
             {{- /* AppProfile had one spec.ingress with serviceName and servicePort;
@@ -859,6 +864,9 @@ spec:
                 wait: true
                 waitTimeout: "10m"
                 skipCRDs: true
+                # The tenant's namespace exists, and the account the release
+                # is installed as may not create one.
+                skipCreateNamespace: true
                 {{- if gt (len $scExtraVals) 0 }}
                 values:
                   {{ toYaml $scExtraVals | nindent 18 }}
@@ -867,8 +875,10 @@ spec:
                 set:
                   {{ toYaml $scRelSet | nindent 18 }}
                 {{- end }}
+              # A tenant's chart is installed as the narrow account, not as the
+              # kernel's cluster-admin one (gentian-os provider-configs.yaml).
               providerConfigRef:
-                name: kubernetes
+                name: tenant-apps
 
             {{- if $sc.stableServiceName }}
             {{- $scSvcPort := default 80 ($sc.stableServicePort | int) }}
