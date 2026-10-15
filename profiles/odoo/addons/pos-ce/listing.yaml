@@ -1,6 +1,15 @@
 profile: odoo-pos-ce
-displayName: "Odoo Point of Sale"
-description: "Point of Sale and Restaurant/Bar management module for Odoo."
+displayName: "Point of Sale"
+summary: "Browser-based checkout for shops and restaurants, with table management, bill splitting and kitchen printing."
+description: |
+  Odoo Point of Sale is a browser-based till that handles checkouts and payments, works offline and updates stock and invoicing in Odoo. This install adds the **Restaurant** extension: floors and tables, printing a bill before payment, splitting bills and sending order updates to kitchen or bar printers.
+categories: [commerce, crm-sales]
+links:
+  - rel: homepage
+    url: https://www.odoo.com/app/point-of-sale-shop
+  - rel: donate
+    label: "Donate to the Odoo Community Association"
+    url: https://www.odoo-community.org/oca-donations
 family: odoo
 edition: ce
 author: OCA

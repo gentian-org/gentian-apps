@@ -1,6 +1,15 @@
 profile: nextcloud-spreed-ce
 displayName: "Talk"
-description: "Audio/video calls, chat and screensharing."
+summary: "Team chat, audio and video calls and screen sharing, hosted on your own Nextcloud."
+description: |
+  Talk is Nextcloud's chat and video conferencing app. Teams use it for one-to-one and group chats with file sharing, private, group and public (link or password-protected) calls, and screen sharing. Chats can be federated with users on other Nextcloud servers, and there are mobile apps for Android and iOS as well as a desktop client.
+categories: [communication, collaboration]
+links:
+  - rel: homepage
+    url: https://nextcloud.com/talk/
+  - rel: support
+    label: "Support the project"
+    url: https://nextcloud.com/contribute/
 family: nextcloud
 edition: ce
 author: Nextcloud

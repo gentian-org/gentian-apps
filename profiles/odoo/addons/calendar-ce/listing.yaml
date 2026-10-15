@@ -1,6 +1,15 @@
 profile: odoo-calendar-ce
-displayName: "Odoo Calendar"
-description: "Shared calendar module for Odoo."
+displayName: "Calendar"
+summary: "Schedule meetings and events with colleagues and contacts, including recurring events and invitations."
+description: |
+  Odoo's shared calendar for scheduling meetings and events, with attendees, reminders and recurring events. Meetings can be linked to records in other Odoo apps, such as CRM opportunities, so scheduling happens next to the work it belongs to.
+categories: [collaboration, office]
+links:
+  - rel: homepage
+    url: https://www.odoo.com/documentation/19.0/applications/productivity/calendar.html
+  - rel: donate
+    label: "Donate to the Odoo Community Association"
+    url: https://www.odoo-community.org/oca-donations
 family: odoo
 edition: ce
 author: OCA

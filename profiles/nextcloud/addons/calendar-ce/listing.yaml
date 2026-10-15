@@ -1,6 +1,15 @@
 profile: nextcloud-calendar-ce
 displayName: "Calendar"
-description: "CalDAV calendars with scheduling and free/busy."
+summary: "Shared team calendars with invitations, free/busy lookup and reminders, synced to phones and desktop clients over CalDAV."
+description: |
+  Calendar is the Nextcloud calendar app, a web interface for Nextcloud's CalDAV server. Teams use it to share calendars, invite attendees and check their free/busy time, set reminders and subscribe to external WebCal feeds. It also shows tasks and Deck cards that have due dates, and can create a Talk room for a meeting. Events sync to phone and desktop calendar clients.
+categories: [collaboration, communication]
+links:
+  - rel: homepage
+    url: https://nextcloud.com/groupware/
+  - rel: support
+    label: "Support the project"
+    url: https://nextcloud.com/contribute/
 family: nextcloud
 edition: ce
 author: Nextcloud

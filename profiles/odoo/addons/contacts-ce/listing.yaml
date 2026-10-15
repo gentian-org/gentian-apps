@@ -1,6 +1,15 @@
 profile: odoo-contacts-ce
-displayName: "Odoo Contacts"
-description: "Contact management module for Odoo."
+displayName: "Contacts"
+summary: "Keep one shared address book of customers, vendors and other companies and people used across all Odoo apps."
+description: |
+  Odoo's central directory of companies and individuals: customers, vendors and other contacts with addresses, tags and related people. Every other Odoo app (sales, invoicing, purchase, CRM) reads from the same records, so a contact is entered once.
+categories: [crm-sales, office]
+links:
+  - rel: homepage
+    url: https://www.odoo.com/documentation/19.0/applications/essentials/contacts.html
+  - rel: donate
+    label: "Donate to the Odoo Community Association"
+    url: https://www.odoo-community.org/oca-donations
 family: odoo
 edition: ce
 author: OCA

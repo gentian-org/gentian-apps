@@ -1,6 +1,15 @@
 profile: odoo-sales-ce
-displayName: "Odoo Sales"
-description: "Quotations, sales orders and invoicing, in Odoo."
+displayName: "Sales"
+summary: "Create quotations, turn them into sales orders and invoice customers, with price lists and optional products."
+description: |
+  Odoo Sales covers the flow from quotation to sales order to invoice. Quotations can be sent by email and confirmed online by the customer through the portal; with Inventory installed, orders create deliveries.
+categories: [crm-sales, erp-finance]
+links:
+  - rel: homepage
+    url: https://www.odoo.com/app/sales
+  - rel: donate
+    label: "Donate to the Odoo Community Association"
+    url: https://www.odoo-community.org/oca-donations
 family: odoo
 edition: ce
 author: OCA

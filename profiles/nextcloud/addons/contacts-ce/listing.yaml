@@ -1,6 +1,15 @@
 profile: nextcloud-contacts-ce
 displayName: "Contacts"
-description: "CardDAV address books shared across the workspace."
+summary: "Shared address books for the team, synced to phones and other devices over CardDAV."
+description: |
+  Contacts is the Nextcloud address book app, a web interface for Nextcloud's CardDAV server. Teams use it to share address books and contact groups, and its contacts feed into Mail and Calendar (birthdays, for example, appear in the calendar). Contacts sync to phones and desktop clients.
+categories: [collaboration, crm-sales]
+links:
+  - rel: homepage
+    url: https://nextcloud.com/groupware/
+  - rel: support
+    label: "Support the project"
+    url: https://nextcloud.com/contribute/
 family: nextcloud
 edition: ce
 author: Nextcloud

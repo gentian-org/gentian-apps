@@ -1,6 +1,15 @@
 profile: docmost-ce
 displayName: "Docmost"
-description: "Open-source collaborative wiki and documentation — a self-hosted Confluence/Notion alternative."
+summary: "A collaborative wiki where teams write, organise and share documentation together in real time."
+description: |
+  Docmost is an open-source, self-hosted wiki and documentation tool, positioned as an alternative to Confluence and Notion. Teams use it for knowledge bases, internal documentation and shared pages organised into spaces, with real-time collaborative editing, page permissions and public sharing. It includes built-in diagramming and imports from Confluence, Notion, Markdown and HTML.
+categories: [knowledge, collaboration]
+links:
+  - rel: homepage
+    url: https://docmost.com
+  - rel: support
+    label: "Support the project"
+    url: https://docmost.com/pricing
 family: docmost
 edition: ce
 author: Docmost

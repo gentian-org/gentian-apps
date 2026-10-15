@@ -1,6 +1,15 @@
 profile: nextcloud-tasks-ce
 displayName: "Tasks"
-description: "CalDAV task lists, shared with Calendar."
+summary: "Shared to-do lists with start and due dates, synced over CalDAV to desktop and mobile task clients."
+description: |
+  Tasks is a Nextcloud app for managing to-do lists. People add tasks with descriptions, start and due dates and priorities, and share task lists with other users. Each list is a Nextcloud calendar, so tasks sync over CalDAV to clients such as Thunderbird, Evolution, KDE Kontact and Apple Reminders, and tasks with due dates appear in Calendar.
+categories: [project-management, collaboration]
+links:
+  - rel: homepage
+    url: https://apps.nextcloud.com/apps/tasks
+  - rel: support
+    label: "Support the project"
+    url: https://nextcloud.com/contribute/
 family: nextcloud
 edition: ce
 author: Nextcloud

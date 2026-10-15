@@ -1,6 +1,15 @@
 profile: odoo-inventory-ce
-displayName: "Odoo Inventory"
-description: "Inventory and warehouse management module for Odoo."
+displayName: "Inventory"
+summary: "Track stock levels, receipts, deliveries and internal transfers across warehouses and locations."
+description: |
+  Odoo Inventory records every stock move as a transfer between locations, using double-entry stock management. It handles receipts, deliveries, internal transfers, multiple warehouses, reordering rules and lot/serial tracking. The dedicated Barcode app is part of Odoo Enterprise.
+categories: [operations, erp-finance]
+links:
+  - rel: homepage
+    url: https://www.odoo.com/app/inventory
+  - rel: donate
+    label: "Donate to the Odoo Community Association"
+    url: https://www.odoo-community.org/oca-donations
 family: odoo
 edition: ce
 author: OCA

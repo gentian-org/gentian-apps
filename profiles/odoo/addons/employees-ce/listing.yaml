@@ -1,6 +1,15 @@
 profile: odoo-employees-ce
-displayName: "Odoo Employees"
-description: "Employee directory and profile management module for Odoo."
+displayName: "Employees"
+summary: "Keep a directory of employees with departments, job positions, managers and work contact details."
+description: |
+  Odoo Employees centralises employee records: personal and work information, departments, job positions, managers and working schedules. It is the base that other Odoo HR apps build on, and gives staff a searchable company directory.
+categories: [hr]
+links:
+  - rel: homepage
+    url: https://www.odoo.com/app/employees
+  - rel: donate
+    label: "Donate to the Odoo Community Association"
+    url: https://www.odoo-community.org/oca-donations
 family: odoo
 edition: ce
 author: OCA

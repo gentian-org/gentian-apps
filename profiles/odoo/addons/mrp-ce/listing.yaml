@@ -1,6 +1,15 @@
 profile: odoo-mrp-ce
-displayName: "Odoo Manufacturing"
-description: "Manufacturing and Bill of Materials (BoM) recipe management module for Odoo."
+displayName: "Manufacturing"
+summary: "Plan and record production with bills of materials, manufacturing orders and work centers."
+description: |
+  Odoo Manufacturing defines products' bills of materials and creates manufacturing orders that consume components from stock and produce finished goods. Operations can be routed through work centers with work orders. It works on top of Odoo Inventory; PLM, quality control and the shop-floor tablet view are Enterprise apps.
+categories: [operations, erp-finance]
+links:
+  - rel: homepage
+    url: https://www.odoo.com/app/manufacturing
+  - rel: donate
+    label: "Donate to the Odoo Community Association"
+    url: https://www.odoo-community.org/oca-donations
 family: odoo
 edition: ce
 author: OCA

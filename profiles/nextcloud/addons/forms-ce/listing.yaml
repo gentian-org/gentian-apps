@@ -1,6 +1,15 @@
 profile: nextcloud-forms-ce
 displayName: "Forms"
-description: "Surveys, polls and questionnaires."
+summary: "Simple surveys, polls and questionnaires whose responses stay on your own server."
+description: |
+  Forms is a Nextcloud app for creating simple surveys and questionnaires. Teams use it to collect feedback, registrations and poll answers, view the results in charts and export them as CSV. Responses are stored on your own instance rather than with a third-party service, and the app has a REST API for integration.
+categories: [collaboration, automation]
+links:
+  - rel: homepage
+    url: https://apps.nextcloud.com/apps/forms
+  - rel: support
+    label: "Support the project"
+    url: https://nextcloud.com/contribute/
 family: nextcloud
 edition: ce
 author: Nextcloud

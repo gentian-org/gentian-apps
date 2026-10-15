@@ -1,6 +1,15 @@
 profile: nextcloud-base-od
-displayName: "Nextcloud (OpenDesk)"
-description: "OpenDesk Nextcloud AIO file sync and share with OIDC SSO and portal integration."
+displayName: "Nextcloud (openDesk)"
+summary: "Nextcloud file storage and sharing as packaged in openDesk, the sovereign workplace suite for public administration."
+description: |
+  This is Nextcloud as shipped in **openDesk**, the office and collaboration suite for public administration developed by ZenDiS GmbH. It provides file storage, sync and sharing, integrated into the openDesk portal and single sign-on. Nextcloud's desktop and mobile clients work with it.
+categories: [files, collaboration]
+links:
+  - rel: homepage
+    url: https://www.opendesk.eu/en/
+  - rel: support
+    label: "Support the project"
+    url: https://nextcloud.com/contribute/
 family: nextcloud
 edition: ee
 author: openDesk

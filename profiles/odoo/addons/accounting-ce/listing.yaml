@@ -1,6 +1,15 @@
 profile: odoo-accounting-ce
-displayName: "Odoo Accounting"
-description: "Accounting and financial management module for Odoo."
+displayName: "Invoicing"
+summary: "Create and send customer invoices, record vendor bills, and track payments; full accounting reports are not included."
+description: |
+  Odoo's Community `account` module, which Odoo itself names **Invoicing** (the app named "Accounting" is Odoo Enterprise). It covers customer invoices and credit notes, vendor bills, payment registration and taxes, on top of a chart of accounts and journals. Standard financial reports, bank reconciliation, budgets and asset management belong to the Enterprise Accounting app, so it suits businesses whose books are kept by an external accountant.
+categories: [erp-finance]
+links:
+  - rel: homepage
+    url: https://www.odoo.com/app/invoicing
+  - rel: donate
+    label: "Donate to the Odoo Community Association"
+    url: https://www.odoo-community.org/oca-donations
 family: odoo
 edition: ce
 author: OCA
