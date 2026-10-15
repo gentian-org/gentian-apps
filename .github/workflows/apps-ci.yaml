@@ -24,6 +24,8 @@ on:
       - "charts/activepieces/**"
       - "charts/mathesar/**"
       - "charts/docmost/**"
+      # The validators: a change to one is checked by running it.
+      - "scripts/**"
       - ".github/workflows/apps-ci.yaml"
       - ".github/actions/**"
   pull_request:
@@ -38,6 +40,8 @@ on:
       - "charts/activepieces/**"
       - "charts/mathesar/**"
       - "charts/docmost/**"
+      # The validators: a change to one is checked by running it.
+      - "scripts/**"
       # Since a branch is no longer checked on its push, this is the only run
       # a change to the workflow gets before it is merged.
       - ".github/workflows/apps-ci.yaml"
