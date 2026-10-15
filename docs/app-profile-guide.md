@@ -1995,6 +1995,7 @@ spec:
 | `boundSecrets` | See 15d. Most apps need none. |
 | `restore.post` | Something must run before the app serves the restored data: cache invalidation, re-indexing, fingerprinting. |
 | `restore.verify` | Always worth setting. Without it a restore can only report that bytes were written, not that your app can read them. |
+| `restore.domainBound` | Your app writes the tenant's domain into its data and will not start under another (Synapse's server name). A restore onto another domain then leaves its data out, keeps the app as installed there, and names it; on the same domain it is restored as usual. |
 | `consistency` | `perStore` if your app's stores genuinely hold no references to each other. Leave at `app` if unsure. |
 | `minRestoreVersion` | Your app cannot migrate data from before some version. Older data into a newer app is always allowed — that just runs your migrations — but the reverse corrupts silently. |
 
