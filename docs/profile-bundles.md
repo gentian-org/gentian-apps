@@ -28,8 +28,12 @@ Everything stays in the profile's directory, `profiles/[<family>/]<name>/`:
 | `oidc-catalog.yaml` | an `OIDCPackCatalog` companion |
 | `customizations/<record>.yaml` | a `Customization` companion |
 | files under `assets/`, named by a `configMapGenerator` | a `ConfigMap` companion |
-| `listing.yaml` | `listings/<name>.yaml` beside the bundles, for the App Store; not in the bundle |
-| `*.md`, tile art, anything not listed | nothing; it stays in the repository |
+| `*.md`, `assets/tile.png`, anything not listed | nothing; it stays in the repository |
+
+The catalogue listing — display name, summary, description, categories, links, author, license,
+logo — is the App Store's and lives in its database, not here. A profile carries what installing
+the app needs, and its tile: the PNG inlined in `tile.logo`, which `assets/tile.png` is the
+committed copy of.
 
 `kustomization.yaml` is the list. `scripts/build-catalogue-source.py` reads it and puts into the
 bundle exactly what it names:
