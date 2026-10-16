@@ -4,12 +4,12 @@
     build-catalogue-source.py [--out dist/catalogue] [--check]
 
 This repository stores a profile as a BUNDLE — ``profiles/[<family>/]<name>/``
-holding ``profile.yaml``, ``listing.yaml`` and whatever else it needs — because
+holding ``profile.yaml`` and whatever else it needs — because
 that is what Argo CD's ApplicationSet syncs, one Application per directory.
 
 A catalogue SOURCE is the other shape: a flat directory served over https,
-holding ``profiles/<name>.yaml``, ``listings/<name>.yaml``,
-``packages/<name>.yaml`` and ``index.yaml``.
+holding ``profiles/<name>.yaml``, ``packages/<name>.yaml`` and
+``index.yaml``.
 That is what a director materialises an entry from (AD-3) and what the App
 Store ingests. The two shapes exist for two different consumers and neither is
 a mistake; this script turns the first into the second.
@@ -18,8 +18,9 @@ a mistake; this script turns the first into the second.
 so without an index a cluster can install from this catalogue by name but
 cannot say what is in it — which is the whole of a cluster's own catalogue
 screen (AD-14). The index is the technical half and nothing else: name,
-version, edition, trust tier, digest. Presentation belongs to the App Store,
-which keeps it current; a cluster copying it would go stale.
+version, edition, trust tier, digest. The listing -- name, summary,
+description, author, license, logo -- is the App Store's, kept in its own
+database, and nothing here publishes it.
 
 One profile, one file, one fingerprint. ``profiles/<name>.yaml`` is the
 profile's whole bundle: the ComponentProfile first and, after it, every other
@@ -53,7 +54,6 @@ bundle layout, which is why the flattening lives here.
 from __future__ import annotations
 
 import argparse
-import base64
 import hashlib
 import json
 import re
@@ -71,10 +71,15 @@ REPO = Path(__file__).resolve().parent.parent
 # so a typo here would quietly decide where an entry can be seen.
 EDITIONS = ("ce", "pe", "me", "ee")
 
+# Where a profile states its edition: the label gentian-os's api/v1alpha1
+# names for it (LabelProfileEdition).
+EDITION_LABEL = "gentianos.io/profile-edition"
 
-def edition_of(name: str, listing: dict) -> str:
-    """The listing's edition, or the one the bundle's own name ends in."""
-    declared = str(listing.get("edition") or "").strip().lower()
+
+def edition_of(name: str, profile: dict) -> str:
+    """The edition the profile's label states, or the one its name ends in."""
+    labels = (profile.get("metadata") or {}).get("labels") or {}
+    declared = str(labels.get(EDITION_LABEL) or "").strip().lower()
     if declared:
         return declared
     tail = name.rsplit("-", 1)[-1].lower()
@@ -213,11 +218,11 @@ def check_companion(profile_name: str, profile: dict, doc: dict) -> list:
 
 def companions(directory: Path, profile_name: str, profile: dict) -> tuple:
     """The companions a bundle's kustomization.yaml lists, as (kind, name, text)."""
-    listing = directory / "kustomization.yaml"
-    if not listing.exists():
+    kustomization = directory / "kustomization.yaml"
+    if not kustomization.exists():
         return [], []
     try:
-        k = load(listing)
+        k = load(kustomization)
     except yaml.YAMLError as exc:
         return [], [f"kustomization.yaml does not parse: {exc}"]
     problems = []
@@ -314,42 +319,10 @@ def assemble(directory: Path, profile_name: str, profile: dict) -> tuple:
     return body, [(kind, name, doc) for kind, name, doc, _ in found], problems
 
 
-ICON_SIZE = 512
-
-
-def tile_svg(directory: Path, profile: dict, listing: dict) -> bytes | None:
-    """The SVG an entry's tile is drawn from: the listing's tile, else the
-    profile's first exposure tile or its API package's tile, else the
-    bundle's assets/tile.svg."""
-    spec = profile.get("spec") or {}
-    candidates = [(listing.get("tile") or {}).get("logo")]
-    for entry in spec.get("expose") or []:
-        candidates.append(((entry or {}).get("tile") or {}).get("logo"))
-    # A package that is an API has its one tile there, not on an exposure.
-    candidates.append((((spec.get("package") or {}).get("api") or {}).get("tile") or {}).get("logo"))
-    for logo in candidates:
-        if isinstance(logo, str) and logo.startswith("data:image/svg+xml;base64,"):
-            return base64.b64decode(logo.split(",", 1)[1])
-    asset = directory / "assets" / "tile.svg"
-    return asset.read_bytes() if asset.is_file() else None
-
-
-def render_icon(svg: bytes, path: Path) -> None:
-    """The tile as a PNG, ICON_SIZE square. An SVG is the template an app is
-    drawn from, and the App Store shows the PNG: an image a browser only
-    paints, where an SVG is a document that may carry script or fetch from
-    elsewhere."""
-    import cairosvg  # only where icons are asked for: CI's site build
-
-    cairosvg.svg2png(bytestring=svg, write_to=str(path), output_width=ICON_SIZE, output_height=ICON_SIZE)
-
-
-def build(out: Path, icons: bool = False) -> tuple[list[dict], list[str]]:
+def build(out: Path) -> tuple[list[dict], list[str]]:
     profiles_dir = out / "profiles"
-    listings_dir = out / "listings"
     packages_dir = out / "packages"
-    icons_dir = out / "icons"
-    for d in (profiles_dir, listings_dir, packages_dir) + ((icons_dir,) if icons else ()):
+    for d in (profiles_dir, packages_dir):
         d.mkdir(parents=True, exist_ok=True)
 
     # Presets: a named selection of one family's add-ons. Not installable and
@@ -408,15 +381,7 @@ def build(out: Path, icons: bool = False) -> tuple[list[dict], list[str]]:
         if "tenant" not in (spec.get("tenancy") or ["tenant"]):
             continue
 
-        listing = {}
-        listing_path = directory / "listing.yaml"
-        if listing_path.exists():
-            try:
-                listing = load(listing_path)
-            except yaml.YAMLError as exc:
-                complaints.append(f"{name}: listing.yaml does not parse: {exc}")
-
-        edition = edition_of(name, listing)
+        edition = edition_of(name, profile)
         if edition not in EDITIONS:
             complaints.append(
                 f"{name}: edition {edition!r} is not one of {', '.join(EDITIONS)}"
@@ -441,17 +406,6 @@ def build(out: Path, icons: bool = False) -> tuple[list[dict], list[str]]:
 
         published = profiles_dir / f"{name}.yaml"
         published.write_bytes(body)
-        if listing_path.exists():
-            shutil.copyfile(listing_path, listings_dir / f"{name}.yaml")
-        if icons:
-            svg = tile_svg(directory, profile, listing)
-            if svg is None:
-                complaints.append(f"{name}: no tile to draw an icon from")
-            else:
-                try:
-                    render_icon(svg, icons_dir / f"{name}.png")
-                except Exception as exc:  # a tile that does not draw is a complaint, not a crash
-                    complaints.append(f"{name}: its tile does not draw: {exc}")
 
         entry = {
             "name": name,
@@ -486,11 +440,6 @@ def main() -> int:
         help="build into a temporary directory and report, writing nothing lasting",
     )
     ap.add_argument(
-        "--with-icons",
-        action="store_true",
-        help=f"also draw icons/<name>.png, {ICON_SIZE}px square, from each entry's tile (needs cairosvg)",
-    )
-    ap.add_argument(
         "--with-landing-page",
         action="store_true",
         help="also write index.html, so a person who opens the site sees what it is",
@@ -500,7 +449,7 @@ def main() -> int:
     out = args.out
     if out.exists():
         shutil.rmtree(out)
-    entries, complaints = build(out, icons=args.with_icons)
+    entries, complaints = build(out)
 
     for complaint in complaints:
         print(f"  REFUSED  {complaint}", file=sys.stderr)
@@ -543,7 +492,6 @@ entry at the digest the App Store states and refuses anything else.</p>
 <ul>
  <li><a href="index.yaml">index.yaml</a> — what is here, at which version and digest</li>
  <li><code>profiles/&lt;name&gt;.yaml</code> — the profile's bundle: the ComponentProfile and what travels with it</li>
- <li><code>listings/&lt;name&gt;.yaml</code> — how the App Store presents it</li>
 </ul>
 <p>{len(entries)} entries.</p>
 <table><thead><tr><th>Name</th><th>Version</th><th>Edition</th></tr></thead>

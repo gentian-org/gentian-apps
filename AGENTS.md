@@ -133,10 +133,14 @@ docker compose -f docker-compose.dev.yaml up --build
 
 ## Adding/editing profiles (`profiles/[<family>/]<name>/`, OSS or commercial)
 
-Each profile bundle holds `kustomization.yaml` (required), `profile.yaml` (the ComponentProfile —
-describe the app there, not in a separate catalogue doc), and optionally `oidc-catalog.yaml`,
-`composition.yaml`, `assets/`. The App Store runs outside the cluster and is not in this
-repository: it ingests the catalogue source this repository publishes. See
+Each profile bundle holds `kustomization.yaml` (required), `profile.yaml` (the ComponentProfile),
+`assets/tile.png` (its tile, drawn by `scripts/render-default-tile.py` and inlined by
+`scripts/sync-profile-tile.py`), and optionally `oidc-catalog.yaml`, `composition.yaml`, further
+`assets/`. `profile.yaml` carries what installing the app needs: its edition and family as the
+labels `gentianos.io/profile-edition` and `gentianos.io/profile-family`, and the app's license as
+an `SPDX-License-Identifier:` comment on its first line. The listing — display name, summary,
+description, categories, links, author, logo — is the App Store's, which runs outside the
+cluster and keeps it in its own database. See
 [docs/app-profile-guide.md](docs/app-profile-guide.md) for the full workflow.
 
 **Layout rules — CI enforces both:**
