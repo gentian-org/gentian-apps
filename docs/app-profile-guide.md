@@ -242,30 +242,26 @@ Commerce (customer, price, invoice) is handled in **CRM/ERP (Odoo)** — see
 
 ### Portal app-menu tiles
 
-Gentian portal / app-menu icons use a **two-path** model on `AppProfile.spec.tile`:
+A tile sits on an exposure (`spec.expose[].tile`), or on `spec.package.api.tile` for a component
+that is only a link. Its picture is a 128×128 PNG: `tile.logo` is the `data:image/png;base64,…`
+URI the cluster reads (at most 65536 characters), and `tile.image` names the committed file it was
+inlined from, `assets/tile.png`. An `AppPackage` preset's `spec.tile` is the same.
 
-| Path | Spec | Notes |
-|---|---|---|
-| **Catalogue** | `tile.icon: mail` | Pick from `gentian-ui/legacy/design-system/tiles/catalogue.json` |
-| **Custom** | `tile.image: assets/tile.svg` → run `scripts/sync-profile-tile.py` | Inlines to `tile.logo` data URI |
+Every profile here ships the default tile: a platform glyph on the neutral square, drawn the same
+way for every app. The app's own logo is part of its listing, which is the App Store's.
 
-Per sub-app overrides: `spec.portalTiles[].tile.icon` (e.g. OX mail vs calendar).
+```bash
+scripts/render-default-tile.py --list                                   # the glyphs
+scripts/render-default-tile.py <glyph> profiles/<name>/assets/tile.png  # draw
+scripts/sync-profile-tile.py profiles/<name>                            # inline into tile.logo
+```
 
-The catalogue only carries generic glyphs, so a family whose apps have their own
-marks should ship real logos rather than settle for the nearest shape — a "wiki"
-page is not Collectives. Nextcloud does this from
-`scripts/build-nextcloud-tiles.py`: it pulls each logo from the release tarball
-`images/nextcloud/versions.env` already pins, repaints it in the vendor colour on
-the catalogue frame, and writes both `assets/tile-*.svg` and the inlined
-`tile.logo`. Re-run it after bumping a version there. Use it as the model for the
-next family; `sync-profile-tile.py` stays the tool for one-off hand-drawn tiles
-(it rewrites the whole profile through PyYAML, so it drops comments — check the
-diff).
+The glyphs are `scripts/data/tile-catalogue.json`, a copy of gentian-os
+`internal/tiles/catalogue.json`, the set the desktop draws its own tiles from. Drawing needs
+cairosvg or rsvg-convert, on the author's machine only; nothing draws a tile in CI or on a cluster.
 
-The gentian-os LDAP reconciler resolves `tile.icon` to a data URI when writing
-`pathToLogo`. Legacy `spec.logo` still works but is deprecated.
-
-CI: `scripts/validate-profile-tiles.py` (see `.github/workflows/apps-ci.yaml`).
+CI: `scripts/validate-profile-tiles.py` (see `.github/workflows/apps-ci.yaml`) checks that every
+`tile.logo` is a 128×128 PNG and the same bytes as its `tile.image`.
 
 ### Base + addon profile bundles
 

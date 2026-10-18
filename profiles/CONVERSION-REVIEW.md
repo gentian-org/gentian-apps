@@ -6,7 +6,6 @@
 
 - package: dropped deploymentMethod 'crossplane' — delivery is read from which package kind is present and can no longer contradict it
 - requires.privileges.egress/egress-1: write the reason the tenant administrator will read, and give it a name that says where it goes
-- tile/activepieces-me: no SVG, so the placeholder was used. The old profile named the built-in glyph 'analytics'. Draw this component's own art into assets/tile.svg and re-run gentian-apps' scripts/sync-profile-tile.py
 
 ## docmost-ce
 
@@ -21,7 +20,6 @@
 - expose/web: dropped ingress annotations ['nginx.ingress.kubernetes.io/proxy-body-size', 'nginx.ingress.kubernetes.io/proxy-read-timeout', 'nginx.ingress.kubernetes.io/proxy-send-timeout'] — body size and timeouts are the gateway's policy now
 - expose/matrix: dropped ingress annotations ['nginx.ingress.kubernetes.io/proxy-body-size', 'nginx.ingress.kubernetes.io/proxy-read-timeout', 'nginx.ingress.kubernetes.io/proxy-send-timeout'] — body size and timeouts are the gateway's policy now
 - browserProxy /matrix -> http://synapse-web.{namespace}.svc/_matrix/ was DROPPED. The portal no longer proxies for apps, and an exposure's backend must be a Service in the tenant's namespace. If this route is still needed, the app has to serve that path itself or ship a Service for it
-- tile/element-ce: no SVG, so the placeholder was used. The old profile named the built-in glyph 'chat'. Draw this component's own art into assets/tile.svg and re-run gentian-apps' scripts/sync-profile-tile.py
 
 ## gentian-subscriptions-me
 
@@ -33,7 +31,6 @@
 ## mathesar-ce
 
 - package: dropped deploymentMethod 'crossplane' — delivery is read from which package kind is present and can no longer contradict it
-- tile/mathesar-ce: no SVG, so the placeholder was used. The old profile named the built-in glyph 'database'. Draw this component's own art into assets/tile.svg and re-run gentian-apps' scripts/sync-profile-tile.py
 
 ## nextcloud-calendar-ce
 
@@ -164,8 +161,6 @@
 
 - package: dropped deploymentMethod 'crossplane' — delivery is read from which package kind is present and can no longer contradict it
 - secrets.derived: derived secrets rotate silently if the formula or its inputs change; move to generated unless something external recomputes the value
-- tile/open-webui: no SVG, so the placeholder was used. The old profile named the built-in glyph 'chat'. Draw this component's own art into assets/tile.svg and re-run gentian-apps' scripts/sync-profile-tile.py
-- tile/open-webui-admin: no SVG, so the placeholder was used. The old profile named the built-in glyph 'chat'. Draw this component's own art into assets/tile.svg and re-run gentian-apps' scripts/sync-profile-tile.py
 - tile/open-webui-admin: allowedGroup was 'Tenant Admins'; relation is can_launch, which is entitlement to the app. Narrow it if that group meant something else
 
 ## openproject-ce
@@ -174,10 +169,8 @@
 - package: dropped deploymentMethod 'crossplane' — delivery is read from which package kind is present and can no longer contradict it
 - expose/web: dropped ingress annotations ['gentianos.io/gateway-buffer-limit', 'gentianos.io/gateway-request-timeout'] — body size and timeouts are the gateway's policy now
 - browserProxy /api -> http://openproject-ce.{namespace}.svc/api/v3/ was DROPPED. The portal no longer proxies for apps, and an exposure's backend must be a Service in the tenant's namespace. If this route is still needed, the app has to serve that path itself or ship a Service for it
-- tile/openproject-ce: no SVG, so the placeholder was used. The old profile named the built-in glyph 'projects'. Draw this component's own art into assets/tile.svg and re-run gentian-apps' scripts/sync-profile-tile.py
 
 ## xwiki-ce
 
 - package: dropped deploymentMethod 'crossplane' — delivery is read from which package kind is present and can no longer contradict it
 - expose/web: dropped ingress annotations ['gentianos.io/gateway-buffer-limit', 'gentianos.io/gateway-request-timeout'] — body size and timeouts are the gateway's policy now
-- tile/xwiki-ce: no SVG, so the placeholder was used. The old profile named the built-in glyph 'wiki'. Draw this component's own art into assets/tile.svg and re-run gentian-apps' scripts/sync-profile-tile.py

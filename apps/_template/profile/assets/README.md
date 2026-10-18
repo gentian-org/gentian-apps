@@ -1,22 +1,20 @@
-# Tile art
+# Tile
 
-`tile.svg` is the image the portal draws for this component, and every
-component ships its own. A person recognises a tile before they can read its
-label, so two components drawn from one shared glyph set look like the same
-thing — which is why the platform owns no set to pick from.
+`tile.png` is the image the portal draws for this component: a 128×128 PNG.
+The one here is the default every component starts from, a platform glyph on
+the neutral square. Every default tile is drawn the same way, so it reads as a
+tile, not as anybody's logo; the app's own logo is shown by the App Store.
 
-Start from the placeholder here if you have no idea yet. It is deliberately
-plain: it reads as "not finished" at a glance, so a component that shipped
-without its own art is obvious rather than quietly anonymous.
+Pick the glyph that says what the component is and draw it:
 
-Keep it square, 52×52, and legible at 24px. Inline every colour and path; the
-portal renders the whole desktop from one ConfigMap and fetches nothing per
-tile, so a `<image href="…">` or an external stylesheet will not resolve.
+    scripts/render-default-tile.py --list
+    scripts/render-default-tile.py <glyph> <profile-dir>/assets/tile.png
 
-Before you commit, inline it into the profile:
+Then inline it into the profile before you commit:
 
     scripts/sync-profile-tile.py <profile-dir>
 
 That writes the base64 into `expose[].tile.logo`, which is the field the
-cluster reads, and leaves `image` naming this file so a reviewer sees the real
-art in the diff instead of a wall of base64.
+cluster reads (a `data:image/png` URI of at most 65536 characters), and leaves
+`image` naming this file so a reviewer sees the real picture in the diff
+instead of a wall of base64.
