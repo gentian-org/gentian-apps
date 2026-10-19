@@ -1322,7 +1322,7 @@ omission.
 ### 6j. Same-origin iframes share browser state
 
 The desktop opens every tile as an iframe in **one browser tab**, and tiles of
-the same app family share a host — every Odoo module is `erp.<tenant>`. Browsers
+the same app family share a host — every Odoo module is `odoo.<tenant>`. Browsers
 scope `sessionStorage` and `localStorage` per origin, not per iframe, so all of
 those tiles read and write **one** store. Anything an app remembers there as
 "the last thing this session did" is therefore shared with every other tile of

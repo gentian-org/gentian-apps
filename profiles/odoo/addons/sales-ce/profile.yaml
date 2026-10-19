@@ -42,7 +42,7 @@ spec:
     - name: odoo-sales
       surface: gateway
       authMode: oidc
-      subDomain: erp
+      subDomain: odoo
       backend:
         component: odoo-base-ce
         service: odoo

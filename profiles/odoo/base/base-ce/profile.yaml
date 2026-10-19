@@ -83,7 +83,7 @@ spec:
       # the redirectUris registered under kernelRequirements.identity, and every
       # login fails with oauth_error=3 — which on a website-enabled database
       # surfaces as a 500, because the login page itself cannot then render.
-        baseUrl: "https://erp.${TENANT_DOMAIN}"
+        baseUrl: "https://odoo.${TENANT_DOMAIN}"
         oidc:
         # Where the pod validates a token. The browser still goes to the public
         # issuer; only auth_oauth's server-side userinfo call moves in-cluster,
@@ -121,7 +121,7 @@ spec:
           name: Odoo
           accessType: CONFIDENTIAL
           redirectUris:
-            - "https://erp.${TENANT_DOMAIN}/auth_oauth/signin"
+            - "https://odoo.${TENANT_DOMAIN}/auth_oauth/signin"
         # No backchannelLogout: Odoo signs in through auth_oauth, an OAuth2
         # module rather than an OIDC relying party, so there is nothing to send a
         # logout_token to. Its session ends on its own timeout. Recorded rather
@@ -307,7 +307,7 @@ spec:
     - name: web
       surface: gateway
       authMode: oidc
-      subDomain: erp
+      subDomain: odoo
       backend:
         service: odoo
         port: 8069

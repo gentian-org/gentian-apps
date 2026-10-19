@@ -971,7 +971,7 @@ spec:
                          cannot schedule against a PVC that is terminating, and
                          wait-for-base waits forever for the pod that cannot
                          start. Demo sat in it for an hour on 2026-09-04 with
-                         erp.<tenant> answering 500, and nothing in the cluster
+                         odoo.<tenant> answering 500, and nothing in the cluster
                          would have broken the tie.
 
                          A deadline breaks it. The Job fails, the pod goes, the
