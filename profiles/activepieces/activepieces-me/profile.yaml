@@ -39,7 +39,7 @@ spec:
         enabled: false
         tls:
           - hosts:
-              - auto.${TENANT_DOMAIN}
+              - activepieces.${TENANT_DOMAIN}
       resources:
         requests:
           cpu: 100m
@@ -127,7 +127,7 @@ spec:
       redis:
         enabled: false
       activepieces:
-        domain: auto.${TENANT_DOMAIN}
+        domain: activepieces.${TENANT_DOMAIN}
         database: postgres
         queue:
           mode: redis
@@ -227,7 +227,7 @@ spec:
       # The address the app is told it has (activepieces.domain above). The
       # entry named none, so the app was published under the profile's name
       # and told another: links it writes itself led nowhere.
-      subDomain: auto
+      subDomain: activepieces
       # Activepieces' page keeps its session as a token in localStorage and
       # sends it to its own API in the Authorization header. On an ordinary
       # entry the front door replaces that header and removes it, so every

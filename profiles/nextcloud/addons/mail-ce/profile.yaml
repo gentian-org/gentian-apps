@@ -30,7 +30,7 @@ spec:
     - name: mail
       surface: gateway
       authMode: oidc
-      subDomain: cloud
+      subDomain: nextcloud
       backend:
         component: nextcloud-base-ce
         service: nextcloud

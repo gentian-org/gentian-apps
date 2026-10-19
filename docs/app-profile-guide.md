@@ -378,7 +378,7 @@ That value only works in one cluster and breaks on every other environment.
 
 | Placeholder | Use for | Why it matters |
 |---|---|---|
-| **`${TENANT_DOMAIN}`** | App-facing URLs on the tenant zone: `chat.${TENANT_DOMAIN}`, `meet.${TENANT_DOMAIN}`, OIDC `redirectUris`, Matrix `serverName`, public Jitsi URL, `mail.${TENANT_DOMAIN}` in OX | Browsers, Keycloak, and ingress must agree on the **same hostname** the user sees. A typo or hardcoded domain causes `redirect_uri` mismatch, broken cookies, or TLS on the wrong cert (`*.<effectiveDomain>`). |
+| **`${TENANT_DOMAIN}`** | App-facing URLs on the tenant zone: `element.${TENANT_DOMAIN}`, `meet.${TENANT_DOMAIN}`, OIDC `redirectUris`, Matrix `serverName`, public Jitsi URL, `mail.${TENANT_DOMAIN}` in OX | Browsers, Keycloak, and ingress must agree on the **same hostname** the user sees. A typo or hardcoded domain causes `redirect_uri` mismatch, broken cookies, or TLS on the wrong cert (`*.<effectiveDomain>`). |
 | **`${KERNEL_DOMAIN}`** | Shared platform hosts: `portal.${KERNEL_DOMAIN}`, `id.${KERNEL_DOMAIN}`, post-logout redirect to portal | Kernel UIs and the Gentian Portal live on the **cluster** wildcard, not the per-tenant app wildcard. Mixing these (e.g. OIDC issuer on tenant domain when the app expects `id.<kernel>`) breaks SSO and iframe embedding from the portal. |
 
 **Rule of thumb:** anything the tenant's users type in the address bar for an
@@ -459,7 +459,7 @@ Gentian uses a **central Keycloak** on the kernel domain. Realms are **per tenan
 1. **OpenDesk charts with `global.domain` + `global.hosts`** (Element, Jitsi,
    OpenProject, XWiki): set `global.domain: "${KERNEL_DOMAIN}"`,
    `global.hosts.keycloak: "id"`, and prefix **tenant app** host labels with
-   `${TENANT_ID}` (`chat.${TENANT_ID}`, `projects.${TENANT_ID}`, …). OIDC
+   `${TENANT_ID}` (`element.${TENANT_ID}`, `projects.${TENANT_ID}`, …). OIDC
    redirect URIs and public app URLs still use `${TENANT_DOMAIN}`.
 2. **Explicit OIDC property blocks** (OpenProject `openproject.oidc.*`, OX
    `com.openexchange.oidc.*`, XWiki `oidc.provider`): every endpoint and issuer
@@ -772,7 +772,7 @@ backend (same host, no CORS).
 
 Gentian apps open inside the **kernel portal** (`https://portal.${KERNEL_DOMAIN}`)
 in an iframe (gentian-ui window manager). The app UI is cross-origin
-(`https://chat.${TENANT_DOMAIN}`, etc.). Browsers block embedding unless the app
+(`https://element.${TENANT_DOMAIN}`, etc.). Browsers block embedding unless the app
 response explicitly allows the portal origin in **`Content-Security-Policy:
 frame-ancestors`**.
 
@@ -780,7 +780,7 @@ frame-ancestors`**.
 
 That message means the app's CSP (or `X-Frame-Options`) does **not** include
 `https://portal.${KERNEL_DOMAIN}` in `frame-ancestors`, or Keycloak (`id.<kernel>`)
-does not yet allow the app origin (`https://chat.<tenant>`, etc.) when OIDC loads
+does not yet allow the app origin (`https://element.<tenant>`, etc.) when OIDC loads
 inside a WinBox iframe.
 
 **Launch behaviour (gentian-ui):**
@@ -845,7 +845,7 @@ bridged to Envoy `BackendTrafficPolicy`):
 
 ```yaml
 ingress:
-  subDomain: chat
+  subDomain: element
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "100M"
     # NO frame-ancestors / X-Frame-Options / Content-Security-Policy here
@@ -870,10 +870,10 @@ kubectl delete httproute -n tenant-demo httproute-demo-element
 > catalogue. This section documents the pattern for reference; the profile is
 > not in this repository.
 
-Element Web is served at `chat.<tenant-domain>` but the Matrix homeserver (Synapse)
+Element Web is served at `element.<tenant-domain>` but the Matrix homeserver (Synapse)
 and OIDC callback live at **`matrix.<tenant-domain>`** (synapse-web Service). The
 `element` AppProfile declares `additionalIngresses` for `matrix` → `synapse-web:8008`;
-Keycloak `redirectUris` must target that homeserver host, not the chat host:
+Keycloak `redirectUris` must target that homeserver host, not the Element Web host:
 
 ```yaml
 kernelRequirements:
@@ -883,7 +883,7 @@ kernelRequirements:
         - "https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback"
 ```
 
-Using `chat.${TENANT_DOMAIN}` here causes OIDC to fail after Keycloak login —
+Using `element.${TENANT_DOMAIN}` here causes OIDC to fail after Keycloak login —
 Element shows **"Invalid username or password"** even though credentials are
 correct.
 
@@ -901,7 +901,7 @@ broker token. See `gentian-os/docs/design/iam.md`.
 realm; Element/Synapse OIDC uses the **tenant** realm. A previous user's
 tenant-realm SSO cookie or cached Matrix session in the browser can reopen Chat as
 the wrong person. The Element AppProfile sets `logout_redirect_url`; gentian-ui app
-tiles pass `login_hint` and `prompt=login` (and `#/logout` on `chat.*`) when opening
+tiles pass `login_hint` and `prompt=login` (and `#/logout` on `element.*`) when opening
 SSO apps from the portal.
 
 **Known pitfalls** (operator/IAM territory, not AppProfile YAML — diagnose via
@@ -918,7 +918,7 @@ profile):
 
 ### 6e. IdP login inside a portal-embedded app (Keycloak `frame-ancestors`)
 
-Portal tiles load tenant apps in an iframe (`portal.<kernel>` → `chat.<tenant>.<kernel>`).
+Portal tiles load tenant apps in an iframe (`portal.<kernel>` → `element.<tenant>.<kernel>`).
 OIDC SSO then loads **`id.<kernel>` inside the app iframe** (or a nested iframe such
 as Nordeck ICS silent login on `ics.<kernel>`). Firefox blocks with
 *“id… will not allow … if another site has embedded it”* when Keycloak's CSP only
@@ -926,12 +926,12 @@ allows `https://portal.<kernel>` — the **immediate parent** is the app origin,
 the portal.
 
 CSP `host-source` allows at most one `*.` label. `https://*.<kernel>` does **not**
-match `chat.demo.<kernel>`; each tenant needs **`https://*.<tenant-effective-domain>`**
+match `element.demo.<kernel>`; each tenant needs **`https://*.<tenant-effective-domain>`**
 (e.g. `https://*.demo.desk.gentian.org`).
 
 | Layer | Who sets CSP | Must allow |
 |---|---|---|
-| App HTTPRoute (`chat`, `wiki`, …) | gentian-os operator | `https://portal.<kernel>` (§6a–6b) |
+| App HTTPRoute (`element`, `wiki`, …) | gentian-os operator | `https://portal.<kernel>` (§6a–6b) |
 | IdP HTTPRoute (`id.<kernel>`) | gentian-os `KeycloakPlatformReconciler` (HTTPRoute patch + realm `X-Frame-Options` jobs) | `https://portal.<kernel>`, `https://*.<kernel>`, `https://*.<tenant-effective-domain>`, **and** explicit `https://{ingress.subDomain}.<tenant-effective-domain>` for every **installed OIDC AppProfile** (discovered automatically — no manual subdomain list) |
 
 **Do not maintain a static IdP allowlist in AppProfiles or Nubus values.** When you add
@@ -1062,12 +1062,12 @@ Override the two or three rules that consume it for page layout instead.
 ### 6g. Nextcloud (App Store)
 
 Nextcloud is an **App Store app** (`profiles/nextcloud/profile.yaml`), not a kernel
-service. Each tenant gets a dedicated instance at `cloud.<tenant_domain>` with an
+service. Each tenant gets a dedicated instance at `nextcloud.<tenant_domain>` with an
 optional Collabora subchart at `collabora.<tenant_domain>`.
 
 **Gateway policy (declared on the profile, not in gentian-os):** the Collabora
 `additionalIngresses` entry sets `gentianos.io/gateway-frame-ancestors` so the
-editor allows embedding from the main `cloud.<tenant>` host (see Gateway
+editor allows embedding from the main `nextcloud.<tenant>` host (see Gateway
 annotations table). It sets `gentianos.io/gateway-escaped-slashes-action:
 KeepUnchanged` so Envoy forwards `/cool/...` WOPI WebSocket paths without
 `path_normalization_failed`.
@@ -1104,13 +1104,13 @@ egress + host allowlist) recurs for any such companion:
 |---|---|---|
 | `storage.ssl.as_scheme=true` | `extra_params` | **Critical.** Without this, coolwsd always uses SSL for WOPI callbacks regardless of the URL scheme — it tries TLS to port 8080 and hangs with `Connection timed out`. |
 | `storage.ssl.enable=false` | `extra_params` | Internal WOPI callback is plain HTTP (`http://nextcloud.<ns>.svc:8080`); no TLS needed. |
-| `wopi_callback_url` | `http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080` | Must be the **internal** service URL, not the public `https://cloud.<tenant>`. Collabora uses this to call back into Nextcloud for CheckFileInfo/GetFile. |
-| `aliasgroups` | Internal + `http://cloud.<domain>:8080` + `https://cloud.<domain>` | coolwsd validates the WOPI source host against aliasgroups; all forms of the Nextcloud URL must be listed. |
+| `wopi_callback_url` | `http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080` | Must be the **internal** service URL, not the public `https://nextcloud.<tenant>`. Collabora uses this to call back into Nextcloud for CheckFileInfo/GetFile. |
+| `aliasgroups` | Internal + `http://nextcloud.<domain>:8080` + `https://nextcloud.<domain>` | coolwsd validates the WOPI source host against aliasgroups; all forms of the Nextcloud URL must be listed. |
 | `net.post_allow` | `10\.\d+\.\d+\.\d+`, `.*\.svc\.cluster\.local` | Required for coolwsd to accept POST requests from cluster-internal addresses. |
 | `securityContext.capabilities` | `CHOWN`, `FOWNER`, `SYS_CHROOT` | Collabora's `cool` user needs these to create jails and manage file permissions. |
 
 **Egress for HTTPS hairpin:** Collabora pods fetch Nextcloud settings/files via
-`https://cloud.<tenant_domain>` when opening documents in the browser. The
+`https://nextcloud.<tenant_domain>` when opening documents in the browser. The
 CoreDNS hairpin resolves this to the edge gateway. The profile's
 `requires.services.identity` is what opens that path, and the Collabora pod
 carries `gentianos.io/app: nextcloud-base-ce` so that it applies to it.
@@ -1120,7 +1120,7 @@ carries `gentianos.io/app: nextcloud-base-ce` so that it applies to it.
 The portal API (in `platform-kernel`) provisions the app user via OCS before
 opening the Files iframe. This is a textbook **kernel → tenant** call from §2, so
 it uses the internal service URL (`http://nextcloud.tenant-<t>.svc.cluster.local:8080`),
-never the public `https://cloud.<tenant>`. Using the public host here regressed
+never the public `https://nextcloud.<tenant>`. Using the public host here regressed
 with `CERTIFICATE_VERIFY_FAILED` → HTTP 500 ("Could not open Files") the moment
 CoreDNS hairpin + staging certs were in play. The baseline `tenant-isolation`
 NetworkPolicy allows ingress from `platform-kernel` to make this reachable.
@@ -1607,7 +1607,7 @@ CLI to report Ready or inspect `kubectl get app <app> -n tenant-<tenant>`.
 | Symptom | Likely profile issue |
 |---|---|
 | Native username/password form (XWiki, etc.) | `keycloak-bridge-auth` or missing `OIDCAuthServiceImpl` / `oidc.skipped: false` |
-| `redirect_uri` mismatch | `redirectUris` use wrong host (`chat.` vs `matrix.` for Element — §6d) or `${KERNEL_DOMAIN}` instead of `${TENANT_DOMAIN}` |
+| `redirect_uri` mismatch | `redirectUris` use wrong host (`element.` vs `matrix.` for Element — §6d) or `${KERNEL_DOMAIN}` instead of `${TENANT_DOMAIN}` |
 | Element **“Invalid username or password”** after matrix host works | Wrong OIDC redirect URI (§6d), missing `opendesk_username` / Livecollaboration role (IAM), or Synapse token exchange still hitting public `id.<kernel>` on staging — operator `KEYCLOAK_INTERNAL_URL` + `app-element-ce` reconcile (§6d, `security.md` §9.1) |
 | Blank iframe / Firefox framing error | Missing IdP `frame-ancestors` — ensure `ingress.subDomain` + OIDC client declared; operator reconciles (§6e). **First** verify edge headers with `curl -sI https://<subDomain>.<tenant-domain>/ | grep -i content-security-policy` — a single `frame-ancestors 'self' https://portal.<kernel>` line means CSP is fine and the failure is elsewhere (often OIDC — next row). |
 | OpenProject login 404 on `/auth/keycloak` | OIDC auth provider not seeded — `openproject-oidc-seed` Job failed or ran before DB migrations. Not a CSP issue; fix the Job (see §6f). Portal iframe may look like a framing/CORS error when SSO never starts. |
@@ -1762,7 +1762,7 @@ Before opening a PR, verify:
 - [ ] All IdP URLs use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`; redirect URIs use `${TENANT_DOMAIN}`
 - [ ] Server-side/in-cluster calls (companion callbacks, provisioning, token exchange) use internal `.svc.cluster.local` URLs, not public hostnames — §2. If a public host is unavoidable, staging CA is trusted.
 - [ ] No namespace is named: platform paths follow from `spec.requires.services`, companion pods carry `gentianos.io/app`, and any `gentianos.io/kernel-egress-namespaces` entry is commented — §2, §6g
-- [ ] Element *(gentian-pro)*: OIDC redirect is `https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback` (not `chat.`)
+- [ ] Element *(gentian-pro)*: OIDC redirect is `https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback` (not `element.`)
 - [ ] Element *(gentian-pro)*: `additionalIngresses` includes `matrix` → `synapse-web:8008` (required) — §6d
 - [ ] Element *(gentian-pro)*: `matrixIdLocalpart: "opendesk_username"` (not `preferred_username`) — §6d
 - [ ] After tenant purge/redeploy: if Files login fails, check NC `entryUUID` drift (§6g) — not an AppProfile fix

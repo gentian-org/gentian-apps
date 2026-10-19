@@ -29,25 +29,13 @@ on:
       - "scripts/**"
       - ".github/workflows/apps-ci.yaml"
       - ".github/actions/**"
+  # Every pull request, whatever it touches: the `gate` job at the end is a
+  # status the branch rules require, and a check that is never started never
+  # reports, so a path filter here would block the merge of a change outside
+  # the paths above. The `scope` job applies the same filter instead and the
+  # jobs it governs are skipped.
   pull_request:
     branches: [main, develop]
-    paths:
-      - "apps/**"
-      - "profiles/**"
-      - "images/**"
-      - "e2e/**"
-      - "charts/odoo/**"
-      - "charts/gentian-sidecar-git-modules/**"
-      - "charts/activepieces/**"
-      - "charts/mathesar/**"
-      - "charts/docmost/**"
-      - "charts/erpnext/**"
-      # The validators: a change to one is checked by running it.
-      - "scripts/**"
-      # Since a branch is no longer checked on its push, this is the only run
-      # a change to the workflow gets before it is merged.
-      - ".github/workflows/apps-ci.yaml"
-      - ".github/actions/**"
 
 env:
   REGISTRY: ghcr.io
@@ -104,6 +92,40 @@ jobs:
             echo "develop_tag=${develop_tag}"
           } >> "$GITHUB_OUTPUT"
 
+  # Whether this run has anything to check or build. A push or a manual run
+  # always has: the push trigger is path-filtered. A pull request is compared
+  # with its base against the same paths, and when none of them changed every
+  # job that needs this one is skipped. When the comparison cannot be answered
+  # — too large to list, API error — everything runs.
+  scope:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      relevant: ${{ steps.decide.outputs.relevant }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          relevant=true
+          if [ "${EVENT}" = "pull_request" ] \
+            && gh api "repos/${GITHUB_REPOSITORY}/compare/${PR_BASE}...${PR_HEAD}" \
+                 --jq '.files[].filename' > /tmp/changed \
+            && [ "$(wc -l < /tmp/changed)" -gt 0 ] \
+            && [ "$(wc -l < /tmp/changed)" -lt 300 ]; then
+            if ! grep -qE '^(apps/|profiles/|images/|e2e/|charts/(odoo|gentian-sidecar-git-modules|activepieces|mathesar|docmost|erpnext)/|scripts/|\.github/workflows/apps-ci\.yaml$|\.github/actions/)' /tmp/changed; then
+              relevant=false
+            fi
+          fi
+          echo "relevant=${relevant}" >> "$GITHUB_OUTPUT"
+          if [ "${relevant}" = "false" ]; then
+            echo "Nothing this workflow checks or builds was changed; its jobs are skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   # Whether this run has to sign anybody in. The two end-to-end jobs start
   # Keycloak and the apps' real images and take longer than everything else in
   # this workflow together, and what they exercise is the sign-in sidecar, the
@@ -157,13 +179,14 @@ jobs:
           fi
 
   build-nextcloud:
-    needs: [release-gate]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
       - name: Read nextcloud bundle versions
         id: versions
@@ -207,13 +230,14 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ github.sha }}
 
   build-nextcloud-mcp:
-    needs: [release-gate]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
       - name: Read chart version
         id: version
@@ -240,13 +264,14 @@ jobs:
           pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
 
   build-xwiki:
-    needs: [release-gate]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
       - name: Read xwiki bundle versions
         id: versions
@@ -306,12 +331,12 @@ jobs:
       deployable: ${{ steps.policy.outputs.deployable }}
     steps:
       - name: Check out main
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           ref: ${{ github.ref == 'refs/heads/main' && github.sha || 'main' }}
           path: src/main
       - name: Check out develop
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           ref: ${{ github.ref == 'refs/heads/develop' && github.sha || 'develop' }}
           path: src/develop
@@ -417,7 +442,7 @@ jobs:
             echo "${msg}" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa  # v3.0.1
         with:
           path: site
 
@@ -438,14 +463,16 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b  # v5.0.0
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e  # v4.0.5
 
   validate-profiles:
+    needs: [scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           # The version check compares the published bundles with the base
           # branch, or with the commit before the push.
@@ -542,13 +569,14 @@ jobs:
         run: python3 scripts/customization-debt-report.py >> "$GITHUB_STEP_SUMMARY"
 
   build-odoo-chart:
-    needs: [release-gate]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Package and push chart
         uses: ./.github/actions/chart
         with:
@@ -557,16 +585,17 @@ jobs:
           branch-versions: ${{ needs.release-gate.outputs.develop }}
 
   build-activepieces-chart:
-    needs: [release-gate]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
       - name: Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4  # v4.3.1
 
       - name: Registry login
         if: needs.release-gate.outputs.publish == 'true'
@@ -610,13 +639,14 @@ jobs:
           fi
 
   build-git-modules-sidecar-chart:
-    needs: [release-gate]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Package and push chart
         uses: ./.github/actions/chart
         with:
@@ -626,13 +656,14 @@ jobs:
           pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
 
   build-mathesar-chart:
-    needs: [release-gate]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Package and push chart
         uses: ./.github/actions/chart
         with:
@@ -642,13 +673,14 @@ jobs:
           branch-versions: ${{ needs.release-gate.outputs.develop }}
 
   build-docmost-chart:
-    needs: [release-gate]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Package and push chart
         uses: ./.github/actions/chart
         with:
@@ -658,13 +690,14 @@ jobs:
           branch-versions: ${{ needs.release-gate.outputs.develop }}
 
   build-erpnext-chart:
-    needs: [release-gate]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Package and push chart
         uses: ./.github/actions/chart
         with:
@@ -674,13 +707,14 @@ jobs:
           branch-versions: ${{ needs.release-gate.outputs.develop }}
 
   build-git-modules-sidecar-image:
-    needs: [release-gate]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Build and push image
         uses: ./.github/actions/image
         with:
@@ -695,13 +729,15 @@ jobs:
   # an answer it should refuse, so the image is not built from a tree in
   # which they fail.
   test-sso-saml-sidecar:
+    needs: [scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: images/gentian-sidecar-sso-saml
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: "22"
       - run: npm ci
@@ -717,8 +753,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: "22"
       - name: Sign in through the sidecar, end to end
@@ -737,8 +773,8 @@ jobs:
       contents: read
       packages: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: "22"
       - name: Log in to the registry the catalogue's own images are in
@@ -751,16 +787,16 @@ jobs:
   # import puts it back, and the profile's post-restore commands run as the
   # platform runs them. Not a gate of any build: it pulls large images.
   e2e-restore-rewrites:
-    needs: [e2e-scope]
-    if: needs.e2e-scope.outputs.run == 'true'
+    needs: [e2e-scope, scope]
+    if: needs.scope.outputs.relevant == 'true' && needs.e2e-scope.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
       contents: read
       packages: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: "22"
       - name: Log in to the registry the catalogue's own images are in
@@ -775,7 +811,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Read the sidecar's version
         id: version
         run: echo "version=$(node -p "require('./images/gentian-sidecar-sso-saml/package.json').version")" >> "$GITHUB_OUTPUT"
@@ -790,3 +826,24 @@ jobs:
           refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:${{ github.sha }}
+
+  # The one status the branch rules require. It passes when every job above
+  # succeeded or was skipped because this run gave it nothing to do, and fails
+  # when any of them failed or was cancelled. The three deciders must have
+  # run: a decision that was skipped is not a decision.
+  gate:
+    runs-on: ubuntu-latest
+    needs: [release-gate, scope, e2e-scope, build-nextcloud, build-nextcloud-mcp, build-xwiki, assemble-catalogue-site, publish-catalogue, validate-profiles, build-odoo-chart, build-activepieces-chart, build-git-modules-sidecar-chart, build-mathesar-chart, build-docmost-chart, build-erpnext-chart, build-git-modules-sidecar-image, test-sso-saml-sidecar, e2e-sso-saml-sidecar, e2e-oidc-sign-out, e2e-restore-rewrites, build-sso-saml-sidecar-image]
+    if: always()
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          printf '%s' "${RESULTS}" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          if printf '%s' "${RESULTS}" | jq -e '[.[] | .result] | any(. == "failure" or . == "cancelled")' > /dev/null; then
+            echo "a job this gate needs failed" >&2
+            exit 1
+          fi
+          for j in release-gate scope e2e-scope; do
+            test "$(printf '%s' "${RESULTS}" | jq -r --arg j "$j" '.[$j].result')" = "success"
+          done

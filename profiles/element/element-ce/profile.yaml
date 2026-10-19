@@ -79,7 +79,7 @@ spec:
           redirectUris:
             - "https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback"
           postLogoutRedirectUris:
-            - "https://chat.${TENANT_DOMAIN}/*"
+            - "https://element.${TENANT_DOMAIN}/*"
             - "https://portal.${KERNEL_DOMAIN}/*"
         # No backchannelLogout: a sign-out at the platform does not end the
         # session Synapse holds for Element. Two things are missing, and
@@ -123,7 +123,7 @@ spec:
     - name: web
       surface: gateway
       authMode: oidc
-      subDomain: "chat"
+      subDomain: "element"
       backend:
         service: "element-ce"
         port: 8080

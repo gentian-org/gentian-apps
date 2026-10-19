@@ -54,7 +54,7 @@ When a person signs out at the platform, the realm tells Nextcloud, and Nextclou
 person's session: `requires.services.identity.oidc.backchannelLogout` names the path
 `/apps/user_oidc/backchannel-logout/gentian` on the entry `web`, and the platform registers it
 with the realm at Nextcloud's own Service inside the cluster
-(`http://nextcloud.<namespace>.svc.cluster.local:8080/…`), not at `cloud.<domain>`.
+(`http://nextcloud.<namespace>.svc.cluster.local:8080/…`), not at `https://nextcloud.<domain>`.
 
 What `user_oidc` 8.10.1 checks before it ends anything (`lib/Controller/LoginController.php`,
 `backChannelLogout`): the logout token's signature against the realm's published keys; that its
