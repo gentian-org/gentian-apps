@@ -21,7 +21,7 @@ const setup = require('./lib/setup');
 const { signInOf, REPO } = require('./lib/profile');
 
 const IMAGE = process.env.E2E_ACTIVEPIECES_IMAGE || 'docker.io/activepieces/activepieces:0.28.0';
-const HOST = 'auto.acme.e2e.test';
+const HOST = 'activepieces.acme.e2e.test';
 const REALM = 'acme';
 // The profile's own handler and lists: what is sent to the sign-in, what is
 // refused at the front door.

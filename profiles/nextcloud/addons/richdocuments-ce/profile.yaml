@@ -27,7 +27,7 @@ spec:
     - name: document
       surface: gateway
       authMode: oidc
-      subDomain: cloud
+      subDomain: nextcloud
       backend:
         component: nextcloud-base-ce
         service: nextcloud
@@ -43,7 +43,7 @@ spec:
     - name: spreadsheet
       surface: gateway
       authMode: oidc
-      subDomain: cloud
+      subDomain: nextcloud
       backend:
         component: nextcloud-base-ce
         service: nextcloud
@@ -59,7 +59,7 @@ spec:
     - name: presentation
       surface: gateway
       authMode: oidc
-      subDomain: cloud
+      subDomain: nextcloud
       backend:
         component: nextcloud-base-ce
         service: nextcloud

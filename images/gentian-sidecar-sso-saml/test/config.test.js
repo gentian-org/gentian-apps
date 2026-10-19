@@ -28,9 +28,9 @@ test('the app\'s own address and the realm\'s must be https', () => {
 
 test('addresses work for a tenant under the cluster, for a single tenant and for a domain of its own', () => {
     for (const [acs, issuer] of [
-        ['https://auto.acme.example.org/sso/acs', 'https://id.example.org/auth/realms/acme'],
-        ['https://auto.example.org/sso/acs', 'https://id.example.org/auth/realms/user'],
-        ['https://auto.acme.com/sso/acs', 'https://id.example.org/auth/realms/acme'],
+        ['https://activepieces.acme.example.org/sso/acs', 'https://id.example.org/auth/realms/acme'],
+        ['https://activepieces.example.org/sso/acs', 'https://id.example.org/auth/realms/user'],
+        ['https://activepieces.acme.com/sso/acs', 'https://id.example.org/auth/realms/acme'],
     ]) {
         const config = loadConfig({ ...ENV, SSO_ACS_URL: acs, SSO_ENTITY_ID: acs.replace('/acs', ''), SSO_IDP_ENTITY_ID: issuer, SSO_IDP_SSO_URL: issuer + '/protocol/saml' });
         assert.equal(config.acsUrl, acs);
