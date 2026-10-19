@@ -11,7 +11,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: 1.0.0
+  version: "0.5.1-dev"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
@@ -175,6 +175,8 @@ spec:
         startup:
           disableUpgradeBanner: true
   requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
     services:
       identity:
       # Activepieces' own single sign-on needs a licence key and is not used.

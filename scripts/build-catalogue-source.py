@@ -417,6 +417,12 @@ def build(out: Path) -> tuple[list[dict], list[str]]:
         }
         if spec.get("trustTier"):
             entry["trustTier"] = str(spec["trustTier"])
+        # The floor the build declares, spec.requires.platform, repeated so a
+        # cluster can say which entries it cannot install without a fetch.
+        # The bundle's own value is what an install is held to.
+        platform = ((spec.get("requires") or {}).get("platform") or "") if isinstance(spec.get("requires"), dict) else ""
+        if platform:
+            entry["platform"] = str(platform)
         entries.append(entry)
 
     entries.sort(key=lambda e: e["name"])
@@ -432,8 +438,15 @@ def render(entries: list[dict]) -> str:
 
 
 def main() -> int:
+    global REPO
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", type=Path, default=REPO / "dist" / "catalogue")
+    ap.add_argument(
+        "--repo",
+        type=Path,
+        default=None,
+        help="build from another checkout of this repository (a comparison with a base branch)",
+    )
     ap.add_argument(
         "--check",
         action="store_true",
@@ -445,6 +458,8 @@ def main() -> int:
         help="also write index.html, so a person who opens the site sees what it is",
     )
     args = ap.parse_args()
+    if args.repo is not None:
+        REPO = args.repo.resolve()
 
     out = args.out
     if out.exists():

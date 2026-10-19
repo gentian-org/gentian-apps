@@ -446,6 +446,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The version check compares the published bundles with the base
+          # branch, or with the commit before the push.
+          fetch-depth: 0
       - name: Install PyYAML
         run: pip install pyyaml
       - name: Validate profile bundles
@@ -494,6 +498,31 @@ jobs:
         # silently disappears from every cluster's catalogue, and finding
         # that on main is finding it late.
         run: python3 scripts/build-catalogue-source.py --check
+
+      # A profile's version moves with its bundle, and a release carries no
+      # development number (gentian-os docs/plans/versioning.md). Compared
+      # with the base of the pull request, or with the commit before the push.
+      - name: Validate profile versions
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+          TARGET: ${{ github.base_ref || github.ref_name }}
+        run: |
+          args=()
+          if [ -n "${BASE}" ] && git rev-parse --verify --quiet "${BASE}^{commit}" >/dev/null; then
+            args+=(--base "${BASE}")
+          fi
+          if [ "${TARGET}" = "main" ]; then
+            args+=(--released)
+          fi
+          python3 scripts/validate-profile-versions.py "${args[@]}"
+
+      # Every bundle conforms to the schema of each platform line its floor
+      # admits (contracts/platform/<line>/), so a profile is refused here and
+      # not at a tenant's install.
+      - name: Validate against the platform's schemas
+        run: |
+          pip install jsonschema
+          python3 scripts/validate-platform-schema.py
 
       - name: Validate profile tile specs
         run: python3 scripts/validate-profile-tiles.py
