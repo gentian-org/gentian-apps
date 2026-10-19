@@ -35,7 +35,7 @@ spec:
     - name: odoo-mrp
       surface: gateway
       authMode: oidc
-      subDomain: erp
+      subDomain: odoo
       backend:
         component: odoo-base-ce
         service: odoo

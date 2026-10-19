@@ -52,7 +52,7 @@ gentian:
   modulesPath: /opt/odoo/custom-addons
   initModules: "base,web,gentian_os"
 
-  # The URL this Odoo is actually reached on, e.g. https://erp.tenant.example.org.
+  # The URL this Odoo is actually reached on, e.g. https://odoo.tenant.example.org.
   #
   # Odoo keeps this in ir_config_parameter (web.base.url), not in odoo.conf, and
   # defaults it to http://localhost:8069. Every absolute URL it generates comes
