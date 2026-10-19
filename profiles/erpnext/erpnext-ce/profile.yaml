@@ -77,7 +77,7 @@ spec:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: erpnext
-      version: "0.1.0"
+      version: "0.1.0-develop.8a8569a"
 
     valueMapping:
       oidc:
