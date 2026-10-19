@@ -67,7 +67,7 @@ before(async () => {
     // Collabora at its public address, one mailbox the platform provisioned
     // and one a person added.
     startNextcloud(names.old, OLD.db, ['-e', 'NEXTCLOUD_ADMIN_USER=admin', '-e', 'NEXTCLOUD_ADMIN_PASSWORD=admin-e2e-Pw-0123456789',
-        '-e', `NEXTCLOUD_TRUSTED_DOMAINS=cloud.${OLD.domain} nextcloud`]);
+        '-e', `NEXTCLOUD_TRUSTED_DOMAINS=nextcloud.${OLD.domain} nextcloud`]);
     await r.waitFor('Nextcloud', () => occ(names.old, 'status').includes('installed: true'), 600);
     for (const app of ['richdocuments', 'mail']) {
         r.docker('exec', '-u', 'www-data', names.old, 'cp', '-a', `/usr/src/gentian-addons/${app}`, '/var/www/html/custom_apps/');
@@ -146,14 +146,14 @@ test('config.php names the database here and the new domain', () => {
     assert.equal(c.dbuser, NEW.db.user);
     assert.equal(c.dbpassword, NEW.db.password);
     assert.equal(c.dbhost, names.pg);
-    assert.ok(c.trusted_domains.includes(`cloud.${NEW.domain}`));
-    assert.ok(!c.trusted_domains.includes(`cloud.${OLD.domain}`));
+    assert.ok(c.trusted_domains.includes(`nextcloud.${NEW.domain}`));
+    assert.ok(!c.trusted_domains.includes(`nextcloud.${OLD.domain}`));
     assert.equal(c.maintenance, false);
 });
 
 test('Nextcloud answers at the new address and not at the old one', () => {
-    assert.equal(status(names.app, `cloud.${NEW.domain}`, '/login'), '200');
-    assert.equal(status(names.app, `cloud.${OLD.domain}`, '/login'), '400');
+    assert.equal(status(names.app, `nextcloud.${NEW.domain}`, '/login'), '200');
+    assert.equal(status(names.app, `nextcloud.${OLD.domain}`, '/login'), '400');
 });
 
 test('an app setting that named the old domain names the new one', () => {

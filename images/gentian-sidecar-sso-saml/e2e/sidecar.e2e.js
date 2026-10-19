@@ -21,9 +21,9 @@ const CARL = { email: 'carl@acme.e2e.test', firstName: 'Carl', lastName: 'Exampl
 // of a single-tenancy cluster, and a tenant on a domain of its own. The realm
 // differs with the tenant, not with the address.
 const PLACES = [
-    { label: 'tenant under the cluster domain', host: 'auto.acme.e2e.test', realm: 'acme' },
-    { label: 'single-tenancy cluster', host: 'auto.e2e.test', realm: 'user' },
-    { label: 'tenant on its own domain', host: 'auto.acme-corp.test', realm: 'acme' },
+    { label: 'tenant under the cluster domain', host: 'activepieces.acme.e2e.test', realm: 'acme' },
+    { label: 'single-tenancy cluster', host: 'activepieces.e2e.test', realm: 'user' },
+    { label: 'tenant on its own domain', host: 'activepieces.acme-corp.test', realm: 'acme' },
 ];
 
 let kc;

@@ -64,7 +64,7 @@
 
         const portalHost = (() => {
           const parts = window.location.hostname.split(".");
-          if (parts[0] === "chat" && parts.length > 2) {
+          if (parts[0] === "element" && parts.length > 2) {
             return ["portal", ...parts.slice(2)].join(".");
           }
           return `portal.${parts.slice(-2).join(".")}`;
