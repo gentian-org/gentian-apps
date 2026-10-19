@@ -61,7 +61,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "1.0.0"
+  version: "0.5.1-dev"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -245,6 +245,8 @@ spec:
         JS
 
   requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
     services:
       identity:
       # Docmost can do neither OIDC nor SAML in the free edition (see the

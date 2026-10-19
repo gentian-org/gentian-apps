@@ -64,6 +64,24 @@ digest. `kubectl kustomize <dir>` still renders the directory, and CI still runs
 The family's `AppPackage` presets (`profiles/<family>/packages/`) are not companions. Nothing on a
 cluster reads a preset; they are published under `packages/` for the App Store.
 
+## The platform a build needs
+
+A profile declares the oldest platform version line it runs on, as a floor:
+
+```yaml
+spec:
+  requires:
+    platform: ">=0.5"
+```
+
+The catalogue's index repeats it beside the digest, so a cluster on an older line lists the entry
+with the reason and refuses to install it, and `scripts/validate-platform-schema.py` holds every
+bundle to the schema of each line its floor admits (`contracts/platform/<line>/`). No upper bound is
+declared: what a later platform stops reading, the platform says, one line ahead. The profile's own
+`spec.version` is the build's number, bumped on every change to the bundle
+(`scripts/validate-profile-versions.py`); on `develop` it carries the `-dev` suffix of the next-dev
+model, which a release from `main` removes.
+
 ## What a bundle may hold
 
 Four kinds, each with the one name it may have. The cluster refuses the whole bundle for anything

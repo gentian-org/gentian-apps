@@ -37,6 +37,13 @@ change, or the change is released from `main` under its plain version. A profile
 a plain version before `develop` is merged into `main`: a released catalogue names released
 charts only.
 
+**A profile's version moves with its bundle, and a release carries no development number.** This
+is the next-dev model (gentian-os `docs/plans/versioning.md` §1.1): on `develop` a build's
+`spec.version` carries a `-dev` suffix, `0.5.1-dev`, and is bumped whenever the published bundle
+changes; the release from `main` sets the bare number. CI holds both:
+`scripts/validate-profile-versions.py` compares the bundles with the base branch, and on `main`
+refuses `-dev` versions and `-develop.<sha7>` charts alike.
+
 ## Two catalogues, one site
 
 GitHub Pages gives a repository one site, and a deployment replaces all of it. Each deployment

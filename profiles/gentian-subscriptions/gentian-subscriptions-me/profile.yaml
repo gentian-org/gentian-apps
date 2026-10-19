@@ -22,7 +22,10 @@ spec:
   classes:
     - app
   trustTier: experimental
-  version: 0.0.0
+  version: "0.5.1-dev"
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
   package:
     api:
       # redirect, not portal-proxy: the proxy runtime needs something in the

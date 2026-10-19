@@ -23,7 +23,10 @@ spec:
   classes:
     - app
   trustTier: platform
-  version: "1.0.0"
+  version: "0.5.1-dev"
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
   package:
     extraValues:
       odoo:
