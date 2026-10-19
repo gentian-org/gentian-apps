@@ -24,6 +24,7 @@ on:
       - "charts/activepieces/**"
       - "charts/mathesar/**"
       - "charts/docmost/**"
+      - "charts/erpnext/**"
       # The validators: a change to one is checked by running it.
       - "scripts/**"
       - ".github/workflows/apps-ci.yaml"
@@ -40,6 +41,7 @@ on:
       - "charts/activepieces/**"
       - "charts/mathesar/**"
       - "charts/docmost/**"
+      - "charts/erpnext/**"
       # The validators: a change to one is checked by running it.
       - "scripts/**"
       # Since a branch is no longer checked on its push, this is the only run
@@ -622,6 +624,22 @@ jobs:
         uses: ./.github/actions/chart
         with:
           dir: charts/docmost
+          lint: "true"
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
+
+  build-erpnext-chart:
+    needs: [release-gate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package and push chart
+        uses: ./.github/actions/chart
+        with:
+          dir: charts/erpnext
           lint: "true"
           publish: ${{ needs.release-gate.outputs.publish }}
           branch-versions: ${{ needs.release-gate.outputs.develop }}
