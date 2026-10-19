@@ -1,0 +1,225 @@
+nameOverride: erpnext
+fullnameOverride: erpnext-ce
+
+# The official image, unmodified. It holds the bench: Frappe and ERPNext, their
+# Python environment, the built assets, node for the realtime server, nginx, and
+# the mariadb client. Every Frappe process of this chart runs from it.
+image:
+  repository: docker.io/frappe/erpnext
+  tag: "v16.51.1"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# The site, named after the host it is served at (erpnext.<tenant domain>).
+# Frappe keeps a site in sites/<name>/ and is told which site a request is for
+# by the X-Frappe-Site-Name header, which nginx below sets to this name for every
+# request, whatever Host it came with. Required.
+siteName: ""
+
+# The app's database on the platform's MariaDB server. The database and its
+# user exist already; Frappe is given them and never asked to create either
+# (bench new-site --no-setup-db), so no administrator account of the server is
+# needed. Delivered through the profile's valueMapping.database.
+database:
+  host: ""
+  port: 3306
+  name: ""
+  user: ""
+  password: ""
+  # Whether the server speaks TLS. The mariadb client Frappe runs for loading,
+  # dumping and restoring is told to connect without it when false.
+  tls: false
+
+# Signing in through the tenant's realm: a Social Login Key of the built-in
+# Keycloak kind, written on every start from these values.
+oidc:
+  enabled: true
+  # The realm's public issuer, https://id.<kernel>/auth/realms/<realm>. The
+  # browser is sent to its authorization endpoint; the token and userinfo calls
+  # go to the same issuer from inside the pod.
+  issuer: ""
+  clientId: ""
+  clientSecret: ""
+  # The claim an account is linked to on its first sign-in. Accounts are found
+  # by email first (Frappe's own rule), then remembered by this.
+  userIdClaim: sub
+  scope: "openid email profile"
+
+signIn:
+  # Frappe's own password form. Off: the login page offers only the realm's
+  # sign-in, and nobody has a password to use, Administrator included. The
+  # platform reaches the site with Administrator's API key (admin.apiKey).
+  passwordLogin: false
+  # The role a person is given when their first sign-in creates their account.
+  # "Desk User" opens the desk and grants nothing in it; what a person may see
+  # and do is given by the roles an administrator assigns. Empty leaves new
+  # accounts as website users, who see only the portal.
+  defaultRole: "Desk User"
+
+admin:
+  # Administrator's password, set when the site is created. Nobody signs in
+  # with it while signIn.passwordLogin is off.
+  password: ""
+  # Administrator's API key and secret, written on every start. The platform's
+  # provisioning job converges who holds System Manager with them.
+  apiKey: ""
+  apiSecret: ""
+
+# Outgoing mail, as Frappe's site configuration (mail_server and its siblings):
+# the account every notification is sent from until an administrator adds an
+# Email Account of their own.
+smtp:
+  host: ""
+  port: 587
+  user: ""
+  password: ""
+  # STARTTLS before authenticating.
+  useTls: true
+  fromAddress: ""
+  senderName: "ERPNext"
+
+# Redis, two of them, in the pod and nowhere else.
+#
+# Frappe takes a Redis to be its bench's alone. The keys it shares between the
+# sites of a bench are not prefixed (the assets manifest, the app hooks, the
+# concurrency semaphores), and the realtime events and the client-cache
+# invalidations travel on fixed pub/sub channels ("events",
+# "__redis__:invalidate"). On a server shared with other tenants' ERPNext those
+# would be one bench: one tenant's realtime messages delivered to every other
+# tenant's socket server, and one tenant's cached asset hashes served to
+# another running a different version. So the platform's Redis is not used.
+#
+# Bound to 127.0.0.1 in the pod's network namespace: no other pod reaches them,
+# so they need no password, Service or NetworkPolicy rule. Nothing is written to
+# disk. A restart of the pod loses queued background jobs; the scheduler
+# enqueues its own again.
+redis:
+  image:
+    repository: docker.io/valkey/valkey
+    tag: "8.1.4-alpine"
+    pullPolicy: IfNotPresent
+  cache:
+    port: 13000
+    maxmemory: "256mb"
+    # A cache: the least recently used key goes when it is full.
+    maxmemoryPolicy: allkeys-lru
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 500m
+        memory: 320Mi
+  queue:
+    port: 11000
+    maxmemory: "256mb"
+    # The job queue: a full queue is an error, never a dropped job.
+    maxmemoryPolicy: noeviction
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 500m
+        memory: 320Mi
+
+gunicorn:
+  workers: 2
+  threads: 4
+  timeout: 120
+
+nginx:
+  clientMaxBodySize: 50m
+  proxyReadTimeout: 120
+  # Where the gateway's requests come from, so that X-Forwarded-For names the
+  # person and not the gateway (login history, rate limits, IP restrictions).
+  trustedProxies:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+
+resources:
+  # Creating the site installs ERPNext into an empty database: minutes of work,
+  # once. Later starts only migrate when the image's versions changed.
+  configure:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  nginx:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
+  backend:
+    requests:
+      cpu: 250m
+      memory: 768Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  socketio:
+    requests:
+      cpu: 10m
+      memory: 96Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  worker:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      cpu: "1"
+      memory: 1536Mi
+  scheduler:
+    requests:
+      cpu: 10m
+      memory: 192Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# The bench's sites directory: the site's configuration (its encryption key
+# among it), its uploaded files and its own backups. One volume, written by
+# every process of the pod, so ReadWriteOnce is enough: everything that writes
+# it is in this one pod.
+persistence:
+  size: 10Gi
+  storageClass: ""
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+podLabels: {}
+podAnnotations: {}
+
+# Set by the platform when the cluster's certificates are not publicly signed:
+# the trust anchor, mounted into every Frappe container, and the variables that
+# point Python at it (the token and userinfo calls to the issuer).
+extraEnvVars: []
+extraVolumes: []
+extraVolumeMounts: []
+
+# The platform routes to the Service; the chart makes no Ingress or route.
+ingress:
+  enabled: false
