@@ -114,6 +114,8 @@ runs:
     # behind the OCI referrers API by default; the cluster's Kyverno 1.13 verifies
     # the legacy form, a sha256-<digest>.sig tag, with its default verifier. The
     # bundle form returns with the Kyverno upgrade (certification plan C5).
+    # --use-signing-config=false goes with it: the TUF signing config is only
+    # for the bundle form, and cosign refuses the legacy form while it is on.
     - name: Sign
       if: inputs.publish == 'true'
       shell: bash
@@ -122,7 +124,7 @@ runs:
         DIGEST: ${{ steps.build.outputs.digest }}
       run: |
         printf '%s\n' "${REPOS}" | while read -r repo; do
-          [ -n "${repo}" ] && cosign sign --yes --new-bundle-format=false "${repo}@${DIGEST}"
+          [ -n "${repo}" ] && cosign sign --yes --new-bundle-format=false --use-signing-config=false "${repo}@${DIGEST}"
         done
     - name: Scan
       if: inputs.publish == 'true'
