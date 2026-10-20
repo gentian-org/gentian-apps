@@ -1,8 +1,8 @@
 version: 2
+# One grouped pull request per ecosystem and week. The version comment
+# beside each pinned Action or base image is what Dependabot reads and
+# rewrites. Security updates are opened as they appear, outside the groups.
 updates:
-  # Keeps the commit SHAs the workflows pin their Actions to current. One
-  # grouped pull request a week; the version comment beside each SHA is
-  # what Dependabot reads and rewrites.
   - package-ecosystem: github-actions
     directories:
       - /
@@ -12,4 +12,44 @@ updates:
       interval: weekly
     groups:
       actions:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /apps/_template/backend
+    schedule:
+      interval: weekly
+    groups:
+      python-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: pip
+    directory: /images/nextcloud-mcp
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directories:
+      - /apps/_template/frontend
+      - /images/gentian-sidecar-sso-saml
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Base images, pinned by digest. Nextcloud's and XWiki's final stages take
+  # the upstream version as a build argument and stay on tags; their build
+  # stages are pinned.
+  - package-ecosystem: docker
+    directories:
+      - /apps/_template/backend
+      - /apps/_template/frontend
+      - /images/gentian-sidecar-git-modules
+      - /images/gentian-sidecar-sso-saml
+      - /images/nextcloud-mcp
+      - /images/xwiki
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
         patterns: ["*"]
