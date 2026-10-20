@@ -185,6 +185,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
@@ -236,6 +237,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
@@ -270,6 +272,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
@@ -466,6 +469,29 @@ jobs:
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b  # v5.0.0
       - id: deploy
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e  # v4.0.5
+
+  # Known vulnerabilities in the Python the images install: the template
+  # backend's lockfile and the Nextcloud MCP sidecar's requirements. The
+  # lockfile check is strict; the audit is advisory until the backlog is
+  # triaged (certification plan C2).
+  audit-python:
+    needs: [scope]
+    if: needs.scope.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          version: "0.13.3"
+      - name: The template lockfile matches its pyproject
+        working-directory: apps/_template/backend
+        run: uv lock --check
+      - name: Audit
+        continue-on-error: true
+        run: |
+          (cd apps/_template/backend && uv export --locked --no-dev --no-hashes --no-emit-project -o /tmp/template.txt)
+          uvx pip-audit --strict -r /tmp/template.txt
+          uvx pip-audit --strict -r images/nextcloud-mcp/requirements.txt
 
   validate-profiles:
     needs: [scope]
@@ -713,6 +739,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Build and push image
@@ -742,6 +769,11 @@ jobs:
           node-version: "22"
       - run: npm ci
       - run: npm test
+      # Known vulnerabilities in the production dependencies. Advisory until
+      # the backlog is triaged (certification plan C2).
+      - name: Dependency audit
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
 
   # The same sidecar against the real things: Keycloak, and the apps of this
   # catalogue that are signed in to through it, each at the version its chart
@@ -810,6 +842,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Read the sidecar's version
@@ -833,7 +866,7 @@ jobs:
   # run: a decision that was skipped is not a decision.
   gate:
     runs-on: ubuntu-latest
-    needs: [release-gate, scope, e2e-scope, build-nextcloud, build-nextcloud-mcp, build-xwiki, assemble-catalogue-site, publish-catalogue, validate-profiles, build-odoo-chart, build-activepieces-chart, build-git-modules-sidecar-chart, build-mathesar-chart, build-docmost-chart, build-erpnext-chart, build-git-modules-sidecar-image, test-sso-saml-sidecar, e2e-sso-saml-sidecar, e2e-oidc-sign-out, e2e-restore-rewrites, build-sso-saml-sidecar-image]
+    needs: [release-gate, scope, e2e-scope, audit-python, build-nextcloud, build-nextcloud-mcp, build-xwiki, assemble-catalogue-site, publish-catalogue, validate-profiles, build-odoo-chart, build-activepieces-chart, build-git-modules-sidecar-chart, build-mathesar-chart, build-docmost-chart, build-erpnext-chart, build-git-modules-sidecar-image, test-sso-saml-sidecar, e2e-sso-saml-sidecar, e2e-oidc-sign-out, e2e-restore-rewrites, build-sso-saml-sidecar-image]
     if: always()
     steps:
       - env:
