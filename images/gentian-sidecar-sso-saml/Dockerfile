@@ -1,6 +1,6 @@
 # The base image by digest: this is the program that decides whether a
 # sign-in is genuine, and a rebuild must not change what it runs on.
-FROM docker.io/library/node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+FROM docker.io/library/node:26-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5
 
 WORKDIR /usr/src/app
 
