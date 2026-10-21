@@ -1,0 +1,55 @@
+image:
+  repository: ghcr.io/gentian-org/paperless-ngx-mcp
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+port: 8765
+
+# Where Paperless is, inside the namespace -- set by the profile
+# (spec.extensions[].extraValues), not a sensible chart-level default.
+paperlessUrl: "http://paperless-ngx-ce:8000"
+
+# The Paperless account this companion authenticates as: an ordinary user the
+# profile's post-install Job makes, with the permissions the tools need and
+# nothing else. Its password is read from the parent app's own credentials
+# Secret, the one the platform keeps for the profile's secrets.generated,
+# so that the Job which sets it in Paperless and this pod read one value.
+paperlessUser: "mcp-service"
+passwordSecret:
+  name: "paperless-ngx-ce-sensitive-values"
+  key: "internal-mcp_service_password"
+
+# true leaves only the reading tools: an agent can search and read documents
+# but not upload, tag or change one.
+readOnly: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 128Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+# Extra labels for the pod template. The platform injects gentianos.io/app and
+# gentianos.io/tenant here so the companion is selected by the tenant's
+# kernel-egress NetworkPolicy and counted against the app that owns it.
+podLabels: {}

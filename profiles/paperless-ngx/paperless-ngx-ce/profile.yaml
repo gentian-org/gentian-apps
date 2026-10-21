@@ -1,0 +1,521 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# ComponentProfile — Paperless-ngx (scan, OCR and archive documents)
+#
+# Source: no upstream Helm chart exists for Paperless-ngx (docker compose
+#   only), so this profile is backed by a first-party Gentian chart:
+#   charts/paperless-ngx/ (the pattern of charts/docmost and charts/mathesar —
+#   see docs/app-profile-guide.md §0 Consequence 3). The chart wraps the
+#   official ghcr.io/paperless-ngx/paperless-ngx image unmodified, started as
+#   its own non-root user, with a pod-local Redis as its broker (the chart's
+#   values.yaml says why not the shared one).
+#
+# ── Sign-in: the tenant's realm, through django-allauth ─────────────────────
+# Paperless signs people in with allauth's OpenID Connect provider, which the
+# chart configures from the realm client this profile asks for below. An
+# account is made at a person's first sign-in from the realm's claims
+# (PAPERLESS_SOCIAL_AUTO_SIGNUP); Paperless' own password form is switched
+# off and its sign-in page sends people straight to the realm. The API still
+# takes basic auth and tokens, which is what the technical accounts use.
+#
+# ── Who administers Paperless ───────────────────────────────────────────────
+# Who holds the platform's App Admin role (gentian:tenant:<t>:app-admins),
+# applied by spec.hooks.provisioning below: the platform resolves the
+# members and runs the Job, the Job sets is_superuser on their Paperless
+# accounts over the REST API as the technical superuser, and takes it from
+# everyone else. Not Paperless' own claim-driven superuser sync
+# (PAPERLESS_SOCIAL_ACCOUNT_SYNC_SUPERUSER_GROUP): that reads the groups
+# claim from the id token or userinfo, and the realm puts it in the access
+# token only. A member who has not signed in yet has no account to promote;
+# the Job says so and promotes them on a later run, after their first
+# sign-in.
+#
+# ── The MCP companion (spec.extensions) ─────────────────────────────────────
+# images/paperless-ngx-mcp, deployed beside the app as its own release,
+# reached inside the namespace at paperless-ngx-mcp:8765/mcp (streamable
+# HTTP). It lets an agent search and read documents' OCR text and metadata,
+# upload a scan, tag a document and set its custom fields -- the surface a
+# workflow needs to take a scanned letter through a model into another app.
+# It authenticates as its own ordinary Paperless account, "mcp-service",
+# never the superuser and never the person asking. The post-install hook
+# makes that account with the permissions the tools need and adds a
+# Paperless workflow that shares every newly consumed document with it:
+# Paperless shows a document only to its owner and to whom it is shared
+# with, so without the workflow the agent would see nothing a person
+# uploaded. Nothing outside the namespace reaches the companion, and the
+# platform wires no authentication for MCP yet (gentian-os
+# docs/design/agentic-ai.md §3).
+#
+# ── Paperless' own AI features ──────────────────────────────────────────────
+# Off. Paperless 3 can ask a model for title, tag and correspondent
+# suggestions and answer questions about a document. That needs the model
+# gateway: declare requires.services.llm, map valueMapping.llm to the chart's
+# llm.baseUrl / llm.apiKey, set extraValues.ai.enabled and name a model the
+# gateway serves. Left out because declaring llm holds the app's release on a
+# cluster that serves no models.
+#
+# Secret inventory:
+#   Platform-provided:
+#     database host/port/name/user/password (valueMapping.database)
+#     OIDC issuer and client secret (valueMapping.oidc)
+#     smtp host/port/user/password (valueMapping.smtp)
+#   Generated (3), secrets.generated:
+#     secret_key           → secretKey: Django's SECRET_KEY; pinned, or every
+#                            session dies at each restart
+#     admin_password       → admin.password: the technical superuser
+#                            "gentian-bootstrap-admin" Paperless makes at
+#                            first start. Nobody signs in as it; the two Jobs
+#                            below authenticate as it
+#     mcp_service_password → mcp.servicePassword: the MCP companion's own
+#                            account. The post-install hook sets it in
+#                            Paperless and the companion reads it from this
+#                            profile's credentials Secret (key
+#                            internal-mcp_service_password), so both sides
+#                            hold one value
+apiVersion: gentianos.io/v1alpha1
+kind: ComponentProfile
+metadata:
+  name: paperless-ngx-ce
+  labels:
+    gentianos.io/profile-name: paperless-ngx-ce
+    gentianos.io/profile-family: paperless-ngx
+    gentianos.io/profile-edition: ce
+spec:
+  classes:
+    - app
+  trustTier: certified
+  version: "0.5.1-dev"
+  package:
+    chart:
+      repository: "oci://ghcr.io/gentian-org/charts"
+      name: paperless-ngx
+      version: "0.1.0"
+
+    valueMapping:
+      oidc:
+        # The issuer the platform seeded for this tenant's realm, the same
+        # string the client is registered under; allauth discovers the
+        # endpoints from it server-side (see charts/mathesar for the same).
+        issuerKey: "oidc.issuer"
+        clientSecretKey: "oidc.clientSecret"
+      database:
+        hostKey: "database.host"
+        portKey: "database.port"
+        nameKey: "database.name"
+        userKey: "database.user"
+        passwordKey: "database.password"
+      smtp:
+        hostKey: "smtp.host"
+        portKey: "smtp.port"
+        userKey: "smtp.user"
+        passwordKey: "smtp.password"
+
+    extraValues:
+      fullnameOverride: "paperless-ngx-ce"
+      appUrl: "https://documents.${TENANT_DOMAIN}"
+
+      oidc:
+        enabled: true
+        providerId: "gentian"
+        name: "Gentian"
+        clientId: "gentian-paperless-ngx"
+
+      smtp:
+        fromAddress: "gentian-system@${TENANT_DOMAIN}"
+
+      # The image ships eng, deu, fra, ita, spa; more cannot be added at
+      # start without root (chart values.yaml, "image").
+      ocr:
+        language: "deu+fra+ita+eng"
+        mode: "skip"
+        outputType: "pdfa"
+      timeZone: "Europe/Zurich"
+      # The volumes are network-backed; inotify does not fire on them.
+      consumerPollingInterval: 30
+
+      persistence:
+        data:
+          size: "5Gi"
+        media:
+          size: "20Gi"
+
+      ingress:
+        enabled: false
+
+      podAnnotations:
+        reloader.stakater.com/auto: "true"
+
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
+    services:
+      identity:
+        oidc:
+          clientId: "gentian-paperless-ngx"
+          name: "Paperless-ngx"
+          accessType: CONFIDENTIAL
+          # allauth's callback: /accounts/oidc/<provider_id>/login/callback/,
+          # the provider_id being extraValues.oidc.providerId.
+          redirectUris:
+            - "https://documents.${TENANT_DOMAIN}/accounts/oidc/gentian/login/callback/"
+          postLogoutRedirectUris:
+            - "https://documents.${TENANT_DOMAIN}/"
+            - "https://portal.${KERNEL_DOMAIN}/"
+        # No backchannelLogout: this app signs in through django-allauth,
+        # whose OpenID Connect provider implements no endpoint for receiving a
+        # logout_token. Signing out of the portal therefore leaves this app's
+        # own session running until it expires on its own. Recorded rather
+        # than left blank, so the absence reads as a limit of the app and not
+        # as an oversight to be filled in.
+      database:
+        engine: postgresql
+        databasePerTenant: true
+      # Outbound mail only: password-reset and notification mail from
+      # Paperless. Fetching documents from a mailbox is a mail rule a
+      # person sets up in Paperless with a mailbox of their own.
+      mail:
+        smtp: {}
+      # A declaration only (gentian-os docs/design/agentic-ai.md §3): the
+      # platform registers nothing and wires no authentication. The server
+      # is not on the app's own Service but on the companion's,
+      # paperless-ngx-mcp:8765, inside the namespace; auth "none" says what
+      # the endpoint expects of a caller, which the namespace boundary is
+      # what stands in for.
+      mcp:
+        enabled: true
+        endpoint: /mcp
+        auth: none
+
+  provides:
+    - name: document-archive
+      protocol: http-html
+    - name: documents-api
+      protocol: http-json
+
+  integrations:
+    - contract: central-navigation
+      provider: portal
+      capabilities:
+        - navigation:register
+
+  secrets:
+    generated:
+      - name: secret_key
+        valuePath: "secretKey"
+      - name: admin_password
+        valuePath: "admin.password"
+      - name: mcp_service_password
+        valuePath: "mcp.servicePassword"
+
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: "documents"
+      backend:
+        service: "paperless-ngx-ce"
+        port: 8000
+      tile:
+        displayName: "Documents"
+        displayNames:
+          de_DE: Dokumente
+        description: "Scan, OCR and archive your paper"
+        logo: data:image/png;base64,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
+        image: assets/tile.png
+        relation: can_launch
+
+  extensions:
+    - name: mcp
+      chart:
+        repository: oci://ghcr.io/gentian-org/charts
+        name: paperless-ngx-mcp
+        version: "0.1.0"
+      extraValues:
+        image:
+          repository: ghcr.io/gentian-org/paperless-ngx-mcp
+          tag: "0.1.0"
+        paperlessUrl: http://paperless-ngx-ce:8000
+        paperlessUser: mcp-service
+        # This profile's own credentials Secret, where the platform keeps
+        # secrets.generated: the one value the post-install hook sets in
+        # Paperless.
+        passwordSecret:
+          name: paperless-ngx-ce-sensitive-values
+          key: internal-mcp_service_password
+        readOnly: false
+      stableServiceName: paperless-ngx-mcp
+      stableServicePort: 8765
+
+  hooks:
+    # Bootstrap over Paperless' own REST API, as the technical superuser the
+    # image made at first start: the MCP companion's account with the
+    # permissions its tools need, and the workflow that shares each newly
+    # consumed document with that account. Idempotent: it converges both to
+    # what is declared here and changes nothing once they match. Exits
+    # non-zero until Paperless answers, and the platform retries.
+    #
+    # The Job runs on the app's own image for Python; everything it needs is
+    # in the chart's environment Secret (envFrom), under the names the chart
+    # gives Paperless itself.
+    postInstall:
+      image: ghcr.io/paperless-ngx/paperless-ngx:3.3.3
+      envFrom:
+        - paperless-ngx-ce-env
+      script: |
+        #!/bin/sh
+        set -eu
+        exec python3 - <<'PY'
+        import base64, json, os, sys, urllib.error, urllib.request
+
+        # The app's Service, by its name alone: resolved by the namespace's
+        # DNS search domain, and in Paperless' ALLOWED_HOSTS (the chart puts
+        # its own Service name there).
+        URL = "http://paperless-ngx-ce:8000"
+        ADMIN = os.environ["PAPERLESS_ADMIN_USER"]
+        ADMIN_PASSWORD = os.environ["PAPERLESS_ADMIN_PASSWORD"]
+        MCP_USER = os.environ["PAPERLESS_MCP_USER"]
+        MCP_PASSWORD = os.environ["PAPERLESS_MCP_PASSWORD"]
+        WORKFLOW = "Gentian: share new documents with the MCP agent"
+        # What the companion's tools do, and nothing more: read and file
+        # documents, make a tag, read the filing vocabulary and its own tasks.
+        PERMISSIONS = [
+            "view_document", "add_document", "change_document",
+            "view_tag", "add_tag",
+            "view_correspondent", "view_documenttype", "view_storagepath",
+            "view_customfield", "view_note", "add_note", "view_paperlesstask",
+        ]
+
+        def api(method, path, body=None):
+            token = base64.b64encode(("%s:%s" % (ADMIN, ADMIN_PASSWORD)).encode()).decode()
+            data = json.dumps(body).encode() if body is not None else None
+            req = urllib.request.Request(URL + path, data=data, method=method, headers={
+                "Accept": "application/json; version=10",
+                "Content-Type": "application/json",
+                "Authorization": "Basic " + token,
+            })
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    raw = resp.read()
+            except urllib.error.HTTPError as e:
+                # Paperless says why it refused (a field it rejected, say);
+                # that is what the Job's log must show.
+                say("%s %s answered %d: %s" % (method, path, e.code, e.read()[:500].decode(errors="replace")))
+                raise
+            return json.loads(raw) if raw else None
+
+        def say(m):
+            print("[gentian-paperless] " + m, flush=True)
+
+        # Paperless answers, and the technical superuser exists: both come
+        # with the app's first start, which this Job may well be ahead of.
+        try:
+            me = api("GET", "/api/users/?username__iexact=" + ADMIN)
+        except (urllib.error.URLError, urllib.error.HTTPError, OSError) as e:
+            say("Paperless is not ready yet (%s); retrying later" % e)
+            sys.exit(1)
+        if not me.get("results"):
+            say("the technical superuser does not exist yet; retrying later")
+            sys.exit(1)
+
+        # The companion's account. The password is re-set every run so that
+        # the account always holds the value the companion reads.
+        found = api("GET", "/api/users/?username__iexact=" + MCP_USER).get("results") or []
+        body = {
+            "username": MCP_USER,
+            "email": MCP_USER + "@internal.invalid",
+            "first_name": "MCP",
+            "last_name": "agent",
+            "password": MCP_PASSWORD,
+            "is_active": True,
+            "is_staff": False,
+            "is_superuser": False,
+            "user_permissions": PERMISSIONS,
+        }
+        if found:
+            uid = found[0]["id"]
+            api("PATCH", "/api/users/%d/" % uid, body)
+            say("the companion's account is as declared")
+        else:
+            uid = api("POST", "/api/users/", body)["id"]
+            say("made the companion's account")
+
+        # The workflow that shares each consumed document with that account.
+        # Trigger 1 is "consumption started", on every source (consume folder,
+        # API, mail, web) and every file name (a consumption trigger must
+        # filter on something; "*" is the filter that matches all); action 1
+        # is an assignment, here of view and change for the one user. Found
+        # by name: Paperless keys workflows by id.
+        workflows = []
+        page = "/api/workflows/?page_size=100"
+        while page:
+            data = api("GET", page)
+            workflows.extend(data.get("results", []))
+            page = data.get("next")
+            if page:
+                page = page[page.index("/api/"):]
+        mine = [w for w in workflows if w.get("name") == WORKFLOW]
+        actions = [{
+            "type": 1,
+            "assign_view_users": [uid],
+            "assign_change_users": [uid],
+        }]
+        triggers = [{"type": 1, "sources": [1, 2, 3, 4], "filter_filename": "*"}]
+        if mine:
+            w = mine[0]
+            have = w.get("actions") or []
+            ok = (
+                w.get("enabled")
+                and len(have) == 1
+                and have[0].get("type") == 1
+                and uid in (have[0].get("assign_view_users") or [])
+                and uid in (have[0].get("assign_change_users") or [])
+            )
+            if ok:
+                say("the sharing workflow is as declared")
+            else:
+                api("PATCH", "/api/workflows/%d/" % w["id"], {"enabled": True, "triggers": triggers, "actions": actions})
+                say("repaired the sharing workflow")
+        else:
+            api("POST", "/api/workflows/", {
+                "name": WORKFLOW, "order": 0, "enabled": True,
+                "triggers": triggers, "actions": actions,
+            })
+            say("made the sharing workflow")
+        PY
+
+    provisioning:
+      privilegedRole:
+        kind: group
+        # Paperless' privilege model is the flag is_superuser, not a named
+        # group; descriptive only. The script below is what it means.
+        name: superuser
+
+      # How this app applies that role. The platform resolves app-admins
+      # membership, publishes it as JSON and runs this Job; everything below is
+      # Paperless' own protocol and stays in Paperless' catalogue entry.
+      #
+      # Converges rather than applies a delta: everyone in the file who has an
+      # account is a superuser, everyone else is not, and an account that
+      # already matches is left alone. An account exists only after the
+      # person's first sign-in (allauth makes it then, and would not link a
+      # pre-made one), so a member without one is named and promoted on a
+      # later run. The two technical accounts are never touched: the
+      # superuser this very call authenticates as, and the MCP companion's.
+      syncJob:
+        image: ghcr.io/paperless-ngx/paperless-ngx:3.3.3
+        # Bound key by key, not envFrom: the Secret's keys are hyphenated and
+        # Kubernetes drops those from envFrom without a word.
+        env:
+          - name: ADMIN_PASSWORD
+            secretKeyRef:
+              name: paperless-ngx-ce-sensitive-values
+              key: internal-admin_password
+        script: |
+          #!/bin/sh
+          set -eu
+          exec python3 - <<'PY'
+          import base64, json, os, urllib.error, urllib.request
+
+          USER = "gentian-bootstrap-admin"
+          PASSWORD = os.environ["ADMIN_PASSWORD"]
+          APP = os.environ["GENTIAN_APP"]
+          URL = "http://%s:8000" % APP
+          KEEP = {USER, "mcp-service"}
+
+          def api(method, path, body=None):
+              token = base64.b64encode(("%s:%s" % (USER, PASSWORD)).encode()).decode()
+              data = json.dumps(body).encode() if body is not None else None
+              req = urllib.request.Request(URL + path, data=data, method=method, headers={
+                  "Accept": "application/json; version=10",
+                  "Content-Type": "application/json",
+                  "Authorization": "Basic " + token,
+              })
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as resp:
+                      raw = resp.read()
+              except urllib.error.HTTPError as e:
+                  print("%s %s answered %d: %s" % (method, path, e.code, e.read()[:500].decode(errors="replace")))
+                  raise
+              return json.loads(raw) if raw else None
+
+          with open(os.environ["GENTIAN_APP_ADMINS_FILE"]) as fh:
+              members = json.load(fh)
+          want_emails = {m["email"].lower() for m in members if m.get("email")}
+          want_names = {m["username"].lower() for m in members if m.get("username")}
+
+          users = []
+          page = "/api/users/?page_size=100"
+          while page:
+              data = api("GET", page)
+              users.extend(data.get("results", []))
+              page = data.get("next")
+              if page:
+                  page = page[page.index("/api/"):]
+
+          seen = set()
+          for u in users:
+              if u["username"] in KEEP:
+                  continue
+              email = (u.get("email") or "").lower()
+              name = u["username"].lower()
+              wanted = email in want_emails or name in want_names
+              if wanted:
+                  seen.add(email or name)
+              if bool(u.get("is_superuser")) != wanted or (wanted and not u.get("is_staff")):
+                  api("PATCH", "/api/users/%d/" % u["id"], {"is_superuser": wanted, "is_staff": wanted})
+                  print("%s %s" % ("promoted" if wanted else "demoted", u["username"]))
+
+          for m in members:
+              key = (m.get("email") or m.get("username") or "").lower()
+              if key and key not in seen and (m.get("username") or "").lower() not in seen:
+                  print("%s has no account yet: promoted after their first sign-in" % key)
+
+          print("app administrators synchronised: %d" % len(members))
+          PY
+
+  # How this app is captured and put back. The default -- scale to zero, dump
+  # the database, archive both volumes -- is right for a plain Django app;
+  # only the deviations are here.
+  backup:
+    volumes:
+      # The full-text index (Tantivy, under data/index) is rebuilt in full by
+      # the command below, and is the larger part of the data volume. The
+      # originals, the archived PDF/As and the thumbnails on the media volume
+      # are kept: a thumbnail is not regenerated on demand.
+      excludePaths:
+        - "**/data/index"
+    restore:
+      post:
+        - - python3
+          - /usr/src/paperless/src/manage.py
+          - document_index
+          - reindex
+      verify:
+        - python3
+        - /usr/src/paperless/src/manage.py
+        - check
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: C
+    rubricScore: 4
+    supportedRungs: [L0, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/paperless-ngx/paperless-ngx-ce/customization.md
+    configure:
+      hotReload: false
+    publishes:
+      apis:
+        - contract: documents-api
+          protocol: http-json
+          path: /api/
+          # HTTP basic auth or a token of an existing Paperless account; not
+          # the realm's tokens. The MCP companion is one such client.
+          auth: http-basic-or-token
+    repackage:
+      chartOwnership: gentian-owned
+    patch:
+      allowed: false
+      seriesPath: patches/series
+      requiresApproval: platform-team
+    fork:
+      allowed: false
+  launch: tile
