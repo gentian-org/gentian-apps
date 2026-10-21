@@ -28,11 +28,13 @@ profiles/              # App catalogue bundles (OSS + commercial) — published 
       calendar-ce/     #       -> nextcloud-calendar-ce
     packages/          #       AppPackage presets: office, suite
   xwiki/               #   true singleton: stays flat
+  paperless-ngx/       #   singleton with a companion: paperless-ngx-ce + its MCP server (spec.extensions)
 apps/                  # first-party implementations (FastAPI + React + Helm)
   _template/           # copy of gentian-app-template
 charts/                # Helm charts published to oci://ghcr.io/gentian-org/charts
   activepieces/        # pinned upstream (adnoctem/helm) + patch series — no copy
   odoo/                # Gentian-authored chart for OCB — backs all 10 odoo profiles
+  paperless-ngx/       # Gentian-authored chart for the official Paperless-ngx image
   gentian-sidecar-*/   # sidecar charts referenced by profiles
 images/                # Dockerfiles published to ghcr.io
 contracts/             # integration contract schemas

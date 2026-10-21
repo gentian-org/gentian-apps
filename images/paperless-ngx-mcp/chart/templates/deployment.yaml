@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "paperless-ngx-mcp.fullname" . }}
+  labels:
+    {{- include "paperless-ngx-mcp.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "paperless-ngx-mcp.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "paperless-ngx-mcp.labels" . | nindent 8 }}
+        {{- /* The platform identifies a tenant's workloads by gentianos.io/app
+               and gentianos.io/tenant: the kernel-egress NetworkPolicy selects
+               on them, and the app store attributes resource usage by them. A
+               companion without them is invisible to both. The stable alias
+               Service the platform emits selects app.kubernetes.io/instance,
+               which is the release name above. */}}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: paperless-ngx-mcp
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: mcp
+              containerPort: {{ .Values.port }}
+          env:
+            - name: PAPERLESS_URL
+              value: {{ .Values.paperlessUrl | quote }}
+            - name: MCP_PORT
+              value: {{ .Values.port | quote }}
+            - name: PAPERLESS_MCP_USER
+              value: {{ .Values.paperlessUser | quote }}
+            - name: PAPERLESS_MCP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.passwordSecret.name | quote }}
+                  key: {{ .Values.passwordSecret.key | quote }}
+            - name: PAPERLESS_MCP_READ_ONLY
+              value: {{ .Values.readOnly | quote }}
+          readinessProbe:
+            tcpSocket:
+              port: mcp
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: mcp
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

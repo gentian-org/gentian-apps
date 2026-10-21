@@ -1,0 +1,42 @@
+# What the App Store says about Paperless-ngx. The store keeps listings in its
+# own database; this file is what its import reads from a checkout, once.
+#
+# The tile (assets/tile.svg) is Paperless-ngx's own leaf mark, from the
+# project's docs/assets/logo_leaf.svg, under the project's GPL-3.0 licence.
+displayName: Paperless-ngx
+edition: ce
+family: paperless-ngx
+author: Paperless-ngx community
+license: GPL-3.0-only
+summary: >-
+  Scan, OCR and archive your paper: every document becomes searchable text
+  and a PDF/A, filed by correspondent, type and tags, and readable by your
+  AI assistant.
+description: >-
+  Paperless-ngx turns paper into a searchable archive. Upload a scan or a
+  photo, drop a file into its inbox or let it fetch attachments from a
+  mailbox: each document is run through OCR in German, French, Italian or
+  English, kept as a PDF/A beside the original, and filed by correspondent,
+  document type, tags and custom fields that Paperless learns to suggest.
+
+
+  Everything is full-text searchable, from the first letter to the last
+  invoice. Workflows file and share documents as they arrive; the REST API
+  and the bundled MCP server let an assistant or an automation read a
+  document's text and metadata, upload new ones and tag what it has
+  processed. People sign in with their Gentian account; whoever holds the
+  tenant's App Administrator role administers Paperless.
+categories: [files, office, automation]
+keywords: [documents, scanning, OCR, archive, PDF/A, paperless, DMS, invoices, letters, MCP]
+links:
+  - rel: homepage
+    label: Documentation
+    url: https://docs.paperless-ngx.com/
+  - rel: source
+    label: Source code
+    url: https://github.com/paperless-ngx/paperless-ngx
+  - rel: support
+    label: Community discussions
+    url: https://github.com/paperless-ngx/paperless-ngx/discussions
+tile:
+  image: assets/tile.svg

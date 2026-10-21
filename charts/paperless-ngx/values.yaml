@@ -1,0 +1,208 @@
+nameOverride: paperless-ngx
+fullnameOverride: paperless-ngx-ce
+
+image:
+  # The official image, unmodified. No official Helm chart exists upstream
+  # (docker compose only), so this is a first-party Gentian chart wrapping it,
+  # the shape of charts/docmost and charts/mathesar. One container runs the
+  # web server, the consumer, the scheduler and the task worker under
+  # s6-overlay, as upstream's compose file runs it.
+  #
+  # Started as uid 1000, which is the image's own "paperless" user: upstream
+  # documents the image as rootless-capable (setup.md, "user:"), and with no
+  # root there is nothing for s6 to drop. The one thing that mode cannot do is
+  # install extra OCR languages at start (PAPERLESS_OCR_LANGUAGES); the image
+  # ships eng, deu, fra, ita and spa, which is what ocr.language may name.
+  repository: ghcr.io/paperless-ngx/paperless-ngx
+  tag: "3.3.3"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# The public address, no trailing slash: PAPERLESS_URL. It is also what
+# Django trusts for CSRF and CORS. Required.
+appUrl: ""
+port: 8000
+
+# Hosts Django answers beyond the one in appUrl. The chart always adds its own
+# Service name and localhost: the MCP companion and the bootstrap Job reach
+# the app by Service name, and the kubelet's probes by localhost, and Django
+# answers any other Host with a bare 400.
+extraAllowedHosts: []
+
+# The platform's PostgreSQL, delivered through the profile's
+# valueMapping.database as literal values and written into the Secret the
+# pod reads (templates/secret.yaml) -- never into the Deployment's manifest.
+database:
+  host: ""
+  port: 5432
+  name: ""
+  user: ""
+  password: ""
+
+# Dedicated in-pod Redis, NOT the shared kernel Redis. Paperless uses it as
+# Celery's broker and result store and for its websocket channel layer: all of
+# it transient, all of it this one pod's, and upstream ships a broker per
+# install in its own compose file. Bound to 127.0.0.1 inside the pod's network
+# namespace, so it needs no password, no Service and no NetworkPolicy rule.
+# Nothing is persisted (--save "", --appendonly no): a restart loses only queued
+# tasks, and the consumer re-reads the consumption directory on start.
+redis:
+  image:
+    repository: docker.io/library/redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  port: 6379
+  # noeviction: Celery's queue lives here, and evicting a key would drop a
+  # task without a word. Memory pressure is a visible error instead.
+  maxmemory: "128mb"
+  maxmemoryPolicy: noeviction
+  resources:
+    requests:
+      cpu: "10m"
+      memory: "32Mi"
+    limits:
+      cpu: "250m"
+      memory: "192Mi"
+
+# Django's SECRET_KEY. Paperless refuses to start without one, and an
+# unpinned value would invalidate every session on each restart; delivered
+# from the profile's secrets.generated (secret_key).
+secretKey: ""
+
+# The technical superuser Paperless creates at first start
+# (PAPERLESS_ADMIN_USER). Nobody signs in as it: the post-install Job and the
+# app-admins sync Job authenticate as it over the REST API, and people sign in
+# through the realm. Password from secrets.generated (admin_password).
+admin:
+  user: "gentian-bootstrap-admin"
+  mail: "gentian-bootstrap-admin@internal.invalid"
+  password: ""
+
+# Signing in through the tenant's realm: django-allauth's OpenID Connect
+# provider, configured from these values as the JSON PAPERLESS_SOCIALACCOUNT_PROVIDERS
+# wants (templates/secret.yaml). The callback is
+# <appUrl>/accounts/oidc/<providerId>/login/callback/.
+oidc:
+  enabled: true
+  providerId: "gentian"
+  name: "Gentian"
+  clientId: ""
+  clientSecret: ""
+  # The realm's public issuer, https://id.<kernel>/auth/realms/<realm>, from
+  # valueMapping.oidc.issuerKey. allauth discovers the endpoints from its
+  # .well-known/openid-configuration, server-side, so the request leaves the
+  # pod for the edge.
+  issuer: ""
+  scope: ["openid", "profile", "email"]
+  # Paperless' own password form is switched off and its login page sends
+  # people straight to the realm. Django's admin and the API's basic auth are
+  # unaffected, which is what the technical account relies on.
+  disableRegularLogin: true
+  redirectLoginToSso: true
+
+# The account the MCP companion (images/paperless-ngx-mcp) authenticates as.
+# Made by the profile's post-install Job as an ordinary user, never a
+# superuser; this chart only carries the password into the pod's Secret so
+# that Job can read it alongside the admin's. From secrets.generated
+# (mcp_service_password).
+mcp:
+  user: "mcp-service"
+  servicePassword: ""
+
+ocr:
+  # Tesseract codes, joined with +. Only languages in the image (see image
+  # above): eng, deu, fra, ita, spa.
+  language: "deu+fra+ita+eng"
+  # skip: OCR only pages without text. redo / force re-OCR everything.
+  mode: "skip"
+  # Archived copies as PDF/A.
+  outputType: "pdfa"
+
+timeZone: "Europe/Zurich"
+
+# Seconds between polls of the consumption directory. 0 uses inotify, which
+# does not fire on NFS-backed volumes; a positive value polls instead.
+consumerPollingInterval: 30
+
+# Workers. Each web server worker loads the whole app; one is upstream's
+# default and enough for a tenant.
+webserverWorkers: 1
+taskWorkers: 1
+threadsPerWorker: 2
+
+smtp:
+  host: ""
+  port: 587
+  user: ""
+  password: ""
+  useTls: true
+  fromAddress: ""
+
+# Paperless' own AI features (title/tag/correspondent suggestions, chat with a
+# document), which send document text to the model named here. Off unless the
+# profile declares requires.services.llm and hands the gateway's address and
+# key to llm.baseUrl / llm.apiKey. The model must be one the gateway serves.
+ai:
+  enabled: false
+  model: ""
+  embeddingBackend: "openai-like"
+  embeddingModel: ""
+llm:
+  baseUrl: ""
+  apiKey: ""
+
+persistence:
+  # Search index, classifier model, logs. Rebuilt by `document_index reindex`
+  # and the classifier's own schedule; small.
+  data:
+    size: "5Gi"
+    storageClass: ""
+  # Originals, archived PDF/A copies and thumbnails: the documents themselves.
+  media:
+    size: "20Gi"
+    storageClass: ""
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "2"
+    memory: "3Gi"
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+  # s6-overlay writes under /run and the app under /usr/src/paperless, so the
+  # root filesystem stays writable.
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+podLabels: {}
+podAnnotations: {}
+
+# Extra environment, volumes and mounts, for what the platform has to put into
+# the pod (the staging CA trust bundle, say) -- the conventional names.
+extraEnv: []
+extraVolumes: []
+extraVolumeMounts: []
+
+# Chart never manages its own Ingress/HTTPRoute — the gentian-os operator
+# creates the Gateway API route from the profile's expose entries.
+ingress:
+  enabled: false
