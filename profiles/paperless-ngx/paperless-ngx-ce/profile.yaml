@@ -83,12 +83,14 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev"
+  version: "0.5.2-dev"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: paperless-ngx
-      version: "0.1.0"
+      # The develop build of the merge that added this profile; back on a
+      # plain version before develop is merged into main (docs/releasing.md).
+      version: "0.1.0-develop.cdb6281"
 
     valueMapping:
       oidc:
@@ -228,11 +230,11 @@ spec:
       chart:
         repository: oci://ghcr.io/gentian-org/charts
         name: paperless-ngx-mcp
-        version: "0.1.0"
+        # Develop build, as the app's chart above. No image here: the chart
+        # names the image it was built with (develop-cdb6281 in this build,
+        # 0.1.0 in the release), and a tag set here would override it.
+        version: "0.1.0-develop.cdb6281"
       extraValues:
-        image:
-          repository: ghcr.io/gentian-org/paperless-ngx-mcp
-          tag: "0.1.0"
         paperlessUrl: http://paperless-ngx-ce:8000
         paperlessUser: mcp-service
         # This profile's own credentials Secret, where the platform keeps
