@@ -57,8 +57,10 @@ for (const side of [OLD, NEW]) {
     side.issuer = `https://${side.idp}/auth/realms/${TENANT}`;
 }
 
-const ANNA = { uid: 'anna', address: `anna@${OLD.domain}`, recovery: 'anna@home.example', firstName: 'Anna', lastName: 'Example', password: 'pw-anna-e2e-0123' };
-const BEN = { uid: 'ben', address: `ben@${OLD.domain}`, recovery: 'ben@home.example', firstName: 'Ben', lastName: 'Example', password: 'pw-ben-e2e-0123' };
+const ANNA = { address: `anna@${OLD.domain}`, recovery: 'anna@home.example', firstName: 'Anna', lastName: 'Example', password: 'pw-anna-e2e-0123' };
+const BEN = { address: `ben@${OLD.domain}`, recovery: 'ben@home.example', firstName: 'Ben', lastName: 'Example', password: 'pw-ben-e2e-0123' };
+const A = oidc.xwikiPage(ANNA);
+const B = oidc.xwikiPage(BEN);
 const SECRETS = [OLD.secret, NEW.secret, OLD.db.password, NEW.db.password, ANNA.password, BEN.password];
 
 const names = { pg: `${setup.NETWORK}-xw-pg`, old: `${setup.NETWORK}-xw-old`, app: `${setup.NETWORK}-xw`, volume: `${setup.NETWORK}-xw-data` };
@@ -195,8 +197,8 @@ before(async () => {
         await answers(OLD.host);
         return flavorInstalled(names.old);
     }, 900);
-    assert.equal(await signIn(OLD, ANNA), 'xwiki:XWiki.anna');
-    assert.equal(await signIn(OLD, BEN), 'xwiki:XWiki.ben');
+    assert.equal(await signIn(OLD, ANNA), `xwiki:${A}`);
+    assert.equal(await signIn(OLD, BEN), `xwiki:${B}`);
     r.docker('rm', '-f', names.old);
 
     // Where it is put back: the database the platform made here, the realm
@@ -212,13 +214,13 @@ after(() => {
 });
 
 test('the data put back names the old cluster and domain', () => {
-    assert.deepEqual(property('XWiki.OIDC.UserClass', 'issuer'), [`XWiki.anna=${OLD.issuer}`, `XWiki.ben=${OLD.issuer}`]);
+    assert.deepEqual(property('XWiki.OIDC.UserClass', 'issuer'), [`${A}=${OLD.issuer}`, `${B}=${OLD.issuer}`]);
     assert.deepEqual(property('XWiki.XWikiServerClass', 'server'), [`XWiki.XWikiServerXwiki=${OLD.host}`]);
-    assert.deepEqual(property('XWiki.XWikiUsers', 'email'), [`XWiki.anna=${ANNA.address}`, `XWiki.ben=${BEN.address}`]);
+    assert.deepEqual(property('XWiki.XWikiUsers', 'email'), [`${A}=${ANNA.address}`, `${B}=${BEN.address}`]);
 });
 
 test('before the commands, a person who signs in gets a new account, not the one they had', async () => {
-    assert.equal(await signIn(NEW, BEN), 'xwiki:XWiki.ben-0');
+    assert.equal(await signIn(NEW, BEN), `xwiki:${B}-0`);
 });
 
 test('the post-restore commands run as the platform runs them, and again without changing anything', async () => {
@@ -236,7 +238,7 @@ test('the post-restore commands run as the platform runs them, and again without
     assert.match(first, /3 account address\(es\) moved to the new domain/);
     assert.match(first, /XWiki\.XWikiServerXwiki \(server\) now names the new domain/);
     // Ben signed in between the restore and the commands.
-    assert.match(first, /XWiki\.ben and XWiki\.ben-0 are one person at the realm/);
+    assert.match(first, new RegExp(`${B.replace(/\./g, '\\.')} and ${B.replace(/\./g, '\\.')}-0 are one person at the realm`));
     const again = r.runRestore(PROFILE, names.app, env);
     assert.match(again, /the wiki already names this cluster and domain/);
     assert.doesNotMatch(again, /now sign in through|moved to the new domain|now names the new domain/);
@@ -257,11 +259,11 @@ test('the post-restore commands run as the platform runs them, and again without
 });
 
 test('the wiki names the new issuer, host and domain', () => {
-    assert.deepEqual(property('XWiki.OIDC.UserClass', 'issuer'), [`XWiki.anna=${NEW.issuer}`, `XWiki.ben-0=${NEW.issuer}`, `XWiki.ben=${NEW.issuer}`]);
+    assert.deepEqual(property('XWiki.OIDC.UserClass', 'issuer'), [`${A}=${NEW.issuer}`, `${B}-0=${NEW.issuer}`, `${B}=${NEW.issuer}`]);
     assert.deepEqual(property('XWiki.XWikiServerClass', 'server'), [`XWiki.XWikiServerXwiki=${NEW.host}`]);
-    assert.deepEqual(property('XWiki.XWikiUsers', 'email'), [`XWiki.anna=anna@${NEW.domain}`, `XWiki.ben-0=ben@${NEW.domain}`, `XWiki.ben=ben@${NEW.domain}`]);
+    assert.deepEqual(property('XWiki.XWikiUsers', 'email'), [`${A}=anna@${NEW.domain}`, `${B}-0=ben@${NEW.domain}`, `${B}=ben@${NEW.domain}`]);
 });
 
 test('a person who signed in on the old cluster signs in here and is the account they had', async () => {
-    assert.equal(await signIn(NEW, ANNA), 'xwiki:XWiki.anna');
+    assert.equal(await signIn(NEW, ANNA), `xwiki:${A}`);
 });
