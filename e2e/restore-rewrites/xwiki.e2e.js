@@ -238,7 +238,7 @@ test('the post-restore commands run as the platform runs them, and again without
     assert.match(first, /3 account address\(es\) moved to the new domain/);
     assert.match(first, /XWiki\.XWikiServerXwiki \(server\) now names the new domain/);
     // Ben signed in between the restore and the commands.
-    assert.match(first, new RegExp(`${B.replace(/\./g, '\\.')} and ${B.replace(/\./g, '\\.')}-0 are one person at the realm`));
+    assert.ok(first.includes(`${B} and ${B}-0 are one person at the realm`), first);
     const again = r.runRestore(PROFILE, names.app, env);
     assert.match(again, /the wiki already names this cluster and domain/);
     assert.doesNotMatch(again, /now sign in through|moved to the new domain|now names the new domain/);
