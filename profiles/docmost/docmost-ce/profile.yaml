@@ -61,7 +61,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev"
+  version: "0.5.1-dev.1"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -88,7 +88,7 @@ spec:
         passwordKey: "smtp.password"
 
     extraValues:
-      appUrl: "https://docs.${TENANT_DOMAIN}"
+      appUrl: "https://docmost.${TENANT_DOMAIN}"
 
       fullnameOverride: "docmost-ce"
 
@@ -301,7 +301,7 @@ spec:
     - name: web
       surface: gateway
       authMode: oidc
-      subDomain: "docs"
+      subDomain: "docmost"
       # Docmost's own ways in, refused at the front door: signing in with a
       # password, setting or changing one, creating the workspace, and
       # accepting an invitation. The handler makes the last two calls itself, inside the
