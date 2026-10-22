@@ -128,6 +128,26 @@ test('a checked answer becomes the app session the handler described', async () 
     assert.equal(handlerCalls[0].ctx.origin, 'https://app.acme.example.org');
 });
 
+// The front door writes the name as UTF-8 bytes; a Latin-1 string of those
+// bytes makes the test client send exactly them.
+function asSent(text) {
+    return Buffer.from(text, 'utf8').toString('latin1');
+}
+
+test('the handler is given the name the front door wrote, in UTF-8', async () => {
+    const started = await startSignIn({ ...FRONT_DOOR, 'x-gentian-name': asSent('Christian Brändli') });
+    const res = await post(buildResponse(idp, config, { requestId: started.requestId }), { cookie: started.cookiePair });
+    assert.equal(res.status, 303);
+    assert.equal(handlerCalls[0].person.name, 'Christian Brändli');
+});
+
+test('a name that is not UTF-8 is given as it came', async () => {
+    const started = await startSignIn({ ...FRONT_DOOR, 'x-gentian-name': 'Brändli' });
+    const res = await post(buildResponse(idp, config, { requestId: started.requestId }), { cookie: started.cookiePair });
+    assert.equal(res.status, 303);
+    assert.equal(handlerCalls[0].person.name, 'Brändli');
+});
+
 test('identity headers on the ACS request are not believed', async () => {
     const started = await startSignIn();
     const res = await post(buildResponse(idp, config, { requestId: started.requestId, email: 'boss@acme.example.org' }), {
