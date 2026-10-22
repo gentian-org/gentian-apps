@@ -16,7 +16,7 @@ const { signInOf, postInstallOf } = require('./lib/profile');
 const { refusedSignOuts } = require('./lib/signout');
 
 const IMAGE = 'docker.io/docmost/docmost:0.95.0';
-const HOST = 'docs.acme.e2e.test';
+const HOST = 'docmost.acme.e2e.test';
 const REALM = 'acme';
 // The profile's own handler and lists: what is sent to the sign-in, what is
 // refused at the front door.
