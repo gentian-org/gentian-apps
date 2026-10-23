@@ -199,3 +199,41 @@ test('a logout token the realm did not sign, or sent before, ends no session', a
     assert.notEqual(again.status, 200, 'the realm\'s own token, a second time');
     assert.deepEqual(await whoAmI(ben), { status: 200, email: BEN.address });
 });
+
+// Where the tiles land. Not sign-out, but this is the run that signs a person
+// in to the catalogue's Nextcloud the way the platform does.
+function tilePath(profile, entry) {
+    return profile.spec.expose.find((e) => e.name === entry).tile.path;
+}
+
+test('the Files tile and the bare address open Files, not the Dashboard', async () => {
+    const anna = await signIn(ANNA);
+    const files = await anna.request('GET', `https://${HOST}${tilePath(PROFILE, 'web')}`);
+    assert.equal(files.status, 200, `${tilePath(PROFILE, 'web')} answered ${files.status}`);
+    const bare = await anna.request('GET', `https://${HOST}/`);
+    assert.ok([302, 303].includes(bare.status), `/ answered ${bare.status}`);
+    assert.match(new URL(bare.headers.location, `https://${HOST}/`).pathname, /\/apps\/files\/?$/);
+});
+
+test('an Office tile opens the person\'s newest file of its kind, or a new one from the template', async () => {
+    // Office switched on as its add-on is: copied from the image's staging,
+    // then enabled. No Collabora is needed to choose the file.
+    setup.docker('exec', names.app, 'cp', '-a', '/usr/src/gentian-addons/richdocuments', '/var/www/html/custom_apps/');
+    occ('app:enable', 'richdocuments');
+    const office = oidc.profileOf('profiles/nextcloud/addons/richdocuments-ce');
+    const ben = await signIn(BEN);
+    async function open(kind) {
+        const res = await ben.request('GET', `https://${HOST}${tilePath(office, kind)}`);
+        assert.equal(res.status, 303, `${tilePath(office, kind)} answered ${res.status}`);
+        const id = /\/f\/(\d+)$/.exec(new URL(res.headers.location, `https://${HOST}/`).pathname);
+        assert.ok(id, `${kind} went to ${res.headers.location}, not to a file`);
+        return id[1];
+    }
+    const document = await open('document');
+    assert.equal(await open('document'), document, 'the second press opens the document the first made');
+    const spreadsheet = await open('spreadsheet');
+    assert.notEqual(spreadsheet, document);
+    const listing = setup.docker('exec', names.app, 'sh', '-c', 'find /var/www/html/data -path "*/files/New *" -printf "%f\\n"');
+    assert.match(listing, /New Document\.odt/);
+    assert.match(listing, /New Spreadsheet\.ods/);
+});
