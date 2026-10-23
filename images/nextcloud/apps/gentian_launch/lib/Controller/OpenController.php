@@ -13,6 +13,7 @@ use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\Files\File;
 use OCP\Files\IRootFolder;
+use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\IUserSession;
@@ -23,7 +24,9 @@ use Psr\Log\LoggerInterface;
  *
  * The person's most recently changed file of that kind opens in Nextcloud
  * Office; somebody who has none gets a new one, made from Office's own empty
- * template in their home folder. This is what the v0.4 portal bridge did with
+ * template in their home folder. Their templates folder is not looked in:
+ * Nextcloud fills it with samples at sign-up (Invoice.ods, Elegant.odp, ...),
+ * and those are not documents of theirs to reopen. This is what the v0.4 portal bridge did with
  * ?open=<kind>, without the bridge: the person is already signed in to
  * Nextcloud, and one who is not is sent through Nextcloud's own sign-in first.
  *
@@ -72,6 +75,7 @@ class OpenController extends Controller {
         private IUserSession $session,
         private IAppManager $apps,
         private IURLGenerator $urls,
+        private IConfig $config,
         private LoggerInterface $logger,
     ) {
         parent::__construct($appName, $request);
@@ -88,10 +92,18 @@ class OpenController extends Controller {
         }
         try {
             $folder = $this->root->getUserFolder($user->getUID());
+            $templates = trim($this->config->getUserValue($user->getUID(), 'core', 'templateDirectory', ''), '/');
             $newest = null;
             foreach ($spec['mimes'] as $mime) {
                 foreach ($folder->searchByMime($mime) as $node) {
-                    if ($node instanceof File && ($newest === null || $node->getMTime() > $newest->getMTime())) {
+                    if (!$node instanceof File) {
+                        continue;
+                    }
+                    $relative = trim((string)$folder->getRelativePath($node->getPath()), '/');
+                    if ($templates !== '' && str_starts_with($relative, $templates . '/')) {
+                        continue;
+                    }
+                    if ($newest === null || $node->getMTime() > $newest->getMTime()) {
                         $newest = $node;
                     }
                 }
