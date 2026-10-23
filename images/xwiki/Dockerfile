@@ -13,7 +13,7 @@
 # Global build args (declared before the first FROM so XWIKI_VERSION can be used
 # in the runtime stage's FROM line). Re-declared inside each stage that uses them.
 ARG XWIKI_VERSION=17.10.9
-ARG OIDC_VERSION=2.20.2
+ARG OIDC_VERSION=2.29.1
 
 # ---------------------------------------------------------------------------
 # Stage 1 — resolve the OIDC authenticator + deps as JARs.

@@ -21,7 +21,7 @@
   <packaging>pom</packaging>
 
   <properties>
-    <oidc.version>2.20.2</oidc.version>
+    <oidc.version>2.29.1</oidc.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 

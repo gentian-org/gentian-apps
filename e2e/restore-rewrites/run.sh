@@ -22,11 +22,24 @@ sidecar=images/gentian-sidecar-sso-saml
 # The YAML parser.
 [ -d "${sidecar}/node_modules" ] || (cd "${sidecar}" && npm ci)
 
+# XWiki runs as the image its profile names. A change that moves that tag has
+# not published it yet (pull requests publish nothing), so it is built here.
+xwiki_image() {
+    [ -z "${E2E_XWIKI_IMAGE:-}" ] || return 0
+    local tag
+    # shellcheck disable=SC1091
+    tag="$(source images/xwiki/versions.env && echo "${IMAGE_TAG}")"
+    docker pull -q "ghcr.io/gentian-org/xwiki:${tag}" >/dev/null 2>&1 || images/xwiki/build.sh
+}
+
 runs=("$@")
 [ ${#runs[@]} -gt 0 ] || runs=(nextcloud odoo open-webui mathesar xwiki)
 # The image the realm's public addresses are served from.
 case " ${runs[*]} " in
-*" xwiki "*) docker build -q -t "${E2E_SIDECAR_IMAGE:-sso-sidecar:e2e}" "${sidecar}" >/dev/null ;;
+*" xwiki "*)
+    docker build -q -t "${E2E_SIDECAR_IMAGE:-sso-sidecar:e2e}" "${sidecar}" >/dev/null
+    xwiki_image
+    ;;
 esac
 status=0
 for run in "${runs[@]}"; do

@@ -109,10 +109,11 @@ async function ensureRealm(kc, realm, people) {
     }
 }
 
-// The page XWiki keeps a person's account on: their username, cleaned of
-// what a page name may not hold (the profile's nameFormater, _clean).
+// The page XWiki keeps a person's account on: their username, each run of
+// what a page name may not hold made a dash (the profile's nameFormater and
+// nameForbiddenPattern).
 function xwikiPage(person) {
-    return `XWiki.${person.address.toLowerCase().replace(/[@.]/g, '')}`;
+    return `XWiki.${person.address.toLowerCase().replace(/[.: @^/]+/g, '-')}`;
 }
 
 // A person of the realm, found by what they sign in with.
