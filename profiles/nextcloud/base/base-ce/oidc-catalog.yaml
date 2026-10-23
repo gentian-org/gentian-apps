@@ -19,9 +19,12 @@ spec:
         access.token.claim: "true"
         userinfo.token.claim: "true"
     gentian_username:
+      # The Keycloak username, which people cannot change themselves. The realm
+      # stores no "uid" attribute; reading one left the claim out of the token.
+      # Keycloak lists the username among a user's attributes.
       protocolMapper: oidc-usermodel-attribute-mapper
       config:
-        user.attribute: uid
+        user.attribute: username
         claim.name: gentian_username
         jsonType.label: String
         id.token.claim: "true"

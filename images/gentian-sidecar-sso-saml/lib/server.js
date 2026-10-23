@@ -49,6 +49,20 @@ function header(req, name) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
+// A header as the text the front door wrote: it writes UTF-8, and Node reads
+// every header byte as one Latin-1 character, so "Brändli" arrives as
+// "BrÃ¤ndli". The bytes are taken back and read as UTF-8; a value that is not
+// UTF-8 is kept as it came.
+const strictUtf8 = new TextDecoder('utf-8', { fatal: true });
+function textHeader(req, name) {
+    const value = header(req, name);
+    try {
+        return strictUtf8.decode(Buffer.from(value, 'latin1'));
+    } catch {
+        return value;
+    }
+}
+
 function withTimeout(promise, ms) {
     let timer;
     const timeout = new Promise((_, reject) => {
@@ -69,7 +83,7 @@ function createServer({ config, signIn, signOut, handler, certificates }) {
         if (header(req, 'x-gentian-realm') !== config.realm) throw new Refusal('other-realm', 403);
         if (!/^[^\s@]+@[^\s@]+$/.test(email) || email.length > 254) throw new Refusal('no-address', 403);
 
-        const { redirectUrl, cookie } = await signIn.begin({ email, name: header(req, 'x-gentian-name').slice(0, 200) });
+        const { redirectUrl, cookie } = await signIn.begin({ email, name: textHeader(req, 'x-gentian-name').slice(0, 200) });
         res.writeHead(302, {
             ...BASE_HEADERS,
             Location: redirectUrl,

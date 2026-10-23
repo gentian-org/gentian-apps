@@ -29,7 +29,8 @@ const { setup } = oidc;
 const PROFILE = oidc.profileOf('profiles/xwiki/xwiki-ce');
 const CLIENT = PROFILE.spec.requires.services.identity.oidc;
 const ADDRESS = oidc.signOutAddress(PROFILE);
-const IMAGE = process.env.E2E_XWIKI_IMAGE || 'ghcr.io/gentian-org/xwiki:17.10.9-gentian1';
+const VALUES = PROFILE.spec.package.extraValues;
+const IMAGE = process.env.E2E_XWIKI_IMAGE || `${VALUES.image.name}:${VALUES.image.tag}`;
 const HOST = ADDRESS.publicHost;
 const REALM = oidc.TENANT;
 const CLIENT_SECRET = 'e2e-only-client-secret-0123456789';
@@ -38,8 +39,8 @@ const PUBLIC_REALM = `${setup.IDP_BASE}/realms/${REALM}`;
 
 // A person signs in with their workspace address; the other address is
 // their own, for the realm to mail a password reset to, and no app's to know.
-const ANNA = { uid: 'anna', address: `anna@${oidc.DOMAIN}`, recovery: 'anna@home.example', firstName: 'Anna', lastName: 'Example', password: 'pw-anna-e2e' };
-const BEN = { uid: 'ben', address: `ben@${oidc.DOMAIN}`, recovery: 'ben@home.example', firstName: 'Ben', lastName: 'Example', password: 'pw-ben-e2e' };
+const ANNA = { address: `anna@${oidc.DOMAIN}`, recovery: 'anna@home.example', firstName: 'Anna', lastName: 'Example', password: 'pw-anna-e2e' };
+const BEN = { address: `ben@${oidc.DOMAIN}`, recovery: 'ben@home.example', firstName: 'Ben', lastName: 'Example', password: 'pw-ben-e2e' };
 
 const names = { pg: 'oidc-e2e-xwiki-pg', app: 'oidc-e2e-xwiki', service: 'oidc-e2e-xwiki-svc' };
 let kc;
@@ -152,7 +153,7 @@ async function whoAmI(b) {
 function addressHeld(person) {
     return setup.docker('exec', names.pg, 'psql', '-U', 'xwiki', '-d', 'xwiki', '-At', '-c',
         `select s.xws_value from xwikiobjects o join xwikistrings s on s.xws_id = o.xwo_id
-         where o.xwo_name = 'XWiki.${person.uid}' and o.xwo_classname = 'XWiki.XWikiUsers' and s.xws_name = 'email'`);
+         where o.xwo_name = '${oidc.xwikiPage(person)}' and o.xwo_classname = 'XWiki.XWikiUsers' and s.xws_name = 'email'`);
 }
 
 async function signIn(person) {
@@ -183,7 +184,7 @@ test('every mapper that writes the e-mail claim for XWiki reads the workspace ad
 
 test('a person signs in to XWiki through the realm, and XWiki holds their workspace address', async () => {
     const anna = await signIn(ANNA);
-    assert.equal(await whoAmI(anna), `xwiki:XWiki.${ANNA.uid}`);
+    assert.equal(await whoAmI(anna), `xwiki:${oidc.xwikiPage(ANNA)}`);
     const held = addressHeld(ANNA);
     assert.equal(held, ANNA.address);
     assert.notEqual(held, ANNA.recovery, 'the address a password reset goes to is not XWiki\'s to know');
@@ -192,8 +193,8 @@ test('a person signs in to XWiki through the realm, and XWiki holds their worksp
 test('signing out at the realm ends that person\'s session in XWiki, and nobody else\'s', async () => {
     const anna = await signIn(ANNA);
     const ben = await signIn(BEN);
-    assert.equal(await whoAmI(anna), `xwiki:XWiki.${ANNA.uid}`);
-    assert.equal(await whoAmI(ben), `xwiki:XWiki.${BEN.uid}`);
+    assert.equal(await whoAmI(anna), `xwiki:${oidc.xwikiPage(ANNA)}`);
+    assert.equal(await whoAmI(ben), `xwiki:${oidc.xwikiPage(BEN)}`);
 
     const before = (await oidc.posts(service)).length;
     await setup.signOutAtRealm(anna, REALM);
@@ -208,9 +209,9 @@ test('signing out at the realm ends that person\'s session in XWiki, and nobody 
     assert.equal(token.iss, PUBLIC_REALM);
 
     // Her cookie is nobody's: the next person at this browser is not her.
-    assert.notEqual(await whoAmI(anna), `xwiki:XWiki.${ANNA.uid}`);
+    assert.notEqual(await whoAmI(anna), `xwiki:${oidc.xwikiPage(ANNA)}`);
     // Ben is where he was.
-    assert.equal(await whoAmI(ben), `xwiki:XWiki.${BEN.uid}`);
+    assert.equal(await whoAmI(ben), `xwiki:${oidc.xwikiPage(BEN)}`);
 });
 
 test('a logout token the realm did not sign ends no session', async () => {
@@ -231,5 +232,5 @@ test('a logout token the realm did not sign ends no session', async () => {
         const plain = await postToken(forge.unsigned(claims));
         assert.ok(plain.status >= 400, `a token nobody signed was answered ${plain.status}`);
     }
-    assert.equal(await whoAmI(ben), `xwiki:XWiki.${BEN.uid}`);
+    assert.equal(await whoAmI(ben), `xwiki:${oidc.xwikiPage(BEN)}`);
 });

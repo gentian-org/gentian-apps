@@ -34,8 +34,8 @@ const CLIENT_SECRET = 'e2e-only-client-secret-0123456789';
 
 // A person signs in with their workspace address; the other address is
 // their own, for the realm to mail a password reset to, and no app's to know.
-const ANNA = { uid: 'anna', address: `anna@${oidc.DOMAIN}`, recovery: 'anna@home.example', firstName: 'Anna', lastName: 'Example', password: 'pw-anna-e2e' };
-const BEN = { uid: 'ben', address: `ben@${oidc.DOMAIN}`, recovery: 'ben@home.example', firstName: 'Ben', lastName: 'Example', password: 'pw-ben-e2e' };
+const ANNA = { address: `anna@${oidc.DOMAIN}`, recovery: 'anna@home.example', firstName: 'Anna', lastName: 'Example', password: 'pw-anna-e2e' };
+const BEN = { address: `ben@${oidc.DOMAIN}`, recovery: 'ben@home.example', firstName: 'Ben', lastName: 'Example', password: 'pw-ben-e2e' };
 
 const names = { app: 'oidc-e2e-nextcloud', service: 'oidc-e2e-nextcloud-svc' };
 let kc;

@@ -86,8 +86,8 @@ function startPublicIdp(kc, host = setup.IDP_HOST) {
 //     "email" is the workspace address. A profile's pack has a mapper of its
 //     own for that claim, and of two mappers that write one claim the realm
 //     lets either win: both have to read the username;
-//   - a person's account name in an app is the attribute "uid", which the
-//     packs' mappers read.
+//   - a person's account name in an app is their username: the packs'
+//     mappers read it, and the realm sets no other attribute for it.
 async function ensureRealm(kc, realm, people) {
     await kc.admin('POST', '/realms', { realm, enabled: true, ssoSessionMaxLifespan: 43200, accessTokenLifespan: 300 });
     const profile = JSON.parse((await kc.admin('GET', `/realms/${realm}/users/profile`)).body);
@@ -100,14 +100,20 @@ async function ensureRealm(kc, realm, people) {
     await kc.admin('PUT', `/realms/${realm}/client-scopes/${scope.id}/protocol-mappers/models/${mapper.id}`,
         { ...mapper, config: { ...mapper.config, 'user.attribute': 'username' } });
     for (const person of people) {
-        if (person.recovery === person.address) throw new Error(`${person.uid}: the recovery address has to differ from the workspace address`);
+        if (person.recovery === person.address) throw new Error(`${person.address}: the recovery address has to differ from the workspace address`);
         await kc.admin('POST', `/realms/${realm}/users`, {
             username: person.address, email: person.recovery, emailVerified: true, enabled: true,
             firstName: person.firstName, lastName: person.lastName,
-            attributes: { uid: [person.uid] },
             credentials: [{ type: 'password', value: person.password, temporary: false }],
         });
     }
+}
+
+// The page XWiki keeps a person's account on: their username, each run of
+// what a page name may not hold made a dash (the profile's nameFormater and
+// nameForbiddenPattern).
+function xwikiPage(person) {
+    return `XWiki.${person.address.toLowerCase().replace(/[.: @^/]+/g, '-')}`;
 }
 
 // A person of the realm, found by what they sign in with.
@@ -248,6 +254,7 @@ function logoutTokenOf(post) {
 }
 
 module.exports = {
+    xwikiPage,
     setup, Browser, keycloak, YAML, REPO,
     TENANT, NAMESPACE, DOMAIN, KERNEL_DOMAIN, IDP_SERVICE,
     startKeycloak, startPublicIdp, ensureRealm, personId, emailSources, fill, profileOf, signOutAddress, registerClient,

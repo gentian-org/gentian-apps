@@ -46,7 +46,7 @@ sessions: `requires.services.identity.oidc.backchannelLogout` names the path
 the realm at XWiki's own Service inside the cluster
 (`http://xwiki-ce.<namespace>.svc.cluster.local:80/…`), not at `wiki.<domain>`.
 
-What the OIDC authenticator 2.20.2 checks before it ends anything
+What the OIDC authenticator 2.29.1 checks before it ends anything
 (`BackChannelLogoutOIDCEndpoint`): with a provider configured (`oidc.provider`, which this
 profile sets) it validates the logout token — signature against the keys the realm publishes,
 issuer, audience — and then ends **every** session of the person the token names, not only the
