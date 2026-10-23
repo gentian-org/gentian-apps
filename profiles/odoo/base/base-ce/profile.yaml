@@ -10,7 +10,7 @@ metadata:
   labels:
     gentianos.io/profile-name: odoo-base-ce
     gentianos.io/profile-family: odoo
-    gentianos.io/profile-edition: ce
+    gentianos.io/profile-edition: me
   annotations:
     # No kernel-egress-namespaces. Odoo validates tokens against the in-cluster
     # Keycloak Service (extraValues.gentian.oidc.internalIssuer), so nothing it
@@ -23,7 +23,7 @@ spec:
   classes:
     - app
   trustTier: platform
-  version: "0.5.1-dev"
+  version: "0.5.1-dev.1"
   package:
     # The Composition that renders this chart AND the objects that have to
     # exist beside it. A chart and a composition are the one legal pair in

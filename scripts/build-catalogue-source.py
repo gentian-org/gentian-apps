@@ -18,7 +18,8 @@ a mistake; this script turns the first into the second.
 so without an index a cluster can install from this catalogue by name but
 cannot say what is in it — which is the whole of a cluster's own catalogue
 screen (AD-14). The index is the technical half and nothing else: name,
-version, edition, trust tier, digest. The listing -- name, summary,
+version, edition, trust tier, digest, and ``listed: false`` for an entry
+every cluster installs without it being offered. The listing -- name, summary,
 description, author, license, logo -- is the App Store's, kept in its own
 database, and nothing here publishes it.
 
@@ -66,14 +67,22 @@ import yaml
 REPO = Path(__file__).resolve().parent.parent
 
 # The editions an entry may declare. Mirrors gentian-os's api/v1alpha1
-# Edition: community, private, maintained, enterprise. A cluster lists ce and
-# pe from its own sources and sends people to the App Store for the other two,
-# so a typo here would quietly decide where an entry can be seen.
-EDITIONS = ("ce", "pe", "me", "ee")
+# Edition: community, maintained, internal, proprietary, enterprise. A cluster
+# lists ce, me and ie from its own sources and sends people to the App Store
+# for pe and ee, so a typo here would quietly decide where an entry can be
+# seen. An me entry is the community edition's code, curated and maintained by
+# the catalogue's maintainer, and is named -ce like the community edition it
+# packages: its edition is the label, not the name.
+EDITIONS = ("ce", "me", "ie", "pe", "ee")
 
 # Where a profile states its edition: the label gentian-os's api/v1alpha1
 # names for it (LabelProfileEdition).
 EDITION_LABEL = "gentianos.io/profile-edition"
+
+# A profile annotated "false" here is installed on every cluster without
+# being offered: the index says ``listed: false`` and the App Store leaves it
+# out.
+LISTED_ANNOTATION = "gentianos.io/store-listed"
 
 
 def edition_of(name: str, profile: dict) -> str:
@@ -417,6 +426,9 @@ def build(out: Path) -> tuple[list[dict], list[str]]:
         }
         if spec.get("trustTier"):
             entry["trustTier"] = str(spec["trustTier"])
+        annotations = (profile.get("metadata") or {}).get("annotations") or {}
+        if str(annotations.get(LISTED_ANNOTATION) or "").lower() == "false":
+            entry["listed"] = False
         # The floor the build declares, spec.requires.platform, repeated so a
         # cluster can say which entries it cannot install without a fetch.
         # The bundle's own value is what an install is held to.
@@ -476,7 +488,7 @@ def main() -> int:
         by_edition[e["edition"]] = by_edition.get(e["edition"], 0) + 1
     shown = ", ".join(f"{n} {ed}" for ed, n in sorted(by_edition.items()))
     print(f"Catalogue source at {out}: {len(entries)} entries ({shown or 'none'})")
-    local = by_edition.get("ce", 0) + by_edition.get("pe", 0)
+    local = sum(by_edition.get(ed, 0) for ed in ("ce", "me", "ie"))
     print(
         f"  a cluster browsing this source lists {local}; "
         f"the other {len(entries) - local} are the App Store's to present."

@@ -13,7 +13,7 @@ const assert = require('node:assert/strict');
 const { test, before, after } = require('node:test');
 const r = require('./lib/restore');
 
-const PROFILE = r.profileOf('profiles/open-webui/open-webui-me');
+const PROFILE = r.profileOf('profiles/open-webui/open-webui-ce');
 const IMAGE = `ghcr.io/open-webui/open-webui:${PROFILE.spec.package.extraValues.image.tag}`;
 const DATA = '/app/backend/data';
 
@@ -66,7 +66,7 @@ test('started with this cluster\'s values, it still prefers what it stored', () 
 
 test('the post-restore commands run as the platform runs them, and again without changing anything', () => {
     const env = r.restoreEnv({
-        app: 'open-webui-me',
+        app: 'open-webui-ce',
         source: { tenant: 'acme', domain: 'old.e2e.test', platformVersion: '0.5', cluster: 'zrh-1' },
         target: { tenant: 'acme', domain: 'new.e2e.test', cluster: 'gva-2' },
         volumes: [['open-webui', 'open-webui']],
@@ -76,7 +76,7 @@ test('the post-restore commands run as the platform runs them, and again without
     const again = r.runRestore(PROFILE, names.app, env);
     assert.match(again, /already name this domain and gateway/);
     for (const key of [OLD.key, NEW.key, MINE.key]) assert.ok(!first.includes(key) && !again.includes(key), 'a key was printed');
-    r.runRestore(PROFILE, names.app, r.restoreEnv({ app: 'open-webui-me', target: { tenant: 'acme', domain: 'new.e2e.test' } }));
+    r.runRestore(PROFILE, names.app, r.restoreEnv({ app: 'open-webui-ce', target: { tenant: 'acme', domain: 'new.e2e.test' } }));
 });
 
 test('it names the new address and gateway, and keeps the connection an administrator added', () => {
