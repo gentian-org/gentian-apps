@@ -25,7 +25,7 @@ const PROFILE = oidc.profileOf('profiles/nextcloud/base/base-ce');
 const CLIENT = PROFILE.spec.requires.services.identity.oidc;
 const ADDRESS = oidc.signOutAddress(PROFILE);
 const VALUES = PROFILE.spec.package.extraValues;
-const IMAGE = `${VALUES.image.registry}/${VALUES.image.repository}:${VALUES.image.tag}`;
+const IMAGE = process.env.E2E_NEXTCLOUD_IMAGE || `${VALUES.image.registry}/${VALUES.image.repository}:${VALUES.image.tag}`;
 const HOST = ADDRESS.publicHost;
 const REALM = oidc.TENANT;
 // The port the image's web server listens on.

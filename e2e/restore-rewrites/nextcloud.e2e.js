@@ -20,7 +20,7 @@ const r = require('./lib/restore');
 
 const PROFILE = r.profileOf('profiles/nextcloud/base/base-ce');
 const VALUES = PROFILE.spec.package.extraValues;
-const IMAGE = `${VALUES.image.registry}/${VALUES.image.repository}:${VALUES.image.tag}`;
+const IMAGE = process.env.E2E_NEXTCLOUD_IMAGE || `${VALUES.image.registry}/${VALUES.image.repository}:${VALUES.image.tag}`;
 const PORT = VALUES.nextcloud.containerPort;
 const QUIESCE = PROFILE.spec.backup.quiesce;
 
