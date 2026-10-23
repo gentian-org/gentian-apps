@@ -18,11 +18,14 @@ metadata:
   annotations:
     gentianos.io/platform-app: "true"
     gentianos.io/deployment-role: base
+    # Installed on every new tenant, so there is nothing to offer in the App
+    # Store.
+    gentianos.io/store-listed: "false"
 spec:
   classes:
     - app
   trustTier: experimental
-  version: "0.5.1-dev"
+  version: "0.5.1-dev.1"
   requires:
     # The oldest platform version line this build runs on (docs/profile-bundles.md).
     platform: ">=0.5"
