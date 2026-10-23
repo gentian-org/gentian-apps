@@ -138,7 +138,11 @@ Each profile bundle holds `kustomization.yaml` (required), `profile.yaml` (the C
 `scripts/sync-profile-tile.py`), and optionally `oidc-catalog.yaml`, `composition.yaml`, further
 `assets/`. `profile.yaml` carries what installing the app needs: its edition and family as the
 labels `gentianos.io/profile-edition` and `gentianos.io/profile-family`, and the app's license as
-an `SPDX-License-Identifier:` comment on its first line. The listing — display name, summary,
+an `SPDX-License-Identifier:` comment on its first line. The edition is the label, never the name:
+`me` is the community edition's code, curated and maintained by Aluvian because it runs it itself,
+so a `ce` and an `me` profile are both named `<app>-ce`. A profile every cluster installs on its own
+(the account link, for one) is annotated `gentianos.io/store-listed: "false"`, which the catalogue
+index carries as `listed: false` and the App Store does not offer. The listing — display name, summary,
 description, categories, links, author, logo — is the App Store's, which runs outside the
 cluster and keeps it in its own database. See
 [docs/app-profile-guide.md](docs/app-profile-guide.md) for the full workflow.
