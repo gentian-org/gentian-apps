@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.1"
+  version: "0.5.1-dev.2"
   package:
     chart:
       repository: "https://xwiki-contrib.github.io/xwiki-helm"
@@ -62,7 +62,7 @@ spec:
     # image.name carries the full ghcr path. Bump tag with images/xwiki/versions.env.
       image:
         name: ghcr.io/gentian-org/xwiki
-        tag: "17.10.9-gentian1"
+        tag: "17.10.9-gentian2"
         pullPolicy: IfNotPresent
 
       mysql:
@@ -166,6 +166,14 @@ spec:
           oidc.clientid: "gentian-xwiki"
           oidc.scope: "openid,profile,email,gentian-xwiki-scope"
           oidc.user.nameFormater: "${oidc.user.gentian_username._clean._lowerCase}"
+          # _clean turns each run of what a page name may not hold into a dash
+          # rather than dropping it: anna@acme.ch is XWiki.anna-acme-ch. The
+          # characters are the authenticator's default set (2.23.0 and later),
+          # less the comma, which xwiki.properties reads as a list separator and
+          # an address never holds, and with a space for its \s, which
+          # xwiki.properties would unescape.
+          oidc.user.nameForbiddenPattern: "[.: @^/]+"
+          oidc.user.nameForbiddenReplacement: "-"
           oidc.user.subjectFormater: "${oidc.user.subject}"
         # oidc.skipped=false: The OIDC authenticator is active. XWiki immediately redirects
         # unauthenticated requests to Keycloak instead of showing an anonymous view with a "Log In" button.
