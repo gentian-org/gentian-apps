@@ -14,7 +14,7 @@ A non-empty `series` is a debt signal that belongs in the customization debt rep
    failure is the point: it forces a decision instead of silent drift.
 4. Each patch needs a `Customization` record with an owner, exit criteria, and a
    review date.
-5. Never patch to bypass licence validation or unlock paid features.
+5. Never patch to bypass license validation or unlock paid features.
 
 ## DEP-3 header template
 

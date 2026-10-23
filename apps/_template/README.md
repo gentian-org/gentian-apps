@@ -47,7 +47,7 @@ Use **`profile/appprofile.yaml.tmpl`** for a **catalogue app** — something a t
 picks and installs into their own tenant. It is installed by listing it in
 `Tenant.spec.apps`, the app reconciler takes it through a Crossplane App claim, and the
 profile carries what the portal has to show: `displayName`, `description`, `tile`, portal
-tiles, and the catalogue identity (family, catalogue version, edition, licence).
+tiles, and the catalogue identity (family, catalogue version, edition, license).
 
 Use **`profile/componentprofile.yaml.tmpl`** for a **component of the platform itself** —
 a system service, app or agent that the platform installs for itself by creating a
