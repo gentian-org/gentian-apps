@@ -623,8 +623,18 @@ jobs:
         run: python3 scripts/validate-chart-refs.py
       - name: Validate secret references
         run: python3 scripts/validate-secret-refs.py
+      # On develop a profile names an image built here by its develop-<sha7>,
+      # the only name a develop build publishes; into main it names the
+      # version, which the release publishes (docs/releasing.md).
       - name: Validate image tags
-        run: python3 scripts/validate-image-tags.py
+        env:
+          TARGET: ${{ github.base_ref || github.ref_name }}
+        run: |
+          args=()
+          if [ "${TARGET}" = "main" ]; then
+            args+=(--released)
+          fi
+          python3 scripts/validate-image-tags.py "${args[@]}"
       - name: Validate backup contract
         run: python3 scripts/validate-backup-spec.py
       - name: Customization debt report

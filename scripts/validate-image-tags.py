@@ -27,7 +27,16 @@ What is checked:
 
   ghcr.io/gentian-org/<name>   CI must build <name> (a ref in
       .github/workflows/apps-ci.yaml). If images/<name>/versions.env pins an
-      IMAGE_TAG, the tag must be it. Otherwise the registry must hold the tag.
+      IMAGE_TAG, the tag must be it -- or, on develop, a develop-<sha7> build
+      the registry holds. Otherwise the registry must hold the tag.
+
+A build of develop publishes an image only as develop-<sha7>; its IMAGE_TAG is
+published by the release from main (docs/releasing.md). A develop profile
+asking for IMAGE_TAG therefore asked for an image nobody could pull until the
+next release: Nextcloud's 33.0.6-gentian7 sat in ImagePullBackOff, and its
+Helm install with it. So on develop a profile names the develop build, as it
+names a chart's -develop.<sha7>; --released (a pull request into main, or main
+itself) refuses a develop tag and asks for IMAGE_TAG again.
   any other image              the registry must hold a manifest for it, asked
       anonymously as a cluster without pull secrets would. Docker Hub, which
       answers an unknown repository with 401, is asked through its own API.
@@ -40,6 +49,7 @@ credentials. VALIDATE_OFFLINE=1 skips the network.
 
 from __future__ import annotations
 
+import argparse
 import pathlib
 import re
 import sys
@@ -51,6 +61,7 @@ from _artefacts import FOUND, MISSING, OFFLINE, chart_uses, helm_chart_values, i
 REPO = pathlib.Path(__file__).resolve().parent.parent
 OWN = "ghcr.io/gentian-org/"
 WORKFLOW = REPO / ".github/workflows/apps-ci.yaml"
+DEVELOP = re.compile(r"^develop-[0-9a-f]{7}$")
 
 
 def built_tags() -> dict[str, str]:
@@ -171,6 +182,9 @@ def profile_images(spec: dict):
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--released", action="store_true", help="refuse develop builds: a release names IMAGE_TAG")
+    args = ap.parse_args()
     tags = built_tags()
     built = images_ci_builds()
     errors: list[str] = []
@@ -202,13 +216,21 @@ def main() -> int:
                     )
                     continue
                 if name in tags:
-                    if ref.reference != tags[name]:
+                    if DEVELOP.match(ref.reference or "") and args.released:
                         errors.append(
-                            f"{at} asks for {ref_text}, but images/{name}/versions.env builds "
-                            f"IMAGE_TAG={tags[name]}. The tenant would run a different build than "
-                            f"the one this repo produces."
+                            f"{at} asks for {ref_text}, a develop build; a released profile names "
+                            f"IMAGE_TAG={tags[name]} from images/{name}/versions.env"
                         )
-                    continue
+                        continue
+                    if not DEVELOP.match(ref.reference or ""):
+                        if ref.reference != tags[name]:
+                            errors.append(
+                                f"{at} asks for {ref_text}, but images/{name}/versions.env builds "
+                                f"IMAGE_TAG={tags[name]}. The tenant would run a different build than "
+                                f"the one this repo produces."
+                            )
+                        continue
+                    # A develop build: it has to be one the registry holds.
 
             key = f"{full}:{ref.reference}"
             if key not in seen:
@@ -229,7 +251,7 @@ def main() -> int:
 
     print(
         f"Checked {checked} image reference(s): every one exists, and every image built here is "
-        f"asked for at the tag it is built with"
+        f"asked for at the tag it is built with or at a develop build"
         + (f" ({len(warnings)} not confirmed, see warnings)" if warnings else "")
         + "."
     )
