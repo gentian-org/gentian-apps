@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.3"
+  version: "0.5.1-dev.4"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -144,7 +144,7 @@ spec:
       image:
         registry: ghcr.io
         repository: gentian-org/nextcloud
-        tag: 33.0.6-gentian7
+        tag: 33.0.10-gentian1
       extraEnv:
         - name: REDIS_HOST_USER
           value: ${TENANT_ID}-${APP_ID}

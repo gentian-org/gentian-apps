@@ -28,24 +28,24 @@
 #
 # Build args must match versions.env. See BUNDLE.md beside this file.
 
-ARG NEXTCLOUD_VERSION=33.0.6-apache
+ARG NEXTCLOUD_VERSION=33.0.10-apache
 
 FROM docker.io/library/nextcloud:${NEXTCLOUD_VERSION} AS base
 
 USER root
 
 # Platform SSO — always present, always enabled.
-ARG USER_OIDC_VERSION=8.10.1
+ARG USER_OIDC_VERSION=8.11.0
 
 # Optional apps, staged disabled. Selected per tenant via spec.apps[].addons.
-ARG RICHDOCUMENTS_VERSION=10.2.0
-ARG FORMS_VERSION=5.3.2
+ARG RICHDOCUMENTS_VERSION=10.3.2
+ARG FORMS_VERSION=5.4.1
 ARG MAIL_VERSION=5.10.5
 ARG CALENDAR_VERSION=6.5.0
 ARG CONTACTS_VERSION=8.7.2
 ARG TASKS_VERSION=0.18.1
 ARG DECK_VERSION=1.17.4
-ARG COLLECTIVES_VERSION=3.5.0
+ARG COLLECTIVES_VERSION=4.7.1
 ARG SPREED_VERSION=23.0.8
 
 RUN set -eux; \
