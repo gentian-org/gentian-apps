@@ -216,10 +216,19 @@ test('the Files tile and the bare address open Files, not the Dashboard', async 
 });
 
 test('an Office tile opens the person\'s newest file of its kind, or a new one from the template', async () => {
-    // Office switched on as its add-on is: copied from the image's staging,
-    // then enabled. No Collabora is needed to choose the file.
+    // Office switched on as its add-on is: copied from the image's staging and
+    // enabled, then the container started again -- the activation hook runs
+    // before the web server starts, and a web server already running keeps
+    // the apps it read in APCu. No Collabora is needed to choose the file.
     setup.docker('exec', names.app, 'cp', '-a', '/usr/src/gentian-addons/richdocuments', '/var/www/html/custom_apps/');
     occ('app:enable', 'richdocuments');
+    setup.docker('restart', names.app);
+    // A port Docker chose may be another after a restart.
+    appUpstream = `http://127.0.0.1:${setup.publishedPort(names.app, APP_PORT)}`;
+    await setup.waitFor('Nextcloud', async () => {
+        const res = await setup.call('GET', `${appUpstream}/status.php`, { headers: { host: HOST, 'x-forwarded-proto': 'https' } });
+        return res.status === 200;
+    }, 120);
     const office = oidc.profileOf('profiles/nextcloud/addons/richdocuments-ce');
     const ben = await signIn(BEN);
     async function open(kind) {
@@ -229,11 +238,15 @@ test('an Office tile opens the person\'s newest file of its kind, or a new one f
         assert.ok(id, `${kind} went to ${res.headers.location}, not to a file`);
         return id[1];
     }
+    // Nextcloud's samples at sign-up hold a .docx in Documents, which is the
+    // newest document Ben has; spreadsheets and presentations he has only
+    // in his templates folder, which is not looked in.
     const document = await open('document');
-    assert.equal(await open('document'), document, 'the second press opens the document the first made');
+    assert.equal(await open('document'), document, 'the same document again');
     const spreadsheet = await open('spreadsheet');
-    assert.notEqual(spreadsheet, document);
-    const listing = setup.docker('exec', names.app, 'sh', '-c', 'find /var/www/html/data -path "*/files/New *" -printf "%f\\n"');
-    assert.match(listing, /New Document\.odt/);
-    assert.match(listing, /New Spreadsheet\.ods/);
+    assert.equal(await open('spreadsheet'), spreadsheet, 'the second press opens the spreadsheet the first made');
+    const presentation = await open('presentation');
+    assert.equal(new Set([document, spreadsheet, presentation]).size, 3);
+    const made = setup.docker('exec', names.app, 'sh', '-c', 'find /var/www/html/data -path "*/files/New *" -printf "%f\\n"');
+    assert.deepEqual(made.split('\n').sort(), ['New Presentation.odp', 'New Spreadsheet.ods'], 'made from the templates, once each');
 });
