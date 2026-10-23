@@ -86,6 +86,11 @@ RUN set -eux; \
     chown -R www-data:www-data /usr/local/etc/php/conf.d; \
     chown -R www-data:www-data /var/run/apache2 /var/log/apache2 /var/lock/apache2 /var/lib/apache2 /etc/apache2
 
+# Where the platform's Office tiles land (apps/gentian_launch, this repository).
+# Enabled like user_oidc: the profile's hooks copy it from apps/ into
+# custom_apps/ on every start, so an existing install receives it too.
+COPY --chown=www-data:www-data apps/gentian_launch /usr/src/nextcloud/apps/gentian_launch
+
 USER www-data
 
 LABEL org.opencontainers.image.title="Gentian Nextcloud" \
