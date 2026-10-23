@@ -26,6 +26,7 @@ needs no chart change.
 | Component | Why |
 |-----------|-----|
 | `user_oidc` | Platform SSO. Not optional, so it stays in `apps/`. |
+| `gentian_launch` | Where the Office tiles land: the person's newest document, spreadsheet or presentation, or a new one from Office's template. From `apps/gentian_launch` beside this file. |
 
 ## Staged, disabled — selected per tenant
 

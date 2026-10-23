@@ -18,19 +18,20 @@ sidecar=images/gentian-sidecar-sso-saml
 [ -d "${sidecar}/node_modules" ] || (cd "${sidecar}" && npm ci)
 docker build -q -t "${E2E_SIDECAR_IMAGE:-sso-sidecar:e2e}" "${sidecar}" >/dev/null
 
-# XWiki runs as the image its profile names. A change that moves that tag has
-# not published it yet (pull requests publish nothing), so it is built here.
-xwiki_image() {
-    [ -z "${E2E_XWIKI_IMAGE:-}" ] || return 0
+# An app built here runs as the image its profile names. A change that moves
+# that tag has not published it yet (pull requests publish nothing), so it is
+# built here from images/<name>.
+built_image() {
     local tag
-    # shellcheck disable=SC1091
-    tag="$(source images/xwiki/versions.env && echo "${IMAGE_TAG}")"
-    docker pull -q "ghcr.io/gentian-org/xwiki:${tag}" >/dev/null 2>&1 || images/xwiki/build.sh
+    # shellcheck disable=SC1090
+    tag="$(source "images/$1/versions.env" && echo "${IMAGE_TAG}")"
+    docker pull -q "ghcr.io/gentian-org/$1:${tag}" >/dev/null 2>&1 || "images/$1/build.sh"
 }
 
 runs=("$@")
 [ ${#runs[@]} -gt 0 ] || runs=(nextcloud xwiki)
-case " ${runs[*]} " in *" xwiki "*) xwiki_image ;; esac
+case " ${runs[*]} " in *" xwiki "*) [ -n "${E2E_XWIKI_IMAGE:-}" ] || built_image xwiki ;; esac
+case " ${runs[*]} " in *" nextcloud "*) built_image nextcloud ;; esac
 status=0
 for run in "${runs[@]}"; do
     echo "=== ${run} ==="
