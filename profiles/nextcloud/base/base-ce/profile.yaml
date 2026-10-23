@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.3"
+  version: "0.5.1-dev.4"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -144,7 +144,7 @@ spec:
       image:
         registry: ghcr.io
         repository: gentian-org/nextcloud
-        tag: 33.0.6-gentian7
+        tag: 33.0.10-gentian1
       extraEnv:
         - name: REDIS_HOST_USER
           value: ${TENANT_ID}-${APP_ID}
@@ -805,12 +805,37 @@ spec:
         # entrypoint syncs, because its custom_apps copy only runs while that
         # directory is still empty — so anything added to the image later would
         # never reach an existing install. Copying here works on every start.
+        #
+        # A copy already on the volume is replaced when the image's is newer.
+        # Copying only what was missing kept an install on the addon versions it
+        # was first given: a newer image (security fixes among them) never
+        # reached it, because Nextcloud's own updater fetches from the App Store
+        # and a tenant has no way out to it. Never replaced by an older one.
+        version_of() {
+          sed -n 's:.*<version>\(.*\)</version>.*:\1:p' "$1/appinfo/info.xml" 2>/dev/null | head -n 1
+        }
+        replaced=""
         for id in $SELECTED; do
           if [ -d "$STAGE/$id" ] && [ ! -d "$APPS/$id" ]; then
             cp -a "$STAGE/$id" "$APPS/$id"
+          elif [ -d "$STAGE/$id" ]; then
+            staged=$(version_of "$STAGE/$id")
+            have=$(version_of "$APPS/$id")
+            newest=$(printf '%s\n%s\n' "$have" "$staged" | sort -V | tail -n 1)
+            if [ -n "$staged" ] && [ "$staged" != "$have" ] && [ "$newest" = "$staged" ]; then
+              rm -rf "$APPS/$id"
+              cp -a "$STAGE/$id" "$APPS/$id"
+              echo "$id $have -> $staged"
+              replaced="$replaced $id"
+            fi
           fi
           $OCC app:enable "$id" || echo "warning: could not enable $id"
         done
+        # A replaced addon's database steps, before the web server starts:
+        # Nextcloud refuses to serve while an app's code is ahead of its schema.
+        if [ -n "$replaced" ]; then
+          $OCC upgrade || echo "warning: occ upgrade failed after replacing$replaced"
+        fi
 
         # Anything staged but no longer selected goes back to disabled. Driven by the
         # image's staging directory, so the container derives this itself — user_oidc

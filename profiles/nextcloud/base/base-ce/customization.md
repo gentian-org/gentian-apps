@@ -56,12 +56,14 @@ person's session: `requires.services.identity.oidc.backchannelLogout` names the 
 with the realm at Nextcloud's own Service inside the cluster
 (`http://nextcloud.<namespace>.svc.cluster.local:8080/…`), not at `https://nextcloud.<domain>`.
 
-What `user_oidc` 8.10.1 checks before it ends anything (`lib/Controller/LoginController.php`,
-`backChannelLogout`): the logout token's signature against the realm's published keys; that its
-audience is this client; that it carries the back-channel logout event and no nonce; and that a
-session it recorded at sign-in exists for the token's session id, person and issuer together. It
-then invalidates that one session's Nextcloud token. A token that fails any of these ends
-nothing.
+What `user_oidc` 8.11.0 checks before it ends anything (`lib/Controller/LoginController.php`,
+`backChannelLogout`): the logout token's signature against the realm's published keys; that it
+carries the claims a logout token must; that its audience is this client; and that it carries the
+back-channel logout event and no nonce. A token that fails any of these is refused and ends
+nothing. It then looks for the session it recorded at sign-in for the token's session id, person
+and issuer together, and invalidates that one session's Nextcloud token. When there is none -- the
+session already ended, or the token was sent before -- it answers 200 and ends nothing, as the
+back-channel logout specification asks.
 
 It ends the session of the browser that signed out, by the realm's session id; the same person
 signed in elsewhere from another realm session stays signed in there.
