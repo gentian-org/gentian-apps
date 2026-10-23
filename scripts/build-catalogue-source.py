@@ -67,13 +67,13 @@ import yaml
 REPO = Path(__file__).resolve().parent.parent
 
 # The editions an entry may declare. Mirrors gentian-os's api/v1alpha1
-# Edition: community, private, maintained, enterprise. A cluster lists ce, pe
-# and me from its own sources and sends people to the App Store for ee, so a
-# typo here would quietly decide where an entry can be seen. An me entry is
-# the community edition's code, curated and maintained by the catalogue's
-# maintainer, and is named -ce like the community edition it packages: its
-# edition is the label, not the name.
-EDITIONS = ("ce", "pe", "me", "ee")
+# Edition: community, maintained, internal, proprietary, enterprise. A cluster
+# lists ce, me and ie from its own sources and sends people to the App Store
+# for pe and ee, so a typo here would quietly decide where an entry can be
+# seen. An me entry is the community edition's code, curated and maintained by
+# the catalogue's maintainer, and is named -ce like the community edition it
+# packages: its edition is the label, not the name.
+EDITIONS = ("ce", "me", "ie", "pe", "ee")
 
 # Where a profile states its edition: the label gentian-os's api/v1alpha1
 # names for it (LabelProfileEdition).
@@ -488,7 +488,7 @@ def main() -> int:
         by_edition[e["edition"]] = by_edition.get(e["edition"], 0) + 1
     shown = ", ".join(f"{n} {ed}" for ed, n in sorted(by_edition.items()))
     print(f"Catalogue source at {out}: {len(entries)} entries ({shown or 'none'})")
-    local = sum(by_edition.get(ed, 0) for ed in ("ce", "pe", "me"))
+    local = sum(by_edition.get(ed, 0) for ed in ("ce", "me", "ie"))
     print(
         f"  a cluster browsing this source lists {local}; "
         f"the other {len(entries) - local} are the App Store's to present."
