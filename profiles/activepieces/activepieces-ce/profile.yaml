@@ -7,11 +7,14 @@ metadata:
     gentianos.io/profile-name: activepieces-ce
     gentianos.io/profile-family: activepieces
     gentianos.io/profile-edition: ce
+  annotations:
+    # The App Store's listing of activepieces-me goes with the new name.
+    gentianos.io/renamed-from: activepieces-me
 spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev"
+  version: "0.5.1-dev.1"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
