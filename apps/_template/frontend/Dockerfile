@@ -1,7 +1,7 @@
 # The build stage runs on the builder's own platform. Vite produces the same
 # bundle for every target, so emulating a foreign architecture to run npm would
 # only make the arm64 leg slow.
-FROM --platform=$BUILDPLATFORM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS build
+FROM --platform=$BUILDPLATFORM node:26-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS build
 WORKDIR /app
 # The lockfile decides what is installed: npm ci refuses a lockfile that does
 # not match package.json instead of resolving anew.
@@ -10,7 +10,7 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+FROM node:26-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797
 RUN npm install -g serve@14.2.4
 COPY --from=build /app/dist /app/dist
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
