@@ -9,15 +9,15 @@ metadata:
   # Named after the profile it travels with. No namespace: a companion in a
   # profile bundle states none, and the cluster puts it where its catalogue
   # is applied.
-  name: activepieces-me.sign-in-sidecar
+  name: activepieces-ce.sign-in-sidecar
   labels:
-    gentianos.io/profile-name: activepieces-me
+    gentianos.io/profile-name: activepieces-ce
 spec:
   summary: "Sign people in to Activepieces through the platform's sign-in sidecar, with no password"
 
   target:
     family: activepieces
-    profile: activepieces-me
+    profile: activepieces-ce
     appVersion: "0.28.0"
     chartVersion: "0.3.28"
 
@@ -41,7 +41,7 @@ spec:
 
   artifacts:
     - repo: gentian-org/gentian-apps
-      path: profiles/activepieces/activepieces-me/assets/sign-in-handler.js
+      path: profiles/activepieces/activepieces-ce/assets/sign-in-handler.js
       version: "1.1.0"
     - repo: gentian-org/gentian-apps
       path: images/gentian-sidecar-sso-saml

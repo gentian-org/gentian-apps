@@ -2,7 +2,7 @@
 
 33 profiles converted, 100 items a person has to decide.
 
-## activepieces-me
+## activepieces-ce
 
 - package: dropped deploymentMethod 'crossplane' — delivery is read from which package kind is present and can no longer contradict it
 - requires.privileges.egress/egress-1: write the reason the tenant administrator will read, and give it a name that says where it goes

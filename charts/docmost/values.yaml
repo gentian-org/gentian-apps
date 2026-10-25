@@ -15,7 +15,7 @@ appUrl: ""
 port: 3000
 
 # Delivered as literal Helm values via valueMapping (profile.yaml) rather than
-# secretKeyRef, matching the openproject-ce/activepieces-me convention — see
+# secretKeyRef, matching the openproject-ce/activepieces-ce convention — see
 # docs/app-profile-guide.md §3. DATABASE_URL/REDIS_URL are single connection
 # strings (Docmost has no discrete-field option), so they must be assembled at
 # render time from these pieces; secretKeyRef can't do that composition.

@@ -26,8 +26,9 @@ profiles/
 ```
 
 Leaf names now carry an explicit tier suffix — `ce` (Community Edition), `od`
-(openDesk), `me` (Managed/Maintained Edition, the build Gentian maintains for MSP
-customers). `nextcloud-office` (the old standard edition) was dropped; the office
+(openDesk). A maintained edition (`me`: the community edition's code, curated and
+maintained by Aluvian, which runs it itself) keeps the `-ce` name; its edition is
+the `gentianos.io/profile-edition` label. `nextcloud-office` (the old standard edition) was dropped; the office
 group is now the former `office-plus` content as `nextcloud-office-ce`.
 
 **Application naming still uses `path.basename`, not the full relative path.** The

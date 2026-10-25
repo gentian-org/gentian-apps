@@ -8,11 +8,11 @@ resources:
 # an install is pinned to it by the bundle's digest, and it is reviewed with
 # the profile. See customizations/sign-in-sidecar.yaml.
 configMapGenerator:
-  - name: activepieces-me.sign-in-handler
+  - name: activepieces-ce.sign-in-handler
     files:
       - handler.js=assets/sign-in-handler.js
 generatorOptions:
   disableNameSuffixHash: true
   labels:
-    gentianos.io/profile-name: activepieces-me
+    gentianos.io/profile-name: activepieces-ce
     gentianos.io/asset: sign-in-handler
