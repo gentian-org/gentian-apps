@@ -25,7 +25,7 @@ const HOST = 'activepieces.acme.e2e.test';
 const REALM = 'acme';
 // The profile's own handler and lists: what is sent to the sign-in, what is
 // refused at the front door.
-const PROFILE = signInOf('profiles/activepieces/activepieces-me');
+const PROFILE = signInOf('profiles/activepieces/activepieces-ce');
 const HANDLER = PROFILE.handler;
 const ENTRY_PATHS = PROFILE.entryPaths;
 const DENY_PATHS = PROFILE.denyPaths;

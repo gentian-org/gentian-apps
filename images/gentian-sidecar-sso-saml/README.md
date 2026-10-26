@@ -209,7 +209,7 @@ reaches nothing but what was declared.
 
 The handlers in this catalogue are the reference:
 `profiles/docmost/docmost-ce/assets/sign-in-handler.js` and
-`profiles/activepieces/activepieces-me/assets/sign-in-handler.js`, which sign a session token
+`profiles/activepieces/activepieces-ce/assets/sign-in-handler.js`, which sign a session token
 with the app's own key, and `profiles/openproject/openproject-ce/assets/sign-in-handler.js`, for
 an app that keeps its sessions in its database: it signs nothing, and has the app make the
 session itself from a token that works once. Each settles who administers its app; what an

@@ -37,6 +37,14 @@ change, or the change is released from `main` under its plain version. A profile
 a plain version before `develop` is merged into `main`: a released catalogue names released
 charts only.
 
+**An image built here is named the same way.** A profile on `develop` names an image from
+`images/<name>` by the `develop-<sha7>` CI published for it, since that is the only name a develop
+build has; the `IMAGE_TAG` in `versions.env` is published by the release. Before `develop` is
+merged into `main` the profile goes back to `IMAGE_TAG`. `scripts/validate-image-tags.py` holds
+both: on `develop` the develop build must be in the registry, and with `--released` (a pull
+request into `main`, or `main`) only `IMAGE_TAG` is accepted. The end-to-end runs use the image
+the tree builds, whatever the profile names.
+
 **A profile's version moves with its bundle, and a release carries no development number.** This
 is the next-dev model (gentian-os `docs/plans/versioning.md` §1.1): on `develop` a build's
 `spec.version` carries a `-dev` suffix, `0.5.1-dev`, and is bumped whenever the published bundle

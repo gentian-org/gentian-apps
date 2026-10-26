@@ -1,4 +1,4 @@
-# Customization ladder — Activepieces (family `activepieces-me`)
+# Customization ladder — Activepieces (profile `activepieces-ce`)
 
 **Grade: A** · rubric score **7/8** · characterised 2026-08-06
 

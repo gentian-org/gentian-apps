@@ -1876,7 +1876,7 @@ the app's resources, so **the script itself** must:
   (e.g. `GET` the app's own config endpoint) before writing, rather than
   blindly re-applying every run.
 
-**Worked example — open-webui:** `profiles/open-webui/profile.yaml`'s
+**Worked example — open-webui:** `profiles/open-webui/open-webui-ce/profile.yaml`'s
 `postInstallJob` mints a short-lived admin JWT itself (HS256, signed with the
 same `WEBUI_SECRET_KEY` Open WebUI verifies incoming tokens with, sourced via
 `envFrom: [llm-credentials-open-webui]`), reads the admin user id from Open

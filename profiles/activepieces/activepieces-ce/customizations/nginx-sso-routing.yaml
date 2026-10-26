@@ -10,15 +10,15 @@ metadata:
   # Named after the profile it travels with. No namespace: a companion in a
   # profile bundle states none, and the cluster puts it where its catalogue
   # is applied.
-  name: activepieces-me.nginx-sso-routing
+  name: activepieces-ce.nginx-sso-routing
   labels:
-    gentianos.io/profile-name: activepieces-me
+    gentianos.io/profile-name: activepieces-ce
 spec:
   summary: "Front Activepieces with a Gentian nginx config, and send a browser with no session to the platform's sign-in"
 
   target:
     family: activepieces
-    profile: activepieces-me
+    profile: activepieces-ce
     appVersion: "0.28.0"
     chartVersion: "0.3.28"
 

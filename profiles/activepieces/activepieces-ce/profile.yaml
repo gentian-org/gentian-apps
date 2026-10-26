@@ -2,16 +2,19 @@
 apiVersion: gentianos.io/v1alpha1
 kind: ComponentProfile
 metadata:
-  name: activepieces-me
+  name: activepieces-ce
   labels:
-    gentianos.io/profile-name: activepieces-me
+    gentianos.io/profile-name: activepieces-ce
     gentianos.io/profile-family: activepieces
-    gentianos.io/profile-edition: me
+    gentianos.io/profile-edition: ce
+  annotations:
+    # The App Store's listing of activepieces-me goes with the new name.
+    gentianos.io/renamed-from: activepieces-me
 spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev"
+  version: "0.5.1-dev.1"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
@@ -29,7 +32,7 @@ spec:
         portKey: activepieces.redis.port
         passwordKey: activepieces.redis.password
     extraValues:
-      fullnameOverride: activepieces-me
+      fullnameOverride: activepieces-ce
       extraEnvVars:
         - name: AP_TELEMETRY_ENABLED
           value: 'false'
@@ -245,7 +248,7 @@ spec:
         - /api/v1/authn
         - /api/v1/otp
       backend:
-        service: activepieces-me
+        service: activepieces-ce
         port: 8080
       tile:
         displayName: Automation
@@ -258,7 +261,7 @@ spec:
     grade: A
     rubricScore: 7
     supportedRungs: [L0, L1, L3, L4]
-    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/activepieces/activepieces-me/customization.md
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/activepieces/activepieces-ce/customization.md
     configure:
       hotReload: false
     dropIns:

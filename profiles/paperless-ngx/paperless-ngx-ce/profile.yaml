@@ -83,7 +83,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.2-dev"
+  version: "0.5.1-dev.2"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -231,11 +231,13 @@ spec:
       chart:
         repository: oci://ghcr.io/gentian-org/charts
         name: paperless-ngx-mcp
-        # Develop build, as the app's chart above. No image here: the chart
-        # names the image it was built with (develop-cdb6281 in this build,
-        # 0.1.0 in the release), and a tag set here would override it.
+        # Develop build, as the app's chart above. The image is named here
+        # so that validate-image-tags checks it against the registry.
         version: "0.1.0-develop.cdb6281"
       extraValues:
+        image:
+          repository: ghcr.io/gentian-org/paperless-ngx-mcp
+          tag: "develop-e8bcf06"
         paperlessUrl: http://paperless-ngx-ce:8000
         paperlessUser: mcp-service
         # This profile's own credentials Secret, where the platform keeps

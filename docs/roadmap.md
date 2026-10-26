@@ -41,7 +41,7 @@ planned, `(***)` larger or longer-horizon.
   | App layout | Result |
   |---|---|
   | App-schema (`odoo-base-ce`) | `ERROR: permission denied for schema demo_odoo_base_ce` |
-  | Public-schema (`activepieces-me`) | `ERROR: permission denied for table migrations` |
+  | Public-schema (`activepieces-ce`) | `ERROR: permission denied for table migrations` |
 
   Table and schema privileges are owner-only and are never granted to `PUBLIC`,
   and PostgreSQL 15+ already revokes `CREATE` on `public` from `PUBLIC`. What an

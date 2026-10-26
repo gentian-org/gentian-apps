@@ -18,19 +18,25 @@ sidecar=images/gentian-sidecar-sso-saml
 [ -d "${sidecar}/node_modules" ] || (cd "${sidecar}" && npm ci)
 docker build -q -t "${E2E_SIDECAR_IMAGE:-sso-sidecar:e2e}" "${sidecar}" >/dev/null
 
-# XWiki runs as the image its profile names. A change that moves that tag has
-# not published it yet (pull requests publish nothing), so it is built here.
-xwiki_image() {
-    [ -z "${E2E_XWIKI_IMAGE:-}" ] || return 0
-    local tag
-    # shellcheck disable=SC1091
-    tag="$(source images/xwiki/versions.env && echo "${IMAGE_TAG}")"
-    docker pull -q "ghcr.io/gentian-org/xwiki:${tag}" >/dev/null 2>&1 || images/xwiki/build.sh
+# An app built here runs as the image this tree builds, images/<name> at its
+# IMAGE_TAG, whatever develop build its profile names: the run is of this
+# change. That tag is published by a release only, so it is built here unless
+# it can be pulled; the tests are told which image through E2E_<NAME>_IMAGE.
+built_image() {
+    local tag ref var
+    var="E2E_$(echo "$1" | tr '[:lower:]' '[:upper:]')_IMAGE"
+    [ -z "${!var:-}" ] || return 0
+    # shellcheck disable=SC1090
+    tag="$(source "images/$1/versions.env" && echo "${IMAGE_TAG}")"
+    ref="ghcr.io/gentian-org/$1:${tag}"
+    docker pull -q "${ref}" >/dev/null 2>&1 || "images/$1/build.sh"
+    export "${var}=${ref}"
 }
 
 runs=("$@")
 [ ${#runs[@]} -gt 0 ] || runs=(nextcloud xwiki)
-case " ${runs[*]} " in *" xwiki "*) xwiki_image ;; esac
+case " ${runs[*]} " in *" xwiki "*) built_image xwiki ;; esac
+case " ${runs[*]} " in *" nextcloud "*) built_image nextcloud ;; esac
 status=0
 for run in "${runs[@]}"; do
     echo "=== ${run} ==="
