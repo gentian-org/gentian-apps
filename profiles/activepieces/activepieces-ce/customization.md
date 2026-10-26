@@ -37,7 +37,7 @@ chart is *packaging*, and patching packaging is what a distribution repo does.
 
 **L5 remains forbidden**, because at this rung the patch target would be the
 Activepieces application itself — its server bundles and database flags — and
-that is precisely where the licence-bypass temptation lives (see below). The
+that is precisely where the license-bypass temptation lives (see below). The
 distinction is the target, not the technique.
 
 ## L3 is the intended path
@@ -49,19 +49,19 @@ phrased as "add an integration/connector/step" is L3 here, not L2.
 ## Licensing — read before customizing
 
 Several capabilities (SSO, custom appearance, git sync of flows, advanced RBAC) are Enterprise
-features gated by a licence key. Configure them by supplying a valid `AP_LICENSE_KEY`, never by
+features gated by a license key. Configure them by supplying a valid `AP_LICENSE_KEY`, never by
 patching bundles or flipping database flags. This is an explicit absolute prohibition — see
 `app-profile-guide.md`. It is also why `patch.allowed` is `false` for this app: the temptation
 lives exactly here.
 
-Upstream chart provenance and licence terms are pinned in
+Upstream chart provenance and license terms are pinned in
 [`charts/activepieces/UPSTREAM`](../../charts/activepieces/UPSTREAM); the local delta is
 [`charts/activepieces/patches/`](../../charts/activepieces/patches/). Nothing about that
 series touches licensing — it is 3 upstream bug fixes plus 2 additive extension points.
 
 ## Sign-in: the platform's sidecar and this profile's handler
 
-Single sign-on is one of the licence-gated capabilities above and is not used. The profile
+Single sign-on is one of the license-gated capabilities above and is not used. The profile
 declares `requires.services.identity.sidecar`: the platform runs its sign-in sidecar beside
 Activepieces and the sidecar runs [`assets/sign-in-handler.js`](assets/sign-in-handler.js). The
 record is [`customizations/sign-in-sidecar.yaml`](customizations/sign-in-sidecar.yaml); the nginx
@@ -91,7 +91,7 @@ account only, and creating more is behind the `manageProjectsEnabled` switch, wh
 feature. So the handler writes the person's account and one project of their own into the
 database, as the handler before it did. It writes no switch, shares no project and gives no role.
 
-Whether one project per person, written this way, is within the community licence or is going
+Whether one project per person, written this way, is within the community license or is going
 around a paid feature is a judgement this catalogue cannot make for the owner. The rule of this
 repository is not to bypass licensing; until the question is answered this profile should be
 treated as not cleared for a tenant that has not been told.

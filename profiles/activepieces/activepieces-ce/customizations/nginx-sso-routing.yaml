@@ -106,7 +106,7 @@ spec:
     effect: none
     notes: >-
       Activepieces runs Community Edition here — no AP_EDITION, no AP_LICENSE_KEY.
-      Nothing in these patches touches a licence check or a switch of the platform:
+      Nothing in these patches touches a license check or a switch of the platform:
       nginx serves the app and one script, and the entrypoint starts it. The startup
       license patch and the placeholder AP_LICENSE_KEY were removed in c5b0d4f, which
       also added the absolute prohibition to docs/app-profile-guide.md. The job that
