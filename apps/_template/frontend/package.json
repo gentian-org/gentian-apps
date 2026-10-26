@@ -22,7 +22,7 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react-swc": "^4.0.0",
     "tailwindcss": "^4.1.0",
-    "typescript": "^5.8.0",
+    "typescript": "^7.0.2",
     "vite": "^6.2.0"
   }
 }
