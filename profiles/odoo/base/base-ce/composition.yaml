@@ -289,22 +289,36 @@ spec:
             {{- end }}
             {{- end }}
 
+            {{- /* Mail is optional: a cluster without the relay's credentials
+                   leaves them empty, and provider-helm refuses an empty --set
+                   value, which would keep the whole app from installing. So
+                   the SMTP values do not go through set. The ExternalSecret
+                   writes each one, when it is not empty, as a values document
+                   of its own (values-smtp-*), and the Release reads those as
+                   optional valuesFrom: an empty credential is simply not set,
+                   the app installs and sends no mail, and the value reaches
+                   it on the next sync once it exists. Mirrors app-default. */}}
+            {{- $relValuesFrom := list }}
+            {{- $esTemplate := dict }}
             {{- if $vm.smtp }}
-            {{- if $vm.smtp.hostKey }}
-            {{- $relSet = append $relSet (dict "name" $vm.smtp.hostKey
-                "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" "smtp-host"))) }}
+            {{- $optional := list
+                (dict "path" $vm.smtp.hostKey "key" "smtp-host" "raw" false)
+                (dict "path" $vm.smtp.portKey "key" "smtp-port" "raw" true)
+                (dict "path" $vm.smtp.userKey "key" "smtp-user" "raw" false)
+                (dict "path" $vm.smtp.passwordKey "key" "smtp-password" "raw" false) }}
+            {{- range $o := $optional }}
+            {{- if $o.path }}
+            {{- $head := "" }}
+            {{- $tail := "" }}
+            {{- range $part := splitList "." $o.path }}
+            {{- $head = printf "%s{%s:" $head (toJson $part) }}
+            {{- $tail = printf "%s}" $tail }}
             {{- end }}
-            {{- if $vm.smtp.portKey }}
-            {{- $relSet = append $relSet (dict "name" $vm.smtp.portKey
-                "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" "smtp-port"))) }}
+            {{- $value := ternary " . " " . | toJson " $o.raw }}
+            {{- $docKey := printf "values-%s" $o.key }}
+            {{- $esTemplate = set $esTemplate $docKey (printf "%s with index . %q %s%s%s%s%s%s%s end %s" "{{" $o.key "}}" $head "{{" $value "}}" $tail "{{" "}}") }}
+            {{- $relValuesFrom = append $relValuesFrom (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" $docKey "optional" true)) }}
             {{- end }}
-            {{- if $vm.smtp.userKey }}
-            {{- $relSet = append $relSet (dict "name" $vm.smtp.userKey
-                "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" "smtp-user"))) }}
-            {{- end }}
-            {{- if $vm.smtp.passwordKey }}
-            {{- $relSet = append $relSet (dict "name" $vm.smtp.passwordKey
-                "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" "smtp-password"))) }}
             {{- end }}
             {{- end }}
 
@@ -547,6 +561,13 @@ spec:
                       name: {{ $secretName }}
                       creationPolicy: Owner
                       deletionPolicy: Retain
+                      {{- if gt (len $esTemplate) 0 }}
+                      template:
+                        engineVersion: v2
+                        mergePolicy: Merge
+                        data:
+                          {{ toYaml $esTemplate | nindent 26 }}
+                      {{- end }}
                     data:
                       {{ toYaml $esData | nindent 22 }}
               providerConfigRef:
@@ -582,6 +603,34 @@ spec:
             {{- end }}
             {{- if gt $retryAfter 0 }}
             {{- $extraVals = mergeOverwrite $extraVals (dict "gentianRelease" (dict "retryAfterRevision" $retryAfter)) }}
+            {{- end }}
+
+            {{- /* ── Which add-on set is installed ─────────────────────────────
+                   The add-ons Job below runs once per selection. What says it
+                   has run is kept where retryAfterRevision is, in the Release's
+                   values (the chart does not read it): the hash of the
+                   selection whose Job succeeded, carried forward from the
+                   observed Release and set when the observed Job reports
+                   success. Once it names the current selection the Job is no
+                   longer composed, and nothing creates it again when its ttl
+                   removes it. */}}
+            {{- $addons := concat (list "gentian_os") (dig "addons" list $spec) }}
+            {{- $addonList := join "," $addons }}
+            {{- $addonHash := substr 0 10 (sha256sum $addonList) }}
+            {{- $addonKey := printf "%s-addons-job-%s" $app $addonHash }}
+            {{- $observedAddons := dig "resources" $addonKey "resource" dict $.observed }}
+            {{- $addonsInstalled := dig "spec" "forProvider" "values" "gentianRelease" "addonsInstalled" "" $observedRelease }}
+            {{- if gt (dig "status" "atProvider" "manifest" "status" "succeeded" 0 $observedAddons | int) 0 }}
+            {{- $addonsInstalled = $addonHash }}
+            {{- end }}
+            {{- if $addonsInstalled }}
+            {{- $extraVals = mergeOverwrite $extraVals (dict "gentianRelease" (dict "addonsInstalled" $addonsInstalled)) }}
+            {{- end }}
+            {{- $baseReady := false }}
+            {{- range $c := (dig "status" "conditions" list $observedRelease) }}
+            {{- if and (eq (dig "type" "" $c) "Ready") (eq (dig "status" "" $c) "True") }}
+            {{- $baseReady = true }}
+            {{- end }}
             {{- end }}
 
             {{- $extraVals = $extraVals | toJson | fromJson }}
@@ -639,6 +688,10 @@ spec:
                 {{- if gt (len $extraVals) 0 }}
                 values:
                   {{ toYaml $extraVals | nindent 18 }}
+                {{- end }}
+                {{- if gt (len $relValuesFrom) 0 }}
+                valuesFrom:
+                  {{ toYaml $relValuesFrom | nindent 18 }}
                 {{- end }}
                 {{- if gt (len $relSet) 0 }}
                 set:
@@ -932,18 +985,29 @@ spec:
                    It ships in the odoo-modules repo, which the git-modules sidecar syncs
                    into /opt/odoo/custom-addons — so this Job depends on that sidecar
                    having cloned successfully. */}}
-            {{- $addons := concat (list "gentian_os") (dig "addons" list $spec) }}
-            {{- if gt (len $addons) 0 }}
-            {{- $addonList := join "," $addons }}
-            {{- $addonHash := substr 0 10 (sha256sum $addonList) }}
+            {{- /* One Job per selection, composed only while it is needed: not
+                   before the base release is Ready -- the Job mounts odoo-data,
+                   which the release creates, and a Job composed earlier sat
+                   Pending on "persistentvolumeclaim odoo-data not found", one
+                   more for every change of the selection -- and not once the
+                   selection is installed (addonsInstalled above). A composed
+                   Job is kept until it is done, whatever the base does
+                   meanwhile.
+
+                   The Object is named by the selection and orphans its Job: a
+                   selection changed while its Job runs drops the Object, and the
+                   Job finishes and goes with its ttl, pods and all, instead of
+                   being deleted with its pods left behind. */}}
+            {{- if and (ne $addonsInstalled $addonHash) (or $baseReady (gt (len $observedAddons) 0)) }}
             ---
             apiVersion: kubernetes.crossplane.io/v1alpha2
             kind: Object
             metadata:
               annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-addons-job
-              name: {{ $xrName }}-addons-job
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ $addonKey }}
+              name: {{ $xrName }}-addons-{{ $addonHash }}
             spec:
+              deletionPolicy: Orphan
               forProvider:
                 manifest:
                   apiVersion: batch/v1
