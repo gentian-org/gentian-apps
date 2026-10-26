@@ -28,7 +28,9 @@ What is checked:
   ghcr.io/gentian-org/<name>   CI must build <name> (a ref in
       .github/workflows/apps-ci.yaml). If images/<name>/versions.env pins an
       IMAGE_TAG, the tag must be it -- or, on develop, a develop-<sha7> build
-      the registry holds. Otherwise the registry must hold the tag.
+      -- and on develop the registry must hold it: IMAGE_TAG is there only
+      once a release has published it. Otherwise the registry must hold the
+      tag.
 
 A build of develop publishes an image only as develop-<sha7>; its IMAGE_TAG is
 published by the release from main (docs/releasing.md). A develop profile
@@ -229,15 +231,26 @@ def main() -> int:
                                 f"IMAGE_TAG={tags[name]}. The tenant would run a different build than "
                                 f"the one this repo produces."
                             )
-                        continue
-                    # A develop build: it has to be one the registry holds.
+                            continue
+                        if args.released:
+                            # The release publishes IMAGE_TAG, after this check.
+                            continue
+                    # A develop build, or IMAGE_TAG on develop: the registry has
+                    # to hold it, since a develop build publishes only
+                    # develop-<sha7> and IMAGE_TAG waits for the release.
 
             key = f"{full}:{ref.reference}"
             if key not in seen:
                 seen[key] = image_exists(ref, owned=full.startswith(OWN))
             answer = seen[key]
             if answer.state == MISSING:
-                errors.append(f"{at} asks for {ref_text}, which does not exist: {answer.detail}")
+                hint = ""
+                if full.startswith(OWN) and not DEVELOP.match(ref.reference or ""):
+                    hint = (
+                        f"; a develop build publishes only develop-<sha7>, so on develop name the "
+                        f"develop build of images/{full[len(OWN) :]}"
+                    )
+                errors.append(f"{at} asks for {ref_text}, which does not exist: {answer.detail}{hint}")
             elif answer.state != FOUND:
                 warnings.append(f"{at}: could not confirm {ref_text}: {answer.detail}")
 
