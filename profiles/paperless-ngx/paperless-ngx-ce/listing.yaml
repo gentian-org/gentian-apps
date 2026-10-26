@@ -5,7 +5,7 @@
 # written to the store with it.
 #
 # The tile (assets/tile.svg) is Paperless-ngx's own leaf mark, from the
-# project's docs/assets/logo_leaf.svg under the project's GPL-3.0 licence, on
+# project's docs/assets/logo_leaf.svg under the project's GPL-3.0 license, on
 # the light rounded square the store's other entries have.
 displayName: Paperless-ngx
 edition: ce

@@ -40,7 +40,7 @@ upstream chart repo to point `patch.buildRepo`/`fork.repo` at.
 
 Docmost's own single sign-on (SAML, OIDC, LDAP) is entirely behind a paid subscription
 (`apps/server/src/ee/`), so `requires.services.identity.oidc` is not used — using it would need a
-licence, which the platform's licensing-bypass prohibition forbids working around. The profile
+license, which the platform's licensing-bypass prohibition forbids working around. The profile
 declares `requires.services.identity.sidecar` instead: the platform runs its sign-in sidecar
 beside Docmost and the sidecar runs [`assets/sign-in-handler.js`](assets/sign-in-handler.js).
 The record is [`customizations/sign-in-sidecar.yaml`](customizations/sign-in-sidecar.yaml).
@@ -124,7 +124,7 @@ So a person sees three spaces: Docmost's own "General", the tenant's, and their 
 - The job holds what Docmost itself holds — its database and `APP_SECRET` — and no password. It
   listens on nothing.
 - **Open, for the owner.** Docmost 0.95 sells "personal spaces" in its paid edition
-  (`apps/server/src/ee/personal-space`, switched on per workspace behind a licence check). That
+  (`apps/server/src/ee/personal-space`, switched on per workspace behind a license check). That
   feature is not used, switched on or touched: what is made here is an ordinary space of the free
   edition with one member, as the program this replaces made it before Docmost had the feature.
   The result resembles what the paid feature gives. Whether that is acceptable to the vendor is

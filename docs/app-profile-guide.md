@@ -1679,7 +1679,7 @@ it refuses a path for every method. Where an app's form posts to the address of 
 
 Before adding one:
 
-1. **Is there a cleaner way?** OIDC in the edition installed; a licence the tenant holds; a
+1. **Is there a cleaner way?** OIDC in the edition installed; a license the tenant holds; a
    sign-in the app takes from a proxy's headers. A handler is the last resort: it is a program
    that can become anybody in the app.
 2. **Write the `Customization` record first** (`customizations/sign-in-sidecar.yaml`, rung L2):
