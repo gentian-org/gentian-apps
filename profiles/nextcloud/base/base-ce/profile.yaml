@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.6"
+  version: "0.5.1-dev.7"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -145,9 +145,6 @@ spec:
         registry: ghcr.io
         repository: gentian-org/nextcloud
         tag: develop-4f1a61d
-      extraEnv:
-        - name: REDIS_HOST_USER
-          value: ${TENANT_ID}-${APP_ID}
       internalDatabase:
         enabled: false
       externalDatabase:
@@ -259,6 +256,15 @@ spec:
         failureThreshold: 30
       nextcloud:
         containerPort: 8080
+        # The Redis user the platform provisions for this app (the cache's ACL
+        # Job: ACL SETUSER <tenant>-<app>). The image's redis.config.php reads
+        # it; without it Nextcloud signs in to Redis as the default user and is
+        # refused (WRONGPASS), so it serves 500 and an upgrade stops halfway.
+        # Under nextcloud:, the only extraEnv the chart reads: it sat at the
+        # top level from August and was never applied.
+        extraEnv:
+          - name: REDIS_HOST_USER
+            value: ${TENANT_ID}-${APP_ID}
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
