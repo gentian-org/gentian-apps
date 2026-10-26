@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.2"
+  version: "0.5.1-dev.3"
   package:
     chart:
       repository: "https://xwiki-contrib.github.io/xwiki-helm"
@@ -59,10 +59,11 @@ spec:
 
     # Gentian pre-flavored bundle (Standard Flavor XIP + OIDC authenticator baked
     # in) — chart's xwiki.imageName is `printf "%s:%s" image.name image.tag`, so
-    # image.name carries the full ghcr path. Bump tag with images/xwiki/versions.env.
+    # image.name carries the full ghcr path. On develop the tag is the develop-<sha7>
+    # build of images/xwiki, and its IMAGE_TAG on a release (docs/releasing.md).
       image:
         name: ghcr.io/gentian-org/xwiki
-        tag: "17.10.9-gentian2"
+        tag: "develop-4f1a61d"
         pullPolicy: IfNotPresent
 
       mysql:

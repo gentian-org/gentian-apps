@@ -144,7 +144,7 @@ spec:
       image:
         registry: ghcr.io
         repository: gentian-org/nextcloud
-        tag: 33.0.10-gentian1
+        tag: develop-4f1a61d
       extraEnv:
         - name: REDIS_HOST_USER
           value: ${TENANT_ID}-${APP_ID}
