@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.8"
+  version: "0.5.1-dev.9"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -368,7 +368,7 @@ spec:
             - https://nextcloud.${TENANT_DOMAIN}/*
           postLogoutRedirectUris:
             - https://nextcloud.${TENANT_DOMAIN}/
-            - https://portal.${KERNEL_DOMAIN}/
+            - https://desktop.${TENANT_DOMAIN}/
           # Where the realm tells Nextcloud that a person signed out: this
           # path, at the Service and port of the entry "web", inside the
           # cluster. user_oidc checks the token's signature against the
