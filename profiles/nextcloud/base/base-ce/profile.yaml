@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.11"
+  version: "0.5.1-dev.12"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -460,6 +460,11 @@ spec:
       surface: gateway
       authMode: oidc
       subDomain: collabora
+      # The editor's WebSocket path carries the WOPI source URL-encoded
+      # (/cool/http%3A%2F%2F.../ws); the gateway's default normalisation answers
+      # that with a 307 and the document never connects.
+      annotations:
+        gentianos.io/gateway-escaped-slashes-action: KeepUnchanged
       backend:
         service: nextcloud-collabora
         port: 9980
@@ -893,22 +898,23 @@ spec:
             # reason and retrying is the fix. activate-config exits non-zero when it
             # cannot reach discovery or capabilities; the old code sent that to
             # `|| true`, which is how a startup race became a permanently broken
-            # tenant. Bounded at ~90s so a Collabora that never arrives delays the
-            # pod rather than wedging it -- the cron sidecar re-fetches from then on.
-            wired=no
-            i=0
-            while [ "$i" -lt 18 ]; do
-              if $OCC richdocuments:activate-config --callback-url="$NEXTCLOUD_CALLBACK"; then
-                wired=yes
-                break
-              fi
-              i=$((i + 1))
-              sleep 5
-            done
-            if [ "$wired" = no ]; then
-              echo "ERROR: could not reach Collabora at $COLLABORA_INTERNAL after 90s." >&2
+            # tenant. In the background, as the deferred activation above is: each
+            # attempt waits out its own connect timeout, so a cold Collabora held
+            # the web server back for minutes when this ran in line. Bounded at
+            # ten minutes so a Collabora that never arrives leaves no poller
+            # behind -- the cron sidecar re-fetches from then on.
+            (
+              i=0
+              while [ "$i" -lt 120 ]; do
+                if $OCC richdocuments:activate-config --callback-url="$NEXTCLOUD_CALLBACK"; then
+                  exit 0
+                fi
+                i=$((i + 1))
+                sleep 5
+              done
+              echo "ERROR: could not reach Collabora at $COLLABORA_INTERNAL after ten minutes." >&2
               echo "ERROR: office documents will not open until the discovery fetch succeeds." >&2
-            fi
+            ) &
             ;;
         esac
 
