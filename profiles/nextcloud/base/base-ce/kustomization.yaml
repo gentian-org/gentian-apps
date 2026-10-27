@@ -9,15 +9,3 @@ kind: Kustomization
 resources:
   - profile.yaml
   - oidc-catalog.yaml
-configMapGenerator:
-  # The portal-bridge SSO page the app composition copies into the app's
-  # namespace; it finds this by its two labels. Named <profile>.<asset>, and
-  # without a namespace: a companion states none.
-  - name: nextcloud-base-ce.portal-bridge-sso
-    files:
-      - nextcloud-portal-sso.html=assets/nextcloud-portal-sso.html
-generatorOptions:
-  disableNameSuffixHash: true
-  labels:
-    gentianos.io/profile-name: nextcloud-base-ce
-    gentianos.io/asset: portal-bridge-sso
