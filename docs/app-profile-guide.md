@@ -272,6 +272,8 @@ For apps with a shared runtime and thin addon entries (Odoo, OX-style), use
 |---|---|---|
 | `gentianos.io/deployment-role` | `standalone` (default), `base`, `addon` | How the operator/composition deploys this entry |
 | `gentianos.io/platform-app` | `"true"` | Hidden from App Store listing (required base runtimes) |
+| `gentianos.io/store-listed` | `"false"` | The index says `listed: false`; the App Store does not offer the entry |
+| `gentianos.io/requires-capability` | `llm` | The index says `placedWith: llm`: the director keeps the app in every tenant while the cluster serves models, removes it when it stops, and refuses to uninstall it by hand. Only from a cluster catalogue |
 
 An addon names its base in **`spec.customization.addon`** (`id` + `of`), not in an
 annotation. It is never installed on its own: the base is installed and the addon is

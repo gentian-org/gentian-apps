@@ -84,6 +84,12 @@ EDITION_LABEL = "gentianos.io/profile-edition"
 # out.
 LISTED_ANNOTATION = "gentianos.io/store-listed"
 
+# A profile annotated with a capability here is placed by the platform in
+# every tenant of a cluster that has it (llm: the cluster serves models): the
+# index says ``placedWith: <capability>``, and the director keeps the app in
+# place and takes it away again. Nobody installs or uninstalls it by name.
+CAPABILITY_ANNOTATION = "gentianos.io/requires-capability"
+
 
 def edition_of(name: str, profile: dict) -> str:
     """The edition the profile's label states, or the one its name ends in."""
@@ -429,6 +435,9 @@ def build(out: Path) -> tuple[list[dict], list[str]]:
         annotations = (profile.get("metadata") or {}).get("annotations") or {}
         if str(annotations.get(LISTED_ANNOTATION) or "").lower() == "false":
             entry["listed"] = False
+        capability = str(annotations.get(CAPABILITY_ANNOTATION) or "").strip()
+        if capability:
+            entry["placedWith"] = capability
         # The floor the build declares, spec.requires.platform, repeated so a
         # cluster can say which entries it cannot install without a fetch.
         # The bundle's own value is what an install is held to.
