@@ -83,7 +83,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.3"
+  version: "0.5.1-dev.4"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -145,6 +145,15 @@ spec:
 
       podAnnotations:
         reloader.stakater.com/auto: "true"
+
+      # Every account a first sign-in makes is put into the group "Members".
+      # Paperless gives a new account no permissions of its own, so without a
+      # group every screen refuses the person (a 403 on /api/ui_settings/ is
+      # the first). The post-install hook below makes the group and keeps its
+      # permissions; the name is written twice, here and there.
+      extraEnv:
+        - name: PAPERLESS_SOCIAL_ACCOUNT_DEFAULT_GROUPS
+          value: "Members"
 
   requires:
     # The oldest platform version line this build runs on (docs/profile-bundles.md).
@@ -280,6 +289,26 @@ spec:
         MCP_USER = os.environ["PAPERLESS_MCP_USER"]
         MCP_PASSWORD = os.environ["PAPERLESS_MCP_PASSWORD"]
         WORKFLOW = "Gentian: share new documents with the MCP agent"
+        # The group every person's account is in: the chart's
+        # PAPERLESS_SOCIAL_ACCOUNT_DEFAULT_GROUPS names it for accounts made
+        # from now on, and this hook puts the ones made before into it.
+        # Everyday use of Paperless: documents and their filing vocabulary,
+        # saved views, notes, share links, mail fetching, one's own settings
+        # and tasks. Not workflows, users, groups or the app's settings: those
+        # are the App Admin role's (superuser, by the sync Job).
+        MEMBERS = "Members"
+        MEMBER_PERMISSIONS = [
+            "%s_%s" % (action, model)
+            for model in (
+                "document", "tag", "correspondent", "documenttype",
+                "storagepath", "savedview", "customfield", "note", "sharelink",
+                "mailaccount", "mailrule",
+            )
+            for action in ("view", "add", "change", "delete")
+        ] + [
+            "view_uisettings", "add_uisettings", "change_uisettings",
+            "view_paperlesstask", "change_paperlesstask",
+        ]
         # What the companion's tools do, and nothing more: read and file
         # documents, make a tag, read the filing vocabulary and its own tasks.
         PERMISSIONS = [
@@ -385,6 +414,44 @@ spec:
                 "triggers": triggers, "actions": actions,
             })
             say("made the sharing workflow")
+
+        def every(path):
+            out = []
+            page = path + ("&" if "?" in path else "?") + "page_size=100"
+            while page:
+                data = api("GET", page)
+                out.extend(data.get("results", []))
+                page = data.get("next")
+                if page:
+                    page = page[page.index("/api/"):]
+            return out
+
+        # The members' group, with exactly the permissions declared above.
+        found = [g for g in every("/api/groups/?name__iexact=" + MEMBERS) if g["name"] == MEMBERS]
+        if not found:
+            gid = api("POST", "/api/groups/", {"name": MEMBERS, "permissions": MEMBER_PERMISSIONS})["id"]
+            say("made the group %s" % MEMBERS)
+        else:
+            gid = found[0]["id"]
+            if sorted(found[0].get("permissions") or []) != sorted(MEMBER_PERMISSIONS):
+                api("PATCH", "/api/groups/%d/" % gid, {"permissions": MEMBER_PERMISSIONS})
+                say("set the permissions of the group %s" % MEMBERS)
+            else:
+                say("the group %s is as declared" % MEMBERS)
+
+        # Every person's account in it. Paperless applies its default group
+        # only when an account is made, so an account from before this group
+        # existed is added here. The two technical accounts are left out:
+        # the superuser already may do everything, and the companion's
+        # account has the narrower permissions above. Nobody is taken out of
+        # the group, and no other group of an account is touched.
+        added = 0
+        for u in every("/api/users/"):
+            if u["username"] in (ADMIN, MCP_USER) or gid in (u.get("groups") or []):
+                continue
+            api("PATCH", "/api/users/%d/" % u["id"], {"groups": sorted(set(u.get("groups") or []) | {gid})})
+            added += 1
+        say("accounts added to %s: %d" % (MEMBERS, added))
         PY
 
     provisioning:
