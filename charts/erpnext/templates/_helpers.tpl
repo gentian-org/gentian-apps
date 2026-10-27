@@ -52,3 +52,16 @@
 {{ toYaml . }}
 {{- end }}
 {{- end }}
+
+{{/* How nginx hands a request to Frappe's web server. */}}
+{{- define "erpnext.backendProxy" -}}
+proxy_http_version 1.1;
+proxy_set_header X-Forwarded-For $remote_addr;
+proxy_set_header X-Forwarded-Proto https;
+proxy_set_header X-Frappe-Site-Name {{ include "erpnext.siteName" . }};
+proxy_set_header Host $host;
+proxy_set_header X-Use-X-Accel-Redirect True;
+proxy_read_timeout {{ .Values.nginx.proxyReadTimeout }};
+proxy_redirect off;
+proxy_pass http://backend-server;
+{{- end }}
