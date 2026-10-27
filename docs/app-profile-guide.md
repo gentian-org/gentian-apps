@@ -422,7 +422,7 @@ That path has two traps for server-side HTTP clients:
 
 - **Preferred — internal service URL.** Point the callback/integration at
   `.svc.cluster.local`; plain HTTP is fine in-cluster. This is what the Nextcloud
-  WOPI callback (§6g), the portal bridge (§6g), and Element's `KEYCLOAK_INTERNAL_URL`
+  WOPI callback (§6g) and Element's `KEYCLOAK_INTERNAL_URL`
   (§6d) all do.
 - **When the public host is unavoidable** (the app hard-codes it, or browser and
   server must agree on one issuer string) — **trust the staging CA** in that
@@ -1115,41 +1115,15 @@ CoreDNS hairpin resolves this to the edge gateway. The profile's
 `requires.services.identity` is what opens that path, and the Collabora pod
 carries `gentianos.io/app: nextcloud-base-ce` so that it applies to it.
 
-#### Portal bridge — a kernel → tenant server-side call
+#### No blocked egress call in a hot path
 
-The portal API (in `platform-kernel`) provisions the app user via OCS before
-opening the Files iframe. This is a textbook **kernel → tenant** call from §2, so
-it uses the internal service URL (`http://nextcloud.tenant-<t>.svc.cluster.local:8080`),
-never the public `https://nextcloud.<tenant>`. Using the public host here regressed
-with `CERTIFICATE_VERIFY_FAILED` → HTTP 500 ("Could not open Files") the moment
-CoreDNS hairpin + staging certs were in play. The baseline `tenant-isolation`
-NetworkPolicy allows ingress from `platform-kernel` to make this reachable.
-
-**Generalizes to any app with a portal session bridge:** OpenProject's bridge
-(`openproject_session_bridge.py`) follows the identical pattern — internal service
-URL for the admin/provisioning call, public host only for the browser redirect.
-If you add a new bridged app, mint the session server-side against
-`http://<svc>.tenant-<t>.svc.cluster.local`, not the public hostname.
-
-#### Bridge provisioning — keep the hot path cheap
-
-Opening an embedded tile runs the bridge on **every click**, so the
-provisioning step must be fast. Two rules (learned from a ~5s Files stall):
-
-1. **Do only what the login needs.** `gentian-portal-bridge.php` logs the user in
-   with `setUser()` and never checks the account password, so the bridge only has
-   to guarantee the user **exists** — it must **not** reset the password on every
-   open. `_ensure_nextcloud_user` treats OCS `100` (created) and `102` (already
-   exists) as success and skips the password `PUT`. Redundant writes in a
-   per-click path are pure latency.
-2. **Never let a blocked egress call sit in the hot path.** Nextcloud's
-   `password_policy` app runs a **HaveIBeenPwned** breached-password check that
-   calls `api.pwnedpasswords.com` on every password set. Cluster egress blocks it,
-   so each call waited for the ~5s timeout. The profile disables it
-   (`occ config:app:set password_policy enforceHaveIBeenPwned --value=false`). When
-   wrapping any chart, audit for outbound calls to the public internet (breach
-   checks, telemetry, avatar/gravatar fetches, license pings, update checks) and
-   disable them — a blocked call becomes a multi-second stall, not a clean failure.
+Nextcloud's `password_policy` app runs a **HaveIBeenPwned** breached-password check that
+calls `api.pwnedpasswords.com` on every password set. Cluster egress blocks it,
+so each call waited for the ~5s timeout. The profile disables it
+(`occ config:app:set password_policy enforceHaveIBeenPwned --value=false`). When
+wrapping any chart, audit for outbound calls to the public internet (breach
+checks, telemetry, avatar/gravatar fetches, license pings, update checks) and
+disable them — a blocked call becomes a multi-second stall, not a clean failure.
 
 The licensed OpenDesk Nextcloud stack is **not** part of gentian-os or gentian-apps;
 customers who need it install it from the proprietary catalogue separately.
@@ -1237,14 +1211,14 @@ returned "not implemented" for every profile. Adding one now means writing a
 change at all.
 
 **User id mapping:** reconcilers prefer Keycloak attribute `opendesk_username`,
-then email local-part (same as the Nextcloud portal bridge).
+then email local-part.
 
 **Checklist:**
 
 - [ ] Declare `spec.provisioning.privilegedRole` **and** `spec.provisioning.syncJob` when the app has a distinct admin group/role — the role alone is a declaration nothing applies
 - [ ] Do **not** conflate `app-admins` with `app:<profile>` unless product policy explicitly requires both
 - [ ] If the app grants roles from a **claim** rather than a Job, declare `gentianOdooAdminRoles` beside `gentianOdooGroupRoles` — see 6i
-- [ ] Ensure OIDC users exist in the app (bridge or provisioner creates accounts before admin grant)
+- [ ] Ensure OIDC users exist in the app (the provisioner creates accounts before admin grant)
 
 ---
 
@@ -1495,14 +1469,13 @@ hands the app the private address on some realms and not on others.
 must use `https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}` (or path-only auth
 URLs resolved against `openproject.oidc.host: "id.${KERNEL_DOMAIN}"`). See §2.
 
-### 8a. Portal Integration: Direct OIDC vs Session-Bridge Flow
+### 8a. Portal Integration: Direct OIDC
 
-When integrating an application into the Gentian Portal, choose the correct authentication path based on how the application handles OIDC logins inside an iframe/embedded view (`linkTarget: embedded`):
+When integrating an application into the Gentian Portal, the app signs in through OIDC, also inside an iframe/embedded view (`linkTarget: embedded`). There is no session-bridge flow: the desktop mints no login tickets, and an app holds no endpoint that signs a person in on one.
 
 | Integration Path | Description | Typical Apps |
 |---|---|---|
 | **Direct OIDC Flow** | The app's frontend initiates standard browser-side OIDC login. The portal warms up OIDC cookies in the background via hidden iframe. | XWiki, Odoo Community |
-| **Session-Bridge Flow** | The portal API exchanges a single-use login ticket backend-to-backend, and passes this ticket to log the user in inside the iframe. | Nextcloud, Element, OpenProject |
 
 #### 1. Direct OIDC Flow (with Silent SSO Warmup)
 For standard web applications that support clean OIDC redirections and can run within an iframe:
@@ -1510,13 +1483,6 @@ For standard web applications that support clean OIDC redirections and can run w
 - **Requirements**:
   - The Portal frontend must automatically bootstrap the OIDC session cookies (`KEYCLOAK_IDENTITY`/`KEYCLOAK_SESSION` on path `/auth`) upon desktop mount by calling `/auth/idp-session` and loading the impersonation URL in a hidden iframe.
   - The Keycloak browser flow (e.g. `browser-kernel-idp`) must set **both** the `Cookie` execution and the `Identity Provider Redirector` execution to **`ALTERNATIVE`**. Never set the redirector to `REQUIRED` as it forces redirecting to the parent realm and prompts for login.
-
-#### 2. Session-Bridge Flow (with Backend Bridge Tickets)
-For complex suite applications that block nested OIDC redirects inside cross-origin iframes or have custom API session handlers:
-- **How it works**: When the user clicks the tile, the Portal frontend calls the Portal API to get a single-use bridge ticket (e.g. via Nextcloud OCS or OpenProject API). This ticket is passed in the launch URL parameters (e.g. `?ticket=<token>`). A custom bridge script/plugin on the app side consumes the ticket, calls the Portal API to verify it, sets the app session cookie, and redirects the user to the app page.
-- **Requirements**:
-  - The verification call from the app to the Portal API must run cluster-internally over service DNS (`http://gentian-portal-api.platform-kernel.svc.cluster.local:8000`), not the public portal URL, to avoid ingress hairpins and self-signed certificate issues.
-  - The bridge login path must be highly optimized and not execute blocking egress calls (e.g., checking password breach databases) during ticket verification.
 
 ### 8b. openDesk supplier charts on Gentian — integration boundary
 
