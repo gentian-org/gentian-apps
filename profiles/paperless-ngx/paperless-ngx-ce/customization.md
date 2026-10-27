@@ -62,6 +62,15 @@ A member who has not signed in yet has no account to promote (allauth makes it a
 sign-in and would not link one made ahead of it); the Job names them and promotes them on a
 later run.
 
+**Every person is in the group `Members`.** Paperless gives an account its first sign-in makes no
+permissions at all, and every screen then refuses the person. The chart's
+`PAPERLESS_SOCIAL_ACCOUNT_DEFAULT_GROUPS` puts each new account into `Members`, and
+`spec.hooks.postInstall` makes that group with everyday permissions (documents, including
+deleting them, their filing vocabulary, saved views, notes, share links, mail fetching, one's own
+settings and tasks) and adds the accounts made before it. Workflows, users, groups and the app's
+settings stay with the App Admin role. Which documents a member sees is still Paperless' own
+ownership and sharing.
+
 **The MCP companion** authenticates as the ordinary account `mcp-service`, made by
 `spec.hooks.postInstall` with exactly the model permissions its tools need. Paperless shows a
 document only to its owner and to whom it was shared with, and a document a person uploads is
