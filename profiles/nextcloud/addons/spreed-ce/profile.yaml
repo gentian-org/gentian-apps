@@ -18,10 +18,16 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.1"
+  version: "0.5.1-dev.2"
   requires:
     # The oldest platform version line this build runs on (docs/profile-bundles.md).
     platform: ">=0.5"
+    services:
+      # Calls between people behind NAT need a relay. The platform's TURN
+      # edge is served to the Nextcloud this activates into: its address and
+      # secret arrive in turn-credentials-nextcloud-base-ce, which the base
+      # mounts and wires into Talk while this addon is selected.
+      turn: {}
   package:
     addon:
       id: spreed

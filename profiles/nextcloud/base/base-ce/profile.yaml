@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.5"
+  version: "0.5.1-dev.6"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -324,6 +324,15 @@ spec:
             secret:
               secretName: mail-app-passwords
               optional: true
+      # The platform's TURN edge, for Talk: its address and the secret Talk
+      # mints each call's relay credentials with. The platform writes it while
+      # an addon that declares requires.services.turn is selected (Talk), and
+      # takes it away when none is. optional, because a Nextcloud without
+      # Talk never gets it, and the pod must still start.
+          - name: gentian-turn
+            secret:
+              secretName: turn-credentials-nextcloud-base-ce
+              optional: true
         extraVolumeMounts:
           - name: gentian-sensitive
             mountPath: /etc/gentian
@@ -333,6 +342,9 @@ spec:
             readOnly: true
           - name: gentian-mail-passwords
             mountPath: /etc/gentian-mail
+            readOnly: true
+          - name: gentian-turn
+            mountPath: /etc/gentian-turn
             readOnly: true
         hooks:
           before-starting: "#!/bin/bash\nset -eu\nNC=\"php /var/www/html/occ\"\n\n# Nextcloud's own PHP-side install check requires this sentinel file to\n# exist before it will run the automatic, non-interactive install that\n# autoconfig.php sets up (DB/admin credentials are already correctly\n# wired -- this is the only missing piece). Only touched while genuinely\n# not yet installed, so the safety gate this file exists for (don't\n# silently reinstall over live data if config.php ever gets corrupted)\n# stays intact for the rest of the deployment's life.\nif ! $NC status 2>/dev/null | grep -q \"installed: true\"; then\n  touch /var/www/html/config/CAN_INSTALL\nfi\npatch_portal_bridge_htaccess() {\n  python3 - <<'PY'\nfrom pathlib import Path\nhtaccess = Path(\"/var/www/html/.htaccess\")\nif not htaccess.is_file():\n    raise SystemExit(0)\ntext = htaccess.read_text()\nif \"gentian-portal-bridge\" in text:\n    text = text.replace(\"gentian-portal-bridge\", \"portal-bridge\")\n    htaccess.write_text(text)\nelif \"portal-bridge\" not in text:\n    old = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\\.php\"\n    new = r\"RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status|portal-bridge)\\.php\"\n    if old in text:\n        htaccess.write_text(text.replace(old, new))\nPY\n}\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-sso.html \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-sso.html\" || true\ncurl --connect-timeout 5 --max-time 15 -sfLo /var/www/html/portal-bridge.php \\\n  \"http://gentian-portal-gentian-portal-web.platform-kernel.svc.cluster.local:8080/portal-bridge.php\" || true\nsed -i 's/:8080\\\\/api\\\\/v1/:8000\\\\/api\\\\/v1/' /var/www/html/portal-bridge.php 2>/dev/null || true\npatch_portal_bridge_htaccess\nif ! $NC status >/dev/null 2>&1; then\n  exit 0\nfi\nsync_bundled_apps() {\n  for app in user_oidc gentian_launch; do\n    if [ -d \"/usr/src/nextcloud/apps/${app}\" ]; then\n      rm -rf \"/var/www/html/custom_apps/${app}\"\n      cp -a \"/usr/src/nextcloud/apps/${app}\" \"/var/www/html/custom_apps/\"\n      chown -R www-data:www-data \"/var/www/html/custom_apps/${app}\"\n    fi\n    $NC app:enable \"${app}\" 2>/dev/null || true\n  done\n}\nsync_bundled_apps\n# On every start too, so an install made before this setting forwards as well\n# (post-installation runs once).\n$NC config:app:set user_oidc allow_multiple_user_backends --value=\"0\" || true\n# Files is where Nextcloud opens, as its tile does: without this a bare\n# address lands on the Dashboard.\n$NC config:system:set defaultapp --value=files || true\n# Disable the password_policy breached-password check: it calls\n# api.pwnedpasswords.com (blocked by egress) and adds ~5s to every\n# password set — the portal bridge felt this on each Files open.\n$NC config:app:set password_policy enforceHaveIBeenPwned --value=false || true\npatch_portal_bridge_htaccess\npatch_nextcloud_layouts() {\n  python3 - <<'PY'\nfrom pathlib import Path\n\n# Portal windows already supply the chrome (title bar, app switching), so the\n# embedded app must not draw a second one. Nextcloud's shell is a rounded card\n# floating on the theming wallpaper: #content reserves --header-height above\n# itself for the (hidden) header, insets itself by --body-container-margin,\n# rounds by --body-container-radius, and <body> paints --image-background\n# behind it. Zeroing those four is what makes the app fill the window flush.\nBLOCK = \"\"\"\n\t\t<!-- gentian-embed -->\n\t\t<script nonce=\"<?php p($_['cspNonce']); ?>\">\n\t\t\tif (window.self !== window.top) {\n\t\t\t\tdocument.documentElement.classList.add('gentian-embedded');\n\t\t\t}\n\t\t</script>\n\t\t<style>\n\t\t\thtml.gentian-embedded body {\n\t\t\t\t--body-container-margin: 0px;\n\t\t\t\t--body-container-radius: 0px;\n\t\t\t\t--body-height: calc(100% - env(safe-area-inset-bottom));\n\t\t\t\tbackground-image: none;\n\t\t\t\tbackground-color: var(--color-main-background);\n\t\t\t}\n\t\t\thtml.gentian-embedded #header { display: none !important; }\n\t\t\thtml.gentian-embedded #content,\n\t\t\thtml.gentian-embedded #content-vue { margin-top: 0; }\n\t\t</style>\n\t\t<!-- /gentian-embed -->\"\"\"\n\n# In <head> and before the stylesheets, so the header never paints and the\n# content never starts 50px down and then jumps.\nANCHOR = '<meta charset=\"utf-8\">'\n\nfor name in [\"layout.user.php\", \"layout.public.php\"\
@@ -892,6 +904,27 @@ spec:
               echo "ERROR: could not reach Collabora at $COLLABORA_INTERNAL after 90s." >&2
               echo "ERROR: office documents will not open until the discovery fetch succeeds." >&2
             fi
+            ;;
+        esac
+
+        # --- Talk / TURN wiring ------------------------------------------------------
+        # The platform's TURN edge, from turn-credentials-nextcloud-base-ce, which
+        # exists while Talk is selected. TLS is its own entry: another port. Talk
+        # deselected, the entries go, so its secret is not left behind.
+        T=/etc/gentian-turn
+        case " $SELECTED " in
+          *" spreed "*)
+            if [ -s "$T/TURN_SECRET" ]; then
+              H=$(cat "$T/TURN_SERVER"); K=$(cat "$T/TURN_SECRET")
+              $OCC config:app:set spreed stun_servers --value="[\"$H:$(cat "$T/TURN_PORT")\"]" || true
+              $OCC config:app:set spreed turn_servers --value="[{\"schemes\":\"turn\",\"server\":\"$H:$(cat "$T/TURN_PORT")\",\"secret\":\"$K\",\"protocols\":\"udp,tcp\"},{\"schemes\":\"turns\",\"server\":\"$H:$(cat "$T/TURNS_PORT")\",\"secret\":\"$K\",\"protocols\":\"tcp\"}]" || true
+            else
+              echo "warning: Talk has no TURN server from the platform" >&2
+            fi
+            ;;
+          *)
+            $OCC config:app:delete spreed turn_servers >/dev/null 2>&1 || true
+            $OCC config:app:delete spreed stun_servers >/dev/null 2>&1 || true
             ;;
         esac
     configure:
