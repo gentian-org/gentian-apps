@@ -72,12 +72,12 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.1"
+  version: "0.5.1-dev.2"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: erpnext
-      version: "0.1.0-develop.8254745"
+      version: "0.1.0-develop.b82b19a"
 
     valueMapping:
       oidc:
