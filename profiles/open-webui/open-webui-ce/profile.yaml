@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.2"
+  version: "0.5.1-dev.3"
   package:
     chart:
       repository: "https://helm.openwebui.com"
@@ -154,6 +154,15 @@ spec:
       # anyway.
         - name: OAUTH_ADMIN_ROLES
           value: "gentian:tenant:${TENANT_ID}:admins"
+      # Whose request it is, told to the model gateway with every completion,
+      # so it holds each person to the cluster's budget per person
+      # (spec.llm.personBudget). x-litellm-end-user-id is the header the
+      # gateway always reads; the value is this instance's own id of the
+      # person, which is unique and names no address.
+        - name: ENABLE_FORWARD_USER_INFO_HEADERS
+          value: "true"
+        - name: FORWARD_USER_INFO_HEADER_USER_ID
+          value: "x-litellm-end-user-id"
     # Where the model gateway is and the key for it come from the Secret the
     # platform writes for this app, llm-credentials-open-webui-ce
     # (OPENAI_API_BASE_URL, OPENAI_API_KEY), through extraEnvFrom below.
