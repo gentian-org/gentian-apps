@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: LicenseRef-Open-WebUI
 # ComponentProfile — Open WebUI ("AI Chat")
 #
-# Tenant scaffolding lists this profile in spec.apps whenever the cluster claim
-# serves LLM, so it must exist in the catalogue on every such cluster — a
-# tenant definition naming it is refused at admission otherwise. A maintained
+# The platform places this app in every tenant while the cluster serves models
+# (spec.llm.enabled), and removes it when the cluster stops: the index says
+# placedWith: llm, from requires-capability below. It is the AI widget's app,
+# not one a tenant installs, so the App Store does not offer it. A maintained
 # edition named -ce like the community edition it packages; the chart's own
 # names (fullnameOverride open-webui: its Service and volume) are unchanged.
 #
@@ -19,10 +20,11 @@ metadata:
     # The App Store's listing of open-webui goes with the new name.
     gentianos.io/renamed-from: open-webui
     gentianos.io/platform-app: "true"
-    # The tile waits for the cluster to actually serve LLM. platform-app alone
-    # means "show without installing per tenant", which offered a tile pointing
-    # at a host that resolves to nothing whenever spec.llm.enabled was off.
+    # Comes with the cluster serving models: the platform places it in every
+    # tenant then, and only then (placedWith: llm in the catalogue's index).
     gentianos.io/requires-capability: "llm"
+    # Placed, not offered.
+    gentianos.io/store-listed: "false"
     gentianos.io/standard-image-pull-secrets: "true"
     # The portal opens this app hidden at desktop mount. The AI widget queries it
     # in the background, and a cold app answers with a login redirect instead of a
@@ -34,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.1"
+  version: "0.5.1-dev.3"
   package:
     chart:
       repository: "https://helm.openwebui.com"
@@ -152,6 +154,15 @@ spec:
       # anyway.
         - name: OAUTH_ADMIN_ROLES
           value: "gentian:tenant:${TENANT_ID}:admins"
+      # Whose request it is, told to the model gateway with every completion,
+      # so it holds each person to the cluster's budget per person
+      # (spec.llm.personBudget). x-litellm-end-user-id is the header the
+      # gateway always reads; the value is this instance's own id of the
+      # person, which is unique and names no address.
+        - name: ENABLE_FORWARD_USER_INFO_HEADERS
+          value: "true"
+        - name: FORWARD_USER_INFO_HEADER_USER_ID
+          value: "x-litellm-end-user-id"
     # Where the model gateway is and the key for it come from the Secret the
     # platform writes for this app, llm-credentials-open-webui-ce
     # (OPENAI_API_BASE_URL, OPENAI_API_KEY), through extraEnvFrom below.
