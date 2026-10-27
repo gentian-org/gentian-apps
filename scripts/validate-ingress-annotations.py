@@ -31,8 +31,6 @@ PROFILES = ROOT / "profiles"
 KNOWN = {
     "gentianos.io/gateway-frame-ancestors",
     "gentianos.io/gateway-escaped-slashes-action",
-    "gentianos.io/gateway-request-timeout",
-    "gentianos.io/gateway-buffer-limit",
 }
 
 # Removed rather than renamed, with what to use instead.
@@ -41,6 +39,15 @@ RETIRED = {
         "no such field in BackendTrafficPolicy.timeout.http -- the API server "
         "pruned it, so it never had an effect. gateway-request-timeout is the "
         "whole budget for the exchange, response included."
+    ),
+    "gentianos.io/gateway-request-timeout": (
+        "nothing has read it since every app became a Component. The gateway "
+        "behind sign-in gives every request six minutes; there is no per-route "
+        "timeout."
+    ),
+    "gentianos.io/gateway-buffer-limit": (
+        "nothing has read it since every app became a Component; there is no "
+        "per-route buffer limit."
     ),
 }
 
