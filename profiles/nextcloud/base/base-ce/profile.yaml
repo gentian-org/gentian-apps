@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.10"
+  version: "0.5.1-dev.11"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -330,6 +330,15 @@ spec:
             secret:
               secretName: mail-app-passwords
               optional: true
+      # The platform's TURN edge, for Talk: its address and the secret Talk
+      # mints each call's relay credentials with. The platform writes it while
+      # an addon that declares requires.services.turn is selected (Talk), and
+      # takes it away when none is. optional, because a Nextcloud without
+      # Talk never gets it, and the pod must still start.
+          - name: gentian-turn
+            secret:
+              secretName: turn-credentials-nextcloud-base-ce
+              optional: true
         extraVolumeMounts:
           - name: gentian-sensitive
             mountPath: /etc/gentian
@@ -339,6 +348,9 @@ spec:
             readOnly: true
           - name: gentian-mail-passwords
             mountPath: /etc/gentian-mail
+            readOnly: true
+          - name: gentian-turn
+            mountPath: /etc/gentian-turn
             readOnly: true
         hooks:
           pre-upgrade: "#!/bin/bash\nset -eu\n# Credentials the platform rotates, brought up to date in config.php on\n# every start, before anything reads it. config.php lives on the volume and\n# keeps whatever it was installed with, while the platform hands the current\n# database and cache credentials in through the environment: a rotated\n# secret, or a volume that outlived its release, otherwise locks Nextcloud\n# out (\"WRONGPASS invalid username-password pair\") until someone edits the\n# file by hand. Plain PHP, not occ: occ itself needs the working\n# credentials to start.\nsync_platform_credentials() {\n  php <<'PHP' || echo \"warning: could not bring config.php up to date\"\n<?php\n$file = '/var/www/html/config/config.php';\nif (!is_file($file)) {\n    exit(0);\n}\n$env = function (string $name): ?string {\n    $path = getenv($name . '_FILE');\n    $value = $path !== false && is_file($path) ? trim(file_get_contents($path)) : getenv($name);\n    return $value === false || $value === '' ? null : (string) $value;\n};\n$CONFIG = [];\ninclude $file;\n$before = $CONFIG;\n$db = $env('POSTGRES_PASSWORD') ?? $env('MYSQL_PASSWORD');\nif ($db !== null && isset($CONFIG['dbpassword'])) {\n    $CONFIG['dbpassword'] = $db;\n}\nif ($env('REDIS_HOST') !== null && isset($CONFIG['redis']) && is_array($CONFIG['redis'])) {\n    $CONFIG['redis']['host'] = $env('REDIS_HOST');\n    foreach (['port' => 'REDIS_HOST_PORT', 'user' => 'REDIS_HOST_USER', 'password' => 'REDIS_HOST_PASSWORD'] as $key => $name) {\n        if (($value = $env($name)) !== null) {\n            $CONFIG['redis'][$key] = $key === 'port' ? (int) $value : $value;\n        }\n    }\n}\nif ($CONFIG === $before) {\n    exit(0);\n}\n$tmp = $file . '.gentian';\nfile_put_contents($tmp, \"<?php\\n\\$CONFIG = \" . var_export($CONFIG, true) . \";\\n\");\nchmod($tmp, fileperms($file) & 0777);\n@chown($tmp, fileowner($file));\n@chgrp($tmp, filegroup($file));\nrename($tmp, $file);\necho \"[gentian-nextcloud] config.php: credentials brought up to date\\n\";\nPHP\n}\nsync_platform_credentials\n"
@@ -897,6 +909,27 @@ spec:
               echo "ERROR: could not reach Collabora at $COLLABORA_INTERNAL after 90s." >&2
               echo "ERROR: office documents will not open until the discovery fetch succeeds." >&2
             fi
+            ;;
+        esac
+
+        # --- Talk / TURN wiring ------------------------------------------------------
+        # The platform's TURN edge, from turn-credentials-nextcloud-base-ce, which
+        # exists while Talk is selected. TLS is its own entry: another port. Talk
+        # deselected, the entries go, so its secret is not left behind.
+        T=/etc/gentian-turn
+        case " $SELECTED " in
+          *" spreed "*)
+            if [ -s "$T/TURN_SECRET" ]; then
+              H=$(cat "$T/TURN_SERVER"); K=$(cat "$T/TURN_SECRET")
+              $OCC config:app:set spreed stun_servers --value="[\"$H:$(cat "$T/TURN_PORT")\"]" || true
+              $OCC config:app:set spreed turn_servers --value="[{\"schemes\":\"turn\",\"server\":\"$H:$(cat "$T/TURN_PORT")\",\"secret\":\"$K\",\"protocols\":\"udp,tcp\"},{\"schemes\":\"turns\",\"server\":\"$H:$(cat "$T/TURNS_PORT")\",\"secret\":\"$K\",\"protocols\":\"tcp\"}]" || true
+            else
+              echo "warning: Talk has no TURN server from the platform" >&2
+            fi
+            ;;
+          *)
+            $OCC config:app:delete spreed turn_servers >/dev/null 2>&1 || true
+            $OCC config:app:delete spreed stun_servers >/dev/null 2>&1 || true
             ;;
         esac
     configure:
