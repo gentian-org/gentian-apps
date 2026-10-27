@@ -8,12 +8,12 @@ metadata:
     gentianos.io/profile-family: element
     gentianos.io/profile-edition: ce
   annotations:
-    gentianos.io/portal-auth-mode: matrix-bridge
+    gentianos.io/portal-auth-mode: oidc
 spec:
   classes:
     - app
   trustTier: experimental
-  version: "0.5.1-dev.2"
+  version: "0.5.1-dev.3"
   package:
     # The Composition that renders this chart AND the objects that have to
     # exist beside it. A chart and a composition are the one legal pair in
