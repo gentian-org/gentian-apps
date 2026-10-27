@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate gentianos.io/gateway-* annotations on AppProfile ingress specs.
+"""Validate gentianos.io/gateway-* annotations on ComponentProfile exposures.
 
 An annotation the operator does not recognise is not rejected anywhere -- it is
 simply never read, so a profile can ask for behaviour it silently never gets.
@@ -52,32 +52,26 @@ RETIRED = {
 }
 
 
-def ingress_blocks(spec: dict) -> list[dict]:
-    blocks = []
-    primary = spec.get("ingress")
-    if isinstance(primary, dict):
-        blocks.append(primary)
-    for extra in spec.get("additionalIngresses") or []:
-        if isinstance(extra, dict):
-            blocks.append(extra)
-    return blocks
-
-
 def validate_profile(path: Path) -> list[str]:
     errors: list[str] = []
     doc = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not doc or doc.get("kind") != "AppProfile":
+    if not doc or doc.get("kind") != "ComponentProfile":
         return errors
     rel = path.relative_to(ROOT)
-    for block in ingress_blocks(doc.get("spec") or {}):
-        for key in (block.get("annotations") or {}):
+    # Per host, so per exposure: the operator reads them from expose[].annotations
+    # and nowhere else -- metadata.annotations on the profile are not gateway policy.
+    for exposure in (doc.get("spec") or {}).get("expose") or []:
+        if not isinstance(exposure, dict):
+            continue
+        for key in (exposure.get("annotations") or {}):
             if not key.startswith("gentianos.io/gateway-"):
                 continue
+            where = f"{rel}: expose/{exposure.get('name', '?')}"
             if key in RETIRED:
-                errors.append(f"{rel}: {key} is retired -- {RETIRED[key]}")
+                errors.append(f"{where}: {key} is retired -- {RETIRED[key]}")
             elif key not in KNOWN:
                 errors.append(
-                    f"{rel}: {key} is not read by the operator; "
+                    f"{where}: {key} is not read by the operator; "
                     f"known keys are {', '.join(sorted(KNOWN))}"
                 )
     return errors
