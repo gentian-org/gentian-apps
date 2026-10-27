@@ -27,7 +27,7 @@ spec:
   rungJustification:
     L0: >-
       Activepieces' community edition has no setting that takes a person from an
-      identity provider or from a proxy. Its single sign-on is behind a licence key.
+      identity provider or from a proxy. Its single sign-on is behind a license key.
     L1: >-
       The branding drop-in is the only one, and it carries static files.
 
@@ -37,7 +37,7 @@ spec:
     reason: >-
       Single sign-on is what upstream sells. A sign-in that goes around it is not
       something to offer them; the tenant that wants Activepieces' own single sign-on
-      supplies a licence key and the profile then declares identity.oidc.
+      supplies a license key and the profile then declares identity.oidc.
 
   artifacts:
     - repo: gentian-org/gentian-apps
@@ -87,5 +87,5 @@ spec:
       Activepieces' own interface for it, for who holds the platform's App Admin
       role. That is one person, one
       project — not shared projects, project roles or any switch — but it is more than the
-      edition's own interface gives, and whether it is within the licence is a
+      edition's own interface gives, and whether it is within the license is a
       judgement this record does not make.

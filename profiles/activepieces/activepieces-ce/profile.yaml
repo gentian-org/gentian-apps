@@ -14,7 +14,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.1"
+  version: "0.5.1-dev.2"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
@@ -182,7 +182,7 @@ spec:
     platform: ">=0.5"
     services:
       identity:
-      # Activepieces' own single sign-on needs a licence key and is not used.
+      # Activepieces' own single sign-on needs a license key and is not used.
       # Its people are signed in by the platform's sidecar, with the handler
       # in assets/sign-in-handler.js. See customizations/sign-in-sidecar.yaml
       # for the review, and for the question about it that is open.
@@ -290,7 +290,7 @@ spec:
     repackage:
       chartOwnership: patched
     patch:
-      allowed: false      # enterprise features are licence-gated; never patch to unlock
+      allowed: false      # enterprise features are license-gated; never patch to unlock
       seriesPath: patches/series
       requiresApproval: platform-team
     fork:

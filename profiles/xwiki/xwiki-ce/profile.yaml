@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.3"
+  version: "0.5.1-dev.4"
   package:
     chart:
       repository: "https://xwiki-contrib.github.io/xwiki-helm"
@@ -258,7 +258,7 @@ spec:
             - "https://wiki.${TENANT_DOMAIN}/oidc/authenticator/callback"
           postLogoutRedirectUris:
             - "https://wiki.${TENANT_DOMAIN}/"
-            - "https://portal.${KERNEL_DOMAIN}/"
+            - "https://desktop.${TENANT_DOMAIN}/"
         # Where the realm tells XWiki that a person signed out: this path,
         # at the Service and port of the entry "web", inside the cluster. The
         # authenticator checks the token against the keys the realm publishes

@@ -63,20 +63,6 @@ spec:
                     type: FromCompositeFieldPath
                     valueFromFieldPath: spec.profileRef.name
             - kind: ConfigMap
-              into: jitsiOidcOverlays
-              apiVersion: v1
-              type: Selector
-              selector:
-                maxMatch: 1
-                minMatch: 0
-                matchLabels:
-                  - key: gentianos.io/asset
-                    type: Value
-                    value: jitsi-oidc-overlays
-                  - key: gentianos.io/profile-name
-                    type: Value
-                    value: element-ce
-            - kind: ConfigMap
               into: platformSecurity
               apiVersion: v1
               type: Selector
@@ -124,9 +110,6 @@ spec:
                  where the cluster composition put gentian-cluster-config: v4
                  named crossplane-system here, which a v5 cluster does not have. */}}
             {{- $provNs     := dig "metadata" "namespace" "kernel-provisioning" $ccCM }}
-            {{- $jitsiOidcOverlaysRes := dig "jitsiOidcOverlays" list $extraRes }}
-            {{- $jitsiOverlayCM := default dict (index $jitsiOidcOverlaysRes 0) }}
-            {{- $jitsiOverlayData := dig "data" dict $jitsiOverlayCM }}
             {{- $nodeIP        := dig "node.ip"        "" $ccData }}
             {{- $kr            := dig "requires" "services" dict $pSpec }}
             {{- $identity      := default dict $kr.identity }}
@@ -317,10 +300,36 @@ spec:
             {{- end }}
             {{- end }}
 
+            {{- /* Mail is optional: a cluster without the relay's credentials
+                   leaves them empty, and provider-helm refuses an empty --set
+                   value, which would keep the whole app from installing. So
+                   the SMTP values do not go through set. The ExternalSecret
+                   writes each one, when it is not empty, as a values document
+                   of its own (values-smtp-*), and the Release reads those as
+                   optional valuesFrom: an empty credential is simply not set,
+                   the app installs and sends no mail, and the value reaches
+                   it on the next sync once it exists. Mirrors app-default. */}}
+            {{- $relValuesFrom := list }}
+            {{- $esTemplate := dict }}
             {{- if $vm.smtp }}
-            {{- if $vm.smtp.passwordKey }}
-            {{- $relSet = append $relSet (dict "name" $vm.smtp.passwordKey
-                "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" "smtp-password"))) }}
+            {{- $optional := list
+                (dict "path" $vm.smtp.hostKey "key" "smtp-host" "raw" false)
+                (dict "path" $vm.smtp.portKey "key" "smtp-port" "raw" true)
+                (dict "path" $vm.smtp.userKey "key" "smtp-user" "raw" false)
+                (dict "path" $vm.smtp.passwordKey "key" "smtp-password" "raw" false) }}
+            {{- range $o := $optional }}
+            {{- if $o.path }}
+            {{- $head := "" }}
+            {{- $tail := "" }}
+            {{- range $part := splitList "." $o.path }}
+            {{- $head = printf "%s{%s:" $head (toJson $part) }}
+            {{- $tail = printf "%s}" $tail }}
+            {{- end }}
+            {{- $value := ternary " . " " . | toJson " $o.raw }}
+            {{- $docKey := printf "values-%s" $o.key }}
+            {{- $esTemplate = set $esTemplate $docKey (printf "%s with index . %q %s%s%s%s%s%s%s end %s" "{{" $o.key "}}" $head "{{" $value "}}" $tail "{{" "}}") }}
+            {{- $relValuesFrom = append $relValuesFrom (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" $docKey "optional" true)) }}
+            {{- end }}
             {{- end }}
             {{- end }}
 
@@ -361,6 +370,13 @@ spec:
                       name: {{ $secretName }}
                       creationPolicy: Owner
                       deletionPolicy: Retain
+                      {{- if gt (len $esTemplate) 0 }}
+                      template:
+                        engineVersion: v2
+                        mergePolicy: Merge
+                        data:
+                          {{ toYaml $esTemplate | nindent 26 }}
+                      {{- end }}
                     data:
                       {{ toYaml $esData | nindent 22 }}
               providerConfigRef:
@@ -400,8 +416,6 @@ spec:
                           "preferred_domain": "meet.jit.si"
                         }
                       }
-                  binaryData:
-                    gentian-portal-sso.html: {{ index $jitsiOverlayData "gentian-portal-sso.html" | default "" | b64enc | quote }}
               providerConfigRef:
                 name: kubernetes
 
@@ -463,9 +477,6 @@ spec:
                               - name: config
                                 mountPath: /app/config.json
                                 subPath: config.json
-                              - name: config
-                                mountPath: /app/gentian-portal-sso.html
-                                subPath: gentian-portal-sso.html
                               - name: cache
                                 mountPath: /var/cache/nginx
                               - name: run
@@ -563,9 +574,6 @@ spec:
                     (dict "name" "AUTHLIB_INSECURE_TRANSPORT" "value" "1")
                     (dict "name" "OAUTHLIB_INSECURE_TRANSPORT" "value" "1")
                   )
-                  "extraCommands" (list
-                    (printf "(python -c \"import socket, time; any(socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex(('127.0.0.1', 8008)) == 0 or time.sleep(1) for _ in range(300))\" && register_new_matrix_user -c /synapse/config/homeserver.yaml -c /synapse/config/conf.d/secrets.yaml -u gentian-portal-bridge -p \"portal-bridge-not-used-for-login\" -a || true) &")
-                  )
                   "resources" (dict
                     "limits" (dict "cpu" "1" "memory" "2Gi")
                     "requests" (dict "cpu" "250m" "memory" "512Mi")
@@ -644,6 +652,10 @@ spec:
                 skipCreateNamespace: true
                 values:
                   {{ toYaml $synapseVals | nindent 18 }}
+                {{- if gt (len $relValuesFrom) 0 }}
+                valuesFrom:
+                  {{ toYaml $relValuesFrom | nindent 18 }}
+                {{- end }}
                 {{- if gt (len $relSet) 0 }}
                 set:
                   {{ toYaml $relSet | nindent 18 }}

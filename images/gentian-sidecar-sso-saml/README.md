@@ -205,7 +205,7 @@ reaches nothing but what was declared.
 - give anybody a password, or keep one. Where the app's own calls demand one for a new account,
   a random value is given and removed again;
 - log who signed in. `ctx.log` is for what happened, not to whom;
-- touch a licence check or a switch of a paid feature in the app.
+- touch a license check or a switch of a paid feature in the app.
 
 The handlers in this catalogue are the reference:
 `profiles/docmost/docmost-ce/assets/sign-in-handler.js` and

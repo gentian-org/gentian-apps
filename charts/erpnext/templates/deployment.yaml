@@ -147,10 +147,14 @@ spec:
             {{- include "erpnext.env" . | nindent 12 }}
           volumeMounts:
             {{- include "erpnext.mounts" . | nindent 12 }}
+          # gunicorn listens on the pod's loopback only; a tcpSocket probe with
+          # host 127.0.0.1 would dial the node, so connect from inside.
           livenessProbe:
-            tcpSocket:
-              host: 127.0.0.1
-              port: 8000
+            exec:
+              command:
+                - /home/frappe/frappe-bench/env/bin/python
+                - -c
+                - import socket; socket.create_connection(("127.0.0.1", 8000), 3).close()
             initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 5

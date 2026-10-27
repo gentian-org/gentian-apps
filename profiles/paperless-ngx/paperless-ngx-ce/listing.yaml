@@ -1,37 +1,46 @@
 # What the App Store says about Paperless-ngx. The store keeps listings in its
-# own database; this file is what its import reads from a checkout, once.
+# own database, written by its editors (aluvian services/store, "The
+# listings"); this file is the record of what was written there, in English,
+# and what the store's import reads from a checkout. The German text was
+# written to the store with it.
 #
 # The tile (assets/tile.svg) is Paperless-ngx's own leaf mark, from the
-# project's docs/assets/logo_leaf.svg, under the project's GPL-3.0 licence.
+# project's docs/assets/logo_leaf.svg under the project's GPL-3.0 license, on
+# the light rounded square the store's other entries have.
 displayName: Paperless-ngx
 edition: ce
 family: paperless-ngx
 author: Paperless-ngx community
 license: GPL-3.0-only
 summary: >-
-  Scan, OCR and archive your paper: every document becomes searchable text
-  and a PDF/A, filed by correspondent, type and tags, and readable by your
-  AI assistant.
-description: >-
-  Paperless-ngx turns paper into a searchable archive. Upload a scan or a
-  photo, drop a file into its inbox or let it fetch attachments from a
-  mailbox: each document is run through OCR in German, French, Italian or
-  English, kept as a PDF/A beside the original, and filed by correspondent,
-  document type, tags and custom fields that Paperless learns to suggest.
+  Scan, OCR and archive your paper: every letter, invoice and contract becomes searchable text and a PDF/A, filed by correspondent, type and tags, and readable by your AI assistant.
+description: |-
+  Paperless-ngx turns paper into a searchable archive. Scan a letter, photograph a receipt or drop a PDF into its inbox, and it is read, filed and found again in seconds.
 
+  ## What it does
 
-  Everything is full-text searchable, from the first letter to the last
-  invoice. Workflows file and share documents as they arrive; the REST API
-  and the bundled MCP server let an assistant or an automation read a
-  document's text and metadata, upload new ones and tag what it has
-  processed. People sign in with their Gentian account; whoever holds the
-  tenant's App Administrator role administers Paperless.
+  - **Text recognition.** Every document is run through OCR in German, French, Italian or English. You can search the full text of a scan, not only its title.
+  - **An archive that lasts.** Each document is kept as a PDF/A beside the original file, the format made for long-term archiving.
+  - **Filing that learns.** Documents are filed by correspondent, document type, tags and custom fields. Paperless learns from what you file and suggests the same for the next one.
+  - **Several ways in.** Upload in the browser, drop files into the inbox, let it fetch attachments from a mailbox, or scan from your phone with the Paperless mobile apps.
+  - **Workflows.** Rules file, tag and share documents as they arrive, for example every invoice from one supplier.
+
+  ## Built for automation
+
+  The REST API and the bundled MCP server let an AI assistant or an automation read a document's text and metadata, upload new scans, set custom fields and tag what it has processed. A scanned letter can go from Paperless through a language model into your CRM or ERP without anyone typing it in.
+
+  ## On Gentian OS
+
+  People sign in with their Gentian account; nobody needs a separate password. Whoever holds the tenant's App Administrator role administers Paperless. Documents stay in your tenant, on your cluster.
 categories: [files, office, automation]
-keywords: [documents, scanning, OCR, archive, PDF/A, paperless, DMS, invoices, letters, MCP]
+keywords: [documents, scanning, OCR, archive, PDF/A, paperless, DMS, invoices, letters, receipts, MCP]
 links:
   - rel: homepage
-    label: Documentation
+    label: Paperless-ngx
     url: https://docs.paperless-ngx.com/
+  - rel: documentation
+    label: Documentation
+    url: https://docs.paperless-ngx.com/usage/
   - rel: source
     label: Source code
     url: https://github.com/paperless-ngx/paperless-ngx

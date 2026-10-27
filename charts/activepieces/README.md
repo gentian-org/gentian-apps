@@ -46,6 +46,6 @@ container with the chart's own files.
 1. Every patch carries DEP-3 headers; `Forwarded:` is not optional.
 2. A patch that stops applying on an upstream bump is a decision point, not a
    nuisance — rebase or drop it, don't pin upstream forever to avoid it.
-3. Never patch to bypass licence validation or unlock paid features. Activepieces
+3. Never patch to bypass license validation or unlock paid features. Activepieces
    gates SSO and appearance behind `AP_LICENSE_KEY`; supply a real key. This is an
    absolute prohibition — see `docs/app-profile-guide.md`.

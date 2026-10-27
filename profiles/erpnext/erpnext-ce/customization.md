@@ -63,8 +63,10 @@ points the socket server at itself inside the pod, so the call does not leave th
 start. A first sign-in finds an existing account by email, or creates one with the role
 "Desk User". The password form is off (`signIn.passwordLogin: false`); Frappe refuses that
 while no other way in exists, so the chart turns it on again when the realm's sign-in is not
-configured. Frappe implements no back-channel logout, so a portal sign-out leaves the ERPNext
-session to expire on its own.
+configured. While the form is off, the chart's nginx adds a script to Frappe's login page that
+follows its Keycloak link, so nobody sees the page. Frappe implements no back-channel logout, so
+a portal sign-out leaves the ERPNext session to expire on its own, and ERPNext's own logout
+signs the person straight back in while their realm session lasts.
 
 **App administrators.** `hooks.provisioning` converges System Manager to exactly the tenant's
 app administrators, through Frappe's REST API as Administrator with the API key the chart writes

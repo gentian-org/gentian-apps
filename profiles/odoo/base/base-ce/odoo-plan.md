@@ -393,6 +393,7 @@ record (the “group equivalent”). Tenant admins configure Odoo rights on that
 **Sync (runtime):**
 
 - `gentian_os` maps token-received Keycloak group membership → `res.users.groups_id` on login (built on `auth_oauth` or SCIM).
+- A session signed in before the installed modules changed is sent through the zero-click sign-in again on its next page load, so an addon's roles arrive without the user signing out.
 - User in `accountants` gets Odoo groups linked to that Keycloak group only — not
   supervisor rights.
 
