@@ -1064,25 +1064,31 @@ Override the two or three rules that consume it for page layout instead.
 ### 6g. Nextcloud (App Store)
 
 Nextcloud is an **App Store app** (`profiles/nextcloud/profile.yaml`), not a kernel
-service. Each tenant gets a dedicated instance at `nextcloud.<tenant_domain>` with an
-optional Collabora subchart at `collabora.<tenant_domain>`.
+service. Each tenant gets a dedicated instance at `nextcloud.<tenant_domain>`, with
+Collabora on the same host under its own paths.
 
-**Gateway policy (declared on the profile, not in gentian-os):** the Collabora
-`additionalIngresses` entry sets `gentianos.io/gateway-frame-ancestors` so the
-editor allows embedding from the main `nextcloud.<tenant>` host (see Gateway
-annotations table). It sets `gentianos.io/gateway-escaped-slashes-action:
-KeepUnchanged` so Envoy forwards `/cool/...` WOPI WebSocket paths without
+**Gateway policy (declared on the profile, not in gentian-os):** the `collabora`
+exposure shares Nextcloud's host (`subDomain: nextcloud`) and serves only `/browser`,
+`/cool` and `/hosting/{discovery,capabilities}`, with Collabora's administration and
+conversion paths in `denyPaths`. A host of its own would break the first document of
+every session: the editor frame opens with a form POST carrying the WOPI access token,
+the session cookie is per host, and the sign-in redirect turns that POST into a GET
+without the token. `gentianos.io/gateway-escaped-slashes-action: KeepUnchanged` lets
+Envoy forward the URL-encoded `/cool/.../ws` WebSocket path without
 `path_normalization_failed`.
 
 ```yaml
-additionalIngresses:
-  - subDomain: collabora
-    serviceName: nextcloud-collabora
-    servicePort: 9980
-    annotations:
-      gentianos.io/gateway-frame-ancestors: |
-        {"mode":"replace","origins":["mainApp","portal"]}
-      gentianos.io/gateway-escaped-slashes-action: KeepUnchanged
+- name: collabora
+  surface: gateway
+  authMode: oidc
+  subDomain: nextcloud
+  paths: [/browser, /cool, /hosting/discovery, /hosting/capabilities]
+  denyPaths: [/browser/dist/admin, /cool/adminws, /cool/convert-to, /cool/getMetrics]
+  annotations:
+    gentianos.io/gateway-escaped-slashes-action: KeepUnchanged
+  backend:
+    service: nextcloud-collabora
+    port: 9980
 ```
 
 OIDC uses the tenant realm (`${TENANT_ID}`) with client ID `gentian-nextcloud` and
