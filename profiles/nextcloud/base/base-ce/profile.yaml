@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.14"
+  version: "0.5.1-dev.15"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -144,7 +144,7 @@ spec:
       image:
         registry: ghcr.io
         repository: gentian-org/nextcloud
-        tag: develop-4f1a61d
+        tag: develop-202b6ed
       internalDatabase:
         enabled: false
       externalDatabase:
