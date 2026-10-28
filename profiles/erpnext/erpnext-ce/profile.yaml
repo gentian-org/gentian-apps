@@ -50,8 +50,9 @@
 # Login Key the chart writes on every start (charts/erpnext/files/configure.py).
 # A person's first sign-in creates their account, found by email first, with
 # the role "Desk User", which opens the desk and grants nothing in it. Who holds
-# System Manager is the platform's to say: hooks.provisioning below gives it to
-# the tenant's app administrators and takes it from everyone else. Frappe's
+# System Manager is the platform's to say: hooks.provisioning below gives it,
+# with every other role, to the tenant's app administrators and takes them from
+# everyone else. Frappe's
 # password form is switched off; nobody, Administrator included, signs in with
 # a password, and Frappe's login page goes straight on to the realm.
 #
@@ -76,7 +77,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.4"
+  version: "0.5.1-dev.5"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -224,8 +225,10 @@ spec:
       # How this app applies that role. The platform resolves the tenant's app
       # administrators and runs this job with them; the calls are Frappe's REST
       # API, made inside the cluster as Administrator with its API key.
-      # Converges: every app administrator holds System Manager, nobody else
-      # does. Administrator is never touched. An app administrator who has not
+      # Converges: every app administrator holds System Manager and every
+      # other role Frappe's setup wizard gives its first account; nobody else
+      # holds System Manager, and whoever loses it loses those roles with it.
+      # Administrator is never touched. An app administrator who has not
       # signed in yet gets an account by email, which their first sign-in
       # takes.
       syncJob:
@@ -249,6 +252,10 @@ spec:
           BASE = "http://%s:8080" % os.environ["GENTIAN_APP"]
           ROLE = os.environ.get("GENTIAN_PRIVILEGED_ROLE") or "System Manager"
           KEEP = {"administrator", "guest"}
+          # The roles Frappe's setup wizard gives the account it makes
+          # (setup_wizard._get_default_roles): every role but the automatic
+          # ones and those of people outside the company.
+          SKIP = {"Administrator", "Guest", "All", "Desk User", "Customer", "Supplier", "Partner", "Employee"}
 
           def call(method, path, body=None):
               req = urllib.request.Request(
@@ -279,6 +286,10 @@ spec:
               if json.load(resp).get("message") != "Administrator":
                   raise SystemExit("the API key is not Administrator's")
 
+          ROLES = sorted({r["name"] for r in call("GET", "/api/resource/Role?limit_page_length=0"
+                                                  + "&fields=" + urllib.parse.quote(json.dumps(["name"]))) or []}
+                         - SKIP | {ROLE})
+
           with open(os.environ["GENTIAN_APP_ADMINS_FILE"]) as fh:
               members = json.load(fh)
           want = {m["email"].lower(): m for m in members if m.get("email")}
@@ -295,14 +306,15 @@ spec:
                       "first_name": member.get("username") or email.split("@")[0],
                       "send_welcome_email": 0,
                       "user_type": "System User",
-                      "roles": [{"role": ROLE}],
+                      "roles": [{"role": r} for r in ROLES],
                   })
-                  print("made %s, holding %s" % (email, ROLE))
+                  print("made %s, holding %s and %d other roles" % (email, ROLE, len(ROLES) - 1))
                   continue
               roles = [r["role"] for r in doc.get("roles", [])]
-              if ROLE not in roles:
-                  set_roles(doc, roles + [ROLE])
-                  print("gave %s %s" % (email, ROLE))
+              missing = [r for r in ROLES if r not in roles]
+              if missing:
+                  set_roles(doc, roles + missing)
+                  print("gave %s %s" % (email, ", ".join(missing)))
 
           for holder in sorted({h["name"].lower() for h in holders}):
               if holder in want or holder in KEEP:
@@ -310,8 +322,8 @@ spec:
               doc = user(holder)
               if doc is None:
                   continue
-              set_roles(doc, [r["role"] for r in doc.get("roles", []) if r["role"] != ROLE])
-              print("took %s from %s" % (ROLE, holder))
+              set_roles(doc, [r["role"] for r in doc.get("roles", []) if r["role"] not in ROLES])
+              print("took %s and the roles with it from %s" % (ROLE, holder))
 
           print("app administrators synchronised: %d" % len(want))
           PY

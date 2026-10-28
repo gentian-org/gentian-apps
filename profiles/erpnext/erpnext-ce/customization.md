@@ -68,8 +68,8 @@ follows its Keycloak link, so nobody sees the page. Frappe implements no back-ch
 a portal sign-out leaves the ERPNext session to expire on its own, and ERPNext's own logout
 signs the person straight back in while their realm session lasts.
 
-**App administrators.** `hooks.provisioning` converges System Manager to exactly the tenant's
-app administrators, through Frappe's REST API as Administrator with the API key the chart writes
+**App administrators.** `hooks.provisioning` converges System Manager, with every other role
+Frappe's setup wizard gives its first account, to exactly the tenant's app administrators, through Frappe's REST API as Administrator with the API key the chart writes
 on every start. Administrator itself is never changed. An administrator who has not signed in
 yet gets an account by email, which their first sign-in takes.
 
