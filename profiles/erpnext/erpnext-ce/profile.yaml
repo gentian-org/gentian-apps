@@ -77,7 +77,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.5"
+  version: "0.5.1-dev.6"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -228,9 +228,12 @@ spec:
       # Converges: every app administrator holds System Manager and every
       # other role Frappe's setup wizard gives its first account; nobody else
       # holds System Manager, and whoever loses it loses those roles with it.
-      # Administrator is never touched. An app administrator who has not
-      # signed in yet gets an account by email, which their first sign-in
-      # takes.
+      # Everyone else entitled to the app holds USER_ROLES, the roles an
+      # ordinary employee is given: their own Employee record and the reports
+      # Frappe prepares in the background. What a department needs beyond that
+      # an administrator gives in ERPNext. Whoever loses the app loses
+      # USER_ROLES. Administrator is never touched. A person who has not signed
+      # in yet gets an account by email, which their first sign-in takes.
       syncJob:
         image: docker.io/frappe/erpnext:v16.51.1
         env:
@@ -256,6 +259,7 @@ spec:
           # (setup_wizard._get_default_roles): every role but the automatic
           # ones and those of people outside the company.
           SKIP = {"Administrator", "Guest", "All", "Desk User", "Customer", "Supplier", "Partner", "Employee"}
+          USER_ROLES = ["Employee", "Prepared Report User"]
 
           def call(method, path, body=None):
               req = urllib.request.Request(
@@ -265,7 +269,8 @@ spec:
               )
               try:
                   with urllib.request.urlopen(req, timeout=60) as resp:
-                      return json.load(resp).get("data")
+                      body = json.load(resp)
+                      return body.get("data", body.get("message"))
               except urllib.error.HTTPError as e:
                   if e.code == 404 and method == "GET":
                       return None
@@ -326,6 +331,44 @@ spec:
               print("took %s and the roles with it from %s" % (ROLE, holder))
 
           print("app administrators synchronised: %d" % len(want))
+
+          # The entitled users, from an operator that hands them over. Every
+          # role holding is read in one call: there can be thousands of people.
+          users_file = os.environ.get("GENTIAN_APP_USERS_FILE", "")
+          if users_file and os.path.exists(users_file):
+              with open(users_file) as fh:
+                  entitled = {m["email"].lower(): m for m in json.load(fh) if m.get("email")}
+              held = {}
+              rows = call("POST", "/api/method/frappe.client.get_list", {
+                  "doctype": "Has Role", "parent": "User", "fields": ["parent", "role"], "limit_page_length": 0,
+              }) or []
+              for row in rows:
+                  held.setdefault(row["parent"].lower(), set()).add(row["role"])
+              for email, member in sorted(entitled.items()):
+                  if email not in held:
+                      call("POST", "/api/resource/User", {
+                          "email": email,
+                          "first_name": member.get("username") or email.split("@")[0],
+                          "send_welcome_email": 0,
+                          "user_type": "System User",
+                          "roles": [{"role": r} for r in USER_ROLES],
+                      })
+                      print("made %s, holding %s" % (email, ", ".join(USER_ROLES)))
+                      continue
+                  missing = [r for r in USER_ROLES if r not in held[email]]
+                  if missing:
+                      doc = user(email)
+                      set_roles(doc, [r["role"] for r in doc.get("roles", [])] + missing)
+                      print("gave %s %s" % (email, ", ".join(missing)))
+              for name, roles in sorted(held.items()):
+                  if name in entitled or name in want or name in KEEP or not roles & set(USER_ROLES):
+                      continue
+                  doc = user(name)
+                  if doc is None:
+                      continue
+                  set_roles(doc, [r["role"] for r in doc.get("roles", []) if r["role"] not in USER_ROLES])
+                  print("took %s from %s" % (", ".join(USER_ROLES), name))
+              print("app users synchronised: %d" % len(entitled))
           PY
 
   # Customization ladder — see customization.md

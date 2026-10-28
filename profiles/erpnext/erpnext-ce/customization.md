@@ -71,7 +71,9 @@ signs the person straight back in while their realm session lasts.
 **App administrators.** `hooks.provisioning` converges System Manager, with every other role
 Frappe's setup wizard gives its first account, to exactly the tenant's app administrators, through Frappe's REST API as Administrator with the API key the chart writes
 on every start. Administrator itself is never changed. An administrator who has not signed in
-yet gets an account by email, which their first sign-in takes.
+yet gets an account by email, which their first sign-in takes. Everyone else the tenant entitled to ERPNext
+holds Employee and Prepared Report User, and loses them with the app; what a department needs
+beyond that is given in ERPNext.
 
 **Upgrades.** The configure step records the image's Frappe and ERPNext versions beside the
 site and runs `bench migrate` when they differ. An upgrade across a major version (v16 → v17)
