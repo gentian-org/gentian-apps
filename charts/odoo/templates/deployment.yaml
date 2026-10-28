@@ -27,6 +27,10 @@ spec:
       app.kubernetes.io/name: {{ include "odoo.name" . }}
   template:
     metadata:
+      annotations:
+        # A start is what writes the organisation onto the company, so a
+        # tenant filling in its settings after the install restarts Odoo.
+        gentianos.io/organization: {{ .Values.organization | default dict | toJson | sha256sum | trunc 16 | quote }}
       labels:
         app.kubernetes.io/name: {{ include "odoo.name" . }}
         {{- if .Values.podLabels }}
@@ -269,6 +273,16 @@ spec:
               env.cr.commit()
               GENTIAN_BASEURL_EOF
               {{- end }}
+              # Who the tenant is, onto the company Odoo made, once
+              # (files/organization.py).
+              python3 /opt/odoo/src/odoo/odoo-bin shell \
+                -d "${DB_NAME}" \
+                --db_host="${DB_HOST}" \
+                --db_port="${DB_PORT}" \
+                --db_user="${DB_USER}" \
+                --db_password="${DB_PASSWORD}" \
+                --config=/etc/odoo/odoo.conf \
+                --no-http --shell-interface=python < /etc/gentian/organization.py || true
               exec python3 /opt/odoo/src/odoo/odoo-bin \
                 -d "${DB_NAME}" \
                 --db_host="${DB_HOST}" \
@@ -511,6 +525,10 @@ spec:
             items:
               - key: config.json
                 path: config.json
+              - key: organization.json
+                path: organization.json
+              - key: organization.py
+                path: organization.py
         - name: tmp
           emptyDir: {}
         {{- range $gitSources }}

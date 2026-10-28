@@ -112,7 +112,8 @@ mcp:
 
 ocr:
   # Tesseract codes, joined with +. Only languages in the image (see image
-  # above): eng, deu, fra, ita, spa.
+  # above): eng, deu, fra, ita, spa. Used when organization.languages names
+  # none of them; otherwise those are the OCR languages.
   language: "deu+fra+ita+eng"
   # skip: OCR only pages without text. redo / force re-OCR everything.
   mode: "skip"
@@ -206,3 +207,8 @@ extraVolumeMounts: []
 # creates the Gateway API route from the profile's expose entries.
 ingress:
   enabled: false
+
+# Who the tenant is, as the platform tells it (valueMapping.platform
+# organizationKey). Its languages are the OCR languages, those the image
+# ships (ocr.language otherwise).
+organization: {}

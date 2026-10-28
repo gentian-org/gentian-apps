@@ -10,6 +10,9 @@ data:
 {{ .Files.Get "files/configure.sh" | indent 4 }}
   configure.py: |-
 {{ .Files.Get "files/configure.py" | indent 4 }}
+  # Who the tenant is (valueMapping.platform.organizationKey): the company
+  # configure.py sets the site up for, once, when it is complete.
+  organization.json: {{ .Values.organization | toJson | quote }}
   # The image's mariadb client (11.8) asks for TLS by default and refuses a
   # server that offers none, which the platform's does not; Frappe's Python
   # connection never asked for it.

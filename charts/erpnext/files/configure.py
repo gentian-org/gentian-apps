@@ -5,6 +5,7 @@ does: a changed client secret, a realm moved to another host, a restore from
 another domain all take effect at the next start.
 """
 
+import datetime
 import json
 import os
 
@@ -91,6 +92,117 @@ def administrator_api_key():
     set_encrypted_password("User", "Administrator", secret, "api_secret")
 
 
+def company_abbr(name):
+    """ERPNext's own rule: the initials, or the first letters of a single word."""
+    words = [w for w in name.replace("-", " ").split() if w[:1].isalnum()]
+    abbr = "".join(w[0] for w in words) if len(words) > 1 else name[:5]
+    return abbr.upper()[:10] or "CO"
+
+
+def organization():
+    """Who the tenant is, from the values; {} when the platform said nothing."""
+    try:
+        with open("/gentian/organization.json") as f:
+            return json.load(f) or {}
+    except (OSError, ValueError):
+        return {}
+
+
+def setup_from_organization():
+    """Runs the setup wizard from who the tenant is, once.
+
+    Frappe's desk shows its wizard until the site is set up; the first System
+    Manager would be asked for the company, country, currency and fiscal year.
+    The platform knows them, so the site is set up from them instead. Never
+    over a site that is already set up: its company, currency and chart of
+    accounts are the tenant's data by then.
+    """
+    if frappe.is_setup_complete():
+        return
+    org = organization()
+    if not org.get("complete"):
+        say("the tenant's settings are incomplete; the setup wizard is left to the first System Manager")
+        return
+
+    country = frappe.db.get_value("Country", {"code": org["country"].lower()}, "name")
+    if not country:
+        say("Frappe knows no country %r; the setup wizard is left to the first System Manager" % org["country"])
+        return
+    language_code = (org.get("languages") or ["en"])[0]
+    language = frappe.db.get_value("Language", language_code, "language_name") or "English"
+
+    # ERPNext's generic chart, unless the values name another. Its country
+    # charts are no safe default: Switzerland's only one is a school's, and
+    # Germany and France offer several to choose between.
+    chart = os.environ.get("CHART_OF_ACCOUNTS") or "Standard"
+
+    today = datetime.date.today()
+    month = int(org.get("fiscalYearStartMonth") or 1)
+    start = datetime.date(today.year if today.month >= month else today.year - 1, month, 1)
+    end = datetime.date(start.year + 1, start.month, 1) - datetime.timedelta(days=1)
+
+    name = org.get("legalName") or org.get("displayName")
+    args = {
+        "language": language,
+        "country": country,
+        "timezone": org.get("timeZone"),
+        "currency": org.get("currency"),
+        "company_name": name,
+        "company_abbr": company_abbr(name),
+        "chart_of_accounts": chart,
+        "fy_start_date": start.isoformat(),
+        "fy_end_date": end.isoformat(),
+        "enable_telemetry": 0,
+    }
+    from frappe.desk.page.setup_wizard.setup_wizard import setup_complete
+
+    result = setup_complete(args)
+    if not frappe.is_setup_complete():
+        say("the setup wizard did not finish (%s); it is left to the first System Manager" % result)
+        return
+    company_details(name, org)
+    say("set up as %s (%s, %s, %s)" % (name, country, org.get("currency"), chart))
+
+
+def company_details(name, org):
+    """What the wizard does not ask: the company's numbers, contact and address."""
+    company = frappe.get_doc("Company", name)
+    registration = org.get("registrationNumber")
+    company.update(
+        {
+            "tax_id": org.get("taxId") or company.tax_id,
+            "email": org.get("email") or company.email,
+            "phone_no": org.get("phone") or company.phone_no,
+            "website": org.get("website") or company.website,
+            "registration_details": ("Commercial register: %s" % registration) if registration else company.registration_details,
+        }
+    )
+    company.save(ignore_permissions=True)
+
+    address = org.get("address") or {}
+    if not (address.get("street") and address.get("city")):
+        return
+    doc = frappe.new_doc("Address")
+    doc.update(
+        {
+            "address_title": name,
+            "address_type": "Billing",
+            "address_line1": address["street"].splitlines()[0],
+            "address_line2": "\n".join(address["street"].splitlines()[1:]) or None,
+            "pincode": address.get("postalCode"),
+            "city": address["city"],
+            "state": address.get("region"),
+            "country": company.country,
+            "email_id": org.get("email") or None,
+            "phone": org.get("phone") or None,
+            "is_your_company_address": 1,
+            "is_primary_address": 1,
+        }
+    )
+    doc.append("links", {"link_doctype": "Company", "link_name": name})
+    doc.insert(ignore_permissions=True)
+
+
 def main():
     frappe.init(site=SITE, sites_path="/home/frappe/frappe-bench/sites")
     frappe.connect()
@@ -99,6 +211,8 @@ def main():
         realm_sign_in = social_login_key()
         settings(realm_sign_in)
         administrator_api_key()
+        frappe.db.commit()
+        setup_from_organization()
         frappe.db.commit()
         frappe.clear_cache()
     finally:

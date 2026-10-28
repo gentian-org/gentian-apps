@@ -56,3 +56,17 @@ discovery document, the form Paperless' own documentation gives.
       "APPS" (list $app)) }}
 {{- toJson $providers }}
 {{- end }}
+
+{{/*
+The OCR languages: the tenant's (organization.languages), those of them the
+image ships, as Tesseract codes; ocr.language when none of them is.
+*/}}
+{{- define "paperless-ngx.ocrLanguage" -}}
+{{- $tesseract := dict "en" "eng" "de" "deu" "fr" "fra" "it" "ita" "es" "spa" -}}
+{{- $codes := list -}}
+{{- range ((.Values.organization | default dict).languages | default list) -}}
+{{- $code := get $tesseract (. | lower | trunc 2) -}}
+{{- if and $code (not (has $code $codes)) -}}{{- $codes = append $codes $code -}}{{- end -}}
+{{- end -}}
+{{- if $codes -}}{{ join "+" $codes }}{{- else -}}{{ .Values.ocr.language }}{{- end -}}
+{{- end -}}
