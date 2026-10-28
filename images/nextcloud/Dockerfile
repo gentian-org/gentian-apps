@@ -34,6 +34,8 @@ FROM docker.io/library/nextcloud:${NEXTCLOUD_VERSION} AS base
 
 USER root
 
+COPY patches /tmp/patches
+
 # Platform SSO — always present, always enabled.
 ARG USER_OIDC_VERSION=8.11.0
 
@@ -50,7 +52,7 @@ ARG SPREED_VERSION=23.0.8
 
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates curl; \
+    apt-get install -y --no-install-recommends ca-certificates curl patch; \
     rm -rf /var/lib/apt/lists/*; \
     \
     # --- platform SSO: enabled, so it belongs in apps/ ---------------------- \
@@ -77,6 +79,20 @@ RUN set -eux; \
     fetch_addon "https://github.com/nextcloud/collectives/releases/download/v${COLLECTIVES_VERSION}/collectives-${COLLECTIVES_VERSION}.tar.gz"; \
     fetch_addon "https://github.com/nextcloud-releases/spreed/releases/download/v${SPREED_VERSION}/spreed-v${SPREED_VERSION}.tar.gz"; \
     rm -f /tmp/*.tar.gz; \
+    \
+    # --- our patches on staged apps, patches/<app>/*.patch ------------------ \
+    # A patch that no longer applies fails the build, so a version bump in \
+    # versions.env cannot drop one silently. .gentian-patches records what was \
+    # applied, so the profile's start hook re-copies an app whose patches \
+    # changed although its version did not. \
+    for app_dir in /tmp/patches/*/; do \
+      app="$(basename "$app_dir")"; \
+      for p in "$app_dir"*.patch; do \
+        patch -p1 --forward --no-backup-if-mismatch -d "/usr/src/gentian-addons/$app" < "$p"; \
+      done; \
+      (cd "$app_dir" && sha256sum *.patch) > "/usr/src/gentian-addons/$app/.gentian-patches"; \
+    done; \
+    rm -rf /tmp/patches; \
     chown -R www-data:www-data /usr/src/gentian-addons; \
     \
     # --- Gentian runtime adjustments --------------------------------------- \
