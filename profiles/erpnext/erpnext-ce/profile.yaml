@@ -32,8 +32,12 @@
 # restored from another domain is renamed to this host on the start after the
 # restore. See charts/erpnext/files/configure.sh.
 #
-# ERPNext's setup wizard (company, country, currency, fiscal year) is left to
-# the tenant: the first System Manager to open the desk is asked.
+# ERPNext's setup wizard (company, country, currency, fiscal year) runs from
+# the tenant's settings (valueMapping.platform.organizationKey) on the first
+# start that finds them complete, so nobody is asked; while they are not, the
+# first System Manager to open the desk is. The company gets ERPNext's
+# Standard chart of accounts unless extraValues.setup.chartOfAccounts names
+# another.
 #
 # ── Services ────────────────────────────────────────────────────────────────
 # Database: the platform's MariaDB. Redis: two in the pod, not the platform's;
@@ -72,12 +76,12 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.2"
+  version: "0.5.1-dev.3"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: erpnext
-      version: "0.1.0-develop.b82b19a"
+      version: "0.1.0-develop.609543e"
 
     valueMapping:
       oidc:
@@ -93,6 +97,9 @@ spec:
         nameKey: "database.name"
         userKey: "database.user"
         passwordKey: "database.password"
+      platform:
+        # Who the tenant is: the company the setup wizard is run for.
+        organizationKey: "organization"
       smtp:
         hostKey: "smtp.host"
         portKey: "smtp.port"

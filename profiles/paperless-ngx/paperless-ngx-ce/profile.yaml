@@ -83,14 +83,14 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.4"
+  version: "0.5.1-dev.5"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: paperless-ngx
       # The develop build of the merge that added this profile; back on a
       # plain version before develop is merged into main (docs/releasing.md).
-      version: "0.1.0-develop.cdb6281"
+      version: "0.1.0-develop.609543e"
 
     valueMapping:
       oidc:
@@ -110,6 +110,12 @@ spec:
         portKey: "smtp.port"
         userKey: "smtp.user"
         passwordKey: "smtp.password"
+      platform:
+        # The tenant's languages are the OCR languages, those the image
+        # ships; its time zone is Paperless's (Europe/Zurich below while it
+        # names none).
+        organizationKey: "organization"
+        timeZoneKey: "timeZone"
 
     extraValues:
       fullnameOverride: "paperless-ngx-ce"
