@@ -94,6 +94,9 @@ function chartRuntime() {
         database: { hostKey: names.pg, portKey: '5432', nameKey: DB.name, userKey: DB.user, passwordKey: DB.password },
         s3: { endpointKey: `http://${names.s3}:9000`, bucketKey: S3.bucket, accessKeyKey: S3.accessKey, regionKey: 'us-east-1', secretKeyKey: S3.secretKey },
         smtp: { hostKey: 'smtp.invalid', portKey: '587', userKey: 'e2e', passwordKey: 'e2e-smtp' },
+        // A tenant writing English and naming its zone; the pages the run
+        // reads are English.
+        platform: { defaultLanguageKey: 'en', timeZoneKey: 'Europe/Zurich' },
     };
     for (const [service, keys] of Object.entries(pkg.valueMapping || {})) {
         for (const [key, target] of Object.entries(keys)) {
