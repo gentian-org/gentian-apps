@@ -223,3 +223,18 @@ extraVolumeMounts: []
 # The platform routes to the Service; the chart makes no Ingress or route.
 ingress:
   enabled: false
+
+# Who the tenant is, as the platform tells it (valueMapping.platform
+# organizationKey): legalName, country (ISO 3166-1), languages (the first is
+# the tenant's own), currency, timeZone, fiscalYearStartMonth, address,
+# website, email, phone, taxId, registrationNumber, and complete. While the
+# site's setup wizard has not run and complete is true, the configure step
+# runs it from these, so nobody is asked; otherwise the first System Manager
+# is. A later change does not touch a site that is set up.
+organization: {}
+
+setup:
+  # The chart of accounts a site set up from the organization gets, by
+  # ERPNext's name for it ("SKR04 mit Kontonummern"). Empty: "Standard",
+  # ERPNext's generic one.
+  chartOfAccounts: ""

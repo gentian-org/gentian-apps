@@ -143,3 +143,11 @@ dropIns:
   branding:
     enabled: false
     configMaps: []   # static assets, mounted read-only at /opt/odoo/custom-branding
+
+# Who the tenant is, as the platform tells it (valueMapping.platform
+# organizationKey). The first start that finds it complete writes it onto the
+# company Odoo made ("My Company"): name, country, currency, address, website,
+# email, phone, VAT and register numbers, the fiscal year where accounting is
+# installed, and the tenant's language and time zone for its accounts. Once:
+# the company is the tenant's to change after that.
+organization: {}

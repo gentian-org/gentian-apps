@@ -23,6 +23,11 @@ data:
     max_cron_threads = 1
     without_demo = all
     proxy_mode = True
+  # Who the tenant is (valueMapping.platform.organizationKey) and the
+  # shell script that writes it onto the company once.
+  organization.json: {{ .Values.organization | default dict | toJson | quote }}
+  organization.py: |-
+{{ .Files.Get "files/organization.py" | indent 4 }}
   config.json: |
     {
       "tenantId": {{ .Values.tenantId | quote }},
