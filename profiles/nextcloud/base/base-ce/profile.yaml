@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.13"
+  version: "0.5.1-dev.14"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -854,9 +854,11 @@ spec:
         # was first given: a newer image (security fixes among them) never
         # reached it, because Nextcloud's own updater fetches from the App Store
         # and a tenant has no way out to it. Never replaced by an older one.
+        # Same version: replaced when the image's patches changed.
         version_of() {
           sed -n 's:.*<version>\(.*\)</version>.*:\1:p' "$1/appinfo/info.xml" 2>/dev/null | head -n 1
         }
+        patches_of() { cat "$1/.gentian-patches" 2>/dev/null || true; }
         replaced=""
         for id in $SELECTED; do
           if [ -d "$STAGE/$id" ] && [ ! -d "$APPS/$id" ]; then
@@ -870,6 +872,10 @@ spec:
               cp -a "$STAGE/$id" "$APPS/$id"
               echo "$id $have -> $staged"
               replaced="$replaced $id"
+            elif [ "$staged" = "$have" ] && [ "$(patches_of "$STAGE/$id")" != "$(patches_of "$APPS/$id")" ]; then
+              rm -rf "$APPS/$id"
+              cp -a "$STAGE/$id" "$APPS/$id"
+              echo "$id $have: patches changed"
             fi
           fi
           $OCC app:enable "$id" || echo "warning: could not enable $id"

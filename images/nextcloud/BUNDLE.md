@@ -49,6 +49,18 @@ The old `drive` / `office` / `suite` bundles survive as **AppPackage presets** i
 `profiles/nextcloud/packages/` — they pre-tick a set of addons in the selection
 window rather than freezing it into an image.
 
+## Patches
+
+`patches/<app>/*.patch` are applied to the staged app at build time; a patch
+that no longer applies fails the build. `.gentian-patches` in the app records
+them, so the profile's start hook replaces an installed copy whose patches
+changed even when the version did not. Patched apps fail Nextcloud's code
+integrity check for the patched files; that is expected.
+
+| Patch | Why |
+|-------|-----|
+| `richdocuments/settings-files-internal-url.patch` | Collabora fetches the user's settings files (presentation templates and the like) from addresses richdocuments builds on the public host, which asks for a sign-in Collabora cannot give, so documents never finish loading. They now use `wopi_callback_url`, the internal address Collabora already reaches Nextcloud on. |
+
 ## Versions
 
 All pinned in `versions.env` and passed as build args. Bump there, not in the
