@@ -32,7 +32,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev"
+  version: "0.5.1-dev.1"
   package:
     chart:
       repository: "https://charts.openproject.org/"
@@ -57,6 +57,12 @@ spec:
         portKey: "environment.OPENPROJECT_SMTP__PORT"
         userKey: "environment.OPENPROJECT_SMTP__USER__NAME"
         passwordKey: "environment.OPENPROJECT_SMTP__PASSWORD"
+      platform:
+        # The tenant's own language and time zone. Set by environment, so
+        # OpenProject shows them as fixed; without a tenant zone the
+        # Europe/Berlin below stands.
+        defaultLanguageKey: "environment.OPENPROJECT_DEFAULT__LANGUAGE"
+        timeZoneKey: "environment.OPENPROJECT_USER__DEFAULT__TIMEZONE"
 
     extraValues:
       fullnameOverride: "openproject-ce"
