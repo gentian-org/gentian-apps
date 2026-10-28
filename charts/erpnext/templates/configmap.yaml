@@ -102,8 +102,8 @@ data:
       # carries a state Frappe keeps for the callback, and the page to return
       # to. So the page is served as Frappe renders it, and a script at its end
       # follows its own Keycloak link. Frappe sends a signed-in person past this
-      # page before it renders.
-      location = /login {
+      # page before it renders. Its front page is the same page for a guest.
+      location ~ ^/(login)?$ {
         proxy_set_header Accept-Encoding "";
         sub_filter_once on;
         sub_filter '</body>' '<script>(function(){var a=document.querySelector("a.btn-keycloak");if(a)location.replace(a.href)})()</script></body>';
