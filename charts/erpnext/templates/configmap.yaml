@@ -101,12 +101,15 @@ data:
       # page, and the page is the only place that makes the realm's address: it
       # carries a state Frappe keeps for the callback, and the page to return
       # to. So the page is served as Frappe renders it, and a script at its end
-      # follows its own Keycloak link. Frappe sends a signed-in person past this
-      # page before it renders. Its front page is the same page for a guest.
+      # follows its own Keycloak link. The page stays hidden meanwhile, and is
+      # shown only when it has no such link. Frappe sends a signed-in person
+      # past this page before it renders. Its front page is the same page for a
+      # guest.
       location ~ ^/(login)?$ {
         proxy_set_header Accept-Encoding "";
         sub_filter_once on;
-        sub_filter '</body>' '<script>(function(){var a=document.querySelector("a.btn-keycloak");if(a)location.replace(a.href)})()</script></body>';
+        sub_filter '</head>' '<style id="gentian-hold">body{visibility:hidden}</style></head>';
+        sub_filter '</body>' '<script>(function(){var a=document.querySelector("a.btn-keycloak");if(a)location.replace(a.href);else document.getElementById("gentian-hold").remove()})()</script></body>';
         {{- include "erpnext.backendProxy" . | nindent 8 }}
       }
       {{- end }}
