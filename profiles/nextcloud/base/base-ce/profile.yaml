@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.15"
+  version: "0.5.1-dev.16"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -703,9 +703,12 @@ spec:
                     } else {
                         $say("no $secret: the sign-in client secret is left as it was");
                     }
-                    $discovery = (string)($found['discoveryEndpoint'] ?? '');
-                    if ($tenant !== '' && $discovery !== '') {
-                        $args['--discoveryuri'] = preg_replace('#/realms/[^/]+/#', '/realms/' . $tenant . '/', $discovery);
+                    // The whole address, as the post-installation hook writes it: the one
+                    // restored names the realm of where the data was written, at that
+                    // cluster's address for Keycloak, which need not be this one's.
+                    if ($tenant !== '') {
+                        $args['--discoveryuri'] = 'http://gentian-idp-keycloak-keycloakx-http.kernel-authentication.svc.cluster.local:8080/auth/realms/'
+                            . $tenant . '/.well-known/openid-configuration';
                     }
                     foreach (['--endsessionendpointuri' => 'endSessionEndpoint', '--postlogouturi' => 'postLogoutUri'] as $opt => $field) {
                         if (is_string($found[$field] ?? null) && $found[$field] !== '') {
