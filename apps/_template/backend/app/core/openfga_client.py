@@ -1,7 +1,6 @@
 """OpenFGA / AuthZEN PDP client stub (M22, S1).
 
 Replace the no-op path with a real Check call when OPENFGA_API_URL is set.
-See gentian-os/docs/design/new-security-architecture.md §2.2.
 """
 
 from typing import Any

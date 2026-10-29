@@ -237,9 +237,6 @@ spec:
   license: Apache-2.0               # SPDX; proprietary for gentian-premium
 ```
 
-Commerce (customer, price, invoice) is handled in **CRM/ERP (Odoo)** — see
-[business-logic-plan.md](../gentian-os/docs/design/business-logic-plan.md).
-
 ### Portal app-menu tiles
 
 A tile sits on an exposure (`spec.expose[].tile`), or on `spec.package.api.tile` for a component
