@@ -241,6 +241,28 @@ spec:
                 -i {{ .Values.gentian.initModules }} \
                 --without-demo=all \
                 --stop-after-init || true
+              # The web client's bootstrap page, from this image's file. Odoo
+              # keeps a template in the database and reads the file again only
+              # when its module is updated, which this start never does: a
+              # database made by an older build, or restored from another
+              # cluster, kept serving the page the image's patches fixed
+              # (ocb patches/series) -- a blank Odoo after signing in.
+              python3 /opt/odoo/src/odoo/odoo-bin shell \
+                -d "${DB_NAME}" \
+                --db_host="${DB_HOST}" \
+                --db_port="${DB_PORT}" \
+                --db_user="${DB_USER}" \
+                --db_password="${DB_PASSWORD}" \
+                --config=/etc/odoo/odoo.conf \
+                --no-http --shell-interface=python <<'GENTIAN_VIEWEOF' || true
+              view = env.ref("web.webclient_bootstrap", raise_if_not_found=False)
+              if view and view.arch_fs:
+                  arch = view.with_context(read_arch_from_file=True, lang=None).arch
+                  if arch and arch != view.arch_db:
+                      view.reset_arch(mode="hard")
+                      env.cr.commit()
+                      print("gentian: web.webclient_bootstrap reset from the image's file")
+              GENTIAN_VIEWEOF
               {{- if .Values.gentian.baseUrl }}
               # web.base.url, after the modules exist and before Odoo serves.
               #

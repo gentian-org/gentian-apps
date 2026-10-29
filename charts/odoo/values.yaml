@@ -22,7 +22,7 @@ image:
   # A digest keeps a manifest alive in GHCR even once untagged, so an ocb
   # retention sweep that prunes untagged versions would strand this. Immutable
   # tags in ocb are the real fix; this is the pin available without one.
-  digest: "sha256:67467ad5256f3dd43bdea07f97bf858142777e8748ffc4a9b9c9b9131a01a689"
+  digest: "sha256:6f5424edbb855edb136316bb16e0e64cd17a650bfffcb567273bf4f2e7f5186c"
   # Fallback when digest is empty — a deliberate moving target, for development.
   tag: latest
   pullPolicy: IfNotPresent
