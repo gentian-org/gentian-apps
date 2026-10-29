@@ -1,6 +1,6 @@
 # Example plugin
 
-A working, minimal plugin for an app built from `gentian-app-template`.
+A working, minimal plugin for an app built from `apps/_template`.
 
 ```bash
 pip install -e customization/extensions/example_plugin

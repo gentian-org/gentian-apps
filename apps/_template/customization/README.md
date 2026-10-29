@@ -1,6 +1,6 @@
 # Customizing this app
 
-This app is built from `gentian-app-template` and ships a customization surface so
+This app is built from `apps/_template` and ships a customization surface so
 you can change its behaviour **without patching or forking it**.
 
 The rungs below come from the Gentian customization ladder — the full framework, the

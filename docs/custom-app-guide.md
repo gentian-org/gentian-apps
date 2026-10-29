@@ -7,8 +7,8 @@ with an AppProfile only, see [app-profile-guide.md](app-profile-guide.md).
 ## Prerequisites
 
 - A running Gentian OS cluster (see [gentian-os/GETTING-STARTED.md](https://github.com/gentian-org/gentian-os/blob/main/GETTING-STARTED.md))
-- [gentian-app-template](https://github.com/gentian-org/gentian-app-template) cloned locally (e.g. `/develop`)
-- Push access to `gentian-org/gentian-apps`
+- A clone of `gentian-org/gentian-apps` with push access — the scaffold is
+  [`apps/_template`](../apps/_template)
 
 ## Repository layout
 
@@ -26,8 +26,9 @@ The cluster never mounts Git source. CI builds **pinned container images** and a
 ## Step 1 — Scaffold from template
 
 ```bash
-cp -a /develop gentian-apps/apps/my-app
-cd gentian-apps/apps/my-app
+cd gentian-apps
+cp -a apps/_template apps/my-app
+cd apps/my-app
 ```
 
 Rename identifiers:

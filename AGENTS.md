@@ -6,7 +6,7 @@
 OS — profile bundles (`profiles/[<family>/]<name>/`, published as the catalogue a cluster installs
 from, one file and one digest per profile: [docs/profile-bundles.md](docs/profile-bundles.md)) plus
 first-party app implementations (`apps/<name>/`, FastAPI + React +
-Helm — same stack as [gentian-app-template](https://github.com/gentian-org/gentian-app-template) /
+Helm — same stack as [`apps/_template`](apps/_template) /
 [gentian-ui](https://github.com/gentian-org/gentian-ui)). This includes commercial
 (`license: proprietary`) profiles, not just OSS ones — [gentian-pro](https://github.com/aluvian-hq/gentian-pro)
 holds only the private chart/image artifacts those profiles reference, it does not sync its own
@@ -69,7 +69,7 @@ L4 `charts/` or `composition.yaml` · L5 the build repo (`ocb`) · L6 a fork rep
 
 ## First-party app development (`apps/_template`)
 
-First-party apps share the FastAPI + React + Helm stack from gentian-app-template.
+First-party apps share the FastAPI + React + Helm stack scaffolded by `apps/_template`.
 
 ### Directory map
 

@@ -30,7 +30,7 @@ profiles/              # App catalogue bundles (OSS + commercial) — published 
   xwiki/               #   true singleton: stays flat
   paperless-ngx/       #   singleton with a companion: paperless-ngx-ce + its MCP server (spec.extensions)
 apps/                  # first-party implementations (FastAPI + React + Helm)
-  _template/           # copy of gentian-app-template
+  _template/           # scaffold for new first-party apps (the one source of truth)
 charts/                # Helm charts published to oci://ghcr.io/gentian-org/charts
   activepieces/        # pinned upstream (adnoctem/helm) + patch series — no copy
   odoo/                # Gentian-authored chart for OCB — backs all 10 odoo profiles
@@ -118,5 +118,4 @@ See [docs/custom-app-guide.md](docs/custom-app-guide.md).
 | [gentian-os](https://github.com/gentian-org/gentian-os) | Orchestrator, CRDs, kernel |
 | [gentian-deployments](https://github.com/gentian-org/gentian-deployments) | Per-environment tenant state |
 | [gentian-pro](https://github.com/aluvian-hq/gentian-pro) | Private chart/image artifacts for commercial (OpenDesk) profiles |
-| [gentian-app-template](https://github.com/gentian-org/gentian-app-template) | Scaffold for new apps |
 | [gentian-ui](https://github.com/gentian-org/gentian-ui) | Portal shell |
