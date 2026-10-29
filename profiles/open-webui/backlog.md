@@ -29,7 +29,7 @@ ship with Envoy Gateway, and no cluster uses one yet.
 **What it would buy:** no local account anywhere; no per-app OIDC client for
 apps that can take a header; immunity to this whole class of first-run
 bootstrap deadlock. It is a platform capability, not an app fix — six
-catalogue profiles declare `kernelRequirements.identity.oidc` today and could
+catalog profiles declare `kernelRequirements.identity.oidc` today and could
 eventually share it.
 
 **What it would cost, and why it was not taken now:**

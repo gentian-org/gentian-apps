@@ -46,7 +46,7 @@ spec:
             # is assembled here from the pieces valueMapping.database delivers.
             # Assumes an alphanumeric generated password (no URL-reserved chars) —
             # consistent with how generated secrets are produced elsewhere in this
-            # catalogue.
+            # catalog.
             - name: DATABASE_URL
               value: >-
                 postgresql://{{ .Values.database.user }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}

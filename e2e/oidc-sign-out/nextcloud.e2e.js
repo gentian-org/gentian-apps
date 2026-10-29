@@ -1,6 +1,6 @@
 'use strict';
 
-// Nextcloud (the catalogue's own image), signed in to with its own OIDC
+// Nextcloud (the catalog's own image), signed in to with its own OIDC
 // client, and signed out of when the person signs out at the realm.
 //
 // What is shown: the realm posts its logout token to the address the platform
@@ -203,7 +203,7 @@ test('a logout token the realm did not sign, or sent before, ends no session', a
 });
 
 // Where the tiles land. Not sign-out, but this is the run that signs a person
-// in to the catalogue's Nextcloud the way the platform does.
+// in to the catalog's Nextcloud the way the platform does.
 function tilePath(profile, entry) {
     return profile.spec.expose.find((e) => e.name === entry).tile.path;
 }

@@ -28,7 +28,7 @@ spec:
   template:
     metadata:
       annotations:
-        # A start is what writes the organisation onto the company, so a
+        # A start is what writes the organization onto the company, so a
         # tenant filling in its settings after the install restarts Odoo.
         gentianos.io/organization: {{ .Values.organization | default dict | toJson | sha256sum | trunc 16 | quote }}
       labels:
@@ -342,7 +342,7 @@ spec:
             #
             # The browser still goes to the public issuer; only this leg is
             # internal. Empty means "use the public issuer", which is the old
-            # behaviour for anything not running against a kernel Keycloak.
+            # behavior for anything not running against a kernel Keycloak.
             - name: OIDC_INTERNAL_ISSUER
               value: {{ .Values.gentian.oidc.internalIssuer | default "" | quote }}
             - name: GENTIAN_TENANT_ID

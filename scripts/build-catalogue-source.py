@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the catalogue source a cluster fetches from.
+"""Build the catalog source a cluster fetches from.
 
     build-catalogue-source.py [--out dist/catalogue] [--check]
 
@@ -7,16 +7,16 @@ This repository stores a profile as a BUNDLE — ``profiles/[<family>/]<name>/``
 holding ``profile.yaml`` and whatever else it needs — because
 that is what Argo CD's ApplicationSet syncs, one Application per directory.
 
-A catalogue SOURCE is the other shape: a flat directory served over https,
+A catalog SOURCE is the other shape: a flat directory served over https,
 holding ``profiles/<name>.yaml``, ``packages/<name>.yaml`` and
 ``index.yaml``.
-That is what a director materialises an entry from (AD-3) and what the App
+That is what a director materializes an entry from (AD-3) and what the App
 Store ingests. The two shapes exist for two different consumers and neither is
 a mistake; this script turns the first into the second.
 
 ``index.yaml`` is why it matters. An https server does not list a directory,
-so without an index a cluster can install from this catalogue by name but
-cannot say what is in it — which is the whole of a cluster's own catalogue
+so without an index a cluster can install from this catalog by name but
+cannot say what is in it — which is the whole of a cluster's own catalog
 screen (AD-14). The index is the technical half and nothing else: name,
 version, edition, trust tier, digest, and ``listed: false`` for an entry
 every cluster installs without it being offered. The listing -- name, summary,
@@ -47,7 +47,7 @@ unchanged -- so the same tree always gives the same digest.
 The format is the contract, and its reader is the authority:
 gentian-os ``internal/director/catalogue/index.go`` for the index and
 ``internal/profilebundle/bundle.go`` for a bundle. gentian-os also ships
-``scripts/tools/build-catalogue-index.py``, which indexes a catalogue
+``scripts/tools/build-catalogue-index.py``, which indexes a catalog
 directory somebody else assembled — it does not know about this repository's
 bundle layout, which is why the flattening lives here.
 """
@@ -71,7 +71,7 @@ REPO = Path(__file__).resolve().parent.parent
 # lists ce, me and ie from its own sources and sends people to the App Store
 # for pe and ee, so a typo here would quietly decide where an entry can be
 # seen. An me entry is the community edition's code, curated and maintained by
-# the catalogue's maintainer, and is named -ce like the community edition it
+# the catalog's maintainer, and is named -ce like the community edition it
 # packages: its edition is the label, not the name.
 EDITIONS = ("ce", "me", "ie", "pe", "ee")
 
@@ -130,7 +130,7 @@ DNS_LABEL = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 
 # What a bundle's kustomization.yaml may say. It is read here, not run: the
 # published profile has to be profile.yaml's own bytes, and kustomize would
-# re-serialise it.
+# re-serialize it.
 KUSTOMIZATION_KEYS = {"apiVersion", "kind", "resources", "configMapGenerator", "generatorOptions"}
 
 
@@ -318,7 +318,7 @@ def assemble(directory: Path, profile_name: str, profile: dict) -> tuple:
     meta = profile.get("metadata") or {}
     for key in list(meta.get("annotations") or {}) + list(meta.get("labels") or {}):
         if str(key).startswith("argocd.argoproj.io/"):
-            problems.append(f"the profile states {key}, which is not a catalogue's to set")
+            problems.append(f"the profile states {key}, which is not a catalog's to set")
     stated = (meta.get("labels") or {}).get(PROFILE_LABEL)
     if stated not in (None, profile_name):
         problems.append(f"the profile carries the label {PROFILE_LABEL}: {stated}, which is another profile's name")
@@ -341,7 +341,7 @@ def build(out: Path) -> tuple[list[dict], list[str]]:
         d.mkdir(parents=True, exist_ok=True)
 
     # Presets: a named selection of one family's add-ons. Not installable and
-    # not in the index -- a director never materialises one. Published because
+    # not in the index -- a director never materializes one. Published because
     # the App Store offers them in a base's add-on window, and the store runs
     # outside the cluster: what it is to show has to be where it can read it.
     for preset in sorted(REPO.glob("profiles/**/packages/*.yaml")):
@@ -384,7 +384,7 @@ def build(out: Path) -> tuple[list[dict], list[str]]:
 
         kind = profile.get("kind")
         if kind != "ComponentProfile":
-            # AD-4 leaves one catalogue kind. A bundle still shipping the old
+            # AD-4 leaves one catalog kind. A bundle still shipping the old
             # one would be published and then refused by the API server on the
             # far side, which is a worse place to find out.
             complaints.append(f"{name}: kind is {kind!r}, not ComponentProfile")
@@ -392,7 +392,7 @@ def build(out: Path) -> tuple[list[dict], list[str]]:
 
         spec = profile.get("spec") or {}
         # Only what a tenant can install. A system profile is part of the
-        # kernel and nobody installs one from a catalogue screen.
+        # kernel and nobody installs one from a catalog screen.
         if "tenant" not in (spec.get("tenancy") or ["tenant"]):
             continue
 
@@ -404,7 +404,7 @@ def build(out: Path) -> tuple[list[dict], list[str]]:
             continue
 
         body, held, problems = assemble(directory, name, profile)
-        # One object, one bundle, across the catalogue. The names make that
+        # One object, one bundle, across the catalog. The names make that
         # so for the objects; a pack is found by its client's id, which two
         # profiles could both declare.
         for kind, companion, doc in held:
@@ -453,7 +453,7 @@ def build(out: Path) -> tuple[list[dict], list[str]]:
 def render(entries: list[dict]) -> str:
     return (
         "# Generated by scripts/build-catalogue-source.py. Do not edit.\n"
-        "# The technical half of this catalogue. Presentation is the App Store's.\n"
+        "# The technical half of this catalog. Presentation is the App Store's.\n"
         + yaml.safe_dump({"entries": entries}, sort_keys=False, width=100)
     )
 
@@ -496,7 +496,7 @@ def main() -> int:
     for e in entries:
         by_edition[e["edition"]] = by_edition.get(e["edition"], 0) + 1
     shown = ", ".join(f"{n} {ed}" for ed, n in sorted(by_edition.items()))
-    print(f"Catalogue source at {out}: {len(entries)} entries ({shown or 'none'})")
+    print(f"Catalog source at {out}: {len(entries)} entries ({shown or 'none'})")
     local = sum(by_edition.get(ed, 0) for ed in ("ce", "me", "ie"))
     print(
         f"  a cluster browsing this source lists {local}; "
@@ -514,15 +514,15 @@ def main() -> int:
         (out / "index.html").write_text(f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Gentian catalogue</title>
+<title>Gentian catalog</title>
 <style>
  body {{ font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 52rem; padding: 0 1rem; }}
  table {{ border-collapse: collapse; width: 100%; }}
  td, th {{ text-align: left; padding: .3rem .6rem; border-bottom: 1px solid #ddd; }}
  code {{ font-size: .9em; }}
 </style></head><body>
-<h1>Gentian catalogue</h1>
-<p>A catalogue source: profile bundles a Gentian cluster installs from. Name it on
+<h1>Gentian catalog</h1>
+<p>A catalog source: profile bundles a Gentian cluster installs from. Name it on
 a Cluster claim under <code>spec.catalogue.sources</code>; the director fetches an
 entry at the digest the App Store states and refuses anything else.</p>
 <ul>
@@ -540,7 +540,7 @@ entry at the digest the App Store states and refuses anything else.</p>
     if args.check:
         shutil.rmtree(out, ignore_errors=True)
     # A refusal fails the build. An entry that cannot be published is an entry
-    # that silently disappears from every cluster's catalogue, and a green
+    # that silently disappears from every cluster's catalog, and a green
     # build that quietly ships fewer apps is worse than a red one.
     return 1 if complaints else 0
 

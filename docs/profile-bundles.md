@@ -1,12 +1,12 @@
 # Profile bundles
 
-What a profile's directory becomes when the catalogue is published, and what it may hold. For
+What a profile's directory becomes when the catalog is published, and what it may hold. For
 profile authors. The cluster's side of the same rules is in gentian-os,
 [docs/custom-catalogues.md](https://github.com/gentian-org/gentian-os/blob/main/docs/custom-catalogues.md).
 
 ## One profile, one file, one fingerprint
 
-A cluster installs an app from one file, `profiles/<name>.yaml` of the published catalogue, at one
+A cluster installs an app from one file, `profiles/<name>.yaml` of the published catalog, at one
 digest. That file is the profile's **bundle**: the `ComponentProfile` first and, after it, every
 other object the app needs on a cluster — its **companions**. The digest in `index.yaml` is the
 sha256 of the whole file, so an install is pinned to the profile and to everything that travels with
@@ -30,7 +30,7 @@ Everything stays in the profile's directory, `profiles/[<family>/]<name>/`:
 | files under `assets/`, named by a `configMapGenerator` | a `ConfigMap` companion |
 | `*.md`, `assets/tile.png`, anything not listed | nothing; it stays in the repository |
 
-The catalogue listing — display name, summary, description, categories, links, author, license,
+The catalog listing — display name, summary, description, categories, links, author, license,
 logo — is the App Store's and lives in its database, not here. A profile carries what installing
 the app needs, and its tile: the PNG inlined in `tile.logo`, which `assets/tile.png` is the
 committed copy of.
@@ -74,7 +74,7 @@ spec:
     platform: ">=0.5"
 ```
 
-The catalogue's index repeats it beside the digest, so a cluster on an older line lists the entry
+The catalog's index repeats it beside the digest, so a cluster on an older line lists the entry
 with the reason and refuses to install it, and `scripts/validate-platform-schema.py` holds every
 bundle to the schema of each line its floor admits (`contracts/platform/<line>/`). No upper bound is
 declared: what a later platform stops reading, the platform says, one line ahead. The profile's own
@@ -99,7 +99,7 @@ Every companion:
 - carries the label `gentianos.io/profile-name: <profile>` and no other label (a ConfigMap: that and
   `gentianos.io/asset`);
 - states no namespace. A ConfigMap or a Customization is applied where the cluster applies its
-  catalogue. A composition that reads a companion finds it by its labels, never by a namespace;
+  catalog. A composition that reads a companion finds it by its labels, never by a namespace;
 - states no annotations, owner, finalizer or status.
 
 The bundle may be at most 180 KiB.
@@ -109,12 +109,12 @@ the base's: an add-on is active only inside its base, whose bundle is on the clu
 
 ## Who may bring companions
 
-A catalogue that a cluster's administrator added for the whole cluster. This catalogue is one. A
-bundle served from a tenant's own catalogue is its profile and nothing else — a profile written for
-such a catalogue must work with `app-default` and without an OIDC pack.
+A catalog that a cluster's administrator added for the whole cluster. This catalog is one. A
+bundle served from a tenant's own catalog is its profile and nothing else — a profile written for
+such a catalog must work with `app-default` and without an OIDC pack.
 
 A `Composition` creates objects with the rights of the cluster's providers. An administrator who
-adds this catalogue trusts every Composition in it as they trust the platform's own; treat a change
+adds this catalog trusts every Composition in it as they trust the platform's own; treat a change
 to a `composition.yaml` accordingly.
 
 ## Checking a bundle

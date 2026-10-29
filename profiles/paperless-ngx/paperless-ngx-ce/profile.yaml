@@ -83,7 +83,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.5"
+  version: "0.5.1-dev.6"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -469,7 +469,7 @@ spec:
 
       # How this app applies that role. The platform resolves app-admins
       # membership, publishes it as JSON and runs this Job; everything below is
-      # Paperless' own protocol and stays in Paperless' catalogue entry.
+      # Paperless' own protocol and stays in Paperless' catalog entry.
       #
       # Converges rather than applies a delta: everyone in the file who has an
       # account is a superuser, everyone else is not, and an account that
@@ -547,7 +547,7 @@ spec:
               if key and key not in seen and (m.get("username") or "").lower() not in seen:
                   print("%s has no account yet: promoted after their first sign-in" % key)
 
-          print("app administrators synchronised: %d" % len(members))
+          print("app administrators synchronized: %d" % len(members))
           PY
 
   # How this app is captured and put back. The default -- scale to zero, dump

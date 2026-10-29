@@ -18,7 +18,7 @@
       into etcd and the Admin Console.
 
       Ship coturn as a companion to this profile (ladder L2), not as kernel
-      infrastructure: Element is the only WebRTC consumer in the catalogue, so
+      infrastructure: Element is the only WebRTC consumer in the catalog, so
       a standalone profile providing a `turn` contract is ceremony until a
       second one exists. If Jitsi or Nextcloud Talk arrive, promote it then —
       `provides: turn` plus `optionalIntegrations`, with the secret at
@@ -35,7 +35,7 @@
       Talk-specific facts, so they are not rediscovered:
 
       - **Talk also wants the shared secret**, which settles the shape question
-        above in favour of one contract for both: `talk:turn:add <schemes>
+        above in favor of one contract for both: `talk:turn:add <schemes>
         <server> <protocols> --secret=<s>`, where schemes is `turn,turns` and
         protocols `udp,tcp`. Same `turn_shared_secret` model as Synapse, so a
         single `turn` contract serves both consumers without a second shape.

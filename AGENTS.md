@@ -2,8 +2,8 @@
 
 ## Project overview
 
-`gentian-apps` is **the single source of truth for AppProfile catalogue metadata** for Gentian
-OS — profile bundles (`profiles/[<family>/]<name>/`, published as the catalogue a cluster installs
+`gentian-apps` is **the single source of truth for AppProfile catalog metadata** for Gentian
+OS — profile bundles (`profiles/[<family>/]<name>/`, published as the catalog a cluster installs
 from, one file and one digest per profile: [docs/profile-bundles.md](docs/profile-bundles.md)) plus
 first-party app implementations (`apps/<name>/`, FastAPI + React +
 Helm — same stack as [`apps/_template`](apps/_template) /
@@ -42,7 +42,7 @@ local operations: [docs/customization-ladder.md](docs/customization-ladder.md).
    implementation ("patch `account_move.py`"). Split multi-part requests and run this per part.
 2. **Read the app's ladder**: `AppProfile.spec.customization` in `profiles/<n>/profile.yaml`,
    and `profiles/<n>/customization.md`. If absent, assume `{grade: unknown, supportedRungs:
-   [L0, L4]}` and raise a task to characterise the app — infer nothing more.
+   [L0, L4]}` and raise a task to characterize the app — infer nothing more.
 3. **Walk L0 → L6 in order.** Stop at the first rung that (a) can express the change,
    (b) is in `supportedRungs` (L2 is always available), and (c) is permitted at the requested
    scope. Record a one-line reason for every rung skipped.
@@ -51,7 +51,7 @@ local operations: [docs/customization-ladder.md](docs/customization-ladder.md).
 5. **Gate**: at **L4 or above**, search upstream first, record what you found, and **stop for
    human approval** — do not proceed autonomously. At L5+ platform trust tier and a named
    owner are also required. A cluster hotfix is never a valid outcome.
-6. **Minimise scope** independently of rung: tenant → profile → platform.
+6. **Minimize scope** independently of rung: tenant → profile → platform.
 7. **Write the `Customization` record before the code** (`profiles/<n>/customizations/<name>.yaml`),
    required from L2 up. It is the design review.
 8. **Emit into the repo that owns that rung** (table in `docs/customization-ladder.md`), never
@@ -138,9 +138,9 @@ labels `gentianos.io/profile-edition` and `gentianos.io/profile-family`, and the
 an `SPDX-License-Identifier:` comment on its first line. The edition is the label, never the name:
 `ce` community, `me` the community edition's code curated and maintained by Aluvian because it runs
 it itself, `ie` an operator's own (internal), `pe` proprietary and free, `ee` proprietary and paid.
-A `ce` and an `me` profile are both named `<app>-ce`, and this catalogue holds only those two:
-proprietary profiles live in their supplier's catalogue. A profile every cluster installs on its own
-is annotated `gentianos.io/store-listed: "false"`, which the catalogue index carries as
+A `ce` and an `me` profile are both named `<app>-ce`, and this catalog holds only those two:
+proprietary profiles live in their supplier's catalog. A profile every cluster installs on its own
+is annotated `gentianos.io/store-listed: "false"`, which the catalog index carries as
 `listed: false` and the App Store does not offer. The listing — display name, summary,
 description, categories, links, author, logo — is the App Store's, which runs outside the
 cluster and keeps it in its own database. See

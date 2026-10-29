@@ -7,7 +7,7 @@ apiVersion: gentianos.io/v1alpha1
 kind: Customization
 metadata:
   # Named after the profile it travels with. No namespace: a companion in a
-  # profile bundle states none, and the cluster puts it where its catalogue
+  # profile bundle states none, and the cluster puts it where its catalog
   # is applied.
   name: activepieces-ce.sign-in-sidecar
   labels:
@@ -88,4 +88,4 @@ spec:
       role. That is one person, one
       project — not shared projects, project roles or any switch — but it is more than the
       edition's own interface gives, and whether it is within the license is a
-      judgement this record does not make.
+      judgment this record does not make.

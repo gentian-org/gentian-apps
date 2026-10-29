@@ -65,7 +65,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev"
+  version: "0.5.1-dev.1"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -365,7 +365,7 @@ spec:
 
     # How this app applies that role. The platform resolves app-admins
     # membership, publishes it as JSON and runs this Job; everything below is
-    # Mathesar's own protocol and stays in Mathesar's catalogue entry, because
+    # Mathesar's own protocol and stays in Mathesar's catalog entry, because
     # the kernel must not know any application's admin API (app-profile-guide.md,
     # "Platform boundary").
     #
@@ -459,7 +459,7 @@ spec:
               })
               print("demoted %s" % email)
 
-          print("app administrators synchronised: %d" % len(want))
+          print("app administrators synchronized: %d" % len(want))
           PY
 
   customization:

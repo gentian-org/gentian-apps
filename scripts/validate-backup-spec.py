@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that spec.backup declarations are ones the platform can actually honour.
+"""Check that spec.backup declarations are ones the platform can actually honor.
 
 Nothing else catches a mistake here. The CRD schema constrains enums and the
 OpenBao path shape, but a profile is never validated against the CRD in this
@@ -252,7 +252,7 @@ def main() -> int:
             print(f"  - {err}")
         return 1
 
-    print(f"Checked {declared} spec.backup declaration(s). All are honourable.")
+    print(f"Checked {declared} spec.backup declaration(s). All are honorable.")
     return 0
 
 

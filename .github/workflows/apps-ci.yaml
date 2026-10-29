@@ -11,7 +11,7 @@ on:
     # and one that ran on its push as well did the same work twice. A branch
     # without a pull request is not checked; open one, as a draft if need be,
     # or start the workflow by hand. main releases, under the names the files
-    # state; develop publishes the same artefacts under names marked develop,
+    # state; develop publishes the same artifacts under names marked develop,
     # which no release ever carries (see release-gate).
     branches: [main, develop]
     paths:
@@ -45,11 +45,11 @@ jobs:
   # What this run publishes, and under which names. Decided in one place and
   # read by every job below.
   #
-  #   release      main only. Artefacts go out under the names the files
+  #   release      main only. Artifacts go out under the names the files
   #                state: an image at its version, a chart at the version in
-  #                its Chart.yaml. Those names are what a released catalogue
+  #                its Chart.yaml. Those names are what a released catalog
   #                pins, so nothing but main may write to them.
-  #   develop      develop only. The same artefacts, under names no release
+  #   develop      develop only. The same artifacts, under names no release
   #                carries: an image as develop-<sha7>, a chart as
   #                <version>-develop.<sha7> (immutable) and <version>-develop
   #                (moving, its appVersion naming the immutable one). The rule
@@ -335,21 +335,21 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ github.sha }}
 
-  # The catalogue source, served over https for directors to fetch from.
+  # The catalog source, served over https for directors to fetch from.
   #
   # GitHub Pages because this repository is public and these are the same
   # files it already shows: publishing them flattened discloses nothing new,
-  # and it gives the catalogue a URL that does not depend on anything of ours
+  # and it gives the catalog a URL that does not depend on anything of ours
   # staying up. A cluster names it on its Cluster claim under
   # spec.catalogue.sources, and the bytes are admitted by digest, never by
   # where they came from (AD-3) -- so this host is not trusted, only
   # convenient.
   #
-  # Two catalogues, one site. A repository has ONE Pages site and a deployment
+  # Two catalogs, one site. A repository has ONE Pages site and a deployment
   # replaces all of it, so every deployment carries both:
   #
-  #   /           the released catalogue, built from main
-  #   /develop/   the catalogue of the branch work lands on, built from develop
+  #   /           the released catalog, built from main
+  #   /develop/   the catalog of the branch work lands on, built from develop
   #
   # Whichever branch was pushed is built at the pushed commit, the other at its
   # head, each with its own copy of the build script -- the script is part of
@@ -380,7 +380,7 @@ jobs:
           path: src/develop
       - name: Install PyYAML
         run: pip install pyyaml
-      - name: Build both catalogues
+      - name: Build both catalogs
         env:
           LIVE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
         run: |
@@ -389,9 +389,9 @@ jobs:
             (cd src/main && python3 scripts/build-catalogue-source.py --out "${GITHUB_WORKSPACE}/site" --with-landing-page)
           else
             # main is at a commit from before the build script, so it cannot
-            # build a catalogue. The released catalogue stays the one being
+            # build a catalog. The released catalog stays the one being
             # served: copy it as it is, and publish develop beside it.
-            echo "::warning::main has no scripts/build-catalogue-source.py; the released catalogue is kept as served at ${LIVE}"
+            echo "::warning::main has no scripts/build-catalogue-source.py; the released catalog is kept as served at ${LIVE}"
             mkdir -p site/profiles
             curl -fsS --retry 3 -o site/index.yaml "${LIVE}/index.yaml"
             curl -fsS --retry 3 -o site/index.html "${LIVE}/index.html"
@@ -403,13 +403,13 @@ jobs:
           fi
           (cd src/develop && python3 scripts/build-catalogue-source.py --out "${GITHUB_WORKSPACE}/site/develop" --with-landing-page)
 
-      # A push to develop must leave the released catalogue exactly as it is:
+      # A push to develop must leave the released catalog exactly as it is:
       # what a cluster installs from changes when main does and at no other
       # time. main has not moved, so its build has to come out as the bytes
       # already served. If it does not -- a tool on the runner changed, the
       # script reads something outside the tree -- this stops the deployment
       # rather than publishing a release nobody made.
-      - name: The released catalogue is unchanged
+      - name: The released catalog is unchanged
         if: github.ref == 'refs/heads/develop'
         env:
           LIVE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
@@ -429,10 +429,10 @@ jobs:
               differ=$((differ + 1))
             fi
           done < <(find . -path ./develop -prune -o -type f -print | sed 's|^\./||' | sort)
-          echo "compared ${checked} file(s) of the released catalogue with ${LIVE}: ${differ} differ"
+          echo "compared ${checked} file(s) of the released catalog with ${LIVE}: ${differ} differ"
           [ "${differ}" = "0" ]
 
-      - name: The develop catalogue's digests are its files'
+      - name: The develop catalog's digests are its files'
         run: |
           python3 - <<'PY'
           import hashlib, pathlib, yaml
@@ -492,7 +492,7 @@ jobs:
       contents: read
       pages: write
       id-token: write
-    # One deployment at a time, and never a cancelled one: each replaces the
+    # One deployment at a time, and never a canceled one: each replaces the
     # whole site, and the later of two is the one that has seen both branches.
     concurrency:
       group: catalogue-site
@@ -579,12 +579,12 @@ jobs:
           done < <(find profiles -name profile.yaml | sort)
           echo "Validated ${found} profile bundle(s)"
 
-      - name: Build the catalogue source
+      - name: Build the catalog source
         # The flat, https-served shape a director fetches from and the App
         # Store ingests, with the index that lets a cluster say what is in
-        # this catalogue at all (AD-14). Built on every run, not only when
+        # this catalog at all (AD-14). Built on every run, not only when
         # publishing: a bundle that cannot be published is a bundle that
-        # silently disappears from every cluster's catalogue, and finding
+        # silently disappears from every cluster's catalog, and finding
         # that on main is finding it late.
         run: python3 scripts/build-catalogue-source.py --check
 
@@ -839,7 +839,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   # The same sidecar against the real things: Keycloak, and the apps of this
-  # catalogue that are signed in to through it, each at the version its chart
+  # catalog that are signed in to through it, each at the version its chart
   # pins and with its profile's own handler. Not a gate of the image build: it
   # pulls large images from registries this repository does not run.
   e2e-sso-saml-sidecar:
@@ -855,7 +855,7 @@ jobs:
       - name: Sign in through the sidecar, end to end
         run: images/gentian-sidecar-sso-saml/e2e/run.sh
 
-  # The catalogue's apps that sign people in themselves and say where they are
+  # The catalog's apps that sign people in themselves and say where they are
   # told of a sign-out, each as its real image against Keycloak: the notice
   # arrives at the address the platform builds from the profile, and the
   # app's session is over. Not a gate of any build: it pulls large images.
@@ -872,7 +872,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: "22"
-      - name: Log in to the registry the catalogue's own images are in
+      - name: Log in to the registry the catalog's own images are in
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - name: Sign out of the apps, end to end
         run: e2e/oidc-sign-out/run.sh
@@ -894,7 +894,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: "22"
-      - name: Log in to the registry the catalogue's own images are in
+      - name: Log in to the registry the catalog's own images are in
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - name: Restore into another cluster and domain, end to end
         run: e2e/restore-rewrites/run.sh
@@ -925,7 +925,7 @@ jobs:
 
   # The one status the branch rules require. It passes when every job above
   # succeeded or was skipped because this run gave it nothing to do, and fails
-  # when any of them failed or was cancelled. The three deciders must have
+  # when any of them failed or was canceled. The three deciders must have
   # run: a decision that was skipped is not a decision.
   gate:
     runs-on: ubuntu-latest

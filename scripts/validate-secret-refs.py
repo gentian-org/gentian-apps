@@ -79,7 +79,7 @@ def check_gateway_backends(path: pathlib.Path, doc: dict) -> list[str]:
     #
     # Read from ComponentProfile's shape: spec.ingress became one entry of
     # spec.expose, each naming its own backend, and spec.sidecars became
-    # spec.extensions. Both spellings are accepted while the catalogue is
+    # spec.extensions. Both spellings are accepted while the catalog is
     # converted -- a validator that only knew the new shape would report every
     # unconverted profile as broken, which is noise rather than a finding.
     allowed = {f"{name}-api"}

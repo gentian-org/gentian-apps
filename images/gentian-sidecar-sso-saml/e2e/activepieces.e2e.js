@@ -1,6 +1,6 @@
 'use strict';
 
-// Activepieces, the real container at the version the catalogue's chart pins,
+// Activepieces, the real container at the version the catalog's chart pins,
 // started the way that chart starts it, signed in to through the sidecar with
 // the profile's own handler.
 //

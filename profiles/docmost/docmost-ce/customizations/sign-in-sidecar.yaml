@@ -6,7 +6,7 @@ apiVersion: gentianos.io/v1alpha1
 kind: Customization
 metadata:
   # Named after the profile it travels with. No namespace: a companion in a
-  # profile bundle states none, and the cluster puts it where its catalogue
+  # profile bundle states none, and the cluster puts it where its catalog
   # is applied.
   name: docmost-ce.sign-in-sidecar
   labels:
@@ -87,5 +87,5 @@ spec:
       with that person as its only member, through the free edition's own calls.
       Docmost 0.95 sells "personal spaces" in its paid edition; that feature and its
       switch are not used or touched, but what is made here resembles what it gives. Whether making that session from outside the app, in place of the paid
-      single sign-on, is acceptable to the vendor is the owner's judgement and is
+      single sign-on, is acceptable to the vendor is the owner's judgment and is
       not settled by this record.

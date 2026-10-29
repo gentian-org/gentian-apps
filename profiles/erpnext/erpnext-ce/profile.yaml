@@ -77,7 +77,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.7"
+  version: "0.5.1-dev.8"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -330,7 +330,7 @@ spec:
               set_roles(doc, [r["role"] for r in doc.get("roles", []) if r["role"] not in ROLES])
               print("took %s and the roles with it from %s" % (ROLE, holder))
 
-          print("app administrators synchronised: %d" % len(want))
+          print("app administrators synchronized: %d" % len(want))
 
           # The entitled users, from an operator that hands them over. Every
           # role holding is read in one call: there can be thousands of people.
@@ -368,7 +368,7 @@ spec:
                       continue
                   set_roles(doc, [r["role"] for r in doc.get("roles", []) if r["role"] not in USER_ROLES])
                   print("took %s from %s" % (", ".join(USER_ROLES), name))
-              print("app users synchronised: %d" % len(entitled))
+              print("app users synchronized: %d" % len(entitled))
           PY
 
   # Customization ladder — see customization.md

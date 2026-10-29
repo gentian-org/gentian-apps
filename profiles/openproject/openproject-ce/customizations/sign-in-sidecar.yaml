@@ -6,7 +6,7 @@ apiVersion: gentianos.io/v1alpha1
 kind: Customization
 metadata:
   # Named after the profile it travels with. No namespace: a companion in a
-  # profile bundle states none, and the cluster puts it where its catalogue
+  # profile bundle states none, and the cluster puts it where its catalog
   # is applied.
   name: openproject-ce.sign-in-sidecar
   labels:
@@ -100,4 +100,4 @@ spec:
       anything — is what the paid edition sells as single sign-on, reached here
       without it. OpenProject's code is under the GPL, version 3, which does not
       restrict how the program is run; whether the vendor accepts this use of the
-      community edition is a judgement this record does not make.
+      community edition is a judgment this record does not make.

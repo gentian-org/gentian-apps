@@ -1,6 +1,6 @@
 # Customization ladder — ERPNext (family `erpnext`)
 
-**Grade: B** · rubric score **5/8** · characterised 2026-10-19
+**Grade: B** · rubric score **5/8** · characterized 2026-10-19
 
 Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
 

@@ -48,7 +48,7 @@ def encode_png(path: Path) -> str:
 
 
 def siblings(lines: list[str], at: int, indent: str) -> range:
-    """The lines of the mapping the line at `at` belongs to: every neighbour
+    """The lines of the mapping the line at `at` belongs to: every neighbor
     indented at least as far, up to the first line indented less."""
 
     def inside(line: str) -> bool:

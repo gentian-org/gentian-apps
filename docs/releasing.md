@@ -1,4 +1,4 @@
-# Branches, artefacts and releases
+# Branches, artifacts and releases
 
 ## Branches
 
@@ -11,16 +11,16 @@
 ## What CI publishes from where
 
 Every check runs on every branch and every pull request: profile and bundle validation, the
-catalogue build, chart lint and packaging, image builds. What differs is what is pushed.
+catalog build, chart lint and packaging, image builds. What differs is what is pushed.
 
 | | `main` | `develop` | any other branch, any pull request |
 |---|---|---|---|
 | Image | under the names the build states — its version, `latest`, the commit sha | `develop-<sha7>` only | built, not pushed |
 | Chart | the version in `Chart.yaml` (`charts/activepieces/UPSTREAM` for Activepieces) | `<version>-develop.<sha7>`, immutable, and `<version>-develop`, moving, its `appVersion` naming the immutable one | packaged or linted, not pushed |
-| Catalogue | `https://gentian-org.github.io/gentian-apps/` | `https://gentian-org.github.io/gentian-apps/develop/` | built and checked, not published |
+| Catalog | `https://gentian-org.github.io/gentian-apps/` | `https://gentian-org.github.io/gentian-apps/develop/` | built and checked, not published |
 
 `<sha7>` is the first seven characters of the commit. A develop name can never be a release's
-name, so a build of `develop` cannot overwrite anything a released catalogue pins. The naming is
+name, so a build of `develop` cannot overwrite anything a released catalog pins. The naming is
 [gentian-ui](https://github.com/gentian-org/gentian-ui)'s.
 
 A chart from `develop` whose only image is built here (the git-modules sidecar, `nextcloud-mcp`) names
@@ -34,7 +34,7 @@ pointed at a new chart, in a commit there.
 changed on `develop` is therefore not what a develop cluster installs until either the profile
 is pointed, in a later commit, at the `<version>-develop.<sha7>` that CI published for the chart
 change, or the change is released from `main` under its plain version. A profile must be back on
-a plain version before `develop` is merged into `main`: a released catalogue names released
+a plain version before `develop` is merged into `main`: a released catalog names released
 charts only.
 
 **An image built here is named the same way.** A profile on `develop` names an image from
@@ -52,12 +52,12 @@ changes; the release from `main` sets the bare number. CI holds both:
 `scripts/validate-profile-versions.py` compares the bundles with the base branch, and on `main`
 refuses `-dev` versions and `-develop.<sha7>` charts alike.
 
-## Two catalogues, one site
+## Two catalogs, one site
 
 GitHub Pages gives a repository one site, and a deployment replaces all of it. Each deployment
-therefore carries both catalogues: the branch that was pushed is built at that commit, the other
+therefore carries both catalogs: the branch that was pushed is built at that commit, the other
 at its head. A push to `develop` additionally compares the root it built from `main` with what is
-being served, file by file, and stops if anything differs — the released catalogue changes when
+being served, file by file, and stops if anything differs — the released catalog changes when
 `main` does and at no other time.
 
 The `github-pages` environment must allow both `main` and `develop` to deploy (Settings →
@@ -65,21 +65,21 @@ Environments → github-pages → Deployment branches and tags). Where it does n
 and publishes nothing rather than failing.
 
 Until this workflow is on `main` as well, a push to `main` publishes the root alone and the
-develop catalogue is gone until the next push to `develop`.
+develop catalog is gone until the next push to `develop`.
 
-A catalogue is relocatable: nothing in it names its own address. A cluster reads
+A catalog is relocatable: nothing in it names its own address. A cluster reads
 `<address>/index.yaml` and `<address>/profiles/<name>.yaml`, and admits a bundle by the digest
 the index states, so the same files serve from either path.
 
 ## Releases
 
 **A platform release is one tag, `vX.Y.Z`, on gentian-os, gentian-ui and gentian-apps.** The three
-tags mark what was tested together: that platform, those UIs, this catalogue. In this repository
-the tag goes on the `main` commit the catalogue was published from. Nothing is built from the
-tag — `main` already published the artefacts — so the workflow has no tag trigger.
+tags mark what was tested together: that platform, those UIs, this catalog. In this repository
+the tag goes on the `main` commit the catalog was published from. Nothing is built from the
+tag — `main` already published the artifacts — so the workflow has no tag trigger.
 
-The catalogue may move between platform releases: an app is added or updated on `main` without a
-new platform. So a newer catalogue has to stay readable by an older platform, and the rule that
+The catalog may move between platform releases: an app is added or updated on `main` without a
+new platform. So a newer catalog has to stay readable by an older platform, and the rule that
 keeps it so has two halves:
 
 - **A platform refuses what it does not know.** A bundle holding an object of a kind or a name

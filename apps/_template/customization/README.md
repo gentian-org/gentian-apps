@@ -1,7 +1,7 @@
 # Customizing this app
 
 This app is built from `apps/_template` and ships a customization surface so
-you can change its behaviour **without patching or forking it**.
+you can change its behavior **without patching or forking it**.
 
 The rungs below come from the Gentian customization ladder — the full framework, the
 decision procedure, and the record format live in
@@ -37,7 +37,7 @@ who wins:
 | Prefix | Owner |
 |---|---|
 | `00-`–`49-` | platform |
-| `50-`–`89-` | profile / catalogue maintainer |
+| `50-`–`89-` | profile / catalog maintainer |
 | `90-`–`99-` | tenant (self-service, via the Admin Console) |
 
 Full precedence chain: image defaults → chart values → profile `extraValues` → profile

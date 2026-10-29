@@ -1,6 +1,6 @@
 'use strict';
 
-// Docmost, the real container at the version the catalogue pins, signed in to
+// Docmost, the real container at the version the catalog pins, signed in to
 // through the sidecar with the profile's own handler.
 //
 //   docker build -t sso-sidecar:e2e ..   &&   node --test e2e/docmost.e2e.js

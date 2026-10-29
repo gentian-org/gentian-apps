@@ -1,6 +1,6 @@
 'use strict';
 
-// XWiki (the catalogue's own image, with the OIDC authenticator it bundles),
+// XWiki (the catalog's own image, with the OIDC authenticator it bundles),
 // signed in to with its own OIDC client, and signed out of when the person
 // signs out at the realm.
 //

@@ -1,7 +1,7 @@
 # AGENTS.md — Gentian app development conventions
 
 Conventions for AI coding agents and humans extending Gentian first-party UI
-(catalogue apps **and** kernel shell in `gentian-ui` — same stack).
+(catalog apps **and** kernel shell in `gentian-ui` — same stack).
 
 ## Directory map
 
@@ -17,7 +17,7 @@ Conventions for AI coding agents and humans extending Gentian first-party UI
 | `frontend/src/api/client.ts` | Typed fetch helpers |
 | `frontend/src/stores/` | Zustand client state (when needed) |
 | `chart/` | Helm chart (Gateway API HTTPRoute, Pattern A secrets) |
-| `profile/appprofile.yaml.tmpl` | AppProfile skeleton (catalogue apps only) |
+| `profile/appprofile.yaml.tmpl` | AppProfile skeleton (catalog apps only) |
 | `profile/componentprofile.yaml.tmpl` | ComponentProfile skeleton (platform components only) |
 | `.github/workflows/build.yaml` | CI — multi-arch images to GHCR, OCI chart publish |
 | `docs/SECURITY.md` | Security checklist |
@@ -45,13 +45,13 @@ unstable surface lives under `proposed/`.
 
 ## Which profile this app needs
 
-`AppProfile` and `ComponentProfile` are both cluster-scoped catalogue entries, and the
+`AppProfile` and `ComponentProfile` are both cluster-scoped catalog entries, and the
 choice is not cosmetic — it decides which reconciler owns the install.
 
-An **AppProfile** is a catalogue app: a tenant admin installs it by way of
+An **AppProfile** is a catalog app: a tenant admin installs it by way of
 `Tenant.spec.apps`, the app reconciler drives it through a Crossplane App claim, and the
 profile carries the portal's presentation (`displayName`, `description`, `tile`) and the
-catalogue identity.
+catalog identity.
 
 A **ComponentProfile** is a component of the platform: the platform installs it for
 itself by creating a `Component` that names the profile, and `component_reconciler.go`

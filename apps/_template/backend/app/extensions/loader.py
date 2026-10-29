@@ -1,7 +1,7 @@
 """Discover and load plugins registered under this app's entry-point group.
 
 This is the L3 (in-app extension) mechanism for apps built from the Gentian
-template. It exists so consumers who need behaviour *inside* the app do not have
+template. It exists so consumers who need behavior *inside* the app do not have
 to fork it — see gentian-os/docs/app-customization.md.
 
 Two design choices are deliberate:

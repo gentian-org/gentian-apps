@@ -9,7 +9,7 @@ be abandoned — that is the point of keeping the two apart.
 ## ~~Restructure `profiles/` — group by family, drop the flat layout~~ — **done**
 
 Implemented 2026-08-06 (`gentian-apps` 4bc20fa, `gentian-os` 5500d2f). The rationale
-now lives in [app-profile-guide.md](app-profile-guide.md) §0, which generalises it into
+now lives in [app-profile-guide.md](app-profile-guide.md) §0, which generalizes it into
 the distribution-repo model the whole repo layout follows.
 
 **What shipped, in two passes.** The first pass grouped by family only
@@ -79,7 +79,7 @@ not an edition — openDesk is a *supplier*, so `nextcloud-office-od` is an `ee`
 edition supplied by openDesk. Leaf names are free-form hints; `spec.edition` is
 authoritative, and nothing may derive the edition from a name.
 
-## Pro / Solid tiers in the catalogue
+## Pro / Solid tiers in the catalog
 
 **Pro apps must be listed in the App Store**, not hidden until purchase. Folders in
 `gentian-apps/profiles/` for pro (and possibly solid) tiers are stubs *beyond the
@@ -92,12 +92,12 @@ registry host instead of `ghcr.io/gentian-org/charts`.
 This matches the target model already documented (but not yet executed) in
 `aluvian/docs/architecture.md`:
 
-- `gentian-apps/profiles/` stays the single source of truth for *all* catalogue
+- `gentian-apps/profiles/` stays the single source of truth for *all* catalog
   metadata, free and commercial alike (commercial entries carry `license: proprietary`).
 - `aluvian` (+ `gentian-frontpage`) is the commercial/entitlement layer: Buy button
   → checkout → the operator verifies an install grant against it before pulling the
   private chart. Gating happens **at install time by the operator**, not by hiding
-  catalogue metadata — pro/solid tiles stay visible in the Store, just locked until
+  catalog metadata — pro/solid tiles stay visible in the Store, just locked until
   entitled.
 
 **New "solid" tier:** a set of apps curated by Gentian itself (as opposed to `pro`,

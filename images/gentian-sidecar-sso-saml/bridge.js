@@ -18,7 +18,7 @@
 //                      app's handler is asked to end that person's sessions.
 //   GET  /healthz, /readyz   for the kubelet.
 //
-// The handler is the app's catalogue entry's; see README.md for what one is
+// The handler is the app's catalog entry's; see README.md for what one is
 // given and what it may answer.
 
 const log = require('./lib/log');

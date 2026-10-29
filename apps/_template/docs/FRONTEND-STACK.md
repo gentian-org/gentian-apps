@@ -1,7 +1,7 @@
 # Frontend stack
 
 **React + Vite + TypeScript + Tailwind** is the Gentian standard for all first-party
-UI — catalogue apps and kernel shell.
+UI — catalog apps and kernel shell.
 
 ## Libraries (canonical)
 

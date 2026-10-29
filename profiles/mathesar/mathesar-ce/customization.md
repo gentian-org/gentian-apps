@@ -1,6 +1,6 @@
 # Customization ladder — Mathesar (family `mathesar-ce`)
 
-**Grade: C** · rubric score **3/8** · characterised 2026-08-11 (revised — see Notes)
+**Grade: C** · rubric score **3/8** · characterized 2026-08-11 (revised — see Notes)
 
 Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
 
@@ -32,7 +32,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 ## Notes
 
 Mathesar ships no upstream Helm chart at all (docker-compose only), so unlike most profiles in
-this catalogue `charts/mathesar` is a **first-party Gentian chart** wrapping the official,
+this catalog `charts/mathesar` is a **first-party Gentian chart** wrapping the official,
 unmodified `mathesar/mathesar` image — the same shape as `charts/odoo`, not a vendored/patched
 upstream chart. `repackage.chartOwnership: gentian-owned` reflects that; there is no upstream
 chart repo to point `patch.buildRepo`/`fork.repo` at.

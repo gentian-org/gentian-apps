@@ -17,7 +17,7 @@ First-party app **source** lives in this monorepo:
 ```text
 gentian-apps/
 ├── apps/<app-id>/          # implementation (backend, frontend, chart)
-└── profiles/<app-id>.yaml  # AppProfile catalogue entry
+└── profiles/<app-id>.yaml  # AppProfile catalog entry
 ```
 
 The cluster never mounts Git source. CI builds **pinned container images** and an
@@ -91,7 +91,7 @@ python3 -c "import yaml; yaml.safe_load(open('profiles/my-app.yaml'))"
 
 `.github/workflows/apps-ci.yaml` builds changed apps under `apps/`.
 
-On merge to `main` (from `develop` the same artefacts go out under develop names —
+On merge to `main` (from `develop` the same artifacts go out under develop names —
 [releasing.md](releasing.md)):
 
 1. Docker images → `ghcr.io/gentian-org/<app>-api:<version>`
@@ -115,5 +115,5 @@ kubectl gentian apps install my-app --tenant gtn-demo
 
 ## Related
 
-- [app-profile-guide.md](app-profile-guide.md) — catalogue-only / upstream charts
+- [app-profile-guide.md](app-profile-guide.md) — catalog-only / upstream charts
 - [gentian-os/docs/design/app-catalogue.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/app-catalogue.md)

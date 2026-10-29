@@ -20,7 +20,7 @@ It is a SAML service provider towards the tenant's realm, on the app's own host:
 | `POST /sso/logout` | by the realm only, inside the cluster, under the sidecar's own Service name; not routed from outside | checks the realm's sign-out request, then asks the handler to end that person's sessions in the app |
 | `GET /healthz`, `GET /readyz` | by the kubelet | ready means the realm's signing certificate is known |
 
-The realm recognises the person from the sign-in at the platform and answers without asking.
+The realm recognizes the person from the sign-in at the platform and answers without asking.
 
 ## What it accepts as an answer
 
@@ -121,7 +121,7 @@ All given by the platform. Nothing is assembled from a tenant's name and a domai
 
 ## A handler
 
-The app's part: one file, `handler.js`, from the app's catalogue entry. It knows how this app
+The app's part: one file, `handler.js`, from the app's catalog entry. It knows how this app
 keeps a session and nothing about SAML.
 
 ```js
@@ -207,7 +207,7 @@ reaches nothing but what was declared.
 - log who signed in. `ctx.log` is for what happened, not to whom;
 - touch a license check or a switch of a paid feature in the app.
 
-The handlers in this catalogue are the reference:
+The handlers in this catalog are the reference:
 `profiles/docmost/docmost-ce/assets/sign-in-handler.js` and
 `profiles/activepieces/activepieces-ce/assets/sign-in-handler.js`, which sign a session token
 with the app's own key, and `profiles/openproject/openproject-ce/assets/sign-in-handler.js`, for

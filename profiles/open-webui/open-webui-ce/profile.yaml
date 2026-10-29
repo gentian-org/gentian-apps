@@ -21,7 +21,7 @@ metadata:
     gentianos.io/renamed-from: open-webui
     gentianos.io/platform-app: "true"
     # Comes with the cluster serving models: the platform places it in every
-    # tenant then, and only then (placedWith: llm in the catalogue's index).
+    # tenant then, and only then (placedWith: llm in the catalog's index).
     gentianos.io/requires-capability: "llm"
     # Placed, not offered.
     gentianos.io/store-listed: "false"
@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.4"
+  version: "0.5.1-dev.5"
   package:
     chart:
       repository: "https://helm.openwebui.com"
@@ -228,7 +228,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
 
-  # Not yet characterised against the customization ladder.
+  # Not yet characterized against the customization ladder.
   requires:
     # The oldest platform version line this build runs on (docs/profile-bundles.md).
     platform: ">=0.5"

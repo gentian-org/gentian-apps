@@ -97,7 +97,7 @@ platform:
   # The name of the zone's realm.
   realm: ""
   # "kernel" for the platform's own zone, "tenant" for a customer's. A component
-  # whose behaviour differs between the two decides from this.
+  # whose behavior differs between the two decides from this.
   zoneKind: ""
 
 # Where the director answers, for a platform-trust component that relays the

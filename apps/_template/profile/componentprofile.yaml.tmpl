@@ -1,9 +1,9 @@
-# ComponentProfile — the catalogue entry for a component of the platform itself.
+# ComponentProfile — the catalog entry for a component of the platform itself.
 #
 # Use this file instead of appprofile.yaml.tmpl when what this repo builds is a
-# component rather than a catalogue app: something the platform installs for
+# component rather than a catalog app: something the platform installs for
 # itself by creating a Component object that names this profile, not something a
-# tenant admin picks out of the app catalogue and gets through Tenant.spec.apps.
+# tenant admin picks out of the app catalog and gets through Tenant.spec.apps.
 # README.md and docs/AGENTS.md carry the full distinction; the operator's half of
 # it is that gentian-os reconciles a Component into a provider-helm Release plus
 # one Gateway API route and one Envoy SecurityPolicy per gateway exposure, while
@@ -14,7 +14,7 @@
 # points at: renaming it later does not migrate anything, it orphans every
 # install, which then reports ProfileMissing and waits forever.
 #
-# The catalogue listing -- name, summary, description, categories, links,
+# The catalog listing -- name, summary, description, categories, links,
 # author, license, logo -- is the App Store's, kept in its own database outside
 # the cluster. The one piece of presentation here is the tile on an exposure
 # (spec.expose[].tile), because the portal has to show what the cluster routes
@@ -69,10 +69,10 @@ spec:
   # both of which are refused at any lower tier.
   trustTier: certified
 
-  # The version of this catalogue entry, not of the upstream project it
+  # The version of this catalog entry, not of the upstream project it
   # packages. Bump it when anything in this file changes, including a chart
   # version bump, so that what an install pinned can be told apart from what the
-  # catalogue now says.
+  # catalog now says.
   version: "0.1.0"
 
   # Whether every tenant gets one of these without anybody declaring it. The
@@ -243,7 +243,7 @@ spec:
 
     # A component the platform routes to rather than runs: no pods are created
     # and the request is sent to an origin that is already serving. It does not
-    # mean external — the catalogue's own example points at a Service inside
+    # mean external — the catalog's own example points at a Service inside
     # the cluster. runtime chooses between redirecting the browser (redirect),
     # a kernel API proxy (proxy, reserved and not built) and a same-origin
     # relay through the desktop's BFF (portal-proxy); tenantBinding chooses
@@ -269,7 +269,7 @@ spec:
   # and the component's NetworkPolicy is written from this block, so a store the
   # component uses but does not declare here is a connection Calico refuses.
   requires:
-    # What the platform must fulfil before this component runs. Each is
+    # What the platform must fulfill before this component runs. Each is
     # fulfilled by a component of class service, or by something outside the
     # cluster entirely — a mail relay, a bucket at a cloud provider. It was
     # called kernelRequirements, which named a fulfiller that is not the
@@ -412,7 +412,7 @@ spec:
     #         ports:
     #           - protocol: TCP
     #             port: 443
-    #       reason: "The component synchronises with the vendor's hosted API, which publishes no fixed address range."
+    #       reason: "The component synchronizes with the vendor's hosted API, which publishes no fixed address range."
     #   # Kubernetes API access for the component's ServiceAccount. The rarest
     #   # request of the three: a component that needs the API is most of the
     #   # way to being a controller, and should usually be one instead.
@@ -720,7 +720,7 @@ spec:
   customization:
     # The summary of the rubric score below. CI checks that the two agree —
     # A needs 7 or more, B is 5 to 6, C is 3 to 4, D is 2 or less — so an
-    # optimistic grade fails the catalogue build rather than misleading anyone.
+    # optimistic grade fails the catalog build rather than misleading anyone.
     grade: A
     rubricScore: 7
     # The rungs this component can be customized at. L2 must not be listed: a
@@ -737,7 +737,7 @@ spec:
     # L1, directories the component already treats as extension points. Content
     # is parsed at admission so a malformed fragment fails there rather than at
     # boot. upstreamDocumented false means the path is really L4 — upstream has
-    # promised nothing about it surviving a reorganisation — and tenantEditable
+    # promised nothing about it surviving a reorganization — and tenantEditable
     # decides whether tenant admins may write here at all, which a policy file
     # usually must not allow.
     dropIns:
