@@ -83,14 +83,14 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.6"
+  version: "0.5.1-dev.7"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: paperless-ngx
       # The develop build of the merge that added this profile; back on a
       # plain version before develop is merged into main (docs/releasing.md).
-      version: "0.1.0-develop.609543e"
+      version: "0.1.1-develop.76d6231"
 
     valueMapping:
       oidc:
