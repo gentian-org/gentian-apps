@@ -90,14 +90,10 @@ doesn't own that code), and `spec.chart.repository` points at a **private** OCI
 registry host instead of `ghcr.io/gentian-org/charts`.
 
 This matches the target model already documented (but not yet executed) in
-`gentian-pro/README.md` and `aluvian/docs/architecture.md`:
+`aluvian/docs/architecture.md`:
 
 - `gentian-apps/profiles/` stays the single source of truth for *all* catalogue
   metadata, free and commercial alike (commercial entries carry `license: proprietary`).
-- `gentian-pro` shrinks to hosting only the private chart/image artifacts those
-  `chart.repository` coordinates reference — the `od-*` bundles currently living there
-  in full (with `composition.yaml`) are a pending migration into `gentian-apps`, not the
-  intended end state.
 - `aluvian` (+ `gentian-frontpage`) is the commercial/entitlement layer: Buy button
   → checkout → the operator verifies an install grant against it before pulling the
   private chart. Gating happens **at install time by the operator**, not by hiding
@@ -116,13 +112,6 @@ turning the paywall on/off later needs no directory or repo move.
   that `pro`/`solid` stub bundles don't accidentally ship implementation source or a
   public `chart.repository`.
 - Decide the App Store UI treatment for `solid` (badge/messaging distinct from `pro`).
-- Migrate the remaining `gentian-pro/profiles/od-*` bundles into `gentian-apps/profiles/`
-  per the target model above. **`od-nextcloud` is done** — it now lives at
-  `profiles/nextcloud/office/nextcloud-office-od` (still `license: proprietary`, still
-  pointing at the openCode private registry, exactly as the model prescribes). The copy
-  under `gentian-pro/profiles/od-nextcloud` is now redundant and should be removed in a
-  gentian-pro commit. Remaining: `od-element`, `od-openproject`, `od-ox-appsuite`,
-  `od-xwiki`.
 - Reconcile the tier suffix with `spec.tier`. Leaf names now encode tier as
   `-ce` / `-od` / `-me`, but there is still no queryable field — so App Store badges and
   operator entitlement gating cannot read it. The suffix and the future field must not

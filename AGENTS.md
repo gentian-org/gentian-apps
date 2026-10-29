@@ -7,10 +7,7 @@ OS — profile bundles (`profiles/[<family>/]<name>/`, published as the catalogu
 from, one file and one digest per profile: [docs/profile-bundles.md](docs/profile-bundles.md)) plus
 first-party app implementations (`apps/<name>/`, FastAPI + React +
 Helm — same stack as [`apps/_template`](apps/_template) /
-[gentian-ui](https://github.com/gentian-org/gentian-ui)). This includes commercial
-(`license: proprietary`) profiles, not just OSS ones — [gentian-pro](https://github.com/aluvian-hq/gentian-pro)
-holds only the private chart/image artifacts those profiles reference, it does not sync its own
-catalogue. See [README.md](README.md) for full scope and
+[gentian-ui](https://github.com/gentian-org/gentian-ui)). See [README.md](README.md) for full scope and
 [docs/app-profile-guide.md](docs/app-profile-guide.md) /
 [docs/custom-app-guide.md](docs/custom-app-guide.md) for the two main workflows.
 
