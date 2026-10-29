@@ -26,7 +26,7 @@ database:
   user: ""
   password: ""
 
-# Dedicated in-pod Redis, NOT the shared kernel Redis.
+# Dedicated in-pod Redis (Valkey), NOT the shared kernel Redis.
 #
 # Docmost cannot use the kernel's per-app Redis ACL user: parseRedisUrl
 # (apps/server/src/common/helpers/utils.ts) destructures only
@@ -49,8 +49,12 @@ redis:
   enabled: true
   port: 6379
   image:
-    repository: docker.io/library/redis
-    tag: "7-alpine"
+    # Valkey, the BSD-licensed fork of Redis 7.2: same protocol and
+    # commands, so the app's redis:// URL is unchanged. Pinned by the digest
+    # of the multi-arch index; the tag is only the readable label.
+    repository: docker.io/valkey/valkey
+    tag: "8.1.11-alpine"
+    digest: "sha256:2602ace2be6569bc2bbb06f873776516ab9089821525be34f4305c67eb9db02a"
     pullPolicy: IfNotPresent
   # BullMQ stores job state here, so eviction would silently drop queued jobs.
   # noeviction makes memory pressure a visible error instead.

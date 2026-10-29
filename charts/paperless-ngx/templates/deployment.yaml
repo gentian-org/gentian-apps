@@ -117,11 +117,11 @@ spec:
         # why the shared kernel Redis is not used. --bind 127.0.0.1 keeps it
         # inside the pod's network namespace; nothing is written to disk.
         - name: redis
-          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
+          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}{{ with .Values.redis.image.digest }}@{{ . }}{{ end }}"
           imagePullPolicy: {{ .Values.redis.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-          command: ["redis-server"]
+          command: ["valkey-server"]
           args:
             - --bind
             - 127.0.0.1
@@ -139,7 +139,7 @@ spec:
             - {{ .Values.redis.maxmemoryPolicy | quote }}
           readinessProbe:
             exec:
-              command: ["redis-cli", "-h", "127.0.0.1", "-p", {{ .Values.redis.port | quote }}, "ping"]
+              command: ["valkey-cli", "-h", "127.0.0.1", "-p", {{ .Values.redis.port | quote }}, "ping"]
             initialDelaySeconds: 3
             periodSeconds: 10
             timeoutSeconds: 3
