@@ -69,7 +69,7 @@ Dockerfile.
 ## Build
 
 ```bash
-./build.sh          # honours REGISTRY, defaults to ghcr.io
+./build.sh          # honors REGISTRY, defaults to ghcr.io
 ```
 
 For the base/addon/package model this image serves, see

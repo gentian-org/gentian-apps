@@ -1,6 +1,6 @@
 # Customization ladder — Nextcloud (family `nextcloud`)
 
-**Grade: A** · rubric score **7/8** · characterised 2026-08-06
+**Grade: A** · rubric score **7/8** · characterized 2026-08-06
 Applies to `nextcloud-base-ce` and the `nextcloud-office-*` / `nextcloud-suite-*` profiles.
 
 Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
@@ -32,7 +32,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 
 ## L2 vs L3 here
 
-Nextcloud is the clearest case in the catalogue of both rungs being first-class, and upstream
+Nextcloud is the clearest case in the catalog of both rungs being first-class, and upstream
 names them: a **PHP app** runs inside the server (L3); an **ExApp** (AppAPI) is a container
 alongside it (L2). Apply the framework's tie-breaker — if the function must appear in the
 Nextcloud UI and touch its data model, write an app; otherwise write an ExApp or a Gentian
@@ -72,7 +72,7 @@ Nextcloud answers under its Service's name without that name being listed under
 `trustedDomains`: `overwritehost` is set (`gentian-proxy.config.php`), and Nextcloud does not
 hold a request to that list then.
 
-Shown against the catalogue's image and Keycloak 26.8.0 in `e2e/oidc-sign-out/nextcloud.e2e.js`:
+Shown against the catalog's image and Keycloak 26.8.0 in `e2e/oidc-sign-out/nextcloud.e2e.js`:
 the realm posts to the Service's address, the cookie of the person who signed out is refused
 afterwards, another person's is not, and a token signed with another key, an unsigned one and
 the realm's own token a second time end nothing. The realm posts once: if Nextcloud is not

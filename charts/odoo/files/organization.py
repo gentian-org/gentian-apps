@@ -5,9 +5,9 @@
 # zone to the accounts that exist and as the default of new ones.
 #
 # Once: a company the tenant has since edited is its data. A database that
-# was set up from a complete organisation records it, and is never touched
+# was set up from a complete organization records it, and is never touched
 # again; an incomplete one is left as Odoo made it until a start finds the
-# organisation complete.
+# organization complete.
 import json
 
 DONE = "gentian.organization_applied"

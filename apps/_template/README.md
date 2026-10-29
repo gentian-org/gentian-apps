@@ -1,6 +1,6 @@
 # Gentian app template
 
-Canonical scaffold for **all Gentian-built UI**: catalogue apps (`gentian-apps/apps/*`)
+Canonical scaffold for **all Gentian-built UI**: catalog apps (`gentian-apps/apps/*`)
 and the kernel shell (`gentian-ui`). Same stack, same layout; only deployment differs
 (AppProfile + tenant install vs kernel ApplicationSet).
 
@@ -40,14 +40,14 @@ what the platform enforces vs what app authors must implement.
 
 ## AppProfile or ComponentProfile?
 
-Both are cluster-scoped catalogue entries in `gentian-os`, and this repo ships a skeleton
+Both are cluster-scoped catalog entries in `gentian-os`, and this repo ships a skeleton
 for each. What separates them is who installs the thing and what the operator then does.
 
-Use **`profile/appprofile.yaml.tmpl`** for a **catalogue app** — something a tenant admin
+Use **`profile/appprofile.yaml.tmpl`** for a **catalog app** — something a tenant admin
 picks and installs into their own tenant. It is installed by listing it in
 `Tenant.spec.apps`, the app reconciler takes it through a Crossplane App claim, and the
 profile carries what the portal has to show: `displayName`, `description`, `tile`, portal
-tiles, and the catalogue identity (family, catalogue version, edition, license).
+tiles, and the catalog identity (family, catalog version, edition, license).
 
 Use **`profile/componentprofile.yaml.tmpl`** for a **component of the platform itself** —
 a system service, app or agent that the platform installs for itself by creating a
@@ -71,7 +71,7 @@ the platform runs as part of itself — the desktop is the worked example, in
 `gentian-os/charts/gentian-os/templates/componentprofile-desktop.yaml` — you want the
 second.
 
-## Create a catalogue app
+## Create a catalog app
 
 1. Copy this repo to `gentian-apps/apps/<name>/`.
 2. Rename chart, images, and `profile/appprofile.yaml.tmpl`.
@@ -81,9 +81,9 @@ second.
 ## Components the platform ships itself
 
 The desktop and the administration console (both in `gentian-ui`, under
-`apps/`) are components, not catalogue apps: the platform installs one of each for every
+`apps/`) are components, not catalog apps: the platform installs one of each for every
 tenant from a profile that declares `defaultForTenants`, rather than a tenant
-administrator picking them out of a catalogue.
+administrator picking them out of a catalog.
 
 Use the same `backend/` + `frontend/` + `chart/` layout, and **skip
 `profile/`**. Their ComponentProfiles live in the gentian-os chart

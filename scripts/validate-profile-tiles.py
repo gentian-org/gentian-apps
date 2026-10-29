@@ -21,7 +21,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = ROOT / "profiles"
-CATALOGUE = Path(__file__).resolve().parent / "data" / "tile-catalogue.json"
+CATALOG = Path(__file__).resolve().parent / "data" / "tile-catalogue.json"
 DATA_URI_PREFIX = "data:image/png;base64,"
 DATA_URI_RE = re.compile(r"^data:image/png;base64,[A-Za-z0-9+/]+=*$")
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -30,8 +30,8 @@ MAX_LOGO = 65536
 SIZE = 128
 
 
-def load_catalogue_ids() -> set[str]:
-    data = json.loads(CATALOGUE.read_text(encoding="utf-8"))
+def load_catalog_ids() -> set[str]:
+    data = json.loads(CATALOG.read_text(encoding="utf-8"))
     return set(data.get("tiles", {}).keys())
 
 
@@ -41,7 +41,7 @@ def png_size(data: bytes) -> tuple[int, int] | None:
     return struct.unpack(">II", data[16:24])
 
 
-def check_tile(path: Path, tile: dict, label: str, catalogue_ids: set[str], icon_allowed: bool) -> list[str]:
+def check_tile(path: Path, tile: dict, label: str, catalog_ids: set[str], icon_allowed: bool) -> list[str]:
     errors: list[str] = []
     rel = path.relative_to(ROOT)
     icon = tile.get("icon")
@@ -53,7 +53,7 @@ def check_tile(path: Path, tile: dict, label: str, catalogue_ids: set[str], icon
             errors.append(f"{rel} {label}: this tile has no icon field; draw the glyph with scripts/render-default-tile.py")
         elif logo or image:
             errors.append(f"{rel} {label}: set either tile.icon or tile.image/tile.logo, not both")
-        elif icon not in catalogue_ids:
+        elif icon not in catalog_ids:
             errors.append(f"{rel} {label}: unknown tile.icon {icon!r}")
         return errors
 
@@ -87,7 +87,7 @@ def check_tile(path: Path, tile: dict, label: str, catalogue_ids: set[str], icon
     return errors
 
 
-def validate_profile(path: Path, catalogue_ids: set[str]) -> list[str]:
+def validate_profile(path: Path, catalog_ids: set[str]) -> list[str]:
     doc = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not doc or doc.get("kind") != "ComponentProfile":
         return []
@@ -96,34 +96,34 @@ def validate_profile(path: Path, catalogue_ids: set[str]) -> list[str]:
     for entry in spec.get("expose") or []:
         tile = (entry or {}).get("tile")
         if tile:
-            errors += check_tile(path, tile, f"expose[{entry.get('name', '?')}].tile", catalogue_ids, False)
+            errors += check_tile(path, tile, f"expose[{entry.get('name', '?')}].tile", catalog_ids, False)
     api_tile = ((spec.get("package") or {}).get("api") or {}).get("tile")
     if api_tile:
-        errors += check_tile(path, api_tile, "package.api.tile", catalogue_ids, False)
+        errors += check_tile(path, api_tile, "package.api.tile", catalog_ids, False)
     return errors
 
 
-def validate_preset(path: Path, catalogue_ids: set[str]) -> list[str]:
+def validate_preset(path: Path, catalog_ids: set[str]) -> list[str]:
     doc = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not doc or doc.get("kind") != "AppPackage":
         return []
     tile = (doc.get("spec") or {}).get("tile")
-    return check_tile(path, tile, "spec.tile", catalogue_ids, True) if tile else []
+    return check_tile(path, tile, "spec.tile", catalog_ids, True) if tile else []
 
 
 def main() -> int:
-    if not CATALOGUE.is_file():
-        print(f"missing tile catalogue: {CATALOGUE}", file=sys.stderr)
+    if not CATALOG.is_file():
+        print(f"missing tile catalog: {CATALOG}", file=sys.stderr)
         return 1
 
-    catalogue_ids = load_catalogue_ids()
+    catalog_ids = load_catalog_ids()
     profiles = sorted(PROFILES.glob("**/profile.yaml"))
     presets = sorted(p for p in PROFILES.glob("**/packages/*.yaml") if p.name != "kustomization.yaml")
     errors: list[str] = []
     for path in profiles:
-        errors += validate_profile(path, catalogue_ids)
+        errors += validate_profile(path, catalog_ids)
     for path in presets:
-        errors += validate_preset(path, catalogue_ids)
+        errors += validate_preset(path, catalog_ids)
 
     if errors:
         for err in errors:

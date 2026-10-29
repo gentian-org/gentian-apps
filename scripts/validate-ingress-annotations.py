@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Validate gentianos.io/gateway-* annotations on ComponentProfile exposures.
 
-An annotation the operator does not recognise is not rejected anywhere -- it is
-simply never read, so a profile can ask for behaviour it silently never gets.
+An annotation the operator does not recognize is not rejected anywhere -- it is
+simply never read, so a profile can ask for behavior it silently never gets.
 
 That is not hypothetical. gentianos.io/gateway-response-timeout was declared,
-documented, honoured in the operator and set by four profiles, and did nothing
+documented, honored in the operator and set by four profiles, and did nothing
 at all: BackendTrafficPolicy's timeout.http has no responseTimeout field, so the
 API server pruned it on write and every policy came back with requestTimeout
 alone. It took a 504 on a user-facing sign-in to notice.

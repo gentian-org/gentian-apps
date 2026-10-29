@@ -1,6 +1,6 @@
 # Customization ladder — XWiki (family `xwiki`)
 
-**Grade: A** · rubric score **7/8** · characterised 2026-08-06
+**Grade: A** · rubric score **7/8** · characterized 2026-08-06
 
 Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
 
@@ -54,7 +54,7 @@ one that signed out. It reads the realm's keys at the realm's public address, so
 be able to reach `id.<domain>` from inside the cluster and trust its certificate, as it has to
 for signing in.
 
-Shown against the catalogue's image (`ghcr.io/gentian-org/xwiki`) and Keycloak 26.8.0 in
+Shown against the catalog's image (`ghcr.io/gentian-org/xwiki`) and Keycloak 26.8.0 in
 `e2e/oidc-sign-out/xwiki.e2e.js`, with this profile's `oidc.*` settings: the realm posts to the
 Service's address, the session of the person who signed out is nobody's afterwards, another
 person's goes on, and a token signed with another key or not signed at all ends nothing. The

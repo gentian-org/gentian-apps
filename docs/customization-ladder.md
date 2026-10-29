@@ -1,9 +1,9 @@
-# Customization Ladder — catalogue operations
+# Customization Ladder — catalog operations
 
 The framework, the rung definitions, and the decision procedure live in
 **[gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md)**.
 Read that first. This page is the `gentian-apps` operational half: where files go, what CI
-checks, and how to characterise a new catalogue entry.
+checks, and how to characterize a new catalog entry.
 
 ## The ladder in one table
 
@@ -24,7 +24,7 @@ generic mechanisms only).
 
 ## Profile bundle layout
 
-A bundle is any directory containing a `profile.yaml` — that file is what the catalogue
+A bundle is any directory containing a `profile.yaml` — that file is what the catalog
 ApplicationSet matches, and the Application is named after the AppProfile's
 `metadata.name` rather than the directory. Directory names are therefore free to be
 short: an addon lives at `profiles/odoo/addons/crm-ce/` while its profile is still
@@ -47,7 +47,7 @@ Charts and images are deliberately **not** in here — `charts/<name>/` and
 coordinate rather than path and is frequently shared (`charts/odoo` backs 10 profiles).
 See [app-profile-guide.md](app-profile-guide.md) §0.
 
-## Characterising a new app
+## Characterizing a new app
 
 1. Score the §4.1 rubric by hand (8 criteria, +1 each) — grades are **manual** for v0.4;
    automation is gentian-os roadmap item 2.13.
@@ -63,7 +63,7 @@ See [app-profile-guide.md](app-profile-guide.md) §0.
 
 Required from **L2 upward**, written **before** the code. `Customization` is a namespaced CRD
 (`gentianos.io/v1alpha1`); records are authored here in git and synced to clusters like any
-other catalogue object. The operator computes `status` — review overdue, upstream stale,
+other catalog object. The operator computes `status` — review overdue, upstream stale,
 version drift, cheaper rung available — which is what the Admin Console debt report reads.
 
 Validate locally:
@@ -77,7 +77,7 @@ python3 scripts/customization-debt-report.py --format markdown
 
 | Check | Failure means |
 |---|---|
-| every `profiles/*/profile.yaml` has `spec.customization` | app not characterised |
+| every `profiles/*/profile.yaml` has `spec.customization` | app not characterized |
 | `grade` matches `rubricScore` banding | scoring and grade disagree |
 | `supportedRungs` does not contain `L2` | L2 is not a property of the target |
 | declared `dropIns[].path` is absolute; `tenantEditable` entries have a `format` | tenants could get an unvalidatable mount |

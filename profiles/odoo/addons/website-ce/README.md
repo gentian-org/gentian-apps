@@ -1,4 +1,4 @@
-# odoo-website-ce — withdrawn from the catalogue
+# odoo-website-ce — withdrawn from the catalog
 
 This addon is **not synced to any cluster**. Its profile is parked as
 `profile.yaml.disabled`, and the ArgoCD ApplicationSet `gentian-catalogue` globs

@@ -1,6 +1,6 @@
 'use strict';
 
-// Nextcloud (the catalogue's own image) imported into another cluster under
+// Nextcloud (the catalog's own image) imported into another cluster under
 // another domain: its volume and database come back, the database under
 // another name and owned by another role, the sign-in client and every IMAP
 // credential made new. The profile's post-restore commands run as the

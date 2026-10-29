@@ -6,7 +6,7 @@ const fs = require('fs');
 // The app's part: the one piece of code that knows how this app keeps a
 // session.
 //
-// It comes from the app's catalogue entry and is named, by its sha256, in the
+// It comes from the app's catalog entry and is named, by its sha256, in the
 // sidecar's settings. A file that is not that file is not loaded, and without
 // a handler the sidecar does not start: what runs here holds whatever the app
 // handed the sidecar, so it is the reviewed file or nothing.

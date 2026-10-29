@@ -5,7 +5,7 @@
     render-default-tile.py --list
 
 Every default tile looks the same way on purpose -- one glyph, one frame, one
-colour -- so that it reads as "this app has not brought its own picture" rather
+color -- so that it reads as "this app has not brought its own picture" rather
 than as anybody's logo. An app's own logo is the App Store's to show.
 
 The glyphs are scripts/data/tile-catalogue.json, a copy of gentian-os
@@ -31,7 +31,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-CATALOGUE = Path(__file__).resolve().parent / "data" / "tile-catalogue.json"
+CATALOG = Path(__file__).resolve().parent / "data" / "tile-catalogue.json"
 SVG_PREFIX = "data:image/svg+xml;base64,"
 SIZE = 128
 # The cluster's limit on tile.logo, the data URI included.
@@ -39,12 +39,12 @@ MAX_LOGO = 65536
 
 
 def glyphs() -> dict[str, bytes]:
-    tiles = json.loads(CATALOGUE.read_text(encoding="utf-8"))["tiles"]
+    tiles = json.loads(CATALOG.read_text(encoding="utf-8"))["tiles"]
     out = {}
     for name, tile in tiles.items():
         uri = tile["dataUri"]
         if not uri.startswith(SVG_PREFIX):
-            raise SystemExit(f"{CATALOGUE}: glyph {name!r} is not an SVG data URI")
+            raise SystemExit(f"{CATALOG}: glyph {name!r} is not an SVG data URI")
         out[name] = base64.b64decode(uri[len(SVG_PREFIX) :])
     return out
 

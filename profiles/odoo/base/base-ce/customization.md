@@ -1,6 +1,6 @@
 # Customization ladder — Odoo (family `odoo`)
 
-**Grade: A** · rubric score **8/8** · characterised 2026-08-06
+**Grade: A** · rubric score **8/8** · characterized 2026-08-06
 Applies to `odoo-base-ce` and every `odoo-<module>-ce` module profile, which inherit this declaration.
 
 Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
@@ -40,7 +40,7 @@ Three delivery routes are wired up:
 
 - **`git-sidecar`** — the default. Push to `odoo-modules`; the sidecar syncs it into
   `/opt/odoo/custom-addons` on the interval in `gentian.git.syncInterval`.
-- **`addon-profile`** — when the module is a catalogue *product*. Add a thin profile with
+- **`addon-profile`** — when the module is a catalog *product*. Add a thin profile with
   `deployment-role: addon` and `spec.customization.addon: {id: crm, of: odoo-base-ce}`
   (the `odoo-crm-ce` pattern). It is never installed on its own — the base is installed
   and the addon selected into it. The earlier spelling of this route, `module-profile`
@@ -65,5 +65,5 @@ belong in `patches/` with DEP-3 headers, not in the tree — see `ocb/patches/RE
 - Addon *installation* is a runtime operation, not a Helm one — modules land on disk via the
   sidecar but are activated by the `app-odoo-base-ce` composition Job.
 - `gentian.initModules` (`base,web,gentian_os`) is the bootstrap set; adding to it changes
-  first-boot behaviour for every new tenant.
+  first-boot behavior for every new tenant.
 - Assets are cached aggressively; a branding drop-in usually needs an asset regeneration.

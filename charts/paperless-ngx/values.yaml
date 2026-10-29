@@ -40,7 +40,7 @@ database:
   user: ""
   password: ""
 
-# Dedicated in-pod Redis, NOT the shared kernel Redis. Paperless uses it as
+# Dedicated in-pod Redis (Valkey), NOT the shared kernel Redis. Paperless uses it as
 # Celery's broker and result store and for its websocket channel layer: all of
 # it transient, all of it this one pod's, and upstream ships a broker per
 # install in its own compose file. Bound to 127.0.0.1 inside the pod's network
@@ -49,8 +49,12 @@ database:
 # tasks, and the consumer re-reads the consumption directory on start.
 redis:
   image:
-    repository: docker.io/library/redis
-    tag: "7-alpine"
+    # Valkey, the BSD-licensed fork of Redis 7.2: same protocol and
+    # commands, so the app's redis:// URL is unchanged. Pinned by the digest
+    # of the multi-arch index; the tag is only the readable label.
+    repository: docker.io/valkey/valkey
+    tag: "8.1.11-alpine"
+    digest: "sha256:2602ace2be6569bc2bbb06f873776516ab9089821525be34f4305c67eb9db02a"
     pullPolicy: IfNotPresent
   port: 6379
   # noeviction: Celery's queue lives here, and evicting a key would drop a

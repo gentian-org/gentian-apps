@@ -36,7 +36,7 @@
       with at least one participant." Verified on the running instance:
       `talk:stun:list`, `talk:turn:list` and `talk:signaling:list` are all empty.
 
-      This is not a Nextcloud gap; it is the catalogue-wide one recorded on
+      This is not a Nextcloud gap; it is the catalog-wide one recorded on
       [element-ce/backlog.md](../../element/element-ce/backlog.md), which planned
       coturn as an L2 companion providing a `turn` contract and said to promote
       it from "ceremony" to "build it" the moment a second WebRTC consumer

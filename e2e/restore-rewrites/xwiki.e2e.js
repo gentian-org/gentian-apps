@@ -1,6 +1,6 @@
 'use strict';
 
-// XWiki (the catalogue's own image, with the OIDC authenticator it bundles)
+// XWiki (the catalog's own image, with the OIDC authenticator it bundles)
 // imported into another cluster under another domain. On the old one its
 // pages are installed and two people sign in through the tenant's realm at
 // id.<old kernel domain>. Its volume and database come back, the database

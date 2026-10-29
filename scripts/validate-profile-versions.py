@@ -11,7 +11,7 @@ must differ too.
 
 The numbering is the next-dev model (gentian-os docs/plans/versioning.md): on
 develop a build carries a pre-release suffix, "0.5.1-dev", and the suffix is
-removed when the catalogue is released from main. So on main, or in a pull
+removed when the catalog is released from main. So on main, or in a pull
 request into main, a version with "-dev" is refused, as is a chart pinned at a
 "<version>-develop.<sha7>" build (docs/releasing.md).
 
@@ -39,7 +39,7 @@ SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)
 
 
 def index_of(repo: pathlib.Path, out: pathlib.Path) -> dict[str, dict]:
-    """name -> index entry, as the catalogue build of this commit writes it for repo."""
+    """name -> index entry, as the catalog build of this commit writes it for repo."""
     result = subprocess.run(
         [sys.executable, str(BUILD), "--repo", str(repo), "--out", str(out)],
         capture_output=True,
@@ -47,7 +47,7 @@ def index_of(repo: pathlib.Path, out: pathlib.Path) -> dict[str, dict]:
     )
     if result.returncode != 0:
         print(result.stdout, result.stderr, sep="\n", file=sys.stderr)
-        raise SystemExit(f"the catalogue of {repo} does not build")
+        raise SystemExit(f"the catalog of {repo} does not build")
     entries = (yaml.safe_load((out / "index.yaml").read_text()) or {}).get("entries") or []
     return {e["name"]: e for e in entries}
 

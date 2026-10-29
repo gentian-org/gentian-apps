@@ -1,6 +1,6 @@
 # Customization ladder — Docmost (family `docmost-ce`)
 
-**Grade: D** · rubric score **2/8** · characterised 2026-08-11
+**Grade: D** · rubric score **2/8** · characterized 2026-08-11
 
 Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
 
@@ -128,7 +128,7 @@ So a person sees three spaces: Docmost's own "General", the tenant's, and their 
   feature is not used, switched on or touched: what is made here is an ordinary space of the free
   edition with one member, as the program this replaces made it before Docmost had the feature.
   The result resembles what the paid feature gives. Whether that is acceptable to the vendor is
-  the owner's judgement; taking the per-person space out again is deleting `welcome`'s first half
+  the owner's judgment; taking the per-person space out again is deleting `welcome`'s first half
   in the handler.
 
 ### What it is handed

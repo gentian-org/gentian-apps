@@ -46,7 +46,7 @@ spec:
             # is assembled here from the pieces valueMapping.database delivers.
             # Assumes an alphanumeric generated password (no URL-reserved chars) —
             # consistent with how generated secrets are produced elsewhere in this
-            # catalogue.
+            # catalog.
             - name: DATABASE_URL
               value: >-
                 postgresql://{{ .Values.database.user }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}
@@ -132,11 +132,11 @@ spec:
         # written to disk and the container needs no writable volume beyond
         # --dir /tmp.
         - name: redis
-          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
+          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}{{ with .Values.redis.image.digest }}@{{ . }}{{ end }}"
           imagePullPolicy: {{ .Values.redis.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-          command: ["redis-server"]
+          command: ["valkey-server"]
           args:
             - --bind
             - 127.0.0.1
@@ -154,7 +154,7 @@ spec:
             - "{{ .Values.redis.maxmemoryPolicy }}"
           readinessProbe:
             exec:
-              command: ["redis-cli", "-h", "127.0.0.1", "-p", "{{ .Values.redis.port }}", "ping"]
+              command: ["valkey-cli", "-h", "127.0.0.1", "-p", "{{ .Values.redis.port }}", "ping"]
             initialDelaySeconds: 3
             periodSeconds: 10
             timeoutSeconds: 3

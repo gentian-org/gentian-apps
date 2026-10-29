@@ -1,6 +1,6 @@
 # Customization ladder — Paperless-ngx (family `paperless-ngx-ce`)
 
-**Grade: C** · rubric score **4/8** · characterised 2026-10-21
+**Grade: C** · rubric score **4/8** · characterized 2026-10-21
 
 Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
 

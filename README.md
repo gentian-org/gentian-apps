@@ -1,19 +1,14 @@
 # gentian-apps
 
-App Store catalogue for Gentian OS — `AppProfile` CRs plus first-party app implementations.
+App Store catalog for Gentian OS — `AppProfile` CRs plus first-party app implementations.
 
-**This is the single source of truth for AppProfile catalogue metadata — OSS *and* commercial.**
-Commercial (OpenDesk-packaged) profiles live here too, marked `license: proprietary`; they
-render with a **Buy** button pointing at Aluvian's checkout,
-and the operator gates install on entitlement, not on catalogue visibility. The private
-chart/image artifacts those profiles reference come from
-[gentian-pro](https://github.com/aluvian-hq/gentian-pro), which does **not** sync its own
-catalogue — it's being migrated to hold only those artifacts.
+**This is the single source of truth for the AppProfile catalog metadata of the community
+(`ce`) and maintained (`me`) editions.** Proprietary profiles live in their supplier's catalog.
 
 ## Structure
 
 ```text
-profiles/              # App catalogue bundles (OSS + commercial) — published as the catalogue a cluster installs from
+profiles/              # App catalog bundles (ce + me editions) — published as the catalog a cluster installs from
   odoo/                #   family with addons (L3)
     base/
       base-ce/         #       dir is short; the AppProfile is odoo-base-ce
@@ -30,7 +25,7 @@ profiles/              # App catalogue bundles (OSS + commercial) — published 
   xwiki/               #   true singleton: stays flat
   paperless-ngx/       #   singleton with a companion: paperless-ngx-ce + its MCP server (spec.extensions)
 apps/                  # first-party implementations (FastAPI + React + Helm)
-  _template/           # copy of gentian-app-template
+  _template/           # scaffold for new first-party apps (the one source of truth)
 charts/                # Helm charts published to oci://ghcr.io/gentian-org/charts
   activepieces/        # pinned upstream (adnoctem/helm) + patch series — no copy
   odoo/                # Gentian-authored chart for OCB — backs all 10 odoo profiles
@@ -40,7 +35,7 @@ images/                # Dockerfiles published to ghcr.io
 contracts/             # integration contract schemas
 ```
 
-**Discovery:** catalogue = `profiles/` · implementation = `apps/<name>/` · chart = `charts/<name>/`
+**Discovery:** catalog = `profiles/` · implementation = `apps/<name>/` · chart = `charts/<name>/`
 
 A profile bundle is identified by its **`profile.yaml`**, at any depth. It is published under the
 profile's **`metadata.name`**, not under the directory's — so directories can be short
@@ -57,7 +52,7 @@ else in the directory reaches a cluster. What a bundle may hold and how it is na
 or Gentian-authored — belongs in `charts/<name>/`, and its profile references it by OCI
 coordinates, not by path. Charts and images are **not** nested inside profiles: `charts/odoo`
 backs 10 profiles, and 7 profiles wrap external charts this repo never contains. See
-[docs/app-profile-guide.md](docs/app-profile-guide.md) §0 for why this repo is organised as a
+[docs/app-profile-guide.md](docs/app-profile-guide.md) §0 for why this repo is organized as a
 distribution repo rather than an application monorepo.
 
 ## Branches
@@ -66,13 +61,13 @@ Work lands on **`develop`**; **`main`** is what is released, and a release is a 
 the branch the new architecture was built on, is merged into `develop` and **frozen** — do not
 push to it.
 
-| | Catalogue address | Images | Charts |
+| | Catalog address | Images | Charts |
 |---|---|---|---|
 | `main` | `https://gentian-org.github.io/gentian-apps/` | version, `latest` | `<version>` |
 | `develop` | `https://gentian-org.github.io/gentian-apps/develop/` | `develop-<sha7>` | `<version>-develop.<sha7>` |
 
 A platform release is one tag `vX.Y.Z` on gentian-os, gentian-ui and gentian-apps, marking what
-was tested together. The catalogue may move between platform releases, so a newer catalogue has
+was tested together. The catalog may move between platform releases, so a newer catalog has
 to stay readable by an older platform. The rules: [docs/releasing.md](docs/releasing.md).
 
 ## Licensing
@@ -117,6 +112,4 @@ See [docs/custom-app-guide.md](docs/custom-app-guide.md).
 |------|---------|
 | [gentian-os](https://github.com/gentian-org/gentian-os) | Orchestrator, CRDs, kernel |
 | [gentian-deployments](https://github.com/gentian-org/gentian-deployments) | Per-environment tenant state |
-| [gentian-pro](https://github.com/aluvian-hq/gentian-pro) | Private chart/image artifacts for commercial (OpenDesk) profiles |
-| [gentian-app-template](https://github.com/gentian-org/gentian-app-template) | Scaffold for new apps |
 | [gentian-ui](https://github.com/gentian-org/gentian-ui) | Portal shell |

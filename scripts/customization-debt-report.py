@@ -56,7 +56,7 @@ def load_grades() -> dict[str, str]:
     the former nextcloud-base-od deployed the OpenDesk AIO chart from a credentialed registry,
     nextcloud-base-ce the community chart with a Gentian image. Inheriting by family
     reported the OpenDesk bundle as grade A on the strength of a different artifact,
-    and hid it from the uncharacterised list below — the one place it should appear.
+    and hid it from the uncharacterized list below — the one place it should appear.
     """
     entries = []
     graded: dict[str, str] = {}
@@ -82,7 +82,7 @@ def load_grades() -> dict[str, str]:
 
 
 def declared_deltas() -> list[tuple[str, str, str]]:
-    """Deltas the catalogue admits to carrying, read from the profiles.
+    """Deltas the catalog admits to carrying, read from the profiles.
 
     The report used to count only Customization records, so "0 carried deltas at L4
     or above" meant "nobody wrote a record" — the instrument built to measure the gap
@@ -116,14 +116,14 @@ def declared_deltas() -> list[tuple[str, str, str]]:
         # L6). Inferring an L5 delta from the permission would report debt that does
         # not exist, which is the mirror of the bug this section fixes. §8.3 asks for
         # "patch series length per forked component"; that needs the operator, which
-        # can see the repo, not a catalogue-side script.
+        # can see the repo, not a catalog-side script.
         if (surface.get("fork") or {}).get("allowed"):
             repo = (surface.get("fork") or {}).get("repo", "?")
             found.append((name, "L6", f"fork maintained at {repo}"))
     return found
 
 
-def analyse(records: list[dict], grades: dict[str, str]) -> dict:
+def analyze(records: list[dict], grades: dict[str, str]) -> dict:
     today = dt.date.today()
     matrix = collections.Counter()
     by_rung = collections.Counter()
@@ -156,7 +156,7 @@ def analyse(records: list[dict], grades: dict[str, str]) -> dict:
         if origin.get("repoOwnership") == "external":
             external.append((record["_path"], origin.get("organisation", "?")))
 
-    uncharacterised = sorted(
+    uncharacterized = sorted(
         name for name, grade in grades.items() if grade in {"unknown", None}
     )
 
@@ -179,7 +179,7 @@ def analyse(records: list[dict], grades: dict[str, str]) -> dict:
         "reviewOverdue": overdue,
         "upstreamUnforwarded": unforwarded,
         "externallyOwned": external,
-        "uncharacterisedApps": uncharacterised,
+        "uncharacterizedApps": uncharacterized,
         "unrecordedDeltas": unrecorded,
         "grades": collections.Counter(grades.values()),
     }
@@ -222,7 +222,7 @@ def render_markdown(report: dict) -> str:
         lambda r: f"`{r}`",
     )
     section("Externally owned", report["externallyOwned"], lambda r: f"`{r[0]}` — {r[1]}")
-    section("Uncharacterised apps", report["uncharacterisedApps"], lambda r: f"`{r}`")
+    section("Uncharacterized apps", report["uncharacterizedApps"], lambda r: f"`{r}`")
     section(
         "Declared deltas with no Customization record",
         report["unrecordedDeltas"],
@@ -237,7 +237,7 @@ def main() -> int:
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
     args = parser.parse_args()
 
-    report = analyse(load_records(), load_grades())
+    report = analyze(load_records(), load_grades())
 
     if args.format == "json":
         report["grades"] = dict(report["grades"])

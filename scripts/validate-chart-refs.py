@@ -8,7 +8,7 @@ reference. That is far too late to learn about a typo.
 This catches the failure that motivated the check: renaming a profile to carry
 an edition suffix (xwiki -> xwiki-ce) and letting the substitution run through
 the chart's name as well. The chart is still published as `xwiki`; only the
-catalogue entry moved. A profile references its chart by coordinate, and that
+catalog entry moved. A profile references its chart by coordinate, and that
 coordinate is not derived from the profile's own name.
 
 Read: spec.package.chart and spec.extensions[].chart, each {repository, name,

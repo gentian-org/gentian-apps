@@ -9,8 +9,8 @@ apps must not weaken it.
 
 ## Mandatory requirements (every app)
 
-These are **non-negotiable** for any Gentian first-party app (catalogue or kernel).
-CI and catalogue review should fail if any are missing.
+These are **non-negotiable** for any Gentian first-party app (catalog or kernel).
+CI and catalog review should fail if any are missing.
 
 ### Authentication
 
@@ -56,7 +56,7 @@ Public unauthenticated endpoints are limited to **`/healthz`** and **`/readyz`**
 | M16 | **Gateway API HTTPRoute only** | `chart/templates/httproute.yaml`; no nginx Ingress, no in-pod reverse proxy |
 | M17 | **Split API and static web at the gateway** | `/api`, `/healthz`, `/readyz` → API Service; `/` → web Service |
 
-### Catalogue declaration (catalogue apps only)
+### Catalog declaration (catalog apps only)
 
 Integration **contracts** are how Gentian declares what an app offers and what it
 can use from other apps. This is already in the `AppProfile` CRD — not a separate
@@ -74,7 +74,7 @@ only references contract **names** that match those definitions.
 
 | Layer | What | Who authors | Today |
 |---|---|---|---|
-| **Declaration** | `provides` + `optionalIntegrations` on AppProfile | Catalogue / app developer | **Implemented** (CRD) |
+| **Declaration** | `provides` + `optionalIntegrations` on AppProfile | Catalog / app developer | **Implemented** (CRD) |
 | **Wiring** | `IntegrationBinding` — credentials + OIDC between installed apps | Platform operator (auto when peers match) | **Implemented** |
 | **Grant (ReBAC)** | Future `AppGrant` — tenant-approved subset + OpenFGA tuples | Tenant admin at install | **Planned** (Stage 2 in security architecture) |
 
@@ -164,7 +164,7 @@ in the chart unless platform docs explicitly require an app-specific supplement.
 [ ] M8–M10 Health probes; CORS; no in-app TLS termination
 [ ] M11–M15 Pod hardening; pinned images
 [ ] M16–M17 HTTPRoute; no nginx
-[ ] M18–M20 AppProfile honest declaration (catalogue apps)
+[ ] M18–M20 AppProfile honest declaration (catalog apps)
 [ ] M21+    Conditional items reviewed
 [ ] M27     Resource limits set for production
 ```

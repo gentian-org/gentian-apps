@@ -7,8 +7,8 @@ with an AppProfile only, see [app-profile-guide.md](app-profile-guide.md).
 ## Prerequisites
 
 - A running Gentian OS cluster (see [gentian-os/GETTING-STARTED.md](https://github.com/gentian-org/gentian-os/blob/main/GETTING-STARTED.md))
-- [gentian-app-template](https://github.com/gentian-org/gentian-app-template) cloned locally (e.g. `/develop`)
-- Push access to `gentian-org/gentian-apps`
+- A clone of `gentian-org/gentian-apps` with push access — the scaffold is
+  [`apps/_template`](../apps/_template)
 
 ## Repository layout
 
@@ -17,7 +17,7 @@ First-party app **source** lives in this monorepo:
 ```text
 gentian-apps/
 ├── apps/<app-id>/          # implementation (backend, frontend, chart)
-└── profiles/<app-id>.yaml  # AppProfile catalogue entry
+└── profiles/<app-id>.yaml  # AppProfile catalog entry
 ```
 
 The cluster never mounts Git source. CI builds **pinned container images** and an
@@ -26,8 +26,9 @@ The cluster never mounts Git source. CI builds **pinned container images** and a
 ## Step 1 — Scaffold from template
 
 ```bash
-cp -a /develop gentian-apps/apps/my-app
-cd gentian-apps/apps/my-app
+cd gentian-apps
+cp -a apps/_template apps/my-app
+cd apps/my-app
 ```
 
 Rename identifiers:
@@ -90,7 +91,7 @@ python3 -c "import yaml; yaml.safe_load(open('profiles/my-app.yaml'))"
 
 `.github/workflows/apps-ci.yaml` builds changed apps under `apps/`.
 
-On merge to `main` (from `develop` the same artefacts go out under develop names —
+On merge to `main` (from `develop` the same artifacts go out under develop names —
 [releasing.md](releasing.md)):
 
 1. Docker images → `ghcr.io/gentian-org/<app>-api:<version>`
@@ -114,5 +115,5 @@ kubectl gentian apps install my-app --tenant gtn-demo
 
 ## Related
 
-- [app-profile-guide.md](app-profile-guide.md) — catalogue-only / upstream charts
+- [app-profile-guide.md](app-profile-guide.md) — catalog-only / upstream charts
 - [gentian-os/docs/design/app-catalogue.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/app-catalogue.md)

@@ -34,7 +34,7 @@ spec:
           # empty POSTGRES_* value makes Mathesar silently start the Postgres
           # bundled in the image and write tenant data to container-local
           # storage that vanishes on restart. Without it the pod fails loudly
-          # instead, which is the correct behaviour for a tenant app whose
+          # instead, which is the correct behavior for a tenant app whose
           # database is provisioned by the kernel.
           #   -n  use the system gunicorn, not a venv
           #   -s  run migrations + collectstatic before serving

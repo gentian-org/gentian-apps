@@ -1,6 +1,6 @@
 # Signing out of apps that sign people in themselves
 
-End-to-end runs for the catalogue's apps that have an OIDC client of their own and declare
+End-to-end runs for the catalog's apps that have an OIDC client of their own and declare
 `requires.services.identity.oidc.backchannelLogout`: the app's real image, Keycloak 26.8.0, and
 the client and sign-out address the platform would register from the app's profile.
 

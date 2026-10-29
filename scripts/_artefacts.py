@@ -263,7 +263,7 @@ def image_exists(ref: ImageRef, *, owned: bool = False) -> Answer:
                 return Answer(
                     MISSING,
                     f"{ref.registry} refuses an anonymous pull of {ref.repository}: it does not exist "
-                    f"(this organisation's packages are public)",
+                    f"(this organization's packages are public)",
                 )
             return Answer(UNKNOWN, f"{ref.registry} wants credentials for {ref.repository} (HTTP {status})")
         return Answer(UNKNOWN, f"{ref.registry} answered HTTP {status} for {ref.repository}:{ref.reference}")

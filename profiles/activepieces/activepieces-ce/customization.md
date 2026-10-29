@@ -1,6 +1,6 @@
 # Customization ladder — Activepieces (profile `activepieces-ce`)
 
-**Grade: A** · rubric score **7/8** · characterised 2026-08-06
+**Grade: A** · rubric score **7/8** · characterized 2026-08-06
 
 Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
 
@@ -92,7 +92,7 @@ feature. So the handler writes the person's account and one project of their own
 database, as the handler before it did. It writes no switch, shares no project and gives no role.
 
 Whether one project per person, written this way, is within the community license or is going
-around a paid feature is a judgement this catalogue cannot make for the owner. The rule of this
+around a paid feature is a judgment this catalog cannot make for the owner. The rule of this
 repository is not to bypass licensing; until the question is answered this profile should be
 treated as not cleared for a tenant that has not been told.
 

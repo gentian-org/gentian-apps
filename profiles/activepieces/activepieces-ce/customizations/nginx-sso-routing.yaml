@@ -8,7 +8,7 @@ apiVersion: gentianos.io/v1alpha1
 kind: Customization
 metadata:
   # Named after the profile it travels with. No namespace: a companion in a
-  # profile bundle states none, and the cluster puts it where its catalogue
+  # profile bundle states none, and the cluster puts it where its catalog
   # is applied.
   name: activepieces-ce.nginx-sso-routing
   labels:
