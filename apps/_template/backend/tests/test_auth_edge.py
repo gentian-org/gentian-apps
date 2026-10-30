@@ -17,8 +17,8 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import HTTPException
+from gentian_app_runtime import auth
 
-from app.core import auth
 from app.core.config import Settings
 
 ISSUER = "https://id.example.test/auth/realms/kernel"
@@ -88,7 +88,9 @@ def test_the_sessions_own_token_is_refused(keypair):
     """The session's token is made out to the director. It is what the front
     door exchanges, not what a component is handed, and one that arrives here
     is not this component's."""
-    session = token(keypair, aud=["gentian-director", "gentian-edge-exchange"], azp="gentian-edge-kernel")
+    session = token(
+        keypair, aud=["gentian-director", "gentian-edge-exchange"], azp="gentian-edge-kernel"
+    )
     with pytest.raises(jwt.InvalidAudienceError):
         auth.decode_token(session, settings())
 
@@ -111,12 +113,17 @@ def test_a_token_for_another_audience_is_refused(keypair):
     to this component is this component's; an administration console's is
     not, and is refused here rather than accepted as somebody's session."""
     with pytest.raises(jwt.InvalidAudienceError):
-        auth.decode_token(token(keypair, aud=["realm-management", "account"], azp="security-admin-console"), settings())
+        auth.decode_token(
+            token(keypair, aud=["realm-management", "account"], azp="security-admin-console"),
+            settings(),
+        )
 
 
 def test_a_token_from_another_issuer_is_refused(keypair):
     with pytest.raises(jwt.InvalidIssuerError):
-        auth.decode_token(token(keypair, iss="https://id.example.test/auth/realms/other"), settings())
+        auth.decode_token(
+            token(keypair, iss="https://id.example.test/auth/realms/other"), settings()
+        )
 
 
 def test_an_expired_token_is_refused(keypair):
@@ -160,7 +167,7 @@ def test_under_edge_the_tenant_is_the_platforms_not_the_tokens(keypair):
     """The zone's token carries no tenant claim, and in production the pkce
     rule would refuse it as missing one. Under edge the component is in the
     tenant the platform put it in, and the edge decided entry."""
-    from app.core.tenant import assert_tenant_access
+    from gentian_app_runtime.tenant import assert_tenant_access
 
     s = settings(ENVIRONMENT="production", TENANT_ID="acme")
     claims = auth.decode_token(token(keypair, tenant=None), s)
@@ -170,7 +177,7 @@ def test_under_edge_the_tenant_is_the_platforms_not_the_tokens(keypair):
 
 
 def test_under_pkce_a_mismatched_tenant_claim_is_still_refused():
-    from app.core.tenant import assert_tenant_access
+    from gentian_app_runtime.tenant import assert_tenant_access
 
     s = settings(AUTH_MODE="pkce", TENANT_ID="acme")
     with pytest.raises(HTTPException) as refused:
