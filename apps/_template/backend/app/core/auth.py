@@ -91,7 +91,7 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> dict[str, Any]:
     settings = get_settings()
-    if settings.auth_disabled or not settings.oidc_issuer:
+    if settings.auth_disabled:
         return {"sub": f"admin-{settings.tenant_id}", "tenant": settings.tenant_id}
     if credentials is None or not credentials.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
