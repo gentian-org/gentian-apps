@@ -660,18 +660,19 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "gentian-app-runtime" },
     { name = "gitpython" },
     { name = "httpx" },
     { name = "kubernetes" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
-    { name = "pyjwt", extra = ["crypto"] },
     { name = "sqlmodel" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.optional-dependencies]
 dev = [
+    { name = "pyjwt", extra = ["crypto"] },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -680,16 +681,42 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.14.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "gentian-app-runtime", url = "https://github.com/gentian-org/gentian-ui/releases/download/app-runtime-v0.1.0/gentian_app_runtime-0.1.0-py3-none-any.whl" },
     { name = "gitpython", specifier = ">=3.1.43" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "kubernetes", specifier = ">=31.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0" },
     { name = "pydantic-settings", specifier = ">=2.6.0" },
-    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10.0" },
+    { name = "pyjwt", extras = ["crypto"], marker = "extra == 'dev'", specifier = ">=2.10.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.16,<0.17" },
     { name = "sqlmodel", specifier = ">=0.0.22" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
+]
+provides-extras = ["dev"]
+
+[[package]]
+name = "gentian-app-runtime"
+version = "0.1.0"
+source = { url = "https://github.com/gentian-org/gentian-ui/releases/download/app-runtime-v0.1.0/gentian_app_runtime-0.1.0-py3-none-any.whl" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "pyyaml" },
+]
+wheels = [
+    { url = "https://github.com/gentian-org/gentian-ui/releases/download/app-runtime-v0.1.0/gentian_app_runtime-0.1.0-py3-none-any.whl", hash = "sha256:e11c41c133a0b9ce5c58de15ae46c25ab99b3ba803803a6a691f5843e6241a27" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "httpx", specifier = ">=0.28.0" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.16,<0.17" },
 ]
 provides-extras = ["dev"]
 

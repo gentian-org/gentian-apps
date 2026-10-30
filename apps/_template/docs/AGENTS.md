@@ -33,8 +33,8 @@ and [`customization/README.md`](../customization/README.md).
 | Path | Rung | Purpose |
 |------|------|---------|
 | `chart/values.schema.json` | L0 | makes configuration machine-checkable and discoverable |
-| `backend/app/core/dropins.py` | L1 | reads `/etc/gentian/<app>/conf.d/*.yaml` with documented precedence |
-| `backend/app/extensions/` | L3 | entry-point plugin loader + the versioned public contract |
+| `gentian_app_runtime.dropins` | L1 | reads `/etc/gentian/<app>/conf.d/*.yaml` with documented precedence |
+| `gentian_app_runtime.extensions` | L3 | entry-point plugin loader + the versioned public contract |
 | `frontend/src/extensions/` | L3 | named UI slots plugins can contribute to |
 | `customization/` | all | the app's own ladder, drop-in docs, example plugin, patch discipline |
 

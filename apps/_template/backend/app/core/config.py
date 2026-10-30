@@ -101,6 +101,6 @@ def get_dropin_config() -> dict:
     ``auth_disabled`` or ``cors_origins``. Read feature configuration from here;
     read security configuration from ``get_settings()``.
     """
-    from app.core.dropins import load_dropins
+    from gentian_app_runtime.dropins import load_dropins
 
     return load_dropins()

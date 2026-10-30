@@ -18,7 +18,7 @@ CI and catalog review should fail if any are missing.
 |---|-------------|-----|
 | M1 | **Validate OIDC bearer tokens on every user-facing API route** | `Depends(get_current_user)` on all `/api/v1/*` handlers that return or mutate tenant/user data |
 | M2 | **`AUTH_DISABLED` only in local dev** | Must be `false` in cluster; chart sets it from `auth.disabled: false` |
-| M3 | **Validate JWT issuer, signature, and expiry** | Use `core/auth.py` JWKS path — do not roll custom token parsing |
+| M3 | **Validate JWT issuer, signature, and expiry** | Use `gentian_app_runtime.auth` — do not roll custom token parsing |
 | M4 | **Scope operations to the authenticated tenant** | Read `TENANT_ID` / claims; never trust client-supplied tenant IDs without matching the token |
 
 Public unauthenticated endpoints are limited to **`/healthz`** and **`/readyz`** only.
@@ -126,7 +126,7 @@ Until then, M1–M4 + M26 are the minimum authorization bar.
 
 | Area | Path |
 |------|------|
-| JWT validation (M1–M4) | `backend/app/core/auth.py`, `backend/app/core/tenant.py` |
+| JWT validation (M1–M4) | `gentian_app_runtime.auth`, `gentian_app_runtime.tenant` |
 | Log redaction (M7) | `backend/app/core/logging_middleware.py` |
 | Health probes (M8) | `backend/app/api/routes/health.py` |
 | CORS (M9) | `backend/app/core/config.py`, `chart/values.yaml` |
