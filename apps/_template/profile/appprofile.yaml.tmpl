@@ -41,8 +41,8 @@ spec:
       userKey: "database.user"
       passwordKey: "database.password"
 
-  # Hostname intent — platform renders Gateway API HTTPRoute on the tenant Gateway
-  # (see gentian-os/docs/design/gateway.md). TLS is wildcard per tenant.
+  # Hostname intent — platform renders Gateway API HTTPRoute on the tenant Gateway.
+  # TLS is wildcard per tenant.
   ingress:
     subDomain: app
     servicePort: 8080

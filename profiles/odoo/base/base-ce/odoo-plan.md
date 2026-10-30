@@ -25,8 +25,7 @@ the two systems name it differently. Odoo's own terms are left as Odoo says them
 
 **Companion to:** [architecture.md](../../../../gentian-os/docs/architecture.md),
 [app-catalogue.md](../../../../gentian-os/docs/design/app-catalogue.md),
-[iam.md](../../../../gentian-os/docs/design/iam.md),
-[business-logic-plan.md](../../../../gentian-os/docs/design/business-logic-plan.md)
+[iam.md](../../../../gentian-os/docs/design/iam.md)
 
 This document outlines how to add **Odoo Community** as a Gentian **base app**
 with individually installable Odoo modules as catalog entries, Gentian IdM,
@@ -60,8 +59,7 @@ version line and one install path.
 
 ### Non-goals (this plan)
 
-- Replacing **platform commerce Odoo** (customers, orders, entitlements in
-  [business-logic-plan.md](../../../../gentian-os/docs/design/business-logic-plan.md)) —
+- Replacing **platform commerce Odoo** (customers, orders, entitlements) —
   that remains a **separate** kernel- or corp-scoped instance (see §2).
 - Odoo Enterprise licensing / proprietary modules in `gentian-premium` (can follow
   the same pattern later with `edition: ee` profiles).
@@ -289,7 +287,7 @@ machinery:
    entirely — composition-only.
 
 This matches the catalog security principle: **declarative data in
-gentian-apps**, **generic pipelines in gentian-os** ([app-catalogue-security.md](../../../../gentian-os/docs/design/app-catalogue-security.md) §2.2).
+gentian-apps**, **generic pipelines in gentian-os**.
 
 **Interim:** Odoo and other non-openDesk apps use Client MR with OIDC token claims mapping; openDesk
 apps keep embedded packs until the catalog CR migration lands.
@@ -997,7 +995,6 @@ from the base bundle (cluster-scoped Composition name `app-odoo-base-ce`).
 | AppProfile authoring | [app-profile-guide.md](../../../docs/app-profile-guide.md) |
 | IAM / portal tiles | [iam.md](../../../../gentian-os/docs/design/iam.md), [portal-admin-tile.md](../../../docs/portal-admin-tile.md) |
 | OIDC paths (path A vs pack catalog) | [app-profile-guide.md](../../../docs/app-profile-guide.md) §8 |
-| Commerce Odoo (platform) | [business-logic-plan.md](../../../../gentian-os/docs/design/business-logic-plan.md) |
 | Legacy Odoo deployment | `server/base/odoo/`, `odoo-modules/docs/modules-management.md` |
 | **`gentian_os` addon source** | `odoo-modules/gentian_os/` (to be created) |
 | OX multi-tile reference | [profiles/ox-appsuite/profile.yaml](../../ox-appsuite/profile.yaml) |
