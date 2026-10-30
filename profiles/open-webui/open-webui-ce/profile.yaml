@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.6"
+  version: "0.5.1-dev.7"
   package:
     chart:
       repository: "https://helm.openwebui.com"
@@ -46,6 +46,13 @@ spec:
     valueMapping:
       oidc:
         clientSecretKey: "dummyOidcSecret"
+      # The chart has no values for an outside cache. These keys name nothing in
+      # it; they put the cache's coordinates in the Secret the env below reads.
+      cache:
+        hostKey: gentian.cache.host
+        portKey: gentian.cache.port
+        userKey: gentian.cache.user
+        passwordKey: gentian.cache.password
     # This chart does not use the extraVolumes/extraVolumeMounts convention, so
     # the platform is told where to put a volume it has to mount (the staging CA
     # trust bundle). It used to special-case the app name in app-default.
@@ -85,6 +92,39 @@ spec:
           value: "https://ai-chat.${TENANT_DOMAIN}/oauth/oidc/callback"
         - name: ENABLE_LOGIN_FORM
           value: "false"
+      # The platform's cache, for what a sign-out has to reach: Open WebUI's
+      # session is a signed token of its own, refused again only by a mark kept
+      # here. Without it a back-channel logout leaves the browser's cookie valid
+      # until that expires.
+      #
+      # The cache is shared and its users are not confined to their own keys,
+      # so the prefix is what keeps one tenant's marks from another's.
+        - name: CACHE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: open-webui-ce-sensitive-values
+              key: cache-host
+        - name: CACHE_PORT
+          valueFrom:
+            secretKeyRef:
+              name: open-webui-ce-sensitive-values
+              key: cache-port
+        - name: CACHE_USER
+          valueFrom:
+            secretKeyRef:
+              name: open-webui-ce-sensitive-values
+              key: cache-user
+        - name: CACHE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: open-webui-ce-sensitive-values
+              key: cache-password
+        - name: REDIS_URL
+          value: "redis://$(CACHE_USER):$(CACHE_PASSWORD)@$(CACHE_HOST):$(CACHE_PORT)/0"
+        - name: REDIS_KEY_PREFIX
+          value: "${TENANT_ID}:open-webui"
+        - name: ENABLE_OAUTH_BACKCHANNEL_LOGOUT
+          value: "true"
       # Permits exactly one signup: the first, when the user table is empty.
       #
       # Open WebUI refuses /auths/signup outright once the login form is off,
@@ -238,6 +278,8 @@ spec:
       # and a path to the gateway's port -- that port only, not the gateway's
       # database and cache beside it.
       llm: {}
+      cache:
+        engine: redis
       identity:
         oidc:
           clientId: "gentian-open-webui"
@@ -261,18 +303,10 @@ spec:
         # The realm posts to this path at the Service and port of the entry
         # "web", inside the cluster.
         #
-        # NOT IN EFFECT. Open WebUI 0.10.2 answers this path only with
-        # ENABLE_OAUTH_BACKCHANNEL_LOGOUT=true, which this profile does not
-        # set -- and setting it would not be enough. Open WebUI checks the
-        # logout token properly (signature against the realm's keys, issuer,
-        # audience, the event), but its session is a signed token of its own
-        # that it can only refuse again through Redis: without one it deletes
-        # its OAuth session rows, answers 200, and goes on accepting the
-        # browser's cookie until that expires (utils/oauth.py,
-        # handle_backchannel_logout). This profile runs it without Redis. So
-        # until the profile gives it one (requires.services.cache, and the
-        # app's REDIS_URL) and the switch, a sign-out leaves this app's
-        # session as it is, and the realm's notice is answered with an error.
+        # Open WebUI checks the logout token (signature against the realm's keys,
+        # issuer, audience, the event) and refuses the browser's cookie from then
+        # on through the cache, so this works only with
+        # ENABLE_OAUTH_BACKCHANNEL_LOGOUT and REDIS_URL both set above.
           backchannelLogout:
             exposure: web
             path: /oauth/backchannel-logout
