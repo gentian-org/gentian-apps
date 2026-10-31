@@ -68,7 +68,9 @@ spec:
   # L4, where the repackaged chart is the delivery by definition. "chart" is not
   # in the enum, so the API server rejected this object outright and it was
   # never created: the customization went unrecorded, and with it every debt
-  # signal the operator computes from one.
+  # signal the operator computes from one. See backlog.md, "An L3 Route for SSO
+  # Routing", for what would have to exist upstream before this record could
+  # name a delivery at all.
 
   origin:
     authorship: gentian
