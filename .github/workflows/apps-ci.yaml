@@ -623,6 +623,8 @@ jobs:
         run: python3 scripts/validate-chart-refs.py
       - name: Validate secret references
         run: python3 scripts/validate-secret-refs.py
+      - name: Validate that no Composition writes an app's secrets
+        run: python3 scripts/validate-secret-seeds.py
       # On develop a profile names an image built here by its develop-<sha7>,
       # the only name a develop build publishes; into main it names the
       # version, which the release publishes (docs/releasing.md).
