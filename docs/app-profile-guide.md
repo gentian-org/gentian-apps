@@ -77,8 +77,7 @@ migration to `pkgs/by-name/fi/firefox/` made location encode *nothing but the
 name*. A sidecar chart used by two unrelated apps is therefore just
 `charts/gentian-sidecar-git-modules/` — a chart like any other.
 
-The same principle is why `spec.tier` is a **field**, not a directory level (see
-`docs/backlog.md`), and why `contracts/` stays flat: a contract is cross-app by
+The same principle is why `spec.tier` is a **field**, not a directory level, and why `contracts/` stays flat: a contract is cross-app by
 definition, so nesting it under one family would misstate what it is.
 
 ### Consequence 3 — version packaging, never built artifacts
