@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.17"
+  version: "0.5.1-dev.18"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -303,7 +303,7 @@ spec:
             authtype: LOGIN
             name: gentian-system@${TENANT_DOMAIN}
         configs:
-          gentian-proxy.config.php: "<?php\n// Dynamically override session.save_path to support Redis ACL usernames\n$redis_host = getenv('REDIS_HOST') ?: 'redis-dev-master.gentian-infra-dev.svc.cluster.local';\n$redis_port = getenv('REDIS_HOST_PORT') ?: 6379;\n$redis_pass = getenv('REDIS_HOST_PASSWORD') ?: '';\n$redis_user = '${TENANT_ID}-${APP_ID}';\nif ($redis_host && $redis_pass) {\n    $save_path = \"tcp://$redis_host:$redis_port?auth[user]=$redis_user&auth[pass]=$redis_pass\";\n    ini_set('session.save_path', $save_path);\n}\n\n$CONFIG = array(\n  'overwritehost' => 'nextcloud.${TENANT_DOMAIN}',\n  'overwriteprotocol' => 'https',\n  'overwrite.cli.url' => 'https://nextcloud.${TENANT_DOMAIN}',\n  'trusted_proxies' => array('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'),\n  'allow_local_remote_servers' => true,\n  // NFS doesn't support chmod-by-non-owner even when the process has\n  // group access via fsGroup, and Kyverno's gentian-restrict-capabilities\n  // policy blocks the CAP_CHOWN a root init container would need to fix\n  // real ownership instead. This is Nextcloud's own documented escape\n  // hatch for filesystems that don't support standard Unix owner\n  // semantics (NFS chief among them) -- the actual access control is\n  // still enforced by the PVC (RWO, this pod only) and the tenant\n  // NetworkPolicy, not by this check.\n  'check_data_directory_permissions' => false,\n  'memcache_customprefix' => '${TENANT_ID}:nextcloud:',\n  'redis' => array(\n    'user' => '${TENANT_ID}-${APP_ID}',\n  ),\n);"
+          gentian-proxy.config.php: "<?php\n// Dynamically override session.save_path to support Redis ACL usernames\n$redis_host = getenv('REDIS_HOST') ?: 'redis-dev-master.gentian-infra-dev.svc.cluster.local';\n$redis_port = getenv('REDIS_HOST_PORT') ?: 6379;\n$redis_pass = getenv('REDIS_HOST_PASSWORD') ?: '';\n$redis_user = '${TENANT_ID}-${APP_ID}';\nif ($redis_host && $redis_pass) {\n    $redis_prefix = '${TENANT_ID}:${APP_ID}:session:';\n    $save_path = \"tcp://$redis_host:$redis_port?auth[user]=$redis_user&auth[pass]=$redis_pass&prefix=$redis_prefix\";\n    ini_set('session.save_path', $save_path);\n}\n\n$CONFIG = array(\n  'overwritehost' => 'nextcloud.${TENANT_DOMAIN}',\n  'overwriteprotocol' => 'https',\n  'overwrite.cli.url' => 'https://nextcloud.${TENANT_DOMAIN}',\n  'trusted_proxies' => array('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'),\n  'allow_local_remote_servers' => true,\n  // NFS doesn't support chmod-by-non-owner even when the process has\n  // group access via fsGroup, and Kyverno's gentian-restrict-capabilities\n  // policy blocks the CAP_CHOWN a root init container would need to fix\n  // real ownership instead. This is Nextcloud's own documented escape\n  // hatch for filesystems that don't support standard Unix owner\n  // semantics (NFS chief among them) -- the actual access control is\n  // still enforced by the PVC (RWO, this pod only) and the tenant\n  // NetworkPolicy, not by this check.\n  'check_data_directory_permissions' => false,\n  'memcache_customprefix' => '${TENANT_ID}:${APP_ID}:',\n  'redis' => array(\n    'user' => '${TENANT_ID}-${APP_ID}',\n  ),\n);"
         extraVolumes:
           - name: gentian-sensitive
             secret:

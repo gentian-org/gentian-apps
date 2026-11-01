@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.7"
+  version: "0.5.1-dev.8"
   package:
     chart:
       repository: "https://helm.openwebui.com"
@@ -121,8 +121,10 @@ spec:
               key: cache-password
         - name: REDIS_URL
           value: "redis://$(CACHE_USER):$(CACHE_PASSWORD)@$(CACHE_HOST):$(CACHE_PORT)/0"
+        # The prefix the platform's cache user is limited to; the socket
+        # channel is this text with nothing after it.
         - name: REDIS_KEY_PREFIX
-          value: "${TENANT_ID}:open-webui"
+          value: "${TENANT_ID}:${APP_ID}"
         - name: ENABLE_OAUTH_BACKCHANNEL_LOGOUT
           value: "true"
       # Permits exactly one signup: the first, when the user table is empty.
