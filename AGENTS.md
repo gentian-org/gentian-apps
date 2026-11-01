@@ -27,7 +27,7 @@ Helm — same stack as [`apps/_template`](apps/_template) /
 * **Never commit secrets.** Kernel-injected values (`DATABASE_URL`, `OIDC_ISSUER`,
   `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, etc.) arrive via ExternalSecret at runtime — never
   hardcode or commit them.
-* **Respect third-party license terms** for patched/vendored charts (`charts/activepieces/`) and upstream app
+* **Respect third-party license terms** for patched or vendored charts and upstream app
   images (Nextcloud, XWiki, Odoo, OpenProject, ...) — check upstream licensing before modifying
   or repackaging.
 

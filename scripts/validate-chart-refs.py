@@ -44,25 +44,13 @@ OWN_REGISTRY = "oci://ghcr.io/gentian-org/charts"
 
 
 def charts_this_repo_builds() -> dict[str, tuple[str, pathlib.Path]]:
-    """Chart name -> (version it is released under, path), for every chart built here.
-
-    Two layouts count. A vendored or Gentian-authored chart carries its own
-    Chart.yaml. A patched upstream chart (charts/activepieces) has none — it is
-    an UPSTREAM pin plus a patch series, fetched and patched at build time —
-    and is released as CHART_VERSION under the directory name.
-    """
+    """Chart name -> (version it is released under, path), for every chart built here."""
     found: dict[str, tuple[str, pathlib.Path]] = {}
     for pattern in ("charts/*/Chart.yaml", "images/*/chart/Chart.yaml", "apps/*/chart/Chart.yaml"):
         for path in REPO.glob(pattern):
             data = yaml.safe_load(path.read_text()) or {}
             if data.get("name"):
                 found[data["name"]] = (str(data.get("version", "")), path)
-    for upstream in REPO.glob("charts/*/UPSTREAM"):
-        version = ""
-        for line in upstream.read_text().splitlines():
-            if line.strip().startswith("CHART_VERSION="):
-                version = line.split("=", 1)[1].strip().strip("\"'")
-        found.setdefault(upstream.parent.name, (version, upstream))
     return found
 
 

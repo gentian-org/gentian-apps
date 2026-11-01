@@ -208,17 +208,14 @@ reaches nothing but what was declared.
 - touch a license check or a switch of a paid feature in the app.
 
 The handlers in this catalog are the reference:
-`profiles/docmost/docmost-ce/assets/sign-in-handler.js` and
-`profiles/activepieces/activepieces-ce/assets/sign-in-handler.js`, which sign a session token
-with the app's own key, and `profiles/openproject/openproject-ce/assets/sign-in-handler.js`, for
+`profiles/docmost/docmost-ce/assets/sign-in-handler.js`, which signs a session token with the
+app's own key, and `profiles/openproject/openproject-ce/assets/sign-in-handler.js`, for
 an app that keeps its sessions in its database: it signs nothing, and has the app make the
 session itself from a token that works once. Each settles who administers its app; what an
 administrator is in each app is in the profile's `customization.md`.
 
 Docmost's and OpenProject's end a person's sessions in `onLogout`: each app looks a session up
-in its database on every request, so deleting the rows ends it. Activepieces' has no `onLogout`:
-at 0.28.0 its token is checked by signature and end alone, against nothing a handler could
-change, so its session lasts its hour.
+in its database on every request, so deleting the rows ends it.
 
 ## Tests
 
@@ -228,13 +225,11 @@ npm ci && npm test                 # the checks above, against responses signed 
 docker build -t sso-sidecar:e2e .  # then, with docker, against the real things:
 node --test e2e/sidecar.e2e.js       # Keycloak 26.8.0, at the three kinds of address an app has; sign-in and sign-out
 node --test e2e/docmost.e2e.js       # + Docmost 0.95.0, with the profile's handler and its post-install job
-node --test e2e/activepieces.e2e.js  # + Activepieces 0.28.0, started as the chart starts it
 node --test e2e/openproject.e2e.js   # + OpenProject 16.6.10, started as its chart starts it with the profile's values
 ```
 
 Each app's run signs a person out at Keycloak and shows what became of the app's session: ended
-for that person and for nobody else in Docmost and OpenProject, still good until its hour in
-Activepieces; and that a sign-out request the realm did not send, or sent before, ends nothing.
+for that person and for nobody else; and that a sign-out request the realm did not send, or sent before, ends nothing.
 
 The end-to-end runs start their own containers and remove them. `E2E_NETWORK` names the docker
 network and prefixes Keycloak's container, for two runs on one machine. The browser and the front door
