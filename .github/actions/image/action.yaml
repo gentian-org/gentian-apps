@@ -80,7 +80,7 @@ runs:
       uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
       with:
         # An SBOM and a SLSA provenance attestation travel with the image
-        # (certification plan C5).
+        # (controls K3 and K5, gentian-os docs/security/controls.md).
         sbom: true
         provenance: mode=max
         context: ${{ inputs.dir }}
@@ -90,7 +90,7 @@ runs:
         push: ${{ inputs.publish == 'true' }}
 
     # The published image, signed with the calling workflow's identity and
-    # scanned (certification plan C5). Only where the build pushed. One
+    # scanned (controls K3 and K5, gentian-os docs/security/controls.md). Only where the build pushed. One
     # signature per repository name the digest went out under. The scan is
     # advisory until the backlog it finds is triaged; dropping
     # continue-on-error makes it block.
@@ -113,7 +113,7 @@ runs:
     # --new-bundle-format=false: cosign 3 stores a signature as a Sigstore bundle
     # behind the OCI referrers API by default; the cluster's Kyverno 1.13 verifies
     # the legacy form, a sha256-<digest>.sig tag, with its default verifier. The
-    # bundle form returns with the Kyverno upgrade (certification plan C5).
+    # bundle form returns with the Kyverno upgrade (controls K3 and K5, gentian-os docs/security/controls.md).
     # --use-signing-config=false goes with it: the TUF signing config is only
     # for the bundle form, and cosign refuses the legacy form while it is on.
     - name: Sign

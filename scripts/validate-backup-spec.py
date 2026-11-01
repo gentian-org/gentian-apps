@@ -13,7 +13,7 @@ about it.
 The checks below are therefore the ones whose failure mode is silent data loss
 or an app left paused, not stylistic preferences.
 
-See gentian-os/docs/plans/backup-plan.md §5 for the contract.
+See gentian-os/docs/concepts/operations.md §9 for the contract.
 """
 
 from __future__ import annotations

@@ -9,7 +9,7 @@ AppProfile implementations. Read it before writing a new profile — every secti
 corresponds to a class of bug that was caught in git history.
 
 **Before extending an already-installed app**, use the
-[customization ladder](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md)
+[customization ladder](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md)
 and [docs/customization-ladder.md](customization-ladder.md) instead of this guide —
 they give the decision procedure (which rung, which repo) and the per-app declaration
 (`spec.customization`) that make `extraValues` vs `dropins/` vs `composition.yaml`
@@ -269,7 +269,7 @@ annotation. It is never installed on its own: the base is installed and the addo
 selected into it, arriving in `Tenant.spec.apps[].addons`. The retired
 `gentianos.io/requires-profile` annotation, which auto-installed a base when an addon
 was installed as if it were an app, no longer exists — see
-[app-customization.md](../../gentian-os/docs/app-customization.md) §4.2.
+[app-customization.md](../../gentian-os/docs/guides/app-customization.md) §4.2.
 
 App-specific install parameters (e.g. Odoo module technical name) belong in
 `spec.extraValues` and the profile-scoped composition — not in gentian-os CRDs.
@@ -598,7 +598,7 @@ must instead trust the staging CA. When `tenantDNS01ClusterIssuer` contains `sta
 compositions mount `gentian-trust-anchor-tls` and (for Synapse) set
 `use_insecure_ssl_client_just_for_testing_do_not_use` plus explicit OIDC
 endpoints with `discover: false` and `user_profile_method: userinfo_endpoint` in
-`additionalConfiguration.oidc_providers` (see `gentian-os/docs/design/security.md`
+`additionalConfiguration.oidc_providers` (see `gentian-os/docs/security/design.md`
 §9). `install.sh` and the gentian-os operator bootstrap `gentian-trust-anchor-tls`
 in `gentian-dev` and replicate it into each `tenant-*` namespace; run
 `./update.sh --acme-issuers` to refresh the bundle after issuer or kernel cert
@@ -669,7 +669,7 @@ gentian-os controller to create:
 All app routes for that tenant reference the same TLS secret on the tenant Gateway.
 **Do not** set per-app HTTP-01 issuers in profiles — `spec.ingress.clusterIssuer`
 is reserved for a possible future mode and is **ignored** by the operator today.
-See [gentian-os/docs/architecture.md](../gentian-os/docs/architecture.md) §6.1.
+See [gentian-os/docs/overview/architecture.md](../gentian-os/docs/overview/architecture.md) §6.1.
 
 **Narrow exception:** an older gentian-os CRD schema defaulted this field
 server-side (removed; see gentian-os commit `5484346`), which permanently
@@ -886,7 +886,7 @@ userinfo and JWKS calls use the in-cluster Keycloak URL (`KEYCLOAK_INTERNAL_URL`
 never the public host from inside the cluster.
 
 **Known pitfalls** (operator/IAM territory, not AppProfile YAML — diagnose via
-`gentian-os/docs/design/iam.md` before touching a profile):
+`gentian-os/docs/concepts/iam.md` before touching a profile):
 
 | Symptom | Likely cause |
 |---|---|
@@ -1479,7 +1479,7 @@ define the client; **mapper wiring is operator/IAM**, not `extraValues`.
 **Operator-owned (do not hand-craft in AppProfiles):** tenant-realm browser flow
 (auto-redirect to kernel IdP), first-broker-login auto-link by email, IdP HTTPRoute
 `frame-ancestors` for installed OIDC apps, portal/app HTTPRoute CSP, staging CA /
-JVM truststore for Java charts on ACME staging. See `gentian-os/docs/design/iam.md`.
+JVM truststore for Java charts on ACME staging. See `gentian-os/docs/concepts/iam.md`.
 
 **Custom (non-openDesk) apps:** use generic `kernelRequirements.identity.oidc` and
 LDAP placeholders only — do not reuse openDesk-only mechanisms (`keycloak-bridge-auth`,
@@ -1581,7 +1581,7 @@ generatorOptions:
 The profile states no address, no client and no Secret: the platform derives all of them from
 where the app answers and what the app owns. What the platform does for the declaration, and the
 rule that a handler runs only from a bundle of a cluster-wide catalog that the install is pinned
-to, are in gentian-os, `docs/app-customization.md` ("The sign-in sidecar").
+to, are in gentian-os, `docs/guides/app-customization.md` ("The sign-in sidecar").
 
 What a handler is given, what it answers and what it must not do:
 [`images/gentian-sidecar-sso-saml/README.md`](../images/gentian-sidecar-sso-saml/README.md). The
@@ -1964,5 +1964,5 @@ able to weaken a tenant's retention or encryption from the catalog.
 
 Validated by `scripts/validate-backup-spec.py` in CI. The full design, including
 the bundle format and the restore sequence, is in
-`gentian-os/docs/plans/backup-plan.md` §5.
+`gentian-os/docs/concepts/operations.md` §9.
 

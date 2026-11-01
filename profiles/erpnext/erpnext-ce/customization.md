@@ -2,7 +2,7 @@
 
 **Grade: B** · rubric score **5/8** · characterized 2026-10-19
 
-Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
+Framework: [gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md).
 
 ## Rubric
 

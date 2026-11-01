@@ -116,4 +116,4 @@ kubectl gentian apps install my-app --tenant gtn-demo
 ## Related
 
 - [app-profile-guide.md](app-profile-guide.md) — catalog-only / upstream charts
-- [gentian-os/docs/design/app-catalogue.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/app-catalogue.md)
+- [gentian-os/docs/concepts/app-catalog.md](https://github.com/gentian-org/gentian-os/blob/main/docs/concepts/app-catalog.md)

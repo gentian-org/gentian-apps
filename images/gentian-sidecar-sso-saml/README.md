@@ -6,8 +6,8 @@ signed in at the platform opens the app and is in: no second sign-in, no passwor
 This directory is the one copy of it. The platform runs the image built here beside every app
 whose profile declares `requires.services.identity.sidecar`; nothing else deploys it, and it has
 no chart. The platform's side — the declaration, what is composed for it and how its two paths
-are routed — is in gentian-os: `docs/app-customization.md` ("The sign-in sidecar") and
-`docs/design/security.md`.
+are routed — is in gentian-os: `docs/guides/app-customization.md` ("The sign-in sidecar") and
+`docs/security/design.md`.
 
 ## What it does
 

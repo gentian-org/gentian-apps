@@ -46,7 +46,7 @@ request into `main`, or `main`) only `IMAGE_TAG` is accepted. The end-to-end run
 the tree builds, whatever the profile names.
 
 **A profile's version moves with its bundle, and a release carries no development number.** This
-is the next-dev model (gentian-os `docs/plans/versioning.md` §1.1): on `develop` a build's
+is the next-dev model (gentian-os `docs/guides/deployment.md` §5.5): on `develop` a build's
 `spec.version` carries a `-dev` suffix, `0.5.1-dev`, and is bumped whenever the published bundle
 changes; the release from `main` sets the bare number. CI holds both:
 `scripts/validate-profile-versions.py` compares the bundles with the base branch, and on `main`

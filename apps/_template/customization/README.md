@@ -5,7 +5,7 @@ you can change its behavior **without patching or forking it**.
 
 The rungs below come from the Gentian customization ladder — the full framework, the
 decision procedure, and the record format live in
-[gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
+[gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md).
 
 > **Pick the lowest rung that can express your change.** The cost of a customization is
 > not writing it — it is writing it again at every release.

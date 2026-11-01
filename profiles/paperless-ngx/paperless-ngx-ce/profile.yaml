@@ -43,7 +43,7 @@
 # with, so without the workflow the agent would see nothing a person
 # uploaded. Nothing outside the namespace reaches the companion, and the
 # platform wires no authentication for MCP yet (gentian-os
-# docs/design/agentic-ai.md §3).
+# docs/concepts/agentic-ai.md §3).
 #
 # ── Paperless' own AI features ──────────────────────────────────────────────
 # Off. Paperless 3 can ask a model for title, tag and correspondent
@@ -83,7 +83,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.7"
+  version: "0.5.1-dev.8"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -191,7 +191,7 @@ spec:
       # person sets up in Paperless with a mailbox of their own.
       mail:
         smtp: {}
-      # A declaration only (gentian-os docs/design/agentic-ai.md §3): the
+      # A declaration only (gentian-os docs/concepts/agentic-ai.md §3): the
       # platform registers nothing and wires no authentication. The server
       # is not on the app's own Service but on the companion's,
       # paperless-ngx-mcp:8765, inside the namespace; auth "none" says what

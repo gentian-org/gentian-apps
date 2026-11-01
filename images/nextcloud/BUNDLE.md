@@ -73,4 +73,4 @@ Dockerfile.
 ```
 
 For the base/addon/package model this image serves, see
-gentian-os/docs/app-customization.md §4.2.
+gentian-os/docs/guides/app-customization.md §4.2.
