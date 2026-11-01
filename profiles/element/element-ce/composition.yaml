@@ -197,62 +197,6 @@ spec:
             {{- end }}
             {{- end }}
 
-            {{- /* ── Emit OpenBao KV seeders for app-internal secrets ────────── */}}
-            {{- range $s := $appSecrets }}
-            {{- if and $s.name $s.valuePath }}
-            {{- $safeName := $s.name | replace "_" "-" }}
-            {{- $seedName := printf "%s-%s-seed" $xrName $safeName }}
-            {{- $kvPath   := printf "gentian-os/tenants/%s/apps/%s/internal/%s" $tenant $app $s.name }}
-            {{- $seedVal  := sha256sum (printf "%s:%s:%s" $xrName $app $s.name) }}
-            ---
-            apiVersion: kubernetes.crossplane.io/v1alpha2
-            kind: Object
-            metadata:
-              annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $safeName }}-seed-secret
-              name: {{ $seedName }}
-            spec:
-              forProvider:
-                manifest:
-                  apiVersion: v1
-                  kind: Secret
-                  metadata:
-                    name: {{ $seedName }}
-                    namespace: {{ $provNs }}
-                  type: Opaque
-                  stringData:
-                    data.json: '{"value":"{{ $seedVal }}"}'
-              providerConfigRef:
-                name: kubernetes
-            ---
-            apiVersion: kv.vault.upbound.io/v1alpha1
-            kind: SecretV2
-            metadata:
-              annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $safeName }}-kv
-                # Identify this resource by its KV path, not by the install that
-                # created it: without an external-name the provider sees no
-                # existing resource and Creates, overwriting a secret the app's
-                # database is still hashed against. Mirrors app-default.
-                crossplane.io/external-name: secret/data/{{ $kvPath }}
-              name: {{ $seedName }}-kv
-            spec:
-              deletionPolicy: Orphan
-              managementPolicies:
-                - Observe
-                - Create
-              forProvider:
-                mount: secret
-                name: {{ $kvPath }}
-                dataJsonSecretRef:
-                  name: {{ $seedName }}
-                  namespace: {{ $provNs }}
-                  key: data.json
-              providerConfigRef:
-                name: openbao
-            {{- end }}
-            {{- end }}
-
             {{- /* ── Set up Helm Release / Deployment values mapping ── */}}
             {{- $extraVals    := default dict $spec.parameters.extraValues }}
             {{- $imagePull    := list (dict "name" "registry-credentials") }}
