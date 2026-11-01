@@ -125,7 +125,7 @@ podSecurity:
   runAsUser: 65532
   fsGroup: 65532
 
-# Customization ladder rung L1 (see docs/app-customization.md and
+# Customization ladder rung L1 (see docs/guides/app-customization.md and
 # customization/dropins/README.md). Off by default so a fresh scaffold has no
 # extra volumes until the app actually declares a drop-in directory.
 dropIns:

@@ -27,7 +27,7 @@ Conventions for AI coding agents and humans extending Gentian first-party UI
 This template ships a customization surface so apps built from it reach **grade A** on the
 Gentian customization ladder: consumers can configure (L0), drop in config (L1), build
 companions against the OpenAPI surface (L2), and load plugins (L3) — without ever needing to
-patch or fork. See [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md)
+patch or fork. See [gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md)
 and [`customization/README.md`](../customization/README.md).
 
 | Path | Rung | Purpose |

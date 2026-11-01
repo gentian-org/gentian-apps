@@ -33,7 +33,7 @@ profile.yaml, as it always was.
 What goes in is what the bundle's ``kustomization.yaml`` lists: its
 ``resources`` (one document a file) and its ``configMapGenerator``. What may go
 in is decided on the cluster, which refuses a bundle holding anything else
-(docs/profile-bundles.md here; gentian-os docs/custom-catalogues.md): a short
+(docs/profile-bundles.md here; gentian-os docs/guides/custom-catalogs.md): a short
 list of kinds, each named after the profile so that no two bundles can claim
 one object. This script holds every bundle to the same rules, so that what is
 refused there is refused here first.

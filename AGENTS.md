@@ -35,7 +35,7 @@ Helm — same stack as [`apps/_template`](apps/_template) /
 
 **Before adding a feature to an app that already exists, run this procedure.** Do not start
 from "which file do I edit" — start from "what is the cheapest rung that can express this".
-Full framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md);
+Full framework: [gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md);
 local operations: [docs/customization-ladder.md](docs/customization-ladder.md).
 
 1. **Restate** the request as a capability ("users must approve invoices > 10k"), not an

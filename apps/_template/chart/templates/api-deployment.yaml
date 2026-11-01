@@ -147,7 +147,7 @@ spec:
           projected into the same directory, lowest precedence first. Filenames
           carry precedence (00-49 platform, 50-89 profile, 90-99 tenant), so any
           number of layers can coexist without the chart knowing which is which —
-          see docs/app-customization.md §2.2.
+          see docs/guides/app-customization.md §2.2.
         */}}
         {{- if and .Values.dropIns .Values.dropIns.enabled }}
         - name: dropins

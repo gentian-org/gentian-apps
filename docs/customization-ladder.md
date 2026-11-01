@@ -1,7 +1,7 @@
 # Customization Ladder — catalog operations
 
 The framework, the rung definitions, and the decision procedure live in
-**[gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md)**.
+**[gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md)**.
 Read that first. This page is the `gentian-apps` operational half: where files go, what CI
 checks, and how to characterize a new catalog entry.
 
@@ -89,6 +89,6 @@ python3 scripts/customization-debt-report.py --format markdown
 
 ## Related
 
-- [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md) — the framework
+- [gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md) — the framework
 - [app-profile-guide.md](app-profile-guide.md) — authoring profiles for upstream charts
 - [custom-app-guide.md](custom-app-guide.md) — building a first-party app (the L2 path)

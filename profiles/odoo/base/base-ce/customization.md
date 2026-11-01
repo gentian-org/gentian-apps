@@ -3,7 +3,7 @@
 **Grade: A** · rubric score **8/8** · characterized 2026-08-06
 Applies to `odoo-base-ce` and every `odoo-<module>-ce` module profile, which inherit this declaration.
 
-Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
+Framework: [gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md).
 
 ## Rubric
 
@@ -45,7 +45,7 @@ Three delivery routes are wired up:
   (the `odoo-crm-ce` pattern). It is never installed on its own — the base is installed
   and the addon selected into it. The earlier spelling of this route, `module-profile`
   with a `requires-profile` annotation, is retired; see
-  [app-customization.md](../../../../gentian-os/docs/app-customization.md) §4.2.
+  [app-customization.md](../../../../gentian-os/docs/guides/app-customization.md) §4.2.
 - **`image-layer`** — for airgapped or reproducibility-critical installs.
 
 Per-tenant module sets are permitted **because Odoo runs one instance per tenant namespace**

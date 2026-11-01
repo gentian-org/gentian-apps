@@ -8,7 +8,7 @@
 > base when an addon is installed. That mechanism is **retired**: an addon now
 > declares `spec.customization.addon` (`id` + `of`), is never installed on its own,
 > and is selected into an already-installed base, arriving in
-> `Tenant.spec.apps[].addons`. See [app-customization.md](../../../../gentian-os/docs/app-customization.md) §4.2.
+> `Tenant.spec.apps[].addons`. See [app-customization.md](../../../../gentian-os/docs/guides/app-customization.md) §4.2.
 >
 > The rest — the three-tier permission model, the IdM mapping, and the integration
 > contracts — still describes the intent. Read the annotation and auto-install
@@ -23,9 +23,9 @@ database is an Odoo **module**, and Odoo also says *addon* for code on its
 one Gentian addon, one Odoo module, two names for the same installation because
 the two systems name it differently. Odoo's own terms are left as Odoo says them.
 
-**Companion to:** [architecture.md](../../../../gentian-os/docs/architecture.md),
-[app-catalogue.md](../../../../gentian-os/docs/design/app-catalogue.md),
-[iam.md](../../../../gentian-os/docs/design/iam.md)
+**Companion to:** [architecture.md](../../../../gentian-os/docs/overview/architecture.md),
+[app-catalogue.md](../../../../gentian-os/docs/concepts/app-catalog.md),
+[iam.md](../../../../gentian-os/docs/concepts/iam.md)
 
 This document outlines how to add **Odoo Community** as a Gentian **base app**
 with individually installable Odoo modules as catalog entries, Gentian IdM,
@@ -208,7 +208,7 @@ Follow the **standard Gentian AppProfile IdM pattern**
 
 ### 4.1 Admin vs user visibility (IAM)
 
-Align with [iam.md](../../../../gentian-os/docs/design/iam.md) and
+Align with [iam.md](../../../../gentian-os/docs/concepts/iam.md) and
 [portal-admin-tile.md](../../../docs/portal-admin-tile.md):
 
 | Surface | Portal tile | Who sees it |
@@ -873,10 +873,10 @@ provides:
 | `contacts-store` | Odoo consumes CardDAV hub | `gentian_os_contacts` — sync `res.partner` (§5.5) |
 | `central-navigation` | Portal consumes Odoo menus | Portal navigation tiles first; optional later |
 | `erp-ledger` (new) | Odoo provides | Future `gentian_os` provider |
-| MCP / AI | Odoo provides | `browserProxy` + MCP in `gentian_os` (see [agentic-ai.md](../../../../gentian-os/docs/design/agentic-ai.md)) |
+| MCP / AI | Odoo provides | `browserProxy` + MCP in `gentian_os` (see [agentic-ai.md](../../../../gentian-os/docs/concepts/agentic-ai.md)) |
 
 Bindings are **operator-reconciled** when provider and consumer appear in
-`Tenant.spec.apps` ([app-catalogue.md](../../../../gentian-os/docs/design/app-catalogue.md) §4).
+`Tenant.spec.apps` ([app-catalogue.md](../../../../gentian-os/docs/concepts/app-catalog.md) §4).
 The operator writes OpenBao paths; ESO syncs a Secret mounted into the Odoo pod;
 **`gentian_os`** reads credentials — secrets never appear in AppProfile YAML.
 
@@ -953,7 +953,7 @@ from the base bundle (cluster-scoped Composition name `app-odoo-base-ce`).
 
 - [ ] Admission: block base uninstall with dependents
 - [ ] `catalogue-tier: platform` on base; CI render tests for each addon profile
-- [ ] Backup/restore note in [operations.md](../../../../gentian-os/docs/design/operations.md) (Postgres + filestore PVC)
+- [ ] Backup/restore note in [operations.md](../../../../gentian-os/docs/concepts/operations.md) (Postgres + filestore PVC)
 - [ ] Uninstall/purge semantics via `gtnctl apps uninstall --purge`
 
 ---
@@ -991,9 +991,9 @@ from the base bundle (cluster-scoped Composition name `app-odoo-base-ce`).
 
 | Topic | Document |
 |---|---|
-| Platform architecture | [architecture.md](../../../../gentian-os/docs/architecture.md) |
+| Platform architecture | [architecture.md](../../../../gentian-os/docs/overview/architecture.md) |
 | AppProfile authoring | [app-profile-guide.md](../../../docs/app-profile-guide.md) |
-| IAM / portal tiles | [iam.md](../../../../gentian-os/docs/design/iam.md), [portal-admin-tile.md](../../../docs/portal-admin-tile.md) |
+| IAM / portal tiles | [iam.md](../../../../gentian-os/docs/concepts/iam.md), [portal-admin-tile.md](../../../docs/portal-admin-tile.md) |
 | OIDC paths (path A vs pack catalog) | [app-profile-guide.md](../../../docs/app-profile-guide.md) §8 |
 | Legacy Odoo deployment | `server/base/odoo/`, `odoo-modules/docs/modules-management.md` |
 | **`gentian_os` addon source** | `odoo-modules/gentian_os/` (to be created) |

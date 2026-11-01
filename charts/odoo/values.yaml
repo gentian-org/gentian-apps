@@ -130,7 +130,7 @@ resources:
     memory: "4Gi"
 
 # Customization ladder rung L1 (see gentian-apps/profiles/odoo/base/odoo-base-ce/customization.md
-# and gentian-os/docs/app-customization.md §2.2). Off by default so a plain install
+# and gentian-os/docs/guides/app-customization.md §2.2). Off by default so a plain install
 # has no extra init container or volumes.
 #
 # odoo.conf has no native conf.d support — fragments are merged into the rendered

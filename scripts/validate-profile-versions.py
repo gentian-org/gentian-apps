@@ -9,7 +9,7 @@ app said 1.0.0 for a year -- so this holds the two together: when the
 published bundle of a profile differs from the base branch's, spec.version
 must differ too.
 
-The numbering is the next-dev model (gentian-os docs/plans/versioning.md): on
+The numbering is the next-dev model (gentian-os docs/guides/deployment.md §5.5): on
 develop a build carries a pre-release suffix, "0.5.1-dev", and the suffix is
 removed when the catalog is released from main. So on main, or in a pull
 request into main, a version with "-dev" is refused, as is a chart pinned at a

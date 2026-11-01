@@ -507,7 +507,7 @@ jobs:
   # Known vulnerabilities in the Python the images install: the template
   # backend's lockfile and the Nextcloud MCP sidecar's requirements. The
   # lockfile check is strict; the audit is advisory until the backlog is
-  # triaged (certification plan C2).
+  # triaged (control K4, gentian-os docs/security/controls.md).
   audit-python:
     needs: [scope]
     if: needs.scope.outputs.relevant == 'true'
@@ -588,7 +588,7 @@ jobs:
         run: python3 scripts/build-catalogue-source.py --check
 
       # A profile's version moves with its bundle, and a release carries no
-      # development number (gentian-os docs/plans/versioning.md). Compared
+      # development number (gentian-os docs/guides/deployment.md §5.5). Compared
       # with the base of the pull request, or with the commit before the push.
       - name: Validate profile versions
         env:
@@ -780,7 +780,7 @@ jobs:
       - run: npm ci
       - run: npm test
       # Known vulnerabilities in the production dependencies. Advisory until
-      # the backlog is triaged (certification plan C2).
+      # the backlog is triaged (control K4, gentian-os docs/security/controls.md).
       - name: Dependency audit
         continue-on-error: true
         run: npm audit --omit=dev --audit-level=high

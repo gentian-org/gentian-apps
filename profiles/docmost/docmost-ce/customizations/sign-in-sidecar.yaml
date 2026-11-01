@@ -1,4 +1,4 @@
-# Customization record — see gentian-os/docs/app-customization.md §5
+# Customization record — see gentian-os/docs/guides/app-customization.md §5
 #
 # Covers the sign-in handler (assets/sign-in-handler.js): the code the
 # platform's sign-in sidecar runs to make a Docmost session for a person.

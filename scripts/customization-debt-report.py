@@ -13,7 +13,7 @@ whose L4+ count only ever rises is one that has stopped descending.
 Usage:
     python3 scripts/customization-debt-report.py [--format markdown|json]
 
-See gentian-os/docs/app-customization.md section 8.3.
+See gentian-os/docs/guides/app-customization.md section 8.3.
 """
 
 from __future__ import annotations

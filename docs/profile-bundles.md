@@ -2,7 +2,7 @@
 
 What a profile's directory becomes when the catalog is published, and what it may hold. For
 profile authors. The cluster's side of the same rules is in gentian-os,
-[docs/custom-catalogues.md](https://github.com/gentian-org/gentian-os/blob/main/docs/custom-catalogues.md).
+[docs/guides/custom-catalogs.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/custom-catalogs.md).
 
 ## One profile, one file, one fingerprint
 

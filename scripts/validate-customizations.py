@@ -16,7 +16,7 @@ The policy mirrors gentian-os/internal/customization/policy.go — the operator
 enforces the same rules at admission. This script exists so authors and agents get
 the answer before pushing, not after.
 
-See gentian-os/docs/app-customization.md.
+See gentian-os/docs/guides/app-customization.md.
 """
 
 from __future__ import annotations

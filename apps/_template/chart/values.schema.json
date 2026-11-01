@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Gentian app chart values",
-  "description": "Rung L0 of the customization ladder. Publishing this schema is what makes configuration discoverable and machine-checkable: a typo fails at install time instead of at pod start, and an agent can find out whether a requested change is already a supported knob. See gentian-os/docs/app-customization.md.",
+  "description": "Rung L0 of the customization ladder. Publishing this schema is what makes configuration discoverable and machine-checkable: a typo fails at install time instead of at pod start, and an agent can find out whether a requested change is already a supported knob. See gentian-os/docs/guides/app-customization.md.",
   "type": "object",
   "additionalProperties": true,
   "required": ["api", "web", "existingSecret"],
