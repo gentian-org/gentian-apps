@@ -16,7 +16,7 @@ catalog build, chart lint and packaging, image builds. What differs is what is p
 | | `main` | `develop` | any other branch, any pull request |
 |---|---|---|---|
 | Image | under the names the build states — its version, `latest`, the commit sha | `develop-<sha7>` only | built, not pushed |
-| Chart | the version in `Chart.yaml` (`charts/activepieces/UPSTREAM` for Activepieces) | `<version>-develop.<sha7>`, immutable, and `<version>-develop`, moving, its `appVersion` naming the immutable one | packaged or linted, not pushed |
+| Chart | the version in `Chart.yaml` | `<version>-develop.<sha7>`, immutable, and `<version>-develop`, moving, its `appVersion` naming the immutable one | packaged or linted, not pushed |
 | Catalog | `https://gentian-org.github.io/gentian-apps/` | `https://gentian-org.github.io/gentian-apps/develop/` | built and checked, not published |
 
 `<sha7>` is the first seven characters of the commit. A develop name can never be a release's

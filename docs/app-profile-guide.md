@@ -91,16 +91,9 @@ commit build outputs.
 The same rule explains why a **vendored** chart is a smell rather than a pattern.
 Carry the *delta*, not the copy — Debian's `debian/patches/`, Gentoo's `files/`.
 
-`charts/activepieces/` is the worked example. It used to be a 151-file copy of
-upstream including Bitnami's postgresql and redis subcharts; it is now
-[`UPSTREAM`](../charts/activepieces/UPSTREAM) (pinned coordinates) plus
-[`patches/`](../charts/activepieces/patches/) (a DEP-3 series), built by
-`scripts/build-activepieces-chart.sh`. That removed ~22k lines — but the real
-payoff was diagnostic: the actual delta was **240 lines across 4 files**, and
-three of the five patches turned out to be plain upstream bugs (secrets
-regenerated on every deploy, YAML indentation, a Redis username read from a
-nonexistent secret key). A copy had been hiding them as "just how our chart
-looks"; as patches they have `Forwarded:` headers and an owner.
+The shape is an `UPSTREAM` file with the pinned coordinates plus a `patches/`
+directory holding a DEP-3 series, built by a script. As patches, the changes carry
+`Forwarded:` headers and an owner; in a copy they are just how the chart looks.
 
 Set `chartOwnership: patched` for this shape — `vendored` means a copy still
 exists and should be reviewed.
@@ -681,10 +674,9 @@ See [gentian-os/docs/architecture.md](../gentian-os/docs/architecture.md) §6.1.
 **Narrow exception:** an older gentian-os CRD schema defaulted this field
 server-side (removed; see gentian-os commit `5484346`), which permanently
 baked `clusterIssuer: letsencrypt-http01` into any live `AppProfile` that hit
-the code path (profiles declaring `sidecars`, e.g. `activepieces`,
-`odoo-cb-base`). Since Server-Side Apply doesn't retroactively prune a value
-it never itself declared, those two profiles set it explicitly in git to
-match — not because the field does anything, but so ArgoCD stops reporting a
+the code path (profiles declaring `sidecars`, e.g. `odoo-cb-base`). Since
+Server-Side Apply doesn't retroactively prune a value it never itself declared,
+such a profile sets it explicitly in git to match — not because the field does anything, but so ArgoCD stops reporting a
 permanent diff against a value only the API server ever wrote. **Do not copy
 this into a new profile** unless `kubectl get appprofile <name> -o
 jsonpath='{.spec.ingress.clusterIssuer}'` shows it's already live and
@@ -1548,7 +1540,7 @@ CLI to report Ready or inspect `kubectl get app <app> -n tenant-<tenant>`.
 
 ### 8e. An app that can do neither OIDC nor SAML — the sign-in sidecar
 
-Some apps have single sign-on only in a paid edition (Docmost, Activepieces, OpenProject). Declaring
+Some apps have single sign-on only in a paid edition (Docmost, OpenProject). Declaring
 `identity.oidc` for one does nothing, and working around the edition is forbidden (see "no
 licensing bypass" above). What the platform offers instead is its **sign-in sidecar**: a person
 who is signed in at the platform opens the app and is in, with no second sign-in and no password.
@@ -1593,8 +1585,7 @@ to, are in gentian-os, `docs/app-customization.md` ("The sign-in sidecar").
 
 What a handler is given, what it answers and what it must not do:
 [`images/gentian-sidecar-sso-saml/README.md`](../images/gentian-sidecar-sso-saml/README.md). The
-three in this catalog are the reference. Docmost and Activepieces sign a session token with the
-app's own key; OpenProject keeps its sessions in its database, so its handler has OpenProject
+two in this catalog are the reference. Docmost signs a session token with the app's own key; OpenProject keeps its sessions in its database, so its handler has OpenProject
 make the session itself from a one-time token and signs nothing.
 
 An entry path cannot also be under `denyPaths`: the front door refuses before it redirects, and
