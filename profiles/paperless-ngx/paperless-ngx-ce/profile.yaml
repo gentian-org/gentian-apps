@@ -83,7 +83,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.8"
+  version: "0.5.1-dev.9"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -554,6 +554,9 @@ spec:
   # the database, archive both volumes -- is right for a plain Django app;
   # only the deviations are here.
   backup:
+    quiesce:
+      # Where the commands below run: the MCP sidecar has its own pod.
+      container: paperless
     volumes:
       # The full-text index (Tantivy, under data/index) is rebuilt in full by
       # the command below, and is the larger part of the data volume. The
