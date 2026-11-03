@@ -29,7 +29,6 @@ PROFILES = ROOT / "profiles"
 # step with that block; it is the operator's own list and the only thing that
 # decides what is read.
 KNOWN = {
-    "gentianos.io/gateway-frame-ancestors",
     "gentianos.io/gateway-escaped-slashes-action",
 }
 
