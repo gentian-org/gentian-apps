@@ -36,6 +36,11 @@ updates:
     groups:
       npm-minor-patch:
         update-types: ["minor", "patch"]
+    # xml-crypto and node-saml need xmldom 0.8, and xml-crypto's calls fail
+    # on 0.9. Patch releases of 0.8 still come through.
+    ignore:
+      - dependency-name: "@xmldom/xmldom"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
 
   # Base images, pinned by digest. Nextcloud's and XWiki's final stages take
   # the upstream version as a build argument and stay on tags; their build
