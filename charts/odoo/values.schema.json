@@ -122,6 +122,11 @@
           "type": "string",
           "description": "Comma-separated technical module names installed on first boot."
         },
+        "addonModules": {
+          "type": "string",
+          "description": "Technical module names of the selected addons, separated by spaces or commas, installed with initModules on every start.",
+          "default": ""
+        },
         "baseUrl": {
           "type": "string",
           "description": "Public URL this Odoo is served on (https://erp.<tenant domain>). Written to ir_config_parameter as web.base.url and frozen. Empty leaves the parameter alone.",

@@ -231,6 +231,14 @@ spec:
               GENTIAN_PYEOF
               fi
               {{- end }}
+              {{- /* The tenant's addons join the same -i as the base modules:
+                   one start-up, Odoo resolving dependencies between them, and
+                   -i skipping what is installed already. The platform writes
+                   them space-separated, after a comment line when they are
+                   appended to a value already there. Comment lines are dropped
+                   and anything but a module name's characters separates names,
+                   so nothing else reaches the command line. */}}
+              {{- $modules := regexReplaceAll "[^a-z0-9_]+" (printf "%s,%s" .Values.gentian.initModules (regexReplaceAll "(?m)^\\s*#.*$" (default "" .Values.gentian.addonModules) "")) "," | trimAll "," }}
               python3 /opt/odoo/src/odoo/odoo-bin \
                 -d "${DB_NAME}" \
                 --db_host="${DB_HOST}" \
@@ -238,7 +246,7 @@ spec:
                 --db_user="${DB_USER}" \
                 --db_password="${DB_PASSWORD}" \
                 --config=/etc/odoo/odoo.conf \
-                -i {{ .Values.gentian.initModules }} \
+                -i {{ $modules | quote }} \
                 --without-demo=all \
                 --stop-after-init || true
               {{- if .Values.gentian.baseUrl }}
