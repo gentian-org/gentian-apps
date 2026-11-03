@@ -28,7 +28,7 @@ Public unauthenticated endpoints are limited to **`/healthz`** and **`/readyz`**
 | # | Requirement | How |
 |---|-------------|-----|
 | M5 | **Pattern A — no secrets in Git or Helm values** | Chart uses `existingSecret` + `envFrom`; credentials come from ESO/OpenBao |
-| M6 | **No secrets in ConfigMaps, env literals, or AppProfile** | Only `valueMapping` key names in profile; values injected at deploy time |
+| M6 | **No secrets in ConfigMaps, env literals, or ComponentProfile** | Only `valueMapping` key names in profile; values injected at deploy time |
 | M7 | **No logging of tokens, passwords, or connection strings** | Redact `Authorization` headers in logs |
 
 ### API surface
@@ -59,13 +59,13 @@ Public unauthenticated endpoints are limited to **`/healthz`** and **`/readyz`**
 ### Catalog declaration (catalog apps only)
 
 Integration **contracts** are how Gentian declares what an app offers and what it
-can use from other apps. This is already in the `AppProfile` CRD — not a separate
+can use from other apps. This is already in the `ComponentProfile` CRD — not a separate
 `consumes` / `publishes` block.
 
-| Security architecture term | AppProfile CRD field | Meaning |
+| Security architecture term | ComponentProfile CRD field | Meaning |
 |---|---|---|
 | *publishes* (manifest) | `spec.provides` | Contract names this app **provides** (e.g. `project-management`) |
-| *consumes* (manifest) | `spec.optionalIntegrations` | Contract names this app **may consume**, with optional `capabilities` |
+| *consumes* (manifest) | `spec.integrations` | Contract names this app **may consume**, with optional `capabilities` |
 
 Contract **schemas** live in `gentian-apps/contracts/` (when present). The profile
 only references contract **names** that match those definitions.
@@ -74,20 +74,20 @@ only references contract **names** that match those definitions.
 
 | Layer | What | Who authors | Today |
 |---|---|---|---|
-| **Declaration** | `provides` + `optionalIntegrations` on AppProfile | Catalog / app developer | **Implemented** (CRD) |
+| **Declaration** | `provides` + `integrations` on ComponentProfile | Catalog / app developer | **Implemented** (CRD) |
 | **Wiring** | `IntegrationBinding` — credentials + OIDC between installed apps | Platform operator (auto when peers match) | **Implemented** |
-| **Grant (ReBAC)** | Future `AppGrant` — tenant-approved subset + OpenFGA tuples | Tenant admin at install | **Planned** (Stage 2 in security architecture) |
+| **Grant (ReBAC)** | `AppGrant` — the capabilities the tenant approved for a consumer, a subset of what the binding declares; the director projects it into OpenFGA | Tenant admin, after install | **Implemented** |
 
-`kernelRequirements` (OIDC, Postgres, S3, …) is **separate** — it declares
+`requires.services` (OIDC, Postgres, S3, …) is **separate** — it declares
 **kernel services**, not cross-app integration contracts.
 
 | # | Requirement | How |
 |---|-------------|-----|
-| M18 | **Declare kernel needs honestly** | `kernelRequirements` — only OIDC/DB/storage/mail the app actually uses |
-| M19 | **Declare integration contracts honestly** | `provides` / `optionalIntegrations` — only contracts the app implements or consumes; see existing profiles under `gentian-apps/profiles/` |
-| M20 | **Never implement tenant grants in app code** | Cross-app access is wired by `IntegrationBinding` (today) and `AppGrant` + OpenFGA (future) — apps declare, they do not grant |
+| M18 | **Declare kernel needs honestly** | `requires.services` — only OIDC/DB/storage/mail the app actually uses |
+| M19 | **Declare integration contracts honestly** | `provides` / `integrations` — only contracts the app implements or consumes; see existing profiles under `gentian-apps/profiles/` |
+| M20 | **Never implement tenant grants in app code** | Cross-app access is wired by `IntegrationBinding` and narrowed by `AppGrant`, which the director projects into OpenFGA — apps declare, they do not grant |
 
-Kernel-only repos (e.g. `gentian-ui`) skip M18–M20; they deploy via ApplicationSet, not AppProfile.
+Kernel-only repos (e.g. `gentian-ui`) skip M18–M20; they deploy via ApplicationSet, not ComponentProfile.
 
 ---
 
@@ -107,18 +107,19 @@ Enable these when the condition is true — not optional laziness.
 
 ---
 
-## Mandatory once platform Stage 2 is live
+## Authorization with the platform's store
 
-When OpenFGA is available in the cluster, these become mandatory for all apps
-(not just admin apps):
+An app that declares `requires.services.authorization` is given an OpenFGA store of its
+own with its own model, reached through the arbiter (gentian-os app-catalog.md §14.2).
+For such an app:
 
 | # | Requirement |
 |---|-------------|
 | S1 | Call OpenFGA **Check** (AuthZEN API) on every mutation and sensitive read |
-| S2 | Effective access = `AppProfile contract declaration ∩ tenant grant (AppGrant, future) ∩ user ceiling ∩ ABAC` |
+| S2 | Effective access = `ComponentProfile contract declaration ∩ tenant grant (AppGrant) ∩ user ceiling ∩ ABAC` |
 | S3 | Agent routes validate **delegation tuple + task TTL** before acting |
 
-Until then, M1–M4 + M26 are the minimum authorization bar.
+An app without a store of its own relies on M1–M4 and M26.
 
 ---
 
@@ -152,7 +153,7 @@ in the chart unless platform docs explicitly require an app-specific supplement.
 | Admission control (no privileged pods, image policy) | Kyverno / Gatekeeper |
 | Keycloak realm, OIDC clients, token exchange infra | Kernel Keycloak config |
 | OpenBao paths + ESO ExternalSecrets | Platform provisioning |
-| HTTPRoute hostnames from AppProfile `ingress.subDomain` | Operator (tenant apps) |
+| HTTPRoute hostnames from ComponentProfile `expose[].subDomain` | Operator (tenant apps) |
 
 ---
 
@@ -164,7 +165,7 @@ in the chart unless platform docs explicitly require an app-specific supplement.
 [ ] M8–M10 Health probes; CORS; no in-app TLS termination
 [ ] M11–M15 Pod hardening; pinned images
 [ ] M16–M17 HTTPRoute; no nginx
-[ ] M18–M20 AppProfile honest declaration (catalog apps)
+[ ] M18–M20 ComponentProfile honest declaration (catalog apps)
 [ ] M21+    Conditional items reviewed
 [ ] M27     Resource limits set for production
 ```

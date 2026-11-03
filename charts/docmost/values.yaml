@@ -16,7 +16,7 @@ port: 3000
 
 # Delivered as literal Helm values via valueMapping (profile.yaml) rather than
 # secretKeyRef, matching the openproject-ce convention — see
-# docs/app-profile-guide.md §3. DATABASE_URL/REDIS_URL are single connection
+# docs/app-profile-guide.md §4.2. DATABASE_URL/REDIS_URL are single connection
 # strings (Docmost has no discrete-field option), so they must be assembled at
 # render time from these pieces; secretKeyRef can't do that composition.
 database:
@@ -108,7 +108,7 @@ telemetry:
 # `frame-ancestors` policy stays authoritative. Listing origins here instead
 # would make Docmost emit a second CSP header, and the browser enforces the
 # intersection of both -- the double-CSP failure in
-# docs/app-profile-guide.md §6b.
+# docs/app-profile-guide.md §7.1.
 iframe:
   embedAllowed: true
   allowedOrigins: ""

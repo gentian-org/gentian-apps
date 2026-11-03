@@ -193,7 +193,7 @@ technical names, depends-on lists, and Job commands are **not** platform CRD fie
 ## 4. Identity and access
 
 Follow the **standard Gentian AppProfile IdM pattern**
-([app-profile-guide.md](../../../docs/app-profile-guide.md) §2, §8):
+([app-profile-guide.md](../../../docs/app-profile-guide.md) §4.4, §5):
 
 | Concern | Configuration |
 |---|---|
@@ -985,7 +985,7 @@ and the base's chart installs it.
 | Platform architecture | [architecture.md](../../../../gentian-os/docs/overview/architecture.md) |
 | AppProfile authoring | [app-profile-guide.md](../../../docs/app-profile-guide.md) |
 | IAM / portal tiles | [iam.md](../../../../gentian-os/docs/concepts/iam.md), [portal-admin-tile.md](../../../docs/portal-admin-tile.md) |
-| OIDC paths (path A vs pack catalog) | [app-profile-guide.md](../../../docs/app-profile-guide.md) §8 |
+| OIDC paths (path A vs pack catalog) | [app-profile-guide.md](../../../docs/app-profile-guide.md) §5 |
 | Legacy Odoo deployment | `server/base/odoo/`, `odoo-modules/docs/modules-management.md` |
 | **`gentian_os` addon source** | `odoo-modules/gentian_os/` (to be created) |
 | OX multi-tile reference | [profiles/ox-appsuite/profile.yaml](../../ox-appsuite/profile.yaml) |

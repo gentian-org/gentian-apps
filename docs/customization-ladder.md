@@ -25,7 +25,7 @@ generic mechanisms only).
 ## Profile bundle layout
 
 A bundle is any directory containing a `profile.yaml` — that file is what the catalog
-ApplicationSet matches, and the Application is named after the AppProfile's
+ApplicationSet matches, and the Application is named after the profile's
 `metadata.name` rather than the directory. Directory names are therefore free to be
 short: an addon lives at `profiles/odoo/addons/crm-ce/` while its profile is still
 `odoo-crm-ce`. Never locate a bundle by counting path segments.
@@ -45,7 +45,7 @@ profiles/<family>/[base|addons|packages/]<name>/
 Charts and images are deliberately **not** in here — `charts/<name>/` and
 `images/<name>/` are separate flat trees, because a chart is referenced by OCI
 coordinate rather than path and is frequently shared (`charts/odoo` backs 10 profiles).
-See [app-profile-guide.md](app-profile-guide.md) §0.
+See [app-profile-guide.md](app-profile-guide.md) §2.
 
 ## Characterizing a new app
 

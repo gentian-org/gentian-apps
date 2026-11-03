@@ -1,8 +1,8 @@
 # gentian-apps
 
-App Store catalog for Gentian OS — `AppProfile` CRs plus first-party app implementations.
+App Store catalog for Gentian OS — `ComponentProfile` bundles plus first-party app implementations.
 
-**This is the single source of truth for the AppProfile catalog metadata of the community
+**This is the single source of truth for the ComponentProfile catalog metadata of the community
 (`ce`) and maintained (`me`) editions.** Proprietary profiles live in their supplier's catalog.
 
 ## Structure
@@ -11,7 +11,7 @@ App Store catalog for Gentian OS — `AppProfile` CRs plus first-party app imple
 profiles/              # App catalog bundles (ce + me editions) — published as the catalog a cluster installs from
   odoo/                #   family with addons (L3)
     base/
-      base-ce/         #       dir is short; the AppProfile is odoo-base-ce
+      base-ce/         #       dir is short; the profile is odoo-base-ce
     addons/
       crm-ce/          #       -> odoo-crm-ce
       invoicing-ce/    #       -> odoo-invoicing-ce
@@ -51,7 +51,7 @@ else in the directory reaches a cluster. What a bundle may hold and how it is na
 or Gentian-authored — belongs in `charts/<name>/`, and its profile references it by OCI
 coordinates, not by path. Charts and images are **not** nested inside profiles: `charts/odoo`
 backs 10 profiles, and 7 profiles wrap external charts this repo never contains. See
-[docs/app-profile-guide.md](docs/app-profile-guide.md) §0 for why this repo is organized as a
+[docs/app-profile-guide.md](docs/app-profile-guide.md) §2 for why this repo is organized as a
 distribution repo rather than an application monorepo.
 
 ## Branches

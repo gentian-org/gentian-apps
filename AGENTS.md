@@ -2,7 +2,7 @@
 
 ## Project overview
 
-`gentian-apps` is **the single source of truth for AppProfile catalog metadata** for Gentian
+`gentian-apps` is **the single source of truth for ComponentProfile catalog metadata** for Gentian
 OS — profile bundles (`profiles/[<family>/]<name>/`, published as the catalog a cluster installs
 from, one file and one digest per profile: [docs/profile-bundles.md](docs/profile-bundles.md)) plus
 first-party app implementations (`apps/<name>/`, FastAPI + React +
@@ -18,7 +18,7 @@ Helm — same stack as [`apps/_template`](apps/_template) /
 * CI (`.github/workflows/apps-ci.yaml`) builds and pushes images + OCI charts for `apps/*`.
   `profiles/*` sync to clusters via the ArgoCD ApplicationSet `gentian-catalogue`.
 * **Don't build/push images or apply profile changes to a live cluster yourself.** Bump the
-  chart version and the profile's `spec.chart.version`, then let CI and ArgoCD do the rest.
+  chart version and the profile's `spec.package.chart.version`, then let CI and ArgoCD do the rest.
   Deleting a stuck Application/resource to speed up reconciliation is fine; hand-patching
   config in the cluster is not.
 
@@ -40,7 +40,7 @@ local operations: [docs/customization-ladder.md](docs/customization-ladder.md).
 
 1. **Restate** the request as a capability ("users must approve invoices > 10k"), not an
    implementation ("patch `account_move.py`"). Split multi-part requests and run this per part.
-2. **Read the app's ladder**: `AppProfile.spec.customization` in `profiles/<n>/profile.yaml`,
+2. **Read the app's ladder**: `ComponentProfile.spec.customization` in `profiles/<n>/profile.yaml`,
    and `profiles/<n>/customization.md`. If absent, assume `{grade: unknown, supportedRungs:
    [L0, L4]}` and raise a task to characterize the app — infer nothing more.
 3. **Walk L0 → L6 in order.** Stop at the first rung that (a) can express the change,
@@ -82,7 +82,7 @@ First-party apps share the FastAPI + React + Helm stack scaffolded by `apps/_tem
 | `frontend/src/api/client.ts` | Typed fetch helpers |
 | `frontend/src/stores/` | Zustand client state (when needed) |
 | `chart/` | Helm chart (Gateway API HTTPRoute, Pattern A secrets) |
-| `profile/appprofile.yaml.tmpl` | AppProfile skeleton |
+| `profile/componentprofile.yaml.tmpl` | ComponentProfile skeleton |
 | `docs/security.md` | Security checklist |
 | `docs/frontend-stack.md` | Frontend stack rationale |
 
@@ -117,8 +117,8 @@ asked of the director, never read off the token.
 
 1. Bump `chart/Chart.yaml` version and image tags in `chart/values.yaml`.
 2. CI builds and pushes images + OCI chart.
-3. Update the matching `profiles/<app>/profile.yaml` `spec.chart.version`.
-4. AppProfile update reconciler rolls out to tenants.
+3. Update the matching profile's `spec.package.chart.version`.
+4. A tenant's install rolls over when it is moved to the new build (gentian-os docs/concepts/versioning.md).
 
 ### Local dev
 
@@ -160,5 +160,5 @@ cluster and keeps it in its own database. See
 are separate flat trees on purpose: a profile references its chart by OCI coordinate rather
 than by path, `charts/odoo` backs 10 profiles, and 7 profiles wrap external charts this repo
 never contains. The reasoning — this is a distribution repo, not an application monorepo — is
-in [docs/app-profile-guide.md](docs/app-profile-guide.md) §0. Read it before proposing layout
+in [docs/app-profile-guide.md](docs/app-profile-guide.md) §2. Read it before proposing layout
 changes.

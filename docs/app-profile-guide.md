@@ -1,1967 +1,746 @@
-# AppProfile Authoring Guide
+# Writing a component profile
 
-This guide covers **catalog entries for existing upstream Helm charts** (profile
-YAML only). To **build a new Gentian-native app** (FastAPI + React + Helm), see
-[custom-app-guide.md](custom-app-guide.md).
+A `ComponentProfile` is the catalog entry that tells a Gentian OS cluster how an
+app is installed into a tenant: which chart, what the app needs from the
+platform, how people sign in, where it answers, and how its data is captured.
+This guide is the short list of practices that make a profile good. It is
+written for the people and the coding agents who write profiles for this
+catalog, and it applies to any catalog.
 
-This guide captures the accumulated learnings and best practices from the existing
-AppProfile implementations. Read it before writing a new profile — every section
-corresponds to a class of bug that was caught in git history.
+It does not repeat the reference. Read these first, and cite them rather than
+copy them:
 
-**Before extending an already-installed app**, use the
-[customization ladder](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md)
-and [docs/customization-ladder.md](customization-ladder.md) instead of this guide —
-they give the decision procedure (which rung, which repo) and the per-app declaration
-(`spec.customization`) that make `extraValues` vs `dropins/` vs `composition.yaml`
-placement (§1 below) a lookup rather than a judgment call.
-
----
-
-## 0. Why this repo is laid out the way it is
-
-Read this before proposing to move things around. `gentian-apps` is a
-**distribution repo**, not an application monorepo, and almost every layout
-decision follows from that one fact.
-
-### The two archetypes
-
-| | **Application monorepo** | **Distribution / catalog repo** |
-|---|---|---|
-| Examples | company service monorepos (Nx, Turborepo, Bazel) | Debian, nixpkgs, Homebrew, `bitnami/charts` |
-| Contains | source code you own end-to-end | *packaging* for software mostly written elsewhere |
-| Layout | **colocate** — `services/foo/{src,Dockerfile,chart}` | **name-addressed trees per artifact type** |
-| Why | one team owns the whole vertical and ships it as a unit | many independent packages; tooling globs by type |
-
-`gentian-apps` is overwhelmingly the second. Of 21 profiles, 7 wrap **external**
-charts (Nextcloud, XWiki, OpenProject, Element) that this repo will never
-contain, 2 declare no chart at all, and the remaining 13 share just **three**
-in-repo charts — `charts/odoo` alone backs 10 profiles. The repo holds catalog
-metadata and a little packaging, and no first-party application of its own
-(the platform's own UIs live in gentian-ui). That is Debian's shape, not Google's.
-
-### Consequence 1 — artifact types get their own flat, name-addressed trees
-
-```
-profiles/     catalog metadata      → synced by ArgoCD
-charts/       chart source            → built + pushed to OCI by CI
-images/       Dockerfiles             → built + pushed to GHCR by CI
-apps/         first-party source      → the one monorepo-shaped corner
-contracts/    cross-app interfaces    → owned by no single app
-```
-
-Charts and images are **not** nested inside the profile that uses them, for three
-concrete reasons:
-
-1. **The link is by coordinate, not by path.** A profile references its chart as
-   `oci://ghcr.io/gentian-org/charts` + `name` + `version`. Nothing ever reads a
-   chart off disk relative to a profile. Filesystem adjacency would imply a
-   coupling the pipeline does not have.
-2. **The cardinality is wrong.** `charts/odoo` serves 10 profiles; `images/nextcloud`
-   is one Dockerfile matrix-built into 4 editions. Nesting forces an arbitrary
-   choice of which consumer "owns" it.
-3. **Helm tooling assumes it.** `chart-testing` (`ct lint --all`) and
-   `helm/chart-releaser-action` both default to `charts/` at the repo root.
-
-### Consequence 2 — placement never encodes mutable facts
-
-A tempting rule is "shared assets live at the nearest common ancestor, specific
-ones live in the profile folder." **We deliberately rejected it.** It makes a
-directory's location depend on how many things currently use it, so gaining a
-second consumer forces a physical move — new path, new CI trigger, broken git
-history — even though nothing about the artifact changed. You also lose the
-ability to answer "show me every chart" with one glob.
-
-This is the mistake nixpkgs spent years unwinding: `pkgs/applications/networking/
-browsers/firefox/` encoded a classification, and classifications drift. Their 2023
-migration to `pkgs/by-name/fi/firefox/` made location encode *nothing but the
-name*. A sidecar chart used by two unrelated apps is therefore just
-`charts/gentian-sidecar-git-modules/` — a chart like any other.
-
-The same principle is why `spec.tier` is a **field**, not a directory level, and why `contracts/` stays flat: a contract is cross-app by
-definition, so nesting it under one family would misstate what it is.
-
-### Consequence 3 — version packaging, never built artifacts
-
-Distribution repos track the *recipe*; the registry stores the *output*. That is
-why `charts/packages/*.tgz` was removed — CI publishes to
-`oci://ghcr.io/gentian-org/charts`, and that registry is the artifact store.
-Debian does not commit `.deb` files into its packaging tree, and nixpkgs does not
-commit build outputs.
-
-The same rule explains why a **vendored** chart is a smell rather than a pattern.
-Carry the *delta*, not the copy — Debian's `debian/patches/`, Gentoo's `files/`.
-
-The shape is an `UPSTREAM` file with the pinned coordinates plus a `patches/`
-directory holding a DEP-3 series, built by a script. As patches, the changes carry
-`Forwarded:` headers and an owner; in a copy they are just how the chart looks.
-
-Set `chartOwnership: patched` for this shape — `vendored` means a copy still
-exists and should be reviewed.
-
-**When you hit a chart that needs template changes, measure the delta before
-assuming a copy is necessary.** `helm pull --untar` the pinned upstream version
-and `diff -ruN` against what you have; a few hundred lines is a patch series, not
-a fork.
-
-### Consequence 4 — profiles group by family; discovery keys off a marker file
-
-`profiles/` groups multi-profile families one level deeper
-(`profiles/odoo/odoo-cb-crm/`) while true singletons stay flat
-(`profiles/xwiki/`). Bundles are discovered by the presence of
-`kustomization.yaml` at **any** depth, not by a fixed directory level, so mixed
-depth needs no exclude-list of "known family folders".
-
-Two invariants make that safe, and CI enforces both:
-
-- **Leaf directory name == `metadata.name`.** The catalog ApplicationSet names
-  each Application after the leaf directory. `AppProfile` is cluster-scoped, so
-  those names are globally unique — but only while this holds.
-- **A `profile.yaml` must have a sibling `kustomization.yaml`**, or the bundle is
-  invisible to the generator and would silently never sync.
-
-Because leaf names are stable, regrouping a profile updates its Application's
-source path *in place* — no rename, no delete/recreate, and no prune of a live
-`AppProfile` (the ApplicationSet runs `prune: true`).
-
----
-
-## Platform boundary — **no app-specific hardcoding in gentian-os**
-
-**Never** put app-specific values, profile names, or `case "myapp"` logic in gentian-os.
-There are **only two** valid options:
-
-1. **Many apps need it** — extend the **AppProfile** contract (spec, annotations, or
-   composition hooks) **and** gentian-os so the operator implements the behavior
-   **generically** for every profile that declares it.
-2. **Unique to one app** — implement it in **gentian-apps**: the profile,
-   `composition.yaml`, assets, chart `extraValues`, bootstrap Jobs, and other
-   app-owned artifacts — **not** in gentian-os reconcilers or kernel policy.
-
-If neither path is ready yet, **leave the gap** (reconciler reports not implemented /
-fails clearly) rather than hardcoding an exception for a single catalog entry.
-
-### MAC waivers (Stage 2)
-
-Apps that cannot satisfy baseline Kyverno policies declare requests on
-`AppProfile.spec.security.macWaivers`. **Cluster administrators** approve subsets on
-the cluster singleton `PlatformSecurityPolicy` (Admin Console → **Platform** tab,
-platform superadmin only). The operator intersects request ∩ allowlist, publishes
-`gentian-platform-security` for compositions, and Kyverno excludes only labeled pods
-— not cluster-wide PolicyExceptions.
-
----
-
-## ❌ Absolute prohibition — no cluster hotfixes, ever
-
-> **Gentian OS must run identically on any cluster, at any time, from a clean
-> install. Any change that lives only on a specific cluster violates this
-> invariant and is strictly forbidden.**
-
-### What is a cluster hotfix?
-
-A cluster hotfix is any change applied directly to a live cluster that is **not
-tracked in a git repository** and **not deployed by the normal CI/CD pipeline**.
-Common forms include, but are not limited to:
-
-| Forbidden action | Why it is harmful |
+| Question | Where it is answered |
 |---|---|
-| `kubectl create configmap` / `kubectl apply` of a resource that overrides files mounted into a pod | Shadows the Docker image silently; invisible to git, CI, and code review; does not survive cluster reprovisioning |
-| `kubectl patch deployment` to inject an env var, change an image tag, or add a volume | Bypasses the Helm release; ArgoCD will drift-detect or silently accept it |
-| `kubectl exec` + writing files into a running container | Survives only until the pod restarts; leaves no trace |
-| Editing a Secret or ConfigMap in the cluster to change application behavior | Not reviewed, not auditable, not reproducible |
-| Pinning a pod to a node, taint, or toleration outside of the chart | Breaks portability |
+| What does each field mean, and what may a profile ask for? | gentian-os [custom-catalogs.md §4.1](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/custom-catalogs.md), field by field, and the CRD vendored at `contracts/platform/<line>/gentianos.io_componentprofiles.yaml` |
+| What is the model behind the fields: classes, requirements, privileges, exposure? | gentian-os [app-catalog.md §13 to §19](https://github.com/gentian-org/gentian-os/blob/develop/docs/concepts/app-catalog.md) |
+| What is a bundle, and which companions may travel with a profile? | [profile-bundles.md](profile-bundles.md) |
+| How is an installed app customized, and what is `spec.customization`? | gentian-os [app-customization.md](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/app-customization.md) and [customization-ladder.md](customization-ladder.md) |
+| Which branch publishes what, and how are versions numbered? | [releasing.md](releasing.md) |
+| How is a first-party app built, as opposed to packaged? | [custom-app-guide.md](custom-app-guide.md) |
 
-### The correct path — always
+The reference profiles in this catalog are
+[`profiles/paperless-ngx/paperless-ngx-ce/profile.yaml`](../profiles/paperless-ngx/paperless-ngx-ce/profile.yaml)
+(a first-party chart, OIDC sign-in, a companion, both hooks, a backup contract)
+and [`profiles/docmost/docmost-ce/profile.yaml`](../profiles/docmost/docmost-ce/profile.yaml)
+(the sign-in sidecar for an app without single sign-on). When this guide and a
+reference profile disagree, the profile is more likely to be right: say so in a
+pull request.
 
+## 1. What a profile is
+
+A profile **declares**; the platform **fulfills**. The profile says the app
+needs a PostgreSQL database, a bucket, outbound mail and a sign-in client; the
+operator makes each of them for every tenant that installs the app and hands
+the app the credentials. The profile never names a database host, a mail
+server, a realm or a namespace: those differ per cluster and per tenant, and
+the platform knows them.
+
+The kind is generic. It has no field for any one app, and no reconciler in
+gentian-os knows a profile's name. When an app needs something the platform
+does not offer, there are two honest answers: extend the contract in gentian-os
+so every profile can declare it, or carry the behavior in the app's own bundle
+(its chart, its hooks, its composition). Hardcoding one app's case into the
+operator is neither, and is refused in review.
+
+Two rules have no exception:
+
+- **No cluster hotfix.** Nothing is changed on a live cluster by hand. A fix is
+  a commit in the repository that owns the behavior, built by CI and rolled out
+  by the platform ([app-customization.md §2.8](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/app-customization.md)).
+- **No license bypass.** A profile installs the edition its license allows and
+  configures nothing that unlocks a paid feature without the key the vendor
+  sells. Where single sign-on is a paid feature, the answer is the platform's
+  sign-in sidecar (§5.4), never a patch.
+
+## 2. The repository: a distribution, not a monorepo
+
+`gentian-apps` packages software that is mostly written elsewhere, the way a
+Linux distribution does. Its layout follows from that:
+
+```text
+profiles/     catalog bundles, one directory per profile, found by profile.yaml at any depth
+charts/       charts this repository authors, published to oci://ghcr.io/gentian-org/charts
+images/       Dockerfiles this repository builds, published to ghcr.io/gentian-org
+apps/         first-party app source (apps/_template is the scaffold)
+contracts/    the vendored platform CRDs and the cross-app contracts
+scripts/      the validators CI runs
+e2e/          the suites that run an app's real image against the profile
 ```
-1. Reproduce the bug or missing behavior in the local dev environment.
-2. Fix it in the source code (gentian-ui, gentian-apps, gentian-os — whichever owns it).
-3. Write or update a test.
-4. Commit with a descriptive message, push, open a PR / push to develop.
-5. CI builds the image and the CD pipeline deploys it.
-6. Verify on the target cluster via the normal deployment.
-```
 
-If you cannot reproduce the issue locally and feel pressure to "just fix it in the
-cluster", **stop**. Raise the issue in the team, extend the local dev environment
-so the class of bug is reproducible, then fix it properly.
+- **A profile references its chart by coordinate**, `spec.package.chart`
+  (`repository`, `name`, `version`), never by path. Charts and images are flat
+  trees of their own: one chart backs many profiles (`charts/odoo` backs the
+  Odoo family), and most profiles wrap charts this repository does not contain.
+  Do not move a chart or an image into a profile directory.
+- **Keep the recipe, not the output.** CI publishes charts and images to the
+  registry; nothing built is committed. When an upstream chart needs a change,
+  measure the difference before copying it: `helm pull --untar` the pinned
+  version and `diff -ruN`. A few hundred lines is a patch series under
+  `patches/` with `chartOwnership: patched`, not a fork. A copy is
+  `chartOwnership: vendored`, and a reviewer will ask why.
+- **Write a first-party chart when upstream has none.** Paperless-ngx, Docmost
+  and Mathesar ship docker-compose files only; each has a small chart under
+  `charts/` that wraps the official image unmodified, runs it as its own
+  non-root user, and takes every platform value as a chart value (§4).
+- **Directory names are free; `metadata.name` is not.** Profiles are
+  cluster-scoped, and the catalog publishes each under its `metadata.name`, so
+  the name is unique across the catalog. Families with addons use
+  `profiles/<family>/{base,addons,packages}/<dir>/`; everything else
+  `profiles/<family>/<name>/`. A `profile.yaml` without a sibling
+  `kustomization.yaml` is a CI error.
 
-### If a cluster hotfix already exists
+## 3. The profile file
 
-1. Identify the override (e.g. a ConfigMap volume-mounted into a pod).
-2. Implement the real fix in source and push it.
-3. Wait for CI to build and deploy the new image.
-4. **Delete the hotfix resource** (`kubectl delete configmap …`) so the
-   deployment reverts to the clean state.
-5. Confirm via `kubectl get` that no trace of the override remains.
-6. Document what happened in the commit message or a post-mortem.
-
-Leaving a hotfix in place "until we have time" is not acceptable — it will
-outlast the original incident and cause confusion for every engineer who works on
-the system after you.
-
-### ❌ Absolute prohibition — no licensing bypass or software cracking
-
-> **Gentian OS must never bundle, configure, or apply any code modification, patch, or workaround designed to bypass software license key validation, crack enterprise capabilities, or circumvent terms of service for proprietary application features.**
-
-#### Guidelines for Compliant Catalog Integration:
-1. **Edition Strictness:** If an application offers both a Community Edition (CE) and a proprietary Enterprise Edition (EE), the default profile in the catalog repository MUST configure the Community Edition (e.g., standard free auth methods, omitting licensed Enterprise features like SAML SSO, git sync, or advanced RBAC unless a valid license key is provided).
-2. **Proper License Key Activation:** If enterprise features are desired for testing or staging, configure them legally by passing a valid partner/customer license key via secure environment variables (`AP_LICENSE_KEY`, etc.), rather than patching compiled frontend or API server bundles (e.g. `main.js`) on startup.
-3. **No Hacking Workarounds:** Never inject base64-encoded patches, runtime script overrides, or SQL trigger hacks to artificially toggle Boolean flag columns (such as `ssoEnabled: true` or `customAppearanceEnabled: true`) in database platform configurations.
-
----
-
-## 1. Mandatory top-level fields
+### 3.1 What every profile carries
 
 ```yaml
+# SPDX-License-Identifier: AGPL-3.0-only
+# ComponentProfile — <App> (<one line on what it does>)
+#
+# Source: … where the chart and image come from, and why this shape
+# ── Sign-in ── how people get in, and who administers the app
+# Secret inventory: what the platform provides, what is generated, and what each is for
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
-  name: <app-id>                        # lowercase, kebab-case (unique CR name)
+  name: example-ce
   labels:
-    gentianos.io/profile-name: <app-id> # must match metadata.name (controller also sets family/version labels)
+    gentianos.io/profile-name: example-ce
+    gentianos.io/profile-family: example
+    gentianos.io/profile-edition: ce
 spec:
-  deploymentMethod: crossplane          # crossplane (default), or api for an ApiProfile
-  family: <logical-app-id>
-  catalogueVersion: "1.0.0"
-  edition: full
-  trustTier: certified              # platform | certified | experimental
-  license: Apache-2.0               # SPDX; proprietary for gentian-premium
+  classes: [app]
+  trustTier: certified
+  version: "0.5.1-dev"
+  package:
+    chart: {repository: "oci://ghcr.io/gentian-org/charts", name: example, version: "1.0.0"}
+    valueMapping: {…}            # §4.2
+    extraValues: {…}             # §4.1
+  requires:
+    platform: ">=0.5"
+    services: {…}                # §1, §5
+  secrets: {…}                   # §8
+  expose: [{…}]                  # §7
+  customization: {…}             # §12
+  launch: tile
 ```
 
-### Portal app-menu tiles
-
-A tile sits on an exposure (`spec.expose[].tile`), or on `spec.package.api.tile` for a component
-that is only a link. Its picture is a 128×128 PNG: `tile.logo` is the `data:image/png;base64,…`
-URI the cluster reads (at most 65536 characters), and `tile.image` names the committed file it was
-inlined from, `assets/tile.png`. An `AppPackage` preset's `spec.tile` is the same.
-
-Every profile here ships the default tile: a platform glyph on the neutral square, drawn the same
-way for every app. The app's own logo is part of its listing, which is the App Store's.
-
-```bash
-scripts/render-default-tile.py --list                                   # the glyphs
-scripts/render-default-tile.py <glyph> profiles/<name>/assets/tile.png  # draw
-scripts/sync-profile-tile.py profiles/<name>                            # inline into tile.logo
-```
-
-The glyphs are `scripts/data/tile-catalogue.json`, a copy of gentian-os
-`internal/tiles/catalogue.json`, the set the desktop draws its own tiles from. Drawing needs
-cairosvg or rsvg-convert, on the author's machine only; nothing draws a tile in CI or on a cluster.
-
-CI: `scripts/validate-profile-tiles.py` (see `.github/workflows/apps-ci.yaml`) checks that every
-`tile.logo` is a 128×128 PNG and the same bytes as its `tile.image`.
-
-### Base + addon profile bundles
-
-For apps with a shared runtime and thin addon entries (Odoo, OX-style), use
-**metadata annotations** — do not add per-app fields to `AppProfile` spec:
-
-| Annotation | Values | Purpose |
-|---|---|---|
-| `gentianos.io/deployment-role` | `standalone` (default), `base`, `addon` | How the operator/composition deploys this entry |
-| `gentianos.io/platform-app` | `"true"` | Hidden from App Store listing (required base runtimes) |
-| `gentianos.io/store-listed` | `"false"` | The index says `listed: false`; the App Store does not offer the entry |
-| `gentianos.io/requires-capability` | `llm` | The index says `placedWith: llm`: the director keeps the app in every tenant while the cluster serves models, removes it when it stops, and refuses to uninstall it by hand. Only from a cluster catalog |
-
-An addon names its base in **`spec.customization.addon`** (`id` + `of`), not in an
-annotation. It is never installed on its own: the base is installed and the addon is
-selected into it, arriving in `Tenant.spec.apps[].addons`. The retired
-`gentianos.io/requires-profile` annotation, which auto-installed a base when an addon
-was installed as if it were an app, no longer exists — see
-[app-customization.md](../../gentian-os/docs/guides/app-customization.md) §4.2.
-
-App-specific install parameters (e.g. Odoo module technical name) belong in
-`spec.extraValues` and the profile-scoped composition — not in gentian-os CRDs.
-
-### Profile annotations vs composition — where to put app-specific config
-
-Gentian-os should stay **generic**. When a behavior is shared across apps or
-owned by the **operator** (gateway routes, OIDC fallbacks, auto-install base
-profiles), declare it on the **AppProfile metadata** using `gentianos.io/*`
-annotations. When behavior is **deploy sequencing**, **one-off Jobs**, or
-**upstream-chart workarounds** that should eventually move upstream, put it in the
-profile's **`composition.yaml`** (`app-ox`, `app-element-ce`, …).
-
-| Put it in… | When | Examples |
-|---|---|---|
-| **`spec.kernelRequirements` + `valueMapping`** | Any app needs a standard kernel function (OIDC, LDAP, DB, S3, mail) | `clientId`, `redirectUris`, `databasePerTenant` |
-| **Profile annotation** | Operator or gateway reconciler must do the same thing for many apps; value is small and stable | `gentianos.io/deployment-role`, `gentianos.io/gateway-api-backends`, `gentianos.io/oidc-default-redirect-uris` |
-| **`spec.extraValues`** | Helm chart needs non-secret structured config; composition passes it through | Odoo `addon: crm`, chart feature flags |
-| **`spec.postInstallJob`** | Bootstrap must call the app's own runtime admin API (not Helm values, not `kernelRequirements`); small and self-contained | open-webui LiteLLM config seed (§13a) |
-| **`composition.yaml`** | Custom Crossplane MR graph, multi-Job/RBAC sequencing, chart-specific workarounds | OX bootstrap Job, Element Jitsi overlay |
-| **Upstream chart / vendor** | Fix belongs in the supplier chart long-term | OX `initconfigdb -i`, Keycloak client scopes in openDesk |
-
-This table is the rung mapping in different words —
-[customization-ladder.md](customization-ladder.md) names them: `extraValues` is
-**L0**, a declared drop-in directory is **L1**, `composition.yaml` /
-`postInstallJob` is **L4**, and vendoring the chart is an **L4** repackage too
-(an actual source patch is **L5**). Use that doc's decision procedure to pick the
-row; use this table to find the file.
-
-**Never** add per-app fields to the `AppProfile` CRD. **Never** hardcode
-profile names or app-specific branches in gentian-os reconcilers — see
-**Platform boundary** above. If you need a new operator behavior,
-add a **well-known annotation** (or extend an existing generic `spec` block used
-by all apps) and set it from `gentian-apps/profiles/<name>/profile.yaml`.
-
-#### Gateway annotations
-
-| Annotation | Format | Purpose |
-|---|---|---|
-| `gentianos.io/gateway-root-redirect` | Path string | Redirect `GET /` on the app hostname (e.g. `/appsuite/`) |
-| `gentianos.io/gateway-api-backends` | JSON array | Extra path prefixes routed to additional Services on the same host |
-| `gentianos.io/gateway-frame-ancestors` | JSON object on **`ingress.annotations`** or **`additionalIngresses[].annotations`** | Override edge `frame-ancestors` for that host. Shape: `{"mode":"replace\|append","origins":["portal","mainApp",...]}`. Tokens: `portal` → `https://portal.<kernel>`; `mainApp` → primary ingress host (`https://<ingress.subDomain>.<tenant-domain>`). Use when a **secondary host** (e.g. office editor) is embedded by the main app UI, not the portal. |
-| `gentianos.io/gateway-escaped-slashes-action` | `KeepUnchanged` on **`additionalIngresses[].annotations`** | Envoy `ClientTrafficPolicy` on the tenant (and kernel wildcard) gateway listener — required for WOPI/WebSocket paths with encoded slashes (`%3A`, `%2F`). |
-
-```yaml
-metadata:
-  annotations:
-    gentianos.io/gateway-root-redirect: /appsuite/
-    gentianos.io/gateway-api-backends: |
-      [{"pathPrefix":"/appsuite/api","serviceName":"appsuite-api"}]
-```
-
-#### OIDC redirect fallback
-
-Prefer **`spec.kernelRequirements.identity.oidc.redirectUris`** (substitutes
-`${TENANT_DOMAIN}`). When legacy Jobs cannot rely on spec alone, use:
-
-| Annotation | Format |
-|---|---|
-| `gentianos.io/oidc-default-redirect-uris` | JSON array of URIs with `${TENANT_DOMAIN}` |
-
-If both spec and annotation are empty, the operator falls back to
-`https://{tenant-domain}/{profile-name}/*` (discouraged — set explicit URIs).
-
----
-
-## 2. Placeholders (substituted at deploy time)
-
-The **gentian-os operator** sets `App.spec.domain` from the tenant's
-effective domain. **Crossplane app Compositions** replace placeholders in
-`extraValues` and OIDC redirect URIs when rendering helm values and
-`provider-keycloak` Client MRs. Use placeholders everywhere — never
-hardcode cluster-specific addresses.
-
-| Placeholder | Resolves to |
-|---|---|
-| `${TENANT_DOMAIN}` | Tenant effective domain (e.g. `demo.desk.gentian.org`) |
-| `${TENANT_ID}` | Tenant name / Keycloak realm (e.g. `demo`) |
-| `${TENANT_NAMESPACE}` | Kubernetes namespace (`tenant-{id}`) |
-| `${KERNEL_DOMAIN}` | Cluster kernel DNS suffix (e.g. `desk.gentian.org`) |
-| `${LDAP_HOST}` | UCS LDAP service hostname |
-| `${LDAP_BASE_DN}` | LDAP base DN (e.g. `dc=swp-ldap,dc=internal`) |
-| `${LDAP_BIND_DN}` | App-specific LDAP bind DN |
-| `${SMTP_HOST}` | Postfix service address (injected by operator) |
-| `${S3_ENDPOINT}` | MinIO API endpoint URL |
-| `${MYSQL_HOST}` | MariaDB service (OX App Suite) |
-| `${REDIS_HOST}` | Redis service (OX App Suite) |
-| `${IMAP_HOST}` | Dovecot/IMAP service |
-| `${NODE_IP}` | Node external IP (Jitsi TURN) |
-| `${TURN_*}` | TURN credentials (Element/Jitsi, from kernel path) |
-
-**Common mistake:** Using a hardcoded cluster-internal address like
-`nubus-dev-ldap-server.gentian-dev.svc.cluster.local` instead of `${LDAP_HOST}`.
-That value only works in one cluster and breaks on every other environment.
-
-### `${TENANT_DOMAIN}` vs `${KERNEL_DOMAIN}` — where and why
-
-| Placeholder | Use for | Why it matters |
-|---|---|---|
-| **`${TENANT_DOMAIN}`** | App-facing URLs on the tenant zone: `element.${TENANT_DOMAIN}`, `meet.${TENANT_DOMAIN}`, OIDC `redirectUris`, Matrix `serverName`, public Jitsi URL, `mail.${TENANT_DOMAIN}` in OX | Browsers, Keycloak, and ingress must agree on the **same hostname** the user sees. A typo or hardcoded domain causes `redirect_uri` mismatch, broken cookies, or TLS on the wrong cert (`*.<effectiveDomain>`). |
-| **`${KERNEL_DOMAIN}`** | Shared platform hosts: `portal.${KERNEL_DOMAIN}`, `id.${KERNEL_DOMAIN}`, post-logout redirect to portal | Kernel UIs and the Gentian Portal live on the **cluster** wildcard, not the per-tenant app wildcard. Mixing these (e.g. OIDC issuer on tenant domain when the app expects `id.<kernel>`) breaks SSO and iframe embedding from the portal. |
-
-**Rule of thumb:** anything the tenant's users type in the address bar for an
-**installed app** → `${TENANT_DOMAIN}` (plus `subDomain` in `AppProfile.spec.ingress`).
-Anything on the **platform shell or IdP** → `${KERNEL_DOMAIN}`.
-
-**Keycloak / `global.domain`:** charts build `https://{hosts.keycloak}.{global.domain}`
-for OIDC. Set `global.domain: "${KERNEL_DOMAIN}"` and prefix tenant app host
-labels with `${TENANT_ID}` (e.g. `jitsi: "meet.${TENANT_ID}"` →
-`meet.demo.desk.gentian.org`). See `gentian-apps` commit `b1203d0`.
-
-### Browser-facing vs server-to-server URLs (public vs internal)
-
-`${TENANT_DOMAIN}` and `${KERNEL_DOMAIN}` are **public** hostnames for the
-**browser**. Any call made **server-side, from inside the cluster** — one
-workload reaching another — should target **internal** Kubernetes service DNS
-(`<service>.<namespace>.svc.cluster.local`), not the public hostname. This rule
-applies to **every** profile, not any one app.
-
-| Caller → callee | URL to use |
-|---|---|
-| Browser → app UI | Public `https://<sub>.${TENANT_DOMAIN}` |
-| App backend → its kernel deps (DB, S3, LDAP, SMTP) | Internal — already service DNS via `${LDAP_HOST}`, `${S3_ENDPOINT}`, … |
-| Companion/sidecar → main app (e.g. an editor's file callback) | Internal `http://<svc>.${TENANT_NAMESPACE}.svc.cluster.local:<port>` |
-| Kernel component → tenant app (portal API, provisioners) | Internal `http://<svc>.tenant-<t>.svc.cluster.local:<port>` |
-| App backend → central IdP token/userinfo exchange | Internal Keycloak (`KEYCLOAK_INTERNAL_URL`), not `https://id.${KERNEL_DOMAIN}` |
-
-**Why not use the public hostname everywhere?** Inside the cluster, CoreDNS
-**hairpins** `*.${KERNEL_DOMAIN}` and `*.${TENANT_DOMAIN}` to the edge gateway.
-That path has two traps for server-side HTTP clients:
-
-1. **Staging TLS certs.** On dev/staging the gateway serves a **Let's Encrypt
-   staging** cert. Strict clients (Python `httpx`, Go, JVM, Node, Twisted) reject
-   it with `CERTIFICATE_VERIFY_FAILED` / `unable to get local issuer certificate`.
-   Symptom: HTTP 500 from the caller, "could not connect", or a hung TLS handshake.
-2. **Extra latency and failure surface.** The request leaves the pod, traverses
-   the gateway, and comes back — slower, and dependent on gateway/DNS health for a
-   call that never needed to leave the cluster.
-
-**Two ways to satisfy a server-side call:**
-
-- **Preferred — internal service URL.** Point the callback/integration at
-  `.svc.cluster.local`; plain HTTP is fine in-cluster. This is what the Nextcloud
-  WOPI callback (§6g) and Element's `KEYCLOAK_INTERNAL_URL`
-  (§6d) all do.
-- **When the public host is unavoidable** (the app hard-codes it, or browser and
-  server must agree on one issuer string) — **trust the staging CA** in that
-  runtime: mount `gentian-trust-anchor-tls` and set the language's trust env
-  (`NODE_EXTRA_CA_CERTS`, JVM truststore, `SSL_CERT_FILE`), or set the app's
-  documented "insecure SSL for testing" flag. See the ACME staging note below and §8a.
-
-**Cross-namespace reachability:** a profile names no namespace. What an app may
-reach of the platform follows from what it declares under
-`spec.requires.services`: a database, cache or bucket opens that store and its
-port, mail the mail namespaces, and `identity` the edge gateway and the identity
-provider — which is also what a companion needs to fetch
-`https://<sub>.${TENANT_DOMAIN}` in-cluster. Every pod of the app gets these
-paths if it carries the label `gentianos.io/app: <profile>`.
-`gentianos.io/kernel-egress-namespaces` opens whole namespaces by name and is
-for what no declaration can express; an entry needs a comment saying why.
-
-### Central IdP — required pattern (all profiles)
-
-Gentian uses a **central Keycloak** on the kernel domain. Realms are **per tenant**
-(`/realms/${TENANT_ID}`), but the IdP hostname is always **`id.${KERNEL_DOMAIN}`**
-— never `id.${TENANT_DOMAIN}` or `id.${TENANT_ID}.…`.
-
-| What | Placeholder / URL | Example (tenant `demo`, kernel `desk.gentian.org`) |
-|---|---|---|
-| IdP base | `https://id.${KERNEL_DOMAIN}` | `https://id.desk.gentian.org` |
-| Realm | `/realms/${TENANT_ID}` | `/realms/demo` |
-| Full issuer | `https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}` | `https://id.desk.gentian.org/realms/demo` |
-| App login redirect | `https://{sub}.${TENANT_DOMAIN}/…` | `https://projects.demo.desk.gentian.org/…` |
-| Portal / post-logout | `https://portal.${KERNEL_DOMAIN}` | `https://portal.desk.gentian.org` |
-
-**Two configuration styles in existing profiles:**
-
-1. **OpenDesk charts with `global.domain` + `global.hosts`** (Element, Jitsi,
-   OpenProject, XWiki): set `global.domain: "${KERNEL_DOMAIN}"`,
-   `global.hosts.keycloak: "id"`, and prefix **tenant app** host labels with
-   `${TENANT_ID}` (`element.${TENANT_ID}`, `projects.${TENANT_ID}`, …). OIDC
-   redirect URIs and public app URLs still use `${TENANT_DOMAIN}`.
-2. **Explicit OIDC property blocks** (OpenProject `openproject.oidc.*`, OX
-   `com.openexchange.oidc.*`, XWiki `oidc.provider`): every endpoint and issuer
-   must use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`. Charts without
-   `global.hosts.keycloak` (OX) may keep `global.domain: "${TENANT_DOMAIN}"`
-   for the app hostname only — but must not derive IdP URLs from it.
-
-The operator seeds OIDC issuer/client credentials in OpenBao as
-`https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}` (stable across vanity
-`spec.domain` overrides). Profiles that use `valueMapping.oidc.issuerKey`
-(Element/Synapse) rely on that seed; do not hardcode a tenant-scoped IdP host.
-
-**Common IdP mistakes:**
-
-- `global.domain: "${TENANT_DOMAIN}"` with `hosts.keycloak: "id"` → resolves to
-  `id.demo.desk.gentian.org` (404). Use `${KERNEL_DOMAIN}` instead.
-- Hardcoded realm names (`opendesk`, `souvap`) instead of `${TENANT_ID}`.
-- Redirect URIs on `${KERNEL_DOMAIN}` or portal host instead of `${TENANT_DOMAIN}`.
-- No `backchannelLogout`, so signing out of the portal leaves the app signed
-  in. See below.
-- Role settings pointed at group names the platform does not issue, so every
-  member is refused after a successful sign-in. See below.
-
-### Signing out — declare it, or the app keeps the session
-
-An app with its own OIDC client also keeps its own session cookie. Ending the
-identity session does not touch it. When a person signs out, Keycloak ends its
-session and notifies each client of that session **that has somewhere to be
-notified** — so a profile that declares nothing simply is not told.
-
-What that looks like: sign out, sign in as somebody else, open the app, and it is
-still serving the first account. On a shared machine, "log out" does not.
-
-```yaml
-oidc:
-  clientId: "gentian-example"
-  redirectUris:
-    - "https://example.${TENANT_DOMAIN}/oauth/callback"
-  postLogoutRedirectUris:
-    - "https://example.${TENANT_DOMAIN}/"
-  backchannelLogout:
-    exposure: web                        # an entry of this profile's spec.expose
-    path: /oauth/backchannel-logout      # the app's endpoint, as a plain path
-```
-
-**A path, not an address.** The platform builds the address from the entry's own
-backend — `http://<backend.service>.<namespace>.svc.cluster.local:<backend.port><path>`
-— and registers that with the realm, with `backchannelLogoutSessionRequired`.
-Keycloak then calls the app inside the cluster, server to server. The older
-`backchannelLogoutUrl`, a free-form address, is refused: every profile wrote the
-app's public address there, where every path is behind a session and Keycloak's
-request was answered with a redirect to the sign-in; and a free-form address let
-a catalog entry make the identity provider post to anywhere.
-
-The entry has to route to this component's own Service. The path is segments of
-letters, digits, `_`, `~` and `-`, with single dots inside a segment: no query,
-no `..`, no `//`.
-
-**The app sees its Service's name in the Host header**, not its public name. An
-app that refuses a host it does not know needs that name
-(`<service>.${TENANT_NAMESPACE}.svc.cluster.local`) among the hosts it trusts.
-Trusting a name opens no path to the app; it only lets the app answer a caller
-that could already reach it.
-
-**The app must check the token.** A logout token is a JWT the realm signs. Before
-it ends a session the app has to verify the signature against the realm's keys,
-the issuer, that the audience is its own client, and the back-channel logout
-event. An app that does not lets whoever can reach that path sign people out —
-never in. Read the app's code for this, and write into `customization.md` what it
-checks; `profiles/nextcloud/base/base-ce` and `profiles/xwiki/xwiki-ce` are the
-examples.
-
-**Prove it.** `e2e/oidc-sign-out/` runs the app's real image against Keycloak:
-sign in, sign out at Keycloak, and the app's cookie no longer works. A
-declaration that was never run is marked as such in the profile.
-
-**Backchannel, not frontchannel.** Keycloak drives frontchannel logout through
-hidden iframes, which makes it a third-party context — precisely the context
-whose cookies browsers now withhold, and the reason sign-in itself must run in
-the top-level window rather than in the shell's frame. A server-to-server POST
-carrying a `logout_token` is unaffected by any of that.
-
-**Keycloak tells once.** It posts when a person signs out or an administrator
-ends the session. It does not post again if the app did not answer, and not when
-a session merely runs out.
-
-**The endpoint is the relying party's, which is not always the app you are
-packaging.** Element's client belongs to Synapse, so the endpoint is Synapse's
-and Synapse must also be configured to honor it. Look up the path in the
-project's own documentation rather than assuming `/oauth/backchannel-logout`;
-the ones already in this repo differ from each other. Some apps need more than
-the path: Open WebUI answers only with a switch on and can end a session only
-with Redis behind it.
-
-**A profile with its own Composition** registers its client itself: the address
-is built by the platform's Composition, and a Composition of the profile's own
-has to build it the same way or the declaration does nothing.
-
-**Not every app can.** django-allauth implements no logout-token endpoint, and an
-OAuth2 module such as Odoo's `auth_oauth` is not an OIDC relying party at all.
-Where that is the case, say so in the profile where the field would otherwise be
-absent — an unexplained gap reads as an oversight and invites someone to invent a
-URL for it. Those sessions end on their own timeout, and that is a real
-limitation to be aware of rather than a detail.
-
-**Also declare `postLogoutRedirectUris`.** Without them Keycloak refuses the
-`post_logout_redirect_uri` and strands the user on an error page after an
-otherwise successful sign-out.
-
-### Group names — what the claim actually contains
-
-Apps that gate access on roles read the `groups` claim, and the mapper is created
-with `full.path=false`, so the claim carries bare names rather than paths. The
-realm holds exactly these:
-
-| Group | Meaning |
-|---|---|
-| `gentian:tenant:<t>:members` | every member of the tenant |
-| `gentian:tenant:<t>:admins` | tenant administrators |
-| `gentian:tenant:<t>:app-admins` | may install and configure apps |
-| `gentian:tenant:<t>:app:<app>` | entitled to that one app |
-
-Two rules follow. **Put the tenant in the name** — `gentian:tenant:admins` exists
-in no realm, and a setting pointing at it silently promotes nobody. **Gate on the
-app entitlement group**, not on `…:members`: installing an app creates its
-entitlement group, and a member holds it only where the tenant administrator
-granted that app, so admitting `…:members` hands the app to the whole tenant and
-discards the check.
-
-Watch the app's default. Several apps ship an allow-list defaulting to names like
-`user,admin`, which this platform never issues — leave it unset and every member
-is refused after signing in successfully, which reads as a broken login rather
-than as a configuration gap.
-
-Where an app additionally keeps its *own* per-user access lists on top of this —
-Open WebUI does, for models — prefer switching that off to populating it. The
-tenant boundary is already enforced by the entitlement group and by the
-credentials the instance carries; a third list that defaults to denying everyone
-adds no boundary, only an empty screen.
-
-**ACME staging (dev):** this is the "public host unavoidable" branch of the
-server-to-server rule above — Synapse must present the same OIDC issuer string to
-the browser and validate it server-side, so it cannot swap in an internal URL and
-must instead trust the staging CA. When `tenantDNS01ClusterIssuer` contains `staging`,
-compositions mount `gentian-trust-anchor-tls` and (for Synapse) set
-`use_insecure_ssl_client_just_for_testing_do_not_use` plus explicit OIDC
-endpoints with `discover: false` and `user_profile_method: userinfo_endpoint` in
-`additionalConfiguration.oidc_providers` (see `gentian-os/docs/security/design.md`
-§9). `install.sh` and the gentian-os operator bootstrap `gentian-trust-anchor-tls`
-in `gentian-dev` and replicate it into each `tenant-*` namespace; run
-`./update.sh --acme-issuers` to refresh the bundle after issuer or kernel cert
-changes.
-
----
-
-## 3. Secrets and valueMapping
-
-Secrets are **never** placed in `extraValues`. They travel from OpenBao →
-Crossplane `ExternalSecret` → flat Kubernetes `Secret` → Helm `set[]` values.
-
-`valueMapping` maps each secret category to the Helm value path the chart expects:
-
-```yaml
-valueMapping:
-  oidc:
-    clientSecretKey: "openproject.oidc.secret"   # path in Helm values tree
-  database:
-    # Map ALL FIVE fields — missing any one causes the chart to fall back to
-    # a default (usually empty or wrong). This is the most common database bug.
-    hostKey:     "postgresql.connection.host"
-    portKey:     "postgresql.connection.port"
-    nameKey:     "postgresql.auth.database"
-    userKey:     "postgresql.auth.username"
-    passwordKey: "postgresql.auth.password"
-  s3:
-    secretKeyKey: "s3.auth.secretAccessKey"       # only the secret key is secret
-  smtp:
-    passwordKey: "environment.OPENPROJECT_SMTP__PASSWORD"
-  ldap:
-    bindPasswordKey: "environment.OPENPROJECT_SEED_LDAP_..._BINDPASSWORD"
-```
-
-Non-secret fields (S3 endpoint, S3 bucket name, S3 access key ID, LDAP host, SMTP
-host) belong in `extraValues` using placeholders, **not** in `valueMapping`.
-
----
-
-## 4. App-level secrets (appSecrets)
-
-Use `appSecrets` for secrets that belong to the app itself and are not provisioned
-by a kernel reconciler (e.g. initial admin passwords):
-
-```yaml
-appSecrets:
-  - name: admin_password
-    valuePath: "openproject.admin_user.password"
-```
-
-The orchestrator seeds these into OpenBao under
-`gentian-os/tenants/{tenant}/apps/{app}/internal/{name}` and injects them via
-the Crossplane `ExternalSecret` → Helm `set[]` pipeline at deploy time.
-
----
-
-## 5. Edge routing, TLS and CORS
-
-### 5a. How TLS is provisioned
-
-Setting `spec.ingress` (with `tlsEnabled: true`, the default) tells the
-gentian-os controller to create:
-
-1. A Gateway API `HTTPRoute` at `{subDomain}.{effectiveDomain}` → `Service:{servicePort}`.
-2. One **DNS-01 wildcard** cert-manager `Certificate` per tenant
-   (`tenant-{tenant}-wildcard-tls`) covering `*.{effectiveDomain}`.
-
-All app routes for that tenant reference the same TLS secret on the tenant Gateway.
-**Do not** set per-app HTTP-01 issuers in profiles — `spec.ingress.clusterIssuer`
-is reserved for a possible future mode and is **ignored** by the operator today.
-See [gentian-os/docs/overview/architecture.md](../gentian-os/docs/overview/architecture.md) §6.1.
-
-**Narrow exception:** an older gentian-os CRD schema defaulted this field
-server-side (removed; see gentian-os commit `5484346`), which permanently
-baked `clusterIssuer: letsencrypt-http01` into any live `AppProfile` that hit
-the code path (profiles declaring `sidecars`, e.g. `odoo-cb-base`). Since
-Server-Side Apply doesn't retroactively prune a value it never itself declared,
-such a profile sets it explicitly in git to match — not because the field does anything, but so ArgoCD stops reporting a
-permanent diff against a value only the API server ever wrote. **Do not copy
-this into a new profile** unless `kubectl get appprofile <name> -o
-jsonpath='{.spec.ingress.clusterIssuer}'` shows it's already live and
-undeclared.
-
-```yaml
-ingress:
-  subDomain: "projects"        # → projects.demo.desk.gentian.org
-  serviceName: "openproject"   # must match the Kubernetes Service name
-  servicePort: 8080
-  tlsEnabled: true             # default
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "128m"  # bridged to Envoy policy
-```
-
-**`subDomain` capitalization matters.** The field is validated; `subdomain`
-(lowercase) is silently ignored, leaving the app with no edge route.
-
-### 5b. Always disable chart-managed ingress
-
-Every chart that ships its own `Ingress` or Gateway route must have it disabled,
-otherwise two edge routes collide on the same host:
+- **The first line is the app's license**, as an `SPDX-License-Identifier:`
+  comment. A profile without one is not accepted.
+- **The header comment is part of the profile.** The recent profiles open with
+  the source of chart and image, how sign-in works and why, who administers
+  the app and how that is applied, and an inventory of every secret: which the
+  platform provides, which the profile generates, and what each is for. Write
+  it for the reviewer who has never seen the app. A field that is deliberately
+  absent gets a comment saying why (Paperless-ngx on `backchannelLogout`,
+  Docmost on `cache`); an unexplained gap reads as an oversight and invites
+  someone to fill it wrongly.
+- **Required fields**: `classes`, `launch`, `trustTier`, `version` and
+  `package`. None has a default, on purpose: "nobody opens this" and "nothing
+  checks this caller" have to be words somebody wrote.
+- **Edition and family are labels, never part of the name.** The edition is
+  `ce`, `me`, `ie`, `pe` or `ee` ([AGENTS.md](../AGENTS.md) says which is
+  which); this catalog holds `ce` and `me`, and both are named `<app>-ce`.
+  Display name, summary, description, categories and logo are the App Store's
+  and are not in the profile; only the tile is (§7.2).
+- **`requires.platform`** is the oldest platform version line the bundle runs
+  on. Raise it when the profile uses a field a newer line introduced, and
+  vendor that line's CRDs under `contracts/platform/` first.
+
+### 3.2 Declare only what the app needs
+
+Every entry under `requires.services` makes infrastructure and opens network
+paths: a database and a role, a bucket, a cache user, a realm client, a mail
+relay path. Each is reconciled for every tenant on every install. Declare what
+the app reads, and nothing on the chance it might. Two that bite:
+
+- `cache` provisions a Redis ACL user. An app that cannot authenticate with a
+  username (Docmost) runs a pod-local Redis instead and declares nothing.
+- `llm` gives the app a key at the model gateway and holds the app's release on
+  a cluster that serves no models. Declare it when the app cannot run without
+  a model, and leave the app's optional AI features off otherwise, with a
+  comment saying how to switch them on.
+
+Most profiles are `classes: [app]`, `trustTier: certified`, `launch: tile`.
+`platform` trust unlocks what reaches beyond the tenant (`forwardToken`,
+`rights`, `vouching`) and a composition of the bundle's own, and is for the
+platform's own components.
+
+## 4. The chart and its values
+
+### 4.1 What every chart deployment sets
 
 ```yaml
 extraValues:
+  fullnameOverride: "example-ce"        # the Service name; equals metadata.name
   ingress:
-    enabled: false
+    enabled: false                       # the platform routes; a chart Ingress collides
+  podAnnotations:
+    reloader.stakater.com/auto: "true"   # restart on credential rotation; or
+    # secret.reloader.stakater.com/reload: example-ce-sensitive-values, for this app's Secret only
 ```
 
-### 5c. Predictable Service name
+- **`fullnameOverride` is the Service name**, and it is `metadata.name`. Every
+  `expose[].backend.service` and every in-cluster address in a hook refers to
+  it. A Helm release name is not stable; this is.
+- **Every pod template takes `podLabels`.** The operator writes
+  `gentianos.io/app` and `gentianos.io/tenant` into the chart's `podLabels`,
+  and the tenant's network policies select the app's pods by them. A pod a
+  chart renders without them has no network path. A first-party chart applies
+  `.Values.podLabels` to every Deployment, StatefulSet, CronJob and Job it
+  renders.
+- **Resources, probes and the security context are chart values.** There is no
+  profile-level field for them. A first-party chart ships sensible requests and
+  limits, readiness and liveness probes, and runs as a non-root user with a
+  read-only root filesystem where the app allows it. Where the app needs a
+  waiver, ask for it as a privilege with a reason
+  (`requires.privileges.podSecurity`), never by weakening the chart silently.
 
-The Crossplane composition generates a random Helm release name. If the chart
-derives its Service name from the release name, the operator cannot predict it.
-Set `fullnameOverride` to lock the Service name:
+### 4.2 Platform values arrive through `valueMapping`, and only there
 
-```yaml
-extraValues:
-  fullnameOverride: "openproject"   # must match spec.ingress.serviceName
-```
+`spec.package.valueMapping` maps each value the platform provides to the chart
+key that reads it. Map every key the chart needs: a database block maps all
+five of `hostKey`, `portKey`, `nameKey`, `userKey` and `passwordKey`, an S3
+block the endpoint, bucket, access key, secret key and region. A key left
+unmapped falls back to the chart's default, which is empty or wrong, and the
+failure shows up as a connection error far from its cause.
 
-### 5d. CORS — why most apps need nothing extra
+**Never write a platform value into `extraValues` as well.** The two land on
+the same values path; the fixed one wins or loses by rendering order, and the
+result is a profile that works on one cluster and not another. The database
+host, the bucket name, the mail relay, the OIDC issuer and client secret are
+all platform values. What belongs in `extraValues` is what is the same for
+every tenant on every cluster: feature flags, the app's own addresses built
+from placeholders, sizes.
 
-Gentian OS avoids browser CORS issues by architecture:
+For sign-in, map `valueMapping.oidc.issuerKey` and `clientSecretKey` and let
+the app discover its endpoints from the issuer server-side. Spelling the
+authorization, token and userinfo endpoints into `extraValues` by hand is a
+maintenance burden and a source of drift.
 
-- Apps load in **iframes** from the Gentian Portal on `portal.{kernelDomain}`;
-  app UIs are on `{sub}.{tenantDomain}` (cross-origin). The operator injects
-  `frame-ancestors` for the kernel portal origin.
-- **OIDC** token exchange is server-side — no `fetch()` to a foreign origin.
-- When the shell itself needs to call an app's API, declare a
-  `spec.browserProxy` route (see §5e). The shell server proxies the call
-  server-side; the browser sees a same-origin request.
+### 4.3 Five placeholders
 
-If your app's own UI calls back to its own backend (normal REST/XHR to the same
-host), no CORS configuration is needed.
+The operator substitutes these in `extraValues`; a hook script gets the first
+four, and the sign-in client's addresses `${TENANT_DOMAIN}` and
+`${KERNEL_DOMAIN}`. An extension's values additionally take `${SIDECAR_ID}`,
+the extension's own name, and `${NODE_IP}` where a cluster states one (for a
+TURN edge):
 
-### 5e. Shell proxy for app APIs (`spec.browserProxy`) — planned, not yet implemented
-
-> **Status:** The `browserProxy` field exists on the AppProfile CRD but the
-> gentian-ui frontend and backend do **not** implement it yet. Do not rely on
-> it in profiles today — the shell will not proxy anything. This section
-> documents the intended design for when implementation lands.
-
-Declare a `browserProxy` route when the gentian shell (not the app's own UI)
-needs to call the app's API from the browser. The shell will expose
-`/api/apps/{appName}/{path}` and forward requests to the cluster-internal
-service, injecting the user's bearer token.
-
-```yaml
-browserProxy:
-  - path: api
-    target: "http://openproject.{namespace}.svc/api/v3/"
-    authMode: forward-bearer   # default — forwards the user's Bearer token
-    stripPrefix: true          # default — strips /api/apps/{name}/api before forwarding
-```
-
-**When you'll need it:** the shell calls the app's REST API to show a widget,
-badge count, or AI context. **When you don't:** the app's own UI calls its own
-backend (same host, no CORS).
-
----
-
-## 6. Portal iframe embedding (CSP / `frame-ancestors`)
-
-Gentian apps open inside the **kernel portal** (`https://portal.${KERNEL_DOMAIN}`)
-in an iframe (gentian-ui window manager). The app UI is cross-origin
-(`https://element.${TENANT_DOMAIN}`, etc.). Browsers block embedding unless the app
-response explicitly allows the portal origin in **`Content-Security-Policy:
-frame-ancestors`**.
-
-### 6a. Firefox “will not allow … if another site has embedded it”
-
-That message means the app's CSP (or `X-Frame-Options`) does **not** include
-`https://portal.${KERNEL_DOMAIN}` in `frame-ancestors`, or Keycloak (`id.<kernel>`)
-does not yet allow the app origin (`https://element.<tenant>`, etc.) when OIDC loads
-inside a WinBox iframe.
-
-**Launch behavior (gentian-ui):**
-
-| Click | Behavior |
+| Placeholder | Value |
 |---|---|
-| Normal click on an `embedded` tile | Opens in WinBox (portal shell iframe) |
-| **Ctrl/Cmd+click** (any tile) | Opens in a **new browser tab** |
-| `newwindow` tile (e.g. OX App Suite) | Normal click → new tab (app blocks iframes; use only when the app cannot run in WinBox) |
+| `${TENANT_DOMAIN}` | the tenant's domain; the app answers at `<subDomain>.${TENANT_DOMAIN}` |
+| `${TENANT_ID}` | the tenant's name, and its realm |
+| `${TENANT_NAMESPACE}` | the tenant's namespace |
+| `${APP_ID}` | this profile's name |
+| `${KERNEL_DOMAIN}` | the cluster's own domain; the identity provider is `id.${KERNEL_DOMAIN}` |
 
-OIDC apps that work in the portal shell (Element, XWiki, …) should use **`linkTarget: embedded`**
-in `portalTiles`. Reserve `newwindow` for apps that block iframe embedding (OX App Suite).
+Anything else between `${` and `}`, and `${KERNEL_DOMAIN}` in a hook script,
+reaches the container as literal text. Never
+write a cluster's address, a namespace or a realm by hand: a value that holds
+on one cluster is wrong on the next.
 
-The gentian-os **KeycloakPlatformReconciler** converges `id.<kernel>` HTTPRoute CSP
-and Keycloak realm `X-Frame-Options` for all tenants; `install.sh` verifies this
-before declaring the cluster ready.
+### 4.4 Public addresses for browsers, Service names for servers
 
-**Do not fix this in AppProfiles.** The gentian-os operator injects edge
-`frame-ancestors` policy on every HTTPRoute it manages (via Envoy
-`ResponseHeaderModifier` filters; AppProfile `nginx.ingress.kubernetes.io/*`
-annotation keys are bridged to equivalent Envoy policy).
+The browser reaches the app at `https://<subDomain>.${TENANT_DOMAIN}`. Every
+call made from inside the cluster, by the app, a hook, a companion or a sync
+Job, uses the Service name instead: `http://example-ce:8000` within the
+namespace, or `http://example-ce.${TENANT_NAMESPACE}.svc.cluster.local:8000`
+from another. The public name resolves in-cluster to the edge gateway, which
+means a sign-in redirect for a server, a staging certificate the client
+refuses, and a round trip that never needed to leave the node. Nextcloud's
+Collabora callback is the worked example: the editor's URL is public, its WOPI
+callback is the Nextcloud Service.
 
-| Check | Action |
-|---|---|
-| Portal URL | Users must use `portal.${KERNEL_DOMAIN}` — **not** `portal.${TENANT_DOMAIN}` (404 on multi-tenant). |
-| Profile `ingress.annotations` | **Never** add `X-Frame-Options`, `frame-ancestors`, or `Content-Security-Policy` — the operator owns this. Legacy per-tenant portal origins (`portal.${TENANT_DOMAIN}`) are stripped on reconcile. |
-| `linkTarget` | `embedded` and `newwindow` both load inside gentian-ui; CSP must still allow the kernel portal. Default `newwindow` is fine. |
-| Operator version | Reconcile the tenant after upgrading gentian-os so HTTPRoute policies are updated. |
+An app that refuses a `Host` it does not know has to trust its own Service
+name, since that is what the realm's back-channel logout and the platform's
+in-cluster callers send.
 
-### 6b. Double CSP headers (Element and similar)
+### 4.5 Switch off what calls the internet
 
-Some charts (notably **Element** / opendesk-element-web nginx) already send:
+Egress from a tenant is closed unless a privilege opens it. An app that
+phones home anyway does not fail cleanly; it waits for the timeout, on the hot
+path, on every request. Before publishing, read the app's configuration for
+telemetry, update checks, breached-password lookups, avatar and gravatar
+fetches, license pings and public CDN assets, and switch each off in
+`extraValues`, or in the app's own configuration from a hook where it has no
+value for it: Docmost's `telemetry.disabled` is the first, Nextcloud's
+`occ config:app:set password_policy enforceHaveIBeenPwned --value=false` in
+its start-up script the second. What the app legitimately needs from
+outside is a privilege with a `reason` (`requires.privileges.egress`), granted
+by the tenant's approver.
 
-```http
-Content-Security-Policy: frame-ancestors 'self'
-```
+### 4.6 Pin what you ship
 
-If ingress **appends** a second header with the portal origin, the browser
-enforces **both** policies — `'self'` still blocks embedding from
-`portal.${KERNEL_DOMAIN}`. Symptom: portal tile opens but the iframe is blank
-with the Firefox message above; `curl -sI` shows **two** `content-security-policy`
-lines.
+A profile pins a chart version and, where this repository builds the image, an
+image tag. On `develop`, that is the `<version>-develop.<sha7>` chart and the
+`develop-<sha7>` image CI published for the commit; before `develop` is merged
+into `main`, the profile goes back to plain versions ([releasing.md](releasing.md)).
+CI checks that every chart and image a profile names exists where it says.
 
-The operator **replaces** upstream CSP for standard AppProfile routes by clearing
-upstream `X-Frame-Options` and `Content-Security-Policy`, then setting a single:
+## 5. Sign-in
 
-```http
-Content-Security-Policy: frame-ancestors 'self' https://portal.<kernel-domain>
-```
+### 5.1 Exactly one of three
 
-Do not add per-app `Content-Security-Policy` or `X-Frame-Options` annotations — the
-operator owns iframe policy for tenant app HTTPRoutes.
+`requires.services.identity` is `oidc`, `saml` or `sidecar`; declare one (the
+sidecar excludes the other two), and configure nothing by hand in the realm. The platform creates the client in the
+tenant's realm, hands the app its secret through `valueMapping.oidc`, and
+removes the client with the app.
 
-### 6c. AppProfile checklist (all profiles)
-
-These profiles rely on the operator and need **no** CSP annotations:
-
-- `nextcloud`, `openproject`, `xwiki`
-
-Add only non-CSP `ingress.annotations` your chart needs (proxy timeouts, body size —
-bridged to Envoy `BackendTrafficPolicy`):
-
-```yaml
-ingress:
-  subDomain: element
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "100M"
-    # NO frame-ancestors / X-Frame-Options / Content-Security-Policy here
-```
-
-**No other app-level CORS setup is required** for normal same-origin app UIs.
-TLS and `browserProxy` bearer forwarding are platform-managed (§5d–5e).
-
-**Force edge route reconcile:** after an operator upgrade, bump the tenant to refresh
-route policy (the `gentianos.io/reconcile` timestamp annotation alone does
-not change `spec` — patch any field or delete the app HTTPRoute and let the operator
-recreate it):
-
-```bash
-kubectl delete httproute -n tenant-demo httproute-demo-element
-# operator recreates on next tenant reconcile (~seconds)
-```
-
-### 6d. Element SSO — OIDC redirect URI host (`element-ce`)
-
-Element Web is served at `element.<tenant-domain>` but the Matrix homeserver (Synapse)
-and its OIDC callback live at **`matrix.<tenant-domain>`**. The `element-ce` profile
-(`profiles/element/element-ce`) declares a second `spec.expose` entry, `matrix` →
-`synapse-web:8008`, and Keycloak `redirectUris` must target that homeserver host, not
-the Element Web host:
+### 5.2 The OIDC client
 
 ```yaml
 requires:
   services:
     identity:
       oidc:
+        clientId: "gentian-example"
+        name: "Example"
+        accessType: CONFIDENTIAL
         redirectUris:
-          - "https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback"
+          - "https://example.${TENANT_DOMAIN}/auth/callback"
+        postLogoutRedirectUris:
+          - "https://example.${TENANT_DOMAIN}/"
+          - "https://desktop.${TENANT_DOMAIN}/"
+        backchannelLogout:
+          exposure: web                       # an entry of this profile's expose
+          path: /auth/backchannel-logout      # the app's endpoint, as a path
 ```
 
-Using `element.${TENANT_DOMAIN}` here causes OIDC to fail after Keycloak login —
-Element shows **"Invalid username or password"** even though credentials are
-correct.
+- **`clientId` is `gentian-<app>`**, and `accessType` is `CONFIDENTIAL` for any
+  app with a server. `PUBLIC` is for an app that is only a browser.
+- **Redirect addresses are on the tenant's domain**, built from
+  `${TENANT_DOMAIN}`; the desktop is among the post-logout addresses so that
+  signing out of the app lands a person where they started.
+- **Declare back-channel logout as a path**, never as an address. The platform
+  builds the in-cluster address from the entry's Service and registers it; the
+  realm then posts its logout token to the app, server to server, when a
+  person signs out anywhere. The app must verify that token (signature,
+  issuer, audience, the logout event) before it ends a session; read the app's
+  code for this and record what it checks in the profile's `Customization`
+  record. An app whose
+  library has no such endpoint (django-allauth) cannot declare it: write the
+  comment, and the limitation is known rather than hidden.
+- **Prove it.** `e2e/oidc-sign-out/` signs in through a real Keycloak, signs
+  out, and checks the app's session is gone. Add the app there with its
+  declaration.
 
-**Matrix localpart:** the `app-element-ce` composition maps the Matrix localpart from
-`preferred_username` (`localpart_template`), requesting `openid profile email`; the
-client's pack (`oidc-catalog.yaml`, scope `matrix-scope`) adds the `full_name` and
-`email` mappers.
+### 5.3 What the realm tells the app
 
-**Keycloak URLs:** the browser is sent to the public
-`https://id.${KERNEL_DOMAIN}` authorization endpoint, while Synapse's own token,
-userinfo and JWKS calls use the in-cluster Keycloak URL (`KEYCLOAK_INTERNAL_URL`),
-never the public host from inside the cluster.
+The `groups` claim carries bare names: `gentian:tenant:<t>:members`,
+`gentian:tenant:<t>:admins`, `gentian:tenant:<t>:app-admins` and
+`gentian:tenant:<t>:app:<profile>`. Two rules follow:
 
-**Known pitfalls** (operator/IAM territory, not AppProfile YAML — diagnose via
-`gentian-os/docs/concepts/iam.md` before touching a profile):
+- **Gate on the app's own group**, `…:app:<profile>`, which a person holds
+  only where the tenant's administrator granted them this app. Gating on
+  `…:members` hands the app to the whole tenant and discards the check.
+- **Watch the app's default allow-list.** Several apps ship one that names
+  roles like `user,admin`, which this platform never issues; left in place,
+  every member is refused after a successful sign-in, which reads as a broken
+  login. Set the app's "everyone who signs in is a member" switch instead,
+  and let the entitlement group be the boundary.
 
-| Symptom | Likely cause |
-|---|---|
-| `502` on `/realms/.../broker/kernel/endpoint` | Broker using the external instead of in-cluster Keycloak URL, or a missing IdP mapper |
-| `invalid_client_credentials` from Keycloak | Synapse `client_secret` still holds the unsubstituted `@@OIDC_CLIENT_SECRET@@` placeholder — check the composition's secret mapping |
-| `invalid_claim: Invalid claim "iss"` | Configured OIDC issuer doesn't match the cluster's actual realm issuer URL byte-for-byte |
+The `email` claim is a person's workspace address. The person's `sub` and the
+realm's issuer are what is unique; a username is unique within one realm only.
 
-### 6e. IdP login inside a portal-embedded app (Keycloak `frame-ancestors`)
+### 5.4 The front door, and the app that has no single sign-on
 
-Portal tiles load tenant apps in an iframe (`portal.<kernel>` → `element.<tenant>.<kernel>`).
-OIDC SSO then loads **`id.<kernel>` inside the app iframe** (or a nested iframe such
-as Nordeck ICS silent login on `ics.<kernel>`). Firefox blocks with
-*“id… will not allow … if another site has embedded it”* when Keycloak's CSP only
-allows `https://portal.<kernel>` — the **immediate parent** is the app origin, not
-the portal.
+A `surface: gateway`, `authMode: oidc` entry sits behind the tenant's session.
+The front door tells the app who is asking in the `x-gentian-subject`,
+`-email`, `-name`, `-realm` and `-session` headers, strips the client's
+`Authorization` header and the session's cookies, and does not hand the app
+any token unless
+the profile asks: `exchangeToken: true` gives the app a short-lived token
+whose audience is the app alone, which it verifies against the realm's keys.
+An app that signs people in through its own OIDC client needs neither.
 
-CSP `host-source` allows at most one `*.` label. `https://*.<kernel>` does **not**
-match `element.demo.<kernel>`; each tenant needs **`https://*.<tenant-effective-domain>`**
-(e.g. `https://*.demo.desk.gentian.org`).
-
-| Layer | Who sets CSP | Must allow |
-|---|---|---|
-| App HTTPRoute (`element`, `wiki`, …) | gentian-os operator | `https://portal.<kernel>` (§6a–6b) |
-| IdP HTTPRoute (`id.<kernel>`) | gentian-os `KeycloakPlatformReconciler` (HTTPRoute patch + realm `X-Frame-Options` jobs) | `https://portal.<kernel>`, `https://*.<kernel>`, `https://*.<tenant-effective-domain>`, **and** explicit `https://{ingress.subDomain}.<tenant-effective-domain>` for every **installed OIDC AppProfile** (discovered automatically — no manual subdomain list) |
-
-**Do not maintain a static IdP allowlist in AppProfiles or Nubus values.** When you add
-a new OIDC app, declare `kernelRequirements.identity.oidc` and `ingress.subDomain`;
-the operator adds the app origin to `id.<kernel>` on the next tenant or AppProfile
-reconcile. `install.sh` step 16a verifies the IdP HTTPRoute converged.
-
-Helm values provide the install baseline; the operator patches the Keycloak proxy
-ingress on every tenant reconcile when tenants are added or removed. The operator
-also clears Keycloak **`X-Frame-Options: SAMEORIGIN`** on kernel and tenant realms
-(broker `/endpoint` callbacks fail in iframes even when `frame-ancestors` is correct).
-After changing nubus values in Git, sync the nubus manifests app so Crossplane
-reapplies the release. Verify:
-
-```bash
-curl -sI https://id.${KERNEL_DOMAIN}/ | grep -i content-security
-# expect: frame-ancestors 'self' https://portal.<kernel> https://*.demo.<kernel> …
-```
-
-### 6f. Embedded apps must not draw their own window chrome
-
-gentian-ui is the window manager: it supplies the title bar, the desktop and the
-app switcher. An app opened with `linkTarget: embedded` fills a window body, so
-any chrome it draws for itself is a second, wrong one — a top bar inside a title
-bar, or a rounded card floating on the app's own wallpaper inside the shell's.
-
-Hiding the app's header is only half of it. Modern app shells reserve the header's
-height on the content container and paint a background behind an inset, rounded
-content card; hide the header alone and the reserved strip stays as an empty gap
-with the wallpaper showing through it. **Four things have to go, not one:**
-
-| What | Typical mechanism |
-|---|---|
-| The header itself | `display: none` |
-| The space reserved for it | a `margin-top` / `padding-top` / `top` of the header height on the content container |
-| The inset and rounded corners of the content card | a container margin and border-radius, often behind CSS variables |
-| The background the card floats on | a wallpaper or accent color on `<body>` or `<html>` |
-
-Detect the iframe client-side (`window.self !== window.top`) rather than serving
-different HTML per route — the app is reachable directly at its own host too, and
-a user who opens it there needs its navigation. Put the detection and the rules in
-`<head>`, before the stylesheets, so the header never paints and the content never
-starts a header-height down and then jumps.
-
-**Override the container the app actually renders, not the one in the template.**
-Nextcloud's `layout.user.php` ships `<div id="content">`, but every Vue app —
-Files, Settings, the addons — mounts `NcContent`, which renders `#content-vue`
-and carries its own scoped copy of the same layout rule
-(`.content[data-v-…] { margin-top: var(--header-height) }`). A rule written
-against `#content` alone silently does nothing on exactly the screens users open
-from the portal. An id selector under the embed class clears the scoped rule;
-matching on the shared `.content` class is a coin-flip on specificity.
-
-**Nextcloud** is the worked example. Its entrypoint hook rebuilds
-`core/templates/layout.{user,public}.php` from the image's pristine copy under
-`/usr/src/nextcloud` on every start and injects a block after
-`<meta charset="utf-8">`: a nonce'd script that sets `html.gentian-embedded`, and
-a stylesheet that hides `#header`, zeroes `#content`'s `margin-top`, and — on
-`body`, where the theming variables are declared — sets
-`--body-container-margin`, `--body-container-radius` and `--body-height` and
-clears `--image-background`.
-
-Rebuilding from the pristine copy is what makes the hook re-appliable.
-`/var/www/html` is a persistent volume: an in-place edit guarded by "is my marker
-already there?" pins whichever revision of the block landed first, and no later
-change to it ever reaches a tenant that has already been installed.
-
-`style-src` is `'self' 'unsafe-inline'` and carries no nonce-source, so the
-`<style>` needs no nonce; `script-src` is nonce-only, so the `<script>` does.
-
-**Themes: the shell is light-only, and the app must be defaulted, not pinned.**
-The Gentian design system (`gentian-ui/frontend/design-system/gentian-theme.css`)
-defines one palette with no dark variant. Nextcloud's `default` theme follows
-`prefers-color-scheme`, so a user on a dark OS gets a `#171717` app inside a
-light window frame. Removing the app's own wallpaper makes this *worse*: the
-flat expanse that replaces the photo is the theme's background color, at full
-window size.
-
-`enforce_theme` looks like the lever and is the wrong one. It is a **system**
-config, and `ThemesService::getEnabledThemes()` applies it as
-`array_merge([$enforcedTheme], $enabledThemes)` — so a logged-in user whose
-`enabled-themes` is unset still gets the hardcoded `["default"]` merged in, and
-`<body>` still carries `data-theme-default`. It also removes the per-user
-light/dark switch outright.
-
-Set the **user default** instead. Nextcloud has no admin-level default theme, so
-this is a per-user value, applied only when unset so a deliberate choice
-survives:
-
-```bash
-occ user:setting <uid> theming enabled-themes '["light"]'
-```
-
-Two traps in automating that. A Nextcloud user exists only after their **first
-OIDC login**, so a start-up hook cannot reach someone who has not arrived yet —
-write the script to disk and let the cron sidecar re-run it, exactly as the mail
-provisioning does. And test with the **exit code**: `occ user:setting` prints
-*"The setting does not exist for user X"* on **stdout** and exits 1, so a check
-on captured output is non-empty precisely when the value is missing — backwards,
-and silent.
-
-**`data-theme-default` is what the embedded editor reads.** Collabora takes its
-theme from richdocuments' `getUITheme()`, which honors the Nextcloud theme only
-when that attribute is absent and otherwise falls back to the OS preference:
-
-```js
-const matchedDarkMode = (!dataset?.themes || dataset?.themes === '' || dataset?.themeDefault === '')
-    ? systemDarkMode : nextcloudDarkMode
-```
-
-So the attribute is not cosmetic — it decides the theme of a whole second
-application. Check it on an **authenticated** page: anonymous requests resolve
-themes differently, and a login page can show the intended theme while every
-signed-in user gets the other one.
-
-**Do not repaint the app to match the shell.** Nextcloud holds `primary_color`,
-`background_color` and `backgroundMime` as theming **app** config, in the
-database, so a hook that sets them writes state a later revert of that hook
-cannot take back. Matching the container is the job; matching the palette is
-the admin's call.
-
-This is deliberately **not** `--header-height: 0`. That variable also sizes
-NcModal's own header — its close button is `margin: calc((var(--header-height) -
-var(--default-clickable-area)) / 2)` and its play/pause controls are
-`width: var(--header-height)` — so zeroing it globally collapses modal chrome.
-Override the two or three rules that consume it for page layout instead.
-
-### 6g. Nextcloud (App Store)
-
-Nextcloud is an **App Store app** (`profiles/nextcloud/profile.yaml`), not a kernel
-service. Each tenant gets a dedicated instance at `nextcloud.<tenant_domain>`, with
-Collabora on the same host under its own paths.
-
-**Gateway policy (declared on the profile, not in gentian-os):** the `collabora`
-exposure shares Nextcloud's host (`subDomain: nextcloud`) and serves only `/browser`,
-`/cool` and `/hosting/{discovery,capabilities}`, with Collabora's administration and
-conversion paths in `denyPaths`. A host of its own would break the first document of
-every session: the editor frame opens with a form POST carrying the WOPI access token,
-the session cookie is per host, and the sign-in redirect turns that POST into a GET
-without the token. `gentianos.io/gateway-escaped-slashes-action: KeepUnchanged` lets
-Envoy forward the URL-encoded `/cool/.../ws` WebSocket path without
-`path_normalization_failed`.
+An app that, in the edition published, can do neither OIDC nor SAML declares
+the platform's **sign-in sidecar** (Docmost, OpenProject):
 
 ```yaml
-- name: collabora
-  surface: gateway
-  authMode: oidc
-  subDomain: nextcloud
-  paths: [/browser, /cool, /hosting/discovery, /hosting/capabilities]
-  denyPaths: [/browser/dist/admin, /cool/adminws, /cool/convert-to, /cool/getMetrics]
-  annotations:
-    gentianos.io/gateway-escaped-slashes-action: KeepUnchanged
-  backend:
-    service: nextcloud-collabora
-    port: 9980
+requires:
+  services:
+    identity:
+      sidecar:
+        entryPaths: ["/", "/login"]      # the app's front page and its own sign-in page
+        database: true                   # what the handler is given, and no more
+        secrets: [app_secret]
+        appPort: 3000
+expose:
+  - name: web
+    surface: gateway
+    authMode: oidc
+    denyPaths: [/api/auth/login, /api/auth/setup]   # the app's own ways in, refused at the front door
 ```
 
-OIDC uses the tenant realm (`${TENANT_ID}`) with client ID `gentian-nextcloud` and
-the `gentian-nextcloud-scope` pack from the OIDC catalog. Portal SSO follows the
-same tenant-realm + kernel IdP broker path as Element and other installed apps.
+The handler, one JavaScript file in the bundle as the ConfigMap
+`<profile>.sign-in-handler`, is the program that knows how this app keeps a
+session. It can become anybody in the app, so it is the last resort and comes
+with a `Customization` record (rung L2) that says what it writes itself. Who
+administers the app is who holds the platform's App Admin role, and the
+handler gives and takes the app's own administrator role at every sign-in.
+Refuse the app's first-run or setup call under `denyPaths`: whoever reached it
+first would own the installation. The full contract is
+[app-customization.md §2.3a](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/app-customization.md)
+and [`images/gentian-sidecar-sso-saml/README.md`](../images/gentian-sidecar-sso-saml/README.md);
+`images/gentian-sidecar-sso-saml/e2e/` runs the handler against the real app.
 
-Use the **replace** CSP pattern from §6b so `portal.<kernel_domain>` can embed the
-Files tile (`linkTarget: embedded`).
+## 6. App administrators
 
-#### Collabora WOPI — critical configuration
-
-Collabora is a **server-side companion** — the general case is any app that ships
-a back-end helper (document editor, media transcoder, search indexer, thumbnailer)
-that calls back into the main app or another cluster service. Per the public-vs-internal
-rule (§2), those callbacks use **internal service DNS**; the browser-side editor URL
-stays public. The `coolwsd`-specific settings below must align or document editing
-silently fails — but the *shape* of the problem (internal callback URL + SSL scheme +
-egress + host allowlist) recurs for any such companion:
-
-| Setting | Value | Why |
-|---|---|---|
-| `storage.ssl.as_scheme=true` | `extra_params` | **Critical.** Without this, coolwsd always uses SSL for WOPI callbacks regardless of the URL scheme — it tries TLS to port 8080 and hangs with `Connection timed out`. |
-| `storage.ssl.enable=false` | `extra_params` | Internal WOPI callback is plain HTTP (`http://nextcloud.<ns>.svc:8080`); no TLS needed. |
-| `wopi_callback_url` | `http://nextcloud.${TENANT_NAMESPACE}.svc.cluster.local:8080` | Must be the **internal** service URL, not the public `https://nextcloud.<tenant>`. Collabora uses this to call back into Nextcloud for CheckFileInfo/GetFile. |
-| `aliasgroups` | Internal + `http://nextcloud.<domain>:8080` + `https://nextcloud.<domain>` | coolwsd validates the WOPI source host against aliasgroups; all forms of the Nextcloud URL must be listed. |
-| `net.post_allow` | `10\.\d+\.\d+\.\d+`, `.*\.svc\.cluster\.local` | Required for coolwsd to accept POST requests from cluster-internal addresses. |
-| `securityContext.capabilities` | `CHOWN`, `FOWNER`, `SYS_CHROOT` | Collabora's `cool` user needs these to create jails and manage file permissions. |
-
-**Egress for HTTPS hairpin:** Collabora pods fetch Nextcloud settings/files via
-`https://nextcloud.<tenant_domain>` when opening documents in the browser. The
-CoreDNS hairpin resolves this to the edge gateway. The profile's
-`requires.services.identity` is what opens that path, and the Collabora pod
-carries `gentianos.io/app: nextcloud-base-ce` so that it applies to it.
-
-#### No blocked egress call in a hot path
-
-Nextcloud's `password_policy` app runs a **HaveIBeenPwned** breached-password check that
-calls `api.pwnedpasswords.com` on every password set. Cluster egress blocks it,
-so each call waited for the ~5s timeout. The profile disables it
-(`occ config:app:set password_policy enforceHaveIBeenPwned --value=false`). When
-wrapping any chart, audit for outbound calls to the public internet (breach
-checks, telemetry, avatar/gravatar fetches, license pings, update checks) and
-disable them — a blocked call becomes a multi-second stall, not a clean failure.
-
-The licensed OpenDesk Nextcloud stack is **not** part of gentian-os or gentian-apps;
-customers who need it install it from the proprietary catalog separately.
-
-### 6h. App administrators (`app-admins` → in-app privileged role)
-
-Cross-app **in-app administrators** (Nextcloud `admin` group, future Matrix
-room admins, etc.) are **not** tenant IT admins (`gentian:tenant:<t>:admins`) and
-are **not** the same as portal tile entitlements (`gentian:tenant:<t>:app:<profile>`).
-
-| Group / field | Purpose |
-|---|---|
-| `gentian:tenant:<t>:app-admins` | Workspace members who should receive the **privileged in-app role** in every installed app that declares one |
-| `gentian:tenant:<t>:app:<profile>` | Portal tile + OIDC entitlement only |
-| `spec.provisioning.privilegedRole` on `AppProfile` | Maps `app-admins` members to the app's native admin construct |
-
-**Operator flow** (`gentian-os` tenant reconciler):
-
-1. Bootstrap `gentian:tenant:<t>:app-admins` in Keycloak with other Gentian groups.
-2. After apps are ready, list `app-admins` members and reconcile into each
-   installed profile that sets `spec.provisioning.privilegedRole`.
-3. Requeue periodically (5m) and **immediately** when the Admin Console patches
-   `gentianos.io/app-privilege-requested-at` on the `Tenant` CR (membership change).
-
-**Admin Console:** tenant admins assign members to **App administrator** on the
-Members tab (maps to `app-admins`). This does **not** grant portal tiles — assign
-`app:<profile>` entitlements separately when needed.
-
-**The split:** the platform resolves who the app administrators are and runs a
-Job; **the profile supplies the Job**, because how you grant an admin role is a
-property of the application, not of the kernel. gentian-os contains no app's
-protocol, endpoint or account model — see **Platform boundary** above.
+The platform knows who the tenant's app administrators are, the members of
+`gentian:tenant:<t>:app-admins`. How an app grants its own administrator role
+is the app's business, so the profile supplies the Job and the platform runs it
+whenever the membership changes:
 
 ```yaml
-spec:
+hooks:
   provisioning:
     privilegedRole:
-      kind: group          # only "group" is supported today
-      name: superuser      # passed through as GENTIAN_PRIVILEGED_ROLE
+      kind: group
+      name: superuser                   # descriptive; the script is what it means
     syncJob:
-      image: docker.io/example/app:1.0    # usually the app's own image
-      env:                                # bind Secret keys explicitly
+      image: ghcr.io/example/app:1.2.3  # usually the app's own image
+      env:
         - name: ADMIN_PASSWORD
           secretKeyRef:
-            name: <app>-sensitive-values
+            name: example-ce-sensitive-values
             key: internal-admin_password
       script: |
         #!/bin/sh
+        set -eu
         # converge the app to exactly the membership in $GENTIAN_APP_ADMINS_FILE
 ```
 
-The operator provides:
+The Job is given `GENTIAN_APP_ADMINS_FILE` (a JSON array of `{id, username,
+email}`), `GENTIAN_APP_USERS_FILE`, `GENTIAN_PRIVILEGED_ROLE`, `GENTIAN_TENANT`
+and `GENTIAN_APP`. Write the script to **converge**: everyone in the file gets
+the role, everyone else loses it, and nothing is written when the app already
+matches. It re-runs on every change and on every failure. Exclude the
+technical account it authenticates as, or a sync locks itself out. An account
+that does not exist yet (the person has not signed in) is named in the log
+and promoted on a later run. Bind credentials with `env` and `secretKeyRef`,
+not `envFrom`: the Secret's keys are hyphenated, and Kubernetes drops those
+from `envFrom` without a word. A `privilegedRole` without a `syncJob` is
+reported as `AppPrivilegesReady: False`, not silently ignored.
 
-| Variable | Contents |
+An app that takes roles from a claim instead of a Job (Odoo) declares them on
+its group through `gentianos.io/keycloak-group-attributes`; the Odoo profiles
+and [app-customization.md §4.2](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/app-customization.md)
+are the reference. Either way, a profile that grants a member role also
+declares the administrator role; an app where administrators can do no more
+than members reads as "this app has no settings".
+
+## 7. Exposure and the desktop
+
+### 7.1 Entries
+
+```yaml
+expose:
+  - name: web
+    surface: gateway
+    authMode: oidc
+    subDomain: "example"                  # example.${TENANT_DOMAIN}
+    backend: {service: "example-ce", port: 8000}
+    tile: {…}
+```
+
+- **One entry per host and purpose**, `surface: gateway` with `authMode: oidc`
+  for anything a person uses. The schema also admits a gateway entry that
+  pins its caller (`source`) instead; the operator routes gateway entries
+  with `oidc` only.
+- **The backend is this app's own Service** on the port the chart serves; an
+  addon's entry names its base with `backend.component` (§11.1).
+- **Some names are the platform's** in every tenant: `desktop`, `admin`,
+  `store`, `console`, `id`, `auth`, `login` and a few more. An entry that
+  takes one is refused at install ([custom-catalogs.md §4.1](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/custom-catalogs.md)).
+- **A second entry on the same host** serves a companion under its own paths:
+  Nextcloud's Collabora entry shares `subDomain: nextcloud`, lists its `paths`
+  and puts the editor's administration under `denyPaths`. Deny wins over allow.
+- **Anything for the internet is a `perimeter` entry**, `authMode: none` or
+  `app`, and publishes nothing until the tenant's perimeter approver approves
+  it. It is a request, not a setting.
+- **Only two annotations exist on an entry**:
+  `gentianos.io/gateway-frame-ancestors` and
+  `gentianos.io/gateway-escaped-slashes-action` (the latter for WOPI and
+  WebSocket paths with encoded slashes). Never write `Content-Security-Policy`
+  or `X-Frame-Options` anywhere: the operator owns the frame policy of every
+  route it makes, and a chart that sends its own CSP has it replaced.
+
+### 7.2 The tile
+
+```yaml
+    tile:
+      displayName: "Paperless-ngx"        # the product's own name
+      displayNames: {de_DE: "Paperless-ngx"}
+      description: "Scan, OCR and archive your paper"
+      image: assets/tile.png              # the committed file …
+      logo: data:image/png;base64,…       # … inlined; scripts/sync-profile-tile.py keeps them equal
+      path: /                             # optional; where the tile leads
+      relation: can_launch                # what the person must hold
+```
+
+The tile is the one piece of presentation in a profile, because the desktop
+must show what the cluster routes without asking a service outside it. Use the
+product's own name: the App Store shows this label for an entry it has no
+listing for, and a generic word there reads as a different app. The logo is a
+128x128 PNG, the project's own mark or the neutral glyph
+`scripts/render-default-tile.py` draws, inlined by
+`scripts/sync-profile-tile.py`; CI refuses a stale one. `launch: tile` says the tile is how people reach the app; an entry with
+no tile is an API, and an app nobody opens says `launch: none` in words.
+
+### 7.3 Running inside the desktop
+
+The desktop opens a tile as an iframe in one browser tab, so an app that is
+embedded well:
+
+- **draws no window chrome of its own**: detect the iframe client-side
+  (`window.self !== window.top`) and hide the app's header, the space reserved
+  for it, and its own wallpaper. The app is also reachable directly at its own
+  host, where it needs its navigation. Nextcloud's image does this in its
+  entrypoint, re-applied from the pristine template on every start.
+- **shares browser storage with every other tile on the same origin.** All
+  tiles of an app family share one host, so `localStorage` and
+  `sessionStorage` are one store across them; an app that remembers "the last
+  thing this session did" shows one tile's state in another. Derive state from
+  the tile's own URL, not from storage.
+- **follows the shell's theme default** rather than pinning one.
+
+## 8. Secrets
+
+Three kinds, three places:
+
+| The secret | Where it is declared |
 |---|---|
-| `GENTIAN_APP_ADMINS_FILE` | Path to a JSON array of `{"id","username","email"}` — the current `gentian:tenant:<t>:app-admins` members |
-| `GENTIAN_PRIVILEGED_ROLE` | `privilegedRole.name` |
-| `GENTIAN_TENANT` / `GENTIAN_APP` | Tenant name and profile name |
+| a credential the platform makes for a requirement (database, bucket, client secret, mail) | nowhere: it arrives through `valueMapping` |
+| a value the app needs that has no counterparty: a session signing key, a bootstrap admin password, a companion's account password | `secrets.generated[]`, with the chart `valuePath` that receives it |
+| a credential only a person can provide: a payment provider's keys, a token of a service outside the cluster | `secrets.supplied[]`; the tenant's administrator is asked for it in the console |
 
-**Write the script to converge, not to apply a delta.** It re-runs whenever
-membership changes and is retried on failure, so it must be idempotent: grant
-to everyone in the file, revoke from everyone who is no longer in it, and do
-nothing when the app already matches. Exclude any technical account the script
-authenticates as, or a sync can lock itself out.
+Generated secrets are made once per tenant, kept in the vault and reach the
+chart as values; they are also in the Secret `<profile>-sensitive-values`
+under the key `internal-<name>`, which is how a hook or a companion reads the
+same value the app holds. **Pin every key the app signs with**, or every
+session dies at each restart. A secret is never in `extraValues`, never in a
+composition's own vault write, and never in git.
 
-**Use `env` rather than `envFrom` for platform-managed credentials.** The keys
-of an app's `*-sensitive-values` Secret are hyphenated (`db-host`,
-`internal-admin_password`), and Kubernetes silently drops any `envFrom` key that
-is not a valid environment variable name — the variable never appears and the
-script fails on something unrelated.
+## 9. Bootstrap through the app's own API
 
-Declaring `privilegedRole` without a `syncJob` is a clear gap, not a silent
-one: the operator sets `AppPrivilegesReady: False` / `SyncFailed` with
-`declares provisioning.privilegedRole but no provisioning.syncJob`. While a Job
-is running the reason is `Syncing`; only a **completed** run records the
-membership as applied, so a crashed sync is never remembered as success.
+Some state can be set only through the app's own interface after it runs: an
+account for a companion, a workflow, a group's permissions, a first-boot value
+the app copied into its database and ignores from the environment ever after.
+That is `hooks.postInstall`:
 
-**Reference implementation:** `profiles/mathesar/mathesar-ce/profile.yaml`
-(`profile.yaml`'s header comment has the full bootstrap story).
+```yaml
+hooks:
+  postInstall:
+    image: ghcr.io/example/app:1.2.3     # usually the app's own image, for its CLI or runtime
+    envFrom: [example-ce-env]            # Secrets in the tenant namespace, by name
+    script: |
+      #!/bin/sh
+      set -eu
+      …                                  # ${TENANT_ID} and the other placeholders are substituted
+```
 
-**Nextcloud has no sync job yet.** An earlier revision of this guide claimed a
-built-in `nextcloud` OCS provisioner existed; it never did — the operator
-returned "not implemented" for every profile. Adding one now means writing a
-`syncJob` script in the Nextcloud profile that calls OCS, with no gentian-os
-change at all.
+Before writing one, check that the platform does not already do the thing
+generically: databases, buckets, caches, sign-in clients, mail and credentials
+are declarations, not scripts. A hook is for the app's own protocol. Write it
+to **exit non-zero until the app answers** (the Job retries, ten times) and to
+**change nothing once the state matches** (it runs again whenever its script
+changes). Call the app by its Service name. Keep what it does in the header
+comment: a reviewer reads the comment, not the script.
 
-**User id mapping:** reconcilers prefer Keycloak attribute `opendesk_username`,
-then email local-part.
+The fields are `image`, `script`, `envFrom` (Secret names only), an optional
+`serviceAccountName` and, rarely, a `readOnlyPVC` for a value only the app's
+own data holds. There is deliberately no pod spec passthrough.
 
-**Checklist:**
+## 10. Backup and restore
 
-- [ ] Declare `spec.provisioning.privilegedRole` **and** `spec.provisioning.syncJob` when the app has a distinct admin group/role — the role alone is a declaration nothing applies
-- [ ] Do **not** conflate `app-admins` with `app:<profile>` unless product policy explicitly requires both
-- [ ] If the app grants roles from a **claim** rather than a Job, declare `gentianOdooAdminRoles` beside `gentianOdooGroupRoles` — see 6i
-- [ ] Ensure OIDC users exist in the app (the provisioner creates accounts before admin grant)
+`requires.services` tells the platform which stores the app has; the default,
+scale the app to zero, dump every store, archive every volume the release
+owns, is right for a plain app. `spec.backup` holds only the deviations:
 
----
+```yaml
+backup:
+  quiesce:
+    mode: command                                   # the app has a real maintenance mode
+    pre:  [php, occ, "maintenance:mode", --on]      # argv, never a shell line
+    post: [php, occ, "maintenance:mode", --off]     # must be safe when pre never ran
+    container: app
+  volumes:
+    excludePaths: ["**/data/index"]                 # what the app rebuilds; never configuration or keys
+  restore:
+    post:
+      - [python3, manage.py, document_index, reindex]
+    verify: [python3, manage.py, check]             # always: a restore must prove the app can read its data
+```
 
-### 6i. Admin roles for claim-driven apps (`gentianOdooAdminRoles`)
+- **Commands are argument vectors.** A shell string is valid YAML and fails on
+  a live tenant; CI refuses it.
+- **Exclude only what the app rebuilds**: thumbnails, previews, search
+  indexes, caches. Excluding configuration or key material looks like a
+  saving and makes the backup unrestorable; CI refuses paths that look like
+  either.
+- **An app that remembers where it ran** (its address, its database's name)
+  rewrites that in `restore.post`, using the `GENTIAN_RESTORE_SOURCE_*` and
+  `GENTIAN_RESTORE_TARGET_*` variables the platform passes. An app whose data
+  cannot move to another domain (a Matrix server) says `domainBound: true`.
+  `e2e/restore-rewrites/` runs the app under one domain, restores it under
+  another and runs these commands as the platform would: add the app there.
+- Schedule, retention, encryption and destination are the tenant's policy and
+  are not in a profile.
 
-6h covers apps whose admin construct is reached by a **Job**
-(`spec.provisioning.privilegedRole` + `syncJob`). Odoo is the other shape: roles
-arrive in the **OIDC claim** and the app assigns them at sign-in. Both exist, and
-a profile uses whichever matches its app — but the claim-driven one has a trap
-that cost a release to find, so it gets its own rule.
+The sequence and the bundle format are gentian-os
+[data-lifecycle.md](https://github.com/gentian-org/gentian-os/blob/develop/docs/concepts/data-lifecycle.md).
 
-**A profile that grants a member role must also declare the admin role.**
+## 11. Addons, extensions and compositions
+
+### 11.1 An addon flips a switch in its base
+
+An addon runs nothing. It names its base and the switch, and routes its tile
+into the base's Service:
 
 ```yaml
 metadata:
   annotations:
-    gentianos.io/keycloak-group-attributes: >-
-      {"gentianOdooModules":["crm"],
-       "gentianOdooGroupRoles":["sales_team.group_sale_salesman"],
-       "gentianOdooAdminRoles":["sales_team.group_sale_manager"]}
-```
-
-| Attribute | Lands on | Granted to |
-|---|---|---|
-| `gentianOdooModules` | the app's own group | decides portal tile visibility |
-| `gentianOdooGroupRoles` | the app's own group | anyone entitled to that app |
-| `gentianOdooAdminRoles` | `gentian:tenant:<t>:app-admins` | app administrators, for **every** installed app |
-
-gentian-os unions every installed profile's `gentianOdooAdminRoles` onto the
-tenant's `app-admins` group, writing them there as `gentianOdooGroupRoles` — the
-same attribute the member roles use. So there is no second claim and no second
-protocol mapper: an app admin simply has more roles aggregated onto them, and
-`gentian_os`'s `res_users` maps them exactly as it maps the member roles.
-Withdrawal is symmetric — it tracks what it granted in `gentian_dynamic_roles`
-and removes what a later sign-in no longer claims.
-
-**Why it must be declared, rather than inferred from being an admin.** Odoo does
-not imply an application's manager group from platform administration. Its own
-documentation is explicit: a user "**must** have the specific *Administration*
-access rights set on their user profile", and the manager groups are separate
-grants that no other permission carries with it. `base.group_system` is not
-`sales_team.group_sale_manager`.
-
-That is exactly how this was missed. Every Odoo profile declared its member role
-and none declared an admin role, and `res_users` hardcoded three groups for
-admins — `base.group_system`, `base.group_erp_manager` and, alone among the
-modules, `account.group_account_manager`. Accounting therefore worked and looked
-like proof the mechanism was fine. It was not: an app admin opening CRM got
-`Sales / User: Own Documents Only`, and CRM's **Configuration** menu — gated on
-`Sales / Administrator` — was simply absent. Nothing errored. The menu was not
-there, which reads as "this app has no settings" rather than "you lack a role".
-
-**Finding the right role name.** Read it from the app, do not guess it. For a
-module installed on a live tenant:
-
-```
-env["ir.model.data"].search([("model","=","res.groups"),("module","=","crm")])
-```
-
-For one that is not, the group ids are in the addon source
-(`addons/<module>/security/*.xml`). Note the defining module is not always the
-one you install: CRM's manager group is `sales_team.group_sale_manager`, not
-`crm.*`. A module that defines no manager group — `calendar`, `contacts` —
-declares no `gentianOdooAdminRoles`, and that is a complete answer, not an
-omission.
-
-**Checklist:**
-
-- [ ] Every profile with `gentianOdooGroupRoles` also has `gentianOdooAdminRoles`, or the module genuinely defines no manager group
-- [ ] The role id was read from `ir.model.data` or the addon source, not inferred from the module name
-- [ ] Member roles stay member roles — do not grant a manager group to ordinary users to work around a missing admin declaration
-
----
-
-### 6j. Same-origin iframes share browser state
-
-The desktop opens every tile as an iframe in **one browser tab**, and tiles of
-the same app family share a host — every Odoo module is `odoo.<tenant>`. Browsers
-scope `sessionStorage` and `localStorage` per origin, not per iframe, so all of
-those tiles read and write **one** store. Anything an app remembers there as
-"the last thing this session did" is therefore shared with every other tile of
-that app, and the tile that wrote it last wins.
-
-That is not a bug in the app. It is a sound assumption — one web client per
-browser session — that the shell quietly breaks by running several at once.
-
-**Odoo's case, as a worked example.** `WebClient.loadRouterState` decides which
-app the top bar belongs to by finding an `ir.ui.menu` that points at the action,
-and falls back to `sessionStorage["menu_id"]`, the last app visited, when it
-finds none. In the portal that reads as *whichever tile the user opened most
-recently, in any window*: CRM's top bar showing Employees' menu sections.
-
-Finding no menu is not the exception it sounds like, which is why fixing it a
-tile at a time did not hold:
-
-- `crm.crm_lead_action_pipeline` has no menu pointing at it, for anyone.
-- `account.open_account_journal_dashboard_kanban` is reached from *Invoicing /
-  Dashboard* — so it depends on **who is looking**. Odoo sends the client only
-  the menus that user may see, and for a user without that one the action
-  arrives owned by nothing. A check run as superuser says it is owned fine.
-
-**You do not declare anything for this.** `gentian_os` reads the app off the
-tile URL: the module that defines an action also defines its app's root menu
-(`account.open_account_journal_dashboard_kanban` beside `account.menu_finance`),
-the xmlid is already in the URL, and `load_web_menus` already sends each menu's
-xmlid. A module added later is covered without touching anything.
-
-`?gentian_app=<app menu xmlid>` overrides it, for an action whose module is not
-its app's. No profile needs it today.
-
-**The general lesson.** When an embedded app shows state that belongs to another
-tile — the wrong app selected, the wrong workspace, a stale "recent" list —
-suspect per-origin browser storage before suspecting the profile. The tell is
-that it depends on *what you opened before*, and that it does not reproduce with
-a single tile open. The fix belongs in the app's own integration layer, deriving
-the answer from something specific to that tile (its URL), not in the tile's
-declaration.
-
-**Checklist:**
-
-- [ ] Two tiles of the same app family, opened in either order, each show their own state
-- [ ] Reproduced with both open — a bug that needs a *previous* tile is this class
-- [ ] Fixed by deriving from the tile's URL, not by adding a per-tile declaration
-
----
-
-## 7. Global domain and hosts
-
-Many Bitnami-family and opendesk charts read `global.domain` and `global.hosts`
-to build their internal URLs. If these are missing, charts fall back to
-`example.com` defaults, which breaks inter-service communication.
-
-When the chart lists `keycloak` under `global.hosts`, **`global.domain` must be
-`${KERNEL_DOMAIN}`** so Keycloak resolves to the central IdP (see §2). Prefix
-tenant app labels with `${TENANT_ID}`; keep user-facing redirect URIs on
-`${TENANT_DOMAIN}`:
-
-```yaml
-extraValues:
-  global:
-    domain: "${KERNEL_DOMAIN}"
-    hosts:
-      openproject: "projects.${TENANT_ID}"  # → projects.demo.desk.gentian.org
-      keycloak: "id"                        # → id.desk.gentian.org
-      nubus: "portal"                       # → portal.desk.gentian.org
-```
-
-### 7b. Jitsi in Element (`element-ce`)
-
-The `element-ce` profile deploys no Jitsi of its own and there is no Jitsi profile in
-the catalog. Video calls started from Element rooms use the public `meet.jit.si`,
-set as `jitsi.preferred_domain` in the Element Web `config.json` the `app-element-ce`
-composition writes.
-
----
-
-## 8. OIDC client spec
-
-Gentian supports two OIDC integration paths. Choose based on whether the app
-needs only standard SSO or openDesk-style custom scopes and protocol mappers.
-
-| Path | Use when | gentian-apps | gentian-os |
-|---|---|---|---|
-| **A — composition Client MR** | Standard SSO (client id, redirects, confidential secret) | `kernelRequirements.identity.oidc` only | `app-default` (or profile composition) emits Keycloak `Client` + default scopes |
-| **B — OIDC pack** | Custom client scope, protocol mappers, LDAP group → Keycloak client role | `profiles/<app>/oidc-catalog.yaml` | Operator `ResolvePack` provisioning Jobs |
-
-**Path A (most new apps, including Odoo):** declare `clientId`, `redirectUris`,
-and `accessType` in the profile. Do **not** add the client to `OIDCPackCatalog`.
-
-**Path B (openDesk supplier charts):** keep the historical `opendesk-*` `clientId`
-and add or extend the matching pack in `OIDCPackCatalog`. Optional
-`oidcPackRef` when the pack key differs from `clientId`. Pack scopes and
-`fullScopeAllowed` are read from the cluster catalog by compositions — no
-per-`clientId` dicts in composition YAML.
-
-Use the full `OIDCClientSpec` struct. The old `oidc: true` shorthand is removed:
-
-```yaml
-kernelRequirements:
-  identity:
-    oidc:
-      clientId: "opendesk-openproject"
-      name: "OpenProject"
-      accessType: CONFIDENTIAL   # or PUBLIC for browser-only apps (e.g. Jitsi)
-      redirectUris:
-        - "https://projects.${TENANT_DOMAIN}/auth/keycloak/callback"
-      postLogoutRedirectUris:
-        - "https://projects.${TENANT_DOMAIN}/"
-      backchannelLogout:
-        exposure: web
-        path: /auth/keycloak/backchannel-logout
-```
-
-**`PUBLIC` vs `CONFIDENTIAL`:**
-- `CONFIDENTIAL` — server-side apps that can keep a client secret (OpenProject,
-  OX App Suite, Element). Requires `valueMapping.oidc.clientSecretKey`.
-- `PUBLIC` — browser-only or native apps where a secret cannot be protected
-  (Jitsi). No `clientSecretKey` needed.
-
-**Per-tenant realm:** All OIDC/LDAP URLs must use `${TENANT_ID}` as the Keycloak
-realm name. Never hardcode `souvap`, `opendesk`, or any literal realm name.
-
-**The `email` claim is the workspace address:** a person's Keycloak username is
-their workspace address — what they sign in with, and their mailbox. The
-account's e-mail field holds a different, private address, which the realm mails
-a password reset to and which no app is to be given. The realm's own `email`
-scope therefore reads the username, and an `email` mapper in an OIDC pack must
-read it as well (`user.attribute: username`, never `email`): when two mappers
-write the same claim Keycloak lets either one win, so a pack that reads the field
-hands the app the private address on some realms and not on others.
-`e2e/oidc-sign-out` checks this for the apps it runs.
-
-**Central IdP host:** Issuer, authorization, token, JWKS, and logout endpoints
-must use `https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}` (or path-only auth
-URLs resolved against `openproject.oidc.host: "id.${KERNEL_DOMAIN}"`). See §2.
-
-### 8a. Portal Integration: Direct OIDC
-
-When integrating an application into the Gentian Portal, the app signs in through OIDC, also inside an iframe/embedded view (`linkTarget: embedded`). There is no session-bridge flow: the desktop mints no login tickets, and an app holds no endpoint that signs a person in on one.
-
-| Integration Path | Description | Typical Apps |
-|---|---|---|
-| **Direct OIDC Flow** | The app's frontend initiates standard browser-side OIDC login. The portal warms up OIDC cookies in the background via hidden iframe. | XWiki, Odoo Community |
-
-#### 1. Direct OIDC Flow (with Silent SSO Warmup)
-For standard web applications that support clean OIDC redirections and can run within an iframe:
-- **How it works**: The app is launched directly at its public URL (e.g., `https://wiki.demo.desk.gentian.org/`). It redirects the browser inside the iframe to Keycloak. Keycloak detects existing session cookies and logs the user in silently.
-- **Requirements**:
-  - The Portal frontend must automatically bootstrap the OIDC session cookies (`KEYCLOAK_IDENTITY`/`KEYCLOAK_SESSION` on path `/auth`) upon desktop mount by calling `/auth/idp-session` and loading the impersonation URL in a hidden iframe.
-  - The Keycloak browser flow (e.g. `browser-kernel-idp`) must set **both** the `Cookie` execution and the `Identity Provider Redirector` execution to **`ALTERNATIVE`**. Never set the redirector to `REQUIRED` as it forces redirecting to the parent realm and prompts for login.
-
-### 8b. openDesk supplier charts on Gentian — integration boundary
-
-Many AppProfiles wrap **openDesk Helm charts** (XWiki, Element, OX, OpenProject, …).
-Gentian still runs the **Nubus/UCS stack** for LDAP, UDM, portal tiles, and
-openDesk directory attributes — but **authentication topology is not identical**
-to upstream openDesk. Copy chart *data* (LDAP attribute names, OIDC client IDs,
-flavors, themes, MBA groups); do **not** copy every auth-related value verbatim.
-
-| Area | Upstream openDesk | Gentian AppProfile |
-|---|---|---|
-| Keycloak realm | Single `opendesk` realm | **Per-tenant** realm `${TENANT_ID}`; humans log in at **kernel** realm on the portal |
-| IdP hostname | `id.<domain>` on app domain | Always `id.${KERNEL_DOMAIN}` (§2) |
-| Portal → app SSO | Often `keycloak-bridge-auth` (Nubus session bridge) | **Direct OIDC** to tenant realm + kernel IdP broker (operator-managed) |
-| Nextcloud Files | Same `opendesk` realm as portal | **Kernel realm only** — not tenant broker; claim `opendesk_useruuid` (`entryUUID`) — see §6g |
-| LDAP bind DN | Global `uid=ldapsearch_<app>,cn=users,…` | Per-tenant `uid=app-<app>-${TENANT_ID},ou=${TENANT_ID},…` (operator-provisioned) |
-| `global.domain` + `hosts.keycloak` | Same realm/host for portal and apps | `global.domain: "${KERNEL_DOMAIN}"`, tenant app hosts prefixed with `${TENANT_ID}` |
-
-**Keep from openDesk profiles:** `kernelRequirements.identity.oidc.clientId` values
-that match an entry in the cluster `OIDCPackCatalog` (`opendesk-xwiki`,
-`opendesk-matrix-scope`, …), LDAP group mappings, UI themes, chart versions,
-`workplaceServices.*` pointing at `portal.${KERNEL_DOMAIN}` where the chart
-expects Nubus navigation.
-
-**Do not copy into Gentian profiles:**
-
-| Upstream setting | Why |
-|---|---|
-| `keycloak-bridge-auth` (`XWiki.AuthService.Configuration.authService`) | openDesk Nubus bridge assumes portal and app share one Keycloak realm/session. Gentian uses split realms; this property **overrides** `OIDCAuthServiceImpl` and users see the **native login form** instead of Keycloak redirect. |
-| Hardcoded realm `opendesk` / `souvap` in `oidc.provider` or `OIDCIssuer` | Wrong realm; use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`. |
-| `portalTiles.linkTarget: newwindow` on OIDC apps that support iframes | Opens a new tab on normal click; use **`embedded`** so gentian-ui WinBox behavior matches other portal apps (§6a). Reserve `newwindow` for iframe blockers (OX App Suite). |
-
-**XWiki pattern (reference):** set `xwiki.authentication.authclass` to
-`org.xwiki.contrib.oidc.auth.OIDCAuthServiceImpl` in `customConfigs`, configure
-`oidc.provider` / `oidc.clientid` / LDAP import blocks with Gentian placeholders,
-and **omit** `keycloak-bridge-auth`. See `profiles/xwiki.yaml`.
-
-**OIDC token claims:** if the chart maps local users from an openDesk-specific
-claim (e.g. XWiki `oidc.user.opendesk_username`), declare the matching
-`clientId` in `kernelRequirements.identity.oidc` so the operator applies the
-openDesk OIDC pack (protocol mappers, LDAP `uid` → claim). Profile authors
-define the client; **mapper wiring is operator/IAM**, not `extraValues`.
-
-**Operator-owned (do not hand-craft in AppProfiles):** tenant-realm browser flow
-(auto-redirect to kernel IdP), first-broker-login auto-link by email, IdP HTTPRoute
-`frame-ancestors` for installed OIDC apps, portal/app HTTPRoute CSP, staging CA /
-JVM truststore for Java charts on ACME staging. See `gentian-os/docs/concepts/iam.md`.
-
-**Custom (non-openDesk) apps:** use generic `kernelRequirements.identity.oidc` and
-LDAP placeholders only — do not reuse openDesk-only mechanisms (`keycloak-bridge-auth`,
-`opendesk-*` scope names, MBA attribute names) unless you intentionally integrate
-with the openDesk directory model.
-
-### 8c. OIDC Silent Single Sign-On (SSO) & Multi-Tenant Custom Attributes
-
-When integrating OIDC applications in a multi-tenant environment (where users log in to a main portal on the `${KERNEL_DOMAIN}` but run app instances in sub-domains on the `${TENANT_DOMAIN}`), the following requirements are critical for smooth SSO:
-
-1. **Silent SSO Session Bootstrapping**:
-   * **The Problem**: Portal authentication uses a BFF (backend-for-frontend) pattern without redirecting the top-level browser window. Consequently, logging in to the portal does *not* automatically write Keycloak OIDC session cookies (`KEYCLOAK_IDENTITY`/`KEYCLOAK_SESSION`) in the browser. If a user subsequently navigates directly to an OIDC application (like XWiki), they will be redirected to Keycloak, which will fail to find a session and show the login page.
-   * **The Solution**: The portal UI must warm up the OIDC browser session silently on initial desktop mount by making a request to `/auth/idp-session` and loading the resulting impersonation redirect URL in a hidden iframe (or popup). This ensures Keycloak cookies are written to the browser domain (`desk.gentian.org`) under the path `/auth` immediately on login.
-   * **Keycloak Browser Flow Configuration**:
-     * In a multi-tenant Keycloak setup brokered to a parent `kernel` Identity Provider (IdP), the tenant's browser flow (e.g. `browser-kernel-idp`) must configure **both** the `Cookie` execution and the `Identity Provider Redirector` execution as **`ALTERNATIVE`** (instead of setting the redirector to `REQUIRED`).
-     * Setting the redirector to `REQUIRED` will bypass the `Cookie` check entirely, forcing Keycloak to always redirect the browser to the parent `kernel` realm login page even when valid local session cookies are present.
-
-2. **Keycloak User Profile Schema & Custom Claims**:
-   * **The Problem**: Keycloak 24+ enforces a strict schema for user profile attributes. If a custom user attribute (such as `uid` for mapped username claims like `gentian_username`) is set on a user record but is *not* explicitly declared in the realm's User Profile schema configuration, Keycloak will **silently discard** the attribute during user creation/updates via the Admin REST API. As a result, the claim in the OIDC ID Token will remain empty, causing OIDC callback handlers (e.g., XWiki's OIDC authenticator) to fail with internal server errors (like `The user document name resulting from the format is empty`).
-   * **The Solution**:
-     * Any custom attributes that need to be synchronized from LDAP, mapped from a broker, or set via the Admin API (e.g., `uid`, `gentian.inviteEmail`) **must be registered** in the Keycloak User Profile schema configuration for the realm (via the `ShellEnsureInviteEmailUserProfile` helper or Admin REST API `/users/profile`).
-     * Ensure that the OIDC protocol mapper matches the case and name of the registered attribute precisely.
-
-### 8d. SSO smoke-test after publishing a profile
-
-1. Log in at **`https://portal.${KERNEL_DOMAIN}`** (kernel realm).
-2. Click the app tile (normal click, not Ctrl) — should open in **WinBox** if
-   `linkTarget: embedded`.
-3. Expect redirect to **`https://id.${KERNEL_DOMAIN}/realms/${TENANT_ID}/…`**, not
-   a native app login form.
-4. After login, the app UI loads; OIDC callback URL must stay on
-   **`https://<subDomain>.${TENANT_DOMAIN}/…`**.
-
-**Install command readiness:** `gtnctl apps install <app> --tenant <tenant>` commits
-to GitOps, applies the Tenant CR, then **blocks until the Crossplane App claim is
-Ready** (default timeout 15 minutes). It exits non-zero if init Jobs fail (for
-example `openproject-s3-init`, `openproject-oidc-seed`) or the Helm release does
-not converge. Do not treat a successful Git push as “installed” — wait for the
-CLI to report Ready or inspect `kubectl get app <app> -n tenant-<tenant>`.
-
-| Symptom | Likely profile issue |
-|---|---|
-| Native username/password form (XWiki, etc.) | `keycloak-bridge-auth` or missing `OIDCAuthServiceImpl` / `oidc.skipped: false` |
-| `redirect_uri` mismatch | `redirectUris` use wrong host (`element.` vs `matrix.` for Element — §6d) or `${KERNEL_DOMAIN}` instead of `${TENANT_DOMAIN}` |
-| Element **“Invalid username or password”** after matrix host works | Wrong OIDC redirect URI (§6d), missing Livecollaboration entitlement (IAM), or Synapse token exchange still hitting public `id.<kernel>` on staging — operator `KEYCLOAK_INTERNAL_URL` + `app-element-ce` reconcile (§6d, `security.md` §9.1) |
-| Blank iframe / Firefox framing error | Missing IdP `frame-ancestors` — ensure `ingress.subDomain` + OIDC client declared; operator reconciles (§6e). **First** verify edge headers with `curl -sI https://<subDomain>.<tenant-domain>/ | grep -i content-security-policy` — a single `frame-ancestors 'self' https://portal.<kernel>` line means CSP is fine and the failure is elsewhere (often OIDC — next row). |
-| OpenProject login 404 on `/auth/keycloak` | OIDC auth provider not seeded — `openproject-oidc-seed` Job failed or ran before DB migrations. Not a CSP issue; fix the Job (see §6f). Portal iframe may look like a framing/CORS error when SSO never starts. |
-| HTTP 500 on OIDC callback (empty username claim) | Chart expects `opendesk_username` / `gentian_username` (or similar) but `clientId` not in OIDC pack / wrong mapper, or Keycloak User Profile schema configuration is missing the mapped attribute (e.g. `uid`), causing Keycloak to silently drop it during admin user updates/sync. Register custom attributes in the User Profile schema. |
-| Keycloak **“Sign in to your account”** (or redirect to `kernel` login) on direct navigation or tile launch despite active portal session | (1) Portal OIDC session warmup not executed on desktop mount (no cookies set). (2) Keycloak `browser-kernel-idp` browser flow has the redirector execution set to `REQUIRED` instead of `ALTERNATIVE`, causing Keycloak to bypass cookie validation and auto-redirect to the parent realm. |
-| Element **“Account already exists”** (`john-doe@…` on OIDC login) | **Element / Synapse reinstall drift** — Postgres retains Matrix users across app uninstall (`databasePerTenant` + `deletionPolicy: Retain`). **Prevention:** default `gtnctl apps uninstall element --tenant <tenant>` scrubs Matrix identities; **`--purge` / `-f`** drops the Postgres database (full chat/room wipe). Example: `gtnctl apps uninstall element --tenant demo --purge`. |
-| Stale app data after uninstall/reinstall (any app) | Kernel resources (Postgres/MariaDB, S3, Redis ACL, OpenBao secrets) survive app uninstall by design. **`gtnctl apps uninstall <app> --tenant <tenant> --purge`** (or `-f`) removes all app-owned persistent state so the next install starts clean. Applies to all catalog apps (OpenProject, OX, XWiki, etc.) per `AppProfile.spec.kernelRequirements`. |
-| “Account already exists” / email already exists on OIDC login (**OpenProject**) | LDAP `SYNC__USERS` pre-created the user with `ldap_auth_source_id` set (OpenProject 16.x; older releases used `auth_source_id`) — OpenProject cannot remap LDAP users to OIDC (OP-7253). Keep `OPENPROJECT_SEED_LDAP_*_SYNC__USERS: "false"`; OIDC creates users on first login, LDAP group sync only links existing users. **Remediation** (one-off `rails runner` in `openproject-web`): `User.where.not(ldap_auth_source_id: nil).update_all(ldap_auth_source_id: nil)` to unlink LDAP; or `User.find_by(mail: "<email>")&.destroy` if the account has no data to keep; then OIDC login recreates the user. Do **not** use `auth_source_id` (removed in 16.x) or `LdapAuthSource.update_all(sync_users: …)` (column removed in 16.x) |
-| 502 on `/realms/<tenant>/broker/kernel/endpoint` | Broker token/JWKS fetch or oversized headers — operator Keycloak HTTPRoute / internal `tokenUrl`; not AppProfile (§6d) |
-| Element works; Nextcloud “Failed to provision the user” | **Different SSO path** — kernel OIDC + stale NC `entryUUID` after purge; see §6g (not tenant OIDC pack) |
-| “Unexpected error” from identity provider | Usually stale broker links after IAM flow changes — operator purge/re-link; not an AppProfile field |
-
----
-
-### 8e. An app that can do neither OIDC nor SAML — the sign-in sidecar
-
-Some apps have single sign-on only in a paid edition (Docmost, OpenProject). Declaring
-`identity.oidc` for one does nothing, and working around the edition is forbidden (see "no
-licensing bypass" above). What the platform offers instead is its **sign-in sidecar**: a person
-who is signed in at the platform opens the app and is in, with no second sign-in and no password.
-
-A profile declares it and brings a **handler**, the piece of code that knows how this app keeps
-a session:
-
-```yaml
+    gentianos.io/deployment-role: addon
 spec:
-  requires:
-    services:
-      identity:
-        sidecar:
-          entryPaths: ["/", "/login"]   # the app's front page and its own sign-in page
-          database: true                # the handler is given the app's own database
-          secrets: [app_secret]         # and these of spec.secrets.generated
-          appPort: 3000                 # and may call the app inside the cluster
+  package:
+    addon: {id: calendar, of: nextcloud-base-ce}
   expose:
-    - name: web
+    - name: calendar
       surface: gateway
       authMode: oidc
-      denyPaths: [/api/auth/login]      # the app's own ways in, refused at the front door
+      subDomain: nextcloud
+      backend: {component: nextcloud-base-ce, service: nextcloud, port: 8080}
+      tile: {displayName: Calendar, path: /apps/calendar/, relation: can_launch, …}
+  launch: tile
 ```
+
+An addon carries no chart, no `customization` block and no
+`requires.services` of its own, only `requires.platform`; the base declares
+how a selection is activated
+(`customization.addonActivation`, `addonValues`), and
+[app-customization.md §4.2](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/app-customization.md)
+is the model. A preset that bundles several addons is an `AppPackage` under
+`profiles/<family>/packages/`, published for the App Store and never installed
+as such.
+
+### 11.2 An extension is a chart beside the app
+
+A companion the app needs in its own namespace, an MCP server for example, is
+an entry of `spec.extensions`: a chart, its values, its own generated secrets,
+and a stable Service name and port the app reaches it by. It is deployed and
+removed with the app, shares its credentials Secret where the two must hold
+one value (Paperless-ngx's `mcp` extension and the account its hook creates),
+and is reachable only inside the namespace.
+
+### 11.3 A composition is the last resort
+
+`spec.package.composition` names a Crossplane Composition the bundle brings,
+`app-<profile>`, for an app whose rollout needs objects the chart cannot
+express (Element's Synapse beside Element Web). It
+is rendered only for a profile of `platform` trust (the operator refuses it
+with `CompositionRefused` otherwise, whatever the schema admitted), travels
+only in a catalog of the whole cluster, and is used beside a chart: a
+composition alone is `PackageUnsupported`. Everything a hook or an extension
+can do is done there instead.
+
+## 12. The customization declaration
+
+Every profile that is not an addon declares its customization ladder:
 
 ```yaml
-# kustomization.yaml — the handler travels in the bundle, under the bundle's digest
-configMapGenerator:
-  - name: <profile>.sign-in-handler
-    files:
-      - handler.js=assets/sign-in-handler.js
-generatorOptions:
-  disableNameSuffixHash: true
-  labels:
-    gentianos.io/profile-name: <profile>
-    gentianos.io/asset: sign-in-handler
+customization:
+  grade: C                       # from the rubric score: A >= 7, B >= 5, C >= 3, else D
+  rubricScore: 4
+  supportedRungs: [L0, L4]       # never L2; L2 is always available
+  ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/<family>/<name>/customization.md
+  configure: {hotReload: false}
+  repackage: {chartOwnership: gentian-owned}   # upstream | patched | gentian-owned | vendored
+  patch: {allowed: false, seriesPath: patches/series, requiresApproval: platform-team}
+  fork: {allowed: false}
 ```
 
-The profile states no address, no client and no Secret: the platform derives all of them from
-where the app answers and what the app owns. What the platform does for the declaration, and the
-rule that a handler runs only from a bundle of a cluster-wide catalog that the install is pinned
-to, are in gentian-os, `docs/guides/app-customization.md` ("The sign-in sidecar").
+`customization.md` beside the profile holds the assessment in prose, and
+`customizations/<name>.yaml` records every deviation from rung L2 up, written
+before the code. The rubric, the records and what CI checks on them are
+[customization-ladder.md](customization-ladder.md); the ladder itself is
+gentian-os [app-customization.md](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/app-customization.md).
 
-What a handler is given, what it answers and what it must not do:
-[`images/gentian-sidecar-sso-saml/README.md`](../images/gentian-sidecar-sso-saml/README.md). The
-two in this catalog are the reference. Docmost signs a session token with the app's own key; OpenProject keeps its sessions in its database, so its handler has OpenProject
-make the session itself from a one-time token and signs nothing.
+## 13. Versions, bundles and what CI checks
 
-An entry path cannot also be under `denyPaths`: the front door refuses before it redirects, and
-it refuses a path for every method. Where an app's form posts to the address of its own page
-(OpenProject's `/login`), make the page the entry path and switch password sign-in off in the app.
+- **A bundle is one file with one digest**: `profile.yaml` first, then every
+  companion `kustomization.yaml` lists (a composition, an OIDC pack catalog,
+  asset ConfigMaps, customization records), each named for its profile
+  ([profile-bundles.md](profile-bundles.md)). A cluster installs by that
+  digest, and a changed bundle reaches a tenant only when its install is moved
+  to the new build.
+- **`spec.version` moves with the bundle.** It is the catalog entry's version,
+  not the app's. On `develop` it carries a `-dev` suffix (`0.5.1-dev.9`) and
+  is bumped whenever the published bundle changes; a comment inside the
+  profile counts, because the digest covers the bytes. The release from `main`
+  sets the bare number and admits no `-dev` version, no `-develop.<sha7>`
+  chart and no `develop-<sha7>` image.
+- **CI runs every validator** in `.github/workflows/apps-ci.yaml` on every pull
+  request; nothing needs to be run by hand, and each script can be run locally
+  with `python3 scripts/<name>.py` (the kustomization check is a workflow step):
 
-Before adding one:
-
-1. **Is there a cleaner way?** OIDC in the edition installed; a license the tenant holds; a
-   sign-in the app takes from a proxy's headers. A handler is the last resort: it is a program
-   that can become anybody in the app.
-2. **Write the `Customization` record first** (`customizations/sign-in-sidecar.yaml`, rung L2):
-   what the handler writes itself rather than through the app's own interface, and whether any of
-   it is more than the installed edition gives its users. That last question is the owner's to
-   answer, and the record must not answer it by silence.
-3. **Nobody gets a password**, and the session lasts what the sidecar says.
-4. **Who administers the app is who holds the platform's App Admin role**, and nobody else. The
-   sidecar says it (`person.appAdmin`, read from the realm's signed answer); the handler gives
-   the app's own administrator role to that person and takes it from anybody else, in the app's
-   own way, at every sign-in and before the session is made. The account the app keeps for
-   itself keeps its role, and a person who holds its address is refused.
-5. **Refuse the app's own sign-in at the front door** (`denyPaths`) — above all a first-run or
-   setup call that would hand the installation to whoever made it first.
-6. **Test against the real app** at the pinned version: add `e2e/<app>.e2e.js` beside the ones
-   that exist, and run it again before the image tag moves.
-
-## 9. Secret rotation — Reloader annotation
-
-Add the Stakater Reloader annotation so pods restart automatically when the
-`ExternalSecret` refreshes (e.g. after credential rotation):
-
-```yaml
-extraValues:
-  podAnnotations:
-    reloader.stakater.com/auto: "true"
-```
-
----
-
-## 10. Catalog bundles (GitOps)
-
-Each app lives under `profiles/<name>/` with a `kustomization.yaml`. The
-catalog build publishes each as **one bundle file with one digest** — the
-profile, then its companions: optional `composition.yaml`, `oidc-catalog.yaml`,
-customization records and asset ConfigMaps — and a cluster fetches that file
-when a tenant installs the app. What a bundle may hold, how each companion is
-named (`app-<profile>`, `<profile>-oidc`, `<profile>.<asset>`), and that a
-companion states no namespace: [profile-bundles.md](profile-bundles.md).
-
-Set `spec.package.composition` only when the bundle brings its own composition,
-which is then named `app-<profile>`:
-
-| Composition | When to use |
+| Check | What fails it |
 |---|---|
-| *(omit)* | Standard apps — `app-default` is used automatically |
-| `app-element-ce` | Element — Synapse plus Element Web and the objects beside them |
+| `build-catalogue-source.py --check` | a kind other than `ComponentProfile`; a duplicate name; an edition outside `ce me ie pe ee`; a companion with the wrong kind, name or labels; an `argocd.argoproj.io/*` annotation; a bundle over 180 KiB |
+| `validate-profile-versions.py` | a changed bundle with an unchanged `spec.version`; a `-dev` version or develop chart on `main` |
+| `validate-platform-schema.py` | a profile that does not fit the CRD of every line from `requires.platform` up |
+| `validate-chart-refs.py`, `validate-image-tags.py` | a chart or image that does not exist where the profile says; a `develop-<sha7>` image on `main` |
+| `validate-profile-tiles.py` | a `logo` that is not the 128x128 PNG of its `image` |
+| `validate-ingress-annotations.py` | an entry annotation other than the two that exist |
+| `validate-secret-refs.py`, `validate-secret-seeds.py` | a Secret name that is not this profile's; a composition that writes to the vault |
+| `validate-backup-spec.py` | a shell-string command; an excluded path that looks like configuration or keys |
+| `validate-customizations.py` | a missing or inconsistent `customization` block or record |
 
----
+- **Three end-to-end suites** run the app's real image against the profile:
+  `e2e/oidc-sign-out/` for a `backchannelLogout` declaration,
+  `e2e/restore-rewrites/` for `backup.restore.post`, and
+  `images/gentian-sidecar-sso-saml/e2e/` for the sign-in sidecar. A profile
+  that declares one of these adds its `<app>.e2e.js` to the suite. Nothing
+  enforces that, so a declaration that was never run says so in a comment.
 
-## 11. Image pull secrets
+## 14. Checklist
 
-Charts pulling from private registries (e.g. `registry.opencode.de`) need:
+Before opening a pull request:
 
-```yaml
-extraValues:
-  global:
-    imagePullSecrets:
-      - name: registry-credentials
-```
-
-The `registry-credentials` secret is provisioned in every tenant namespace by
-the namespace bootstrap step.
-
----
-
-## 12. Checklist for a new AppProfile
-
-Before opening a PR, verify:
-
-- [ ] `deploymentMethod: crossplane`
-- [ ] `subDomain` is camelCase
-- [ ] No hardcoded cluster addresses — all use `${...}` placeholders
-- [ ] All five database fields mapped in `valueMapping.database`
-- [ ] Chart-managed ingress disabled (`ingress.enabled: false` in `extraValues`)
-- [ ] `fullnameOverride` set to match `spec.ingress.serviceName`
-- [ ] `global.domain` and `global.hosts` set in `extraValues`
-- [ ] If `global.hosts.keycloak` is present: `global.domain` is `${KERNEL_DOMAIN}`, tenant app hosts use `${TENANT_ID}` prefix
-- [ ] All IdP URLs use `id.${KERNEL_DOMAIN}/realms/${TENANT_ID}`; redirect URIs use `${TENANT_DOMAIN}`
-- [ ] Server-side/in-cluster calls (companion callbacks, provisioning, token exchange) use internal `.svc.cluster.local` URLs, not public hostnames — §2. If a public host is unavoidable, staging CA is trusted.
-- [ ] No namespace is named: platform paths follow from `spec.requires.services`, companion pods carry `gentianos.io/app`, and any `gentianos.io/kernel-egress-namespaces` entry is commented — §2, §6g
-- [ ] Element (`element-ce`): OIDC redirect is `https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback` (not `element.`) — §6d
-- [ ] Element (`element-ce`): `spec.expose` includes `matrix` → `synapse-web:8008` (required) — §6d
-- [ ] After tenant purge/redeploy: if Files login fails, check NC `entryUUID` drift (§6g) — not an AppProfile fix
-- [ ] App admins: `spec.provisioning.privilegedRole` + `syncJob` when the app exposes a native admin role (§6h); the sync script converges, never applies a delta
-- [ ] App admins: assign humans via `gentian:tenant:<t>:app-admins`, not per-app manual grants
-- [ ] OIDC uses full `OIDCClientSpec`, realm is `${TENANT_ID}`
-- [ ] openDesk charts: no `keycloak-bridge-auth`; OIDC via tenant realm + `id.${KERNEL_DOMAIN}` (§8a)
-- [ ] openDesk charts: per-tenant LDAP bind / realm placeholders, not upstream `opendesk` realm or global bind DN
-- [ ] OIDC apps in portal: `portalTiles.linkTarget: embedded` unless the app blocks iframes (§6a, §8a)
-- [ ] `clientId` matches an openDesk OIDC pack when the chart depends on openDesk-specific claims/scopes
-- [ ] Secrets only in `valueMapping` / `appSecrets`, never in `extraValues`
-- [ ] `reloader.stakater.com/auto: "true"` in `podAnnotations`
-- [ ] (automatic) Operator injects portal `frame-ancestors` on app HTTPRoutes — no CSP annotations in profile
-- [ ] `ingress.annotations` contains no `frame-ancestors`, `X-Frame-Options`, or `Content-Security-Policy`
-- [ ] `additionalIngresses` use flat subdomains; rely on operator gateway CSP for embed hosts
-- [ ] `spec.browserProxy` declared if the shell will call this app's REST API *(not yet implemented — §5e)*
-- [ ] `compositionRef` omitted unless using a non-default composition
-- [ ] `spec.backup` reviewed — declare it only where the default is wrong for this app (§15); most profiles correctly declare nothing
-- [ ] YAML passes `python3 -c "import yaml; yaml.safe_load(open('<file>'))"` locally
-- [ ] Bootstrap/init jobs in `composition.yaml` targeting OpenBao/Vault use `https://...` and `curl -k` (or mount CA cert) to prevent infinite hangs due to TLS requirement (§13)
-
----
-
-## 13. OpenBao (Vault) Integration in Compositions (Bootstrap Jobs)
-
-When defining bootstrap or initialization Jobs in a composition (`composition.yaml`) that need to communicate directly with the OpenBao/Vault API:
-
-1. **Use HTTPS**: The OpenBao endpoint is TLS-secured. Always set `BAO_ADDR` to `https://openbao.openbao.svc.cluster.local:8200` (not `http://...`).
-2. **Handle TLS/Self-Signed Certificate**: Since OpenBao uses a self-signed or internal CA certificate, `curl` commands in your bootstrap scripts must bypass validation using `-k` or `--insecure` (e.g., `curl -k -sf`), or explicitly mount the CA certificate.
-3. **Avoid Infinite Hangs**: Always ensure curl or other HTTP client calls fail fast by implementing appropriate timeouts (e.g., `--max-time 10` or `--connect-timeout 5`) so that failure modes are readable in pod logs rather than hanging indefinitely.
-
-Example ConfigMap script pattern:
-```bash
-BAO_TOKEN=$(curl -k -sf --max-time 10 "${BAO_ADDR}/v1/auth/kubernetes/login" \
-  -H 'Content-Type: application/json' \
-  -d "{\"role\":\"app-init\",\"jwt\":\"${JWT}\"}" \
-  | jq -r '.auth.client_token')
-```
-
-### 13a. Post-install bootstrap jobs (`spec.postInstallJob`)
-
-Some apps need bootstrap that can only happen through their own admin API (or
-a one-time data read) after the Helm release is up — not something Helm
-values alone can express. `AppProfile.spec.postInstallJob` is a **generic**
-mechanism in gentian-os for exactly this: declare an image + shell script in
-the profile, and the `app-default` composition renders it as a retried Job —
-no custom `composition.yaml` required.
-
-**Before reaching for this, check whether gentian-os already does the thing
-generically.** gentian-os already provisions per-tenant PostgreSQL/MariaDB
-databases, MinIO S3 buckets, and Redis/Memcached caches generically, driven
-purely by `AppProfile.spec.kernelRequirements` (see
-`internal/controller/{database,storage,cache}_reconciler.go` in gentian-os).
-OpenProject's profile once shipped bespoke `s3-init`/`db-init` Jobs in
-`composition.yaml` that quietly duplicated exactly this — added months after
-the generic mechanism existed, writing to the same OpenBao paths with a
-different credential-derivation scheme, running in parallel with the generic
-path on every tenant reconcile. They were removed once confirmed redundant.
-`spec.postInstallJob` is for what genuinely *isn't* covered generically:
-talking to an app's own runtime admin API, not provisioning platform
-infrastructure.
-
-**When to use it:**
-
-- The app persists config to its own database on first boot and ignores env
-  vars on later restarts, so a wrong first-boot value can only be corrected
-  by calling the app's own admin API (open-webui's LiteLLM connection
-  settings, for example).
-- The fix is small and self-contained enough not to justify a full custom
-  `composition.yaml` — if the bootstrap logic needs multiple resources or
-  inter-Job ordering, write a real composition instead (as in §13 above).
-
-Fields:
-
-```yaml
-spec:
-  postInstallJob:
-    image: alpine:3.20        # required
-    script: |                 # required — run via /bin/sh -c, mounted from a ConfigMap
-      #!/bin/sh
-      set -eu
-      ...
-    envFrom:                  # optional — Secret names already present in the tenant namespace
-      - llm-credentials-open-webui
-    serviceAccountName: app-init   # optional — reuse an existing ServiceAccount + RBAC
-    readOnlyPVC:               # optional, rare — mount an existing PVC read-only
-      claimName: open-webui
-      mountPath: /data
-```
-
-`envFrom` only accepts **Secret** names — there is no generic ConfigMap or
-literal `env:` passthrough, deliberately: if a script needs cluster-config-
-derived values (a MinIO endpoint, a CNPG host), that's a sign it belongs in
-`kernelRequirements`/a real composition, not a static per-app script. A
-script that needs its own namespace/tenant name can read them at runtime via
-the Kubernetes downward file
-(`/var/run/secrets/kubernetes.io/serviceaccount/namespace`) or by calling its
-own app's Service unqualified (`http://open-webui`, resolved by the
-in-namespace DNS search domain) instead of needing them injected.
-
-**Retry / idempotency contract:** the rendered Job uses
-`ttlSecondsAfterFinished` + `backoffLimit`, the same pattern as every other
-bootstrap Job in this codebase (§13) — once the Job finishes (success or
-failure) it's deleted after the TTL, and the next tenant reconcile recreates
-it. There is no `dependsOn`/readiness gate between the Job and the rest of
-the app's resources, so **the script itself** must:
-
-- Exit non-zero if a dependency isn't ready yet (e.g. no admin user exists in
-  the app's DB yet) — the Job simply retries on the next reconcile.
-- Be a no-op once the desired state is already correct — check current state
-  (e.g. `GET` the app's own config endpoint) before writing, rather than
-  blindly re-applying every run.
-
-**Worked example — open-webui:** `profiles/open-webui/open-webui-ce/profile.yaml`'s
-`postInstallJob` mints a short-lived admin JWT itself (HS256, signed with the
-same `WEBUI_SECRET_KEY` Open WebUI verifies incoming tokens with, sourced via
-`envFrom: [llm-credentials-open-webui]`), reads the admin user id from Open
-WebUI's own SQLite DB (`readOnlyPVC`, since no HTTP API can supply it before
-authentication exists), and POSTs the correct LiteLLM connection config
-through Open WebUI's own admin API. See that profile for the full script.
-
----
-
-## 14. SaaS Integrations (ApiProfile)
-
-For applications and services that are hosted externally (such as centralized billing, CRM, or external vendor SaaS), Gentian OS supports **ApiProfiles** (`deploymentMethod: api`).
-
-An ApiProfile deploys NO workload pods or Helm releases inside the tenant namespace, but contributes portal shell tiles and ingress routing configurations.
-
-### 14a. Structuring the Profile
-
-Below is a complete template for an ApiProfile:
-
-```yaml
-apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
-metadata:
-  name: external-service
-spec:
-  displayName: "External Service"
-  description: "External SaaS integration sample."
-  license: proprietary
-  
-  deploymentMethod: api
-
-  apiIntegration:
-    runtime: portal-proxy                # redirect | portal-proxy
-    baseUrl: "https://saas.example.com"  # external target URL
-    tenantBinding: tenant-domain         # tenant-domain | none
-
-  portalTiles:
-    - name: dashboard
-      displayName:
-        en_US: "Dashboard"
-      linkTarget: embedded               # embedded | newwindow
-      allowedGroup: "Tenant Admins"
-```
-
-### 14b. Runtime Modes
-
-1. **Redirect Mode (`runtime: redirect`):**
-   * The portal shell tile directs the user's browser to the external `baseUrl` via a top-level redirect or opens a new tab.
-   * If `tenantBinding` is `tenant-domain`, the operator appends `?tenantDomain=<tenant>.<kernel_domain>` to the redirect URL to identify the client workspace.
-
-2. **Portal Proxy Mode (`runtime: portal-proxy`):**
-   * The operator configures Gateway API HTTPRoutes for the app's subdomain to forward all incoming traffic to the central **portal BFF API** (`gentian-portal-gentian-portal-api` Service in the tenant namespace on port `8000`).
-   * The portal BFF acts as a reverse proxy, receiving requests same-origin from the browser and forwarding them server-side to the external `baseUrl` (injecting `tenantDomain` query arguments if requested).
-   * This allows the external SaaS UI to be embedded inside the portal UI in an iframe (`linkTarget: embedded`) safely, avoiding CORS headers and keeping credentials server-side.
-
----
-
-## 15. Backup and restore contract (`spec.backup`)
-
-`spec.kernelRequirements` already tells the platform **which** stores your app
-has, and that is enough to dump them. What it cannot tell the platform is how to
-pause your app, which bytes on its volumes are worth keeping, and what has to run
-after a restore before the app is usable. Only you know that, so it lives here.
-
-**Most profiles should declare nothing.** Omitting `spec.backup` selects the
-default — scale the app to zero, dump every store in `kernelRequirements`,
-archive every PersistentVolumeClaim the release owns — which is correct for a
-plain CRUD app. Declare the section only for the parts where that is wrong.
-
-### 15a. Why an app is paused at all
-
-Nothing coordinates independent stores. If your app's database references objects
-in its bucket and files on its volume, capturing them while writes continue gives
-you three snapshots from three different moments, and a restore from that can
-reference rows that point at objects which never existed.
-
-So the platform pauses writes for the duration of **your app's** capture — not
-the whole tenant's. Two different apps share no transactional state, so they are
-captured one after another and each pause lasts only as long as that app's own
-dump.
-
-### 15b. Fields
-
-```yaml
-spec:
-  backup:
-    quiesce:
-      mode: command                    # none | scaleDown (default) | command
-      pre:  [php, /var/www/html/occ, "maintenance:mode", --on]
-      post: [php, /var/www/html/occ, "maintenance:mode", --off]
-      container: nextcloud             # default: the pod's first container
-    volumes:
-      include: [data]                  # default: every release-owned PVC
-      excludePaths: ["**/appdata_*/preview"]
-    boundSecrets:                      # rarely needed — see 15d
-    - openBaoPath: apps/myapp/config
-      keys: [dataKey]
-    restore:
-      post:
-      - [php, /var/www/html/occ, "maintenance:data-fingerprint"]
-      verify: [php, /var/www/html/occ, status]
-    consistency: app                   # app (default) | perStore
-    minRestoreVersion: "27.0"
-```
-
-| Field | Use it when |
-|---|---|
-| `quiesce.mode` | `scaleDown` (default) always works but takes the app offline. Use `command` when your app has a real maintenance mode — users see a maintenance page instead of a connection error. Use `none` only if your app's stores hold no references to each other. |
-| `quiesce.pre` / `post` | Required with `mode: command`. **`post` must be safe to run when `pre` never ran** — it also runs on the failure path, and an app left paused is an outage. |
-| `volumes.include` | Your release owns volumes that are not app data (scratch, logs) and you want only some captured. |
-| `volumes.excludePaths` | Your app rebuilds data on demand — thumbnails, previews, search indexes, caches. This is often most of the disk, so it is the field with the largest payoff. |
-| `boundSecrets` | See 15d. Most apps need none. |
-| `restore.post` | Something must run before the app serves the restored data: cache invalidation, re-indexing, fingerprinting. |
-| `restore.verify` | Always worth setting. Without it a restore can only report that bytes were written, not that your app can read them. |
-| `restore.domainBound` | Your app writes the tenant's domain into its data and will not start under another (Synapse's server name). A restore onto another domain then leaves its data out, keeps the app as installed there, and names it; on the same domain it is restored as usual. |
-| `consistency` | `perStore` if your app's stores genuinely hold no references to each other. Leave at `app` if unsure. |
-| `minRestoreVersion` | Your app cannot migrate data from before some version. Older data into a newer app is always allowed — that just runs your migrations — but the reverse corrupts silently. |
-
-### 15c. Commands are argv, not shell lines
-
-`pre`, `post`, `verify` and each entry of `restore.post` are argument vectors:
-
-```yaml
-pre: [php, /var/www/html/occ, "maintenance:mode", --on]     # correct
-pre: "php /var/www/html/occ maintenance:mode --on"          # rejected by CI
-```
-
-The first element is the binary and the rest are its arguments, so nothing is
-word-split, glob-expanded or shell-interpreted. A shell string is valid YAML and
-reads naturally, which is exactly why it is the tempting mistake — it would be
-exec'd as a single filename containing spaces, and it fails during a capture on a
-live tenant.
-
-### 15d. `boundSecrets` — usually empty, and that is correct
-
-Declare a secret here only when **all** of these hold: it was not derived, it
-lives outside your app's captured data, and the data cannot be read back without
-it. Two things already cover most cases:
-
-- Values under `spec.appSecrets` are HMAC-derived from the master password,
-  tenant, app and name, so they reproduce byte-identically on the same cluster
-  and on any cluster restored from the recovery kit.
-- A secret your app writes into its own config file on a captured volume travels
-  with that volume.
-
-Nextcloud is the worked example: its `admin_password` is an `appSecret`, and its
-`instanceid`, `secret` and `passwordsalt` live in `config.php` on the data
-volume — so `profiles/nextcloud/base/base-ce/profile.yaml` declares **no** bound
-secrets.
-
-Paths are relative to your tenant's own prefix (`gentian-os/tenants/{tenant}/`).
-Absolute paths and `..` are rejected, so a profile can never name another
-tenant's secrets.
-
-### 15e. Never exclude configuration
-
-`excludePaths` is for data your app can rebuild. Excluding a config directory
-looks like a harmless size saving and is the one mistake in this section that
-destroys data: an app whose config file carries the key its data was encrypted
-with becomes unrestorable, and nothing detects it — the backup succeeds, and the
-failure surfaces at restore time, possibly a year later.
-
-CI rejects `excludePaths` entries whose segments look like configuration or key
-material. If you need such a pattern, narrow it.
-
-### 15f. What does not belong here
-
-Schedule, retention, encryption and destination are platform and tenant policy,
-not app knowledge, and are set on the export itself. An app author must not be
-able to weaken a tenant's retention or encryption from the catalog.
-
-Validated by `scripts/validate-backup-spec.py` in CI. The full design, including
-the bundle format and the restore sequence, is in
-`gentian-os/docs/concepts/operations.md` §9.
-
+- [ ] First line is `# SPDX-License-Identifier: …`; the header says where the
+      chart and image come from, how sign-in works, who administers the app
+      and lists every secret
+- [ ] `kind: ComponentProfile`; the three `gentianos.io/profile-*` labels;
+      `classes`, `launch`, `trustTier`, `version`, `package` and
+      `requires.platform` set
+- [ ] The chart is referenced by coordinate and exists; develop builds are
+      pinned by `-develop.<sha7>` and `develop-<sha7>`
+- [ ] `fullnameOverride` equals `metadata.name` and every `backend.service`;
+      the chart's `ingress` is off; a Reloader annotation is set; every pod
+      template takes `podLabels`
+- [ ] Every platform value the chart reads is in `valueMapping`, none of them
+      repeated in `extraValues`
+- [ ] Only the five placeholders appear; no cluster address, namespace or realm
+      is written by hand; in-cluster calls use Service names
+- [ ] Telemetry, update checks and other outbound calls are off; what the app
+      needs from outside is an egress privilege with a reason
+- [ ] `identity` is one of `oidc`, `saml`, `sidecar`; an OIDC client has
+      `redirectUris` and `postLogoutRedirectUris` on `${TENANT_DOMAIN}` and
+      `backchannelLogout` as a path, or a comment saying why not
+- [ ] The app gates on `gentian:tenant:<t>:app:<profile>`, not on members, and
+      its own allow-list default is dealt with
+- [ ] `hooks.provisioning` applies the App Admin role when the app has one;
+      the script converges and excludes its own technical account
+- [ ] Every entry is `gateway` + `oidc` unless it is for the internet; no CSP
+      or frame header anywhere; the tile is the product's name and a 128x128
+      PNG kept in sync
+- [ ] Generated secrets have a `valuePath`; keys the app signs with are
+      generated, not random at start
+- [ ] A post-install hook exits non-zero until the app answers and is a no-op
+      once the state matches
+- [ ] `spec.backup` holds only deviations; commands are argv; nothing
+      configuration-like is excluded; `restore.verify` is set
+- [ ] `customization` is declared (not for an addon) and `customization.md`
+      exists
+- [ ] `spec.version` is bumped if the bundle changed; the e2e suite the
+      declarations call for has the app

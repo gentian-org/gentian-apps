@@ -3,7 +3,7 @@
 #
 # Source: no upstream Helm chart exists for Mathesar (docker-compose only), so
 #   this profile is backed by a first-party Gentian chart: charts/mathesar/
-#   (same pattern as charts/odoo — see docs/app-profile-guide.md §0
+#   (same pattern as charts/odoo — see docs/app-profile-guide.md §2
 #   Consequence 3). The chart wraps the official image unmodified.
 #
 # Docker image: docker.io/mathesar/mathesar:0.12.0 — upstream's "production"
@@ -65,7 +65,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.1"
+  version: "0.5.1-dev.2"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
