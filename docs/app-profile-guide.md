@@ -163,8 +163,9 @@ the app reads, and nothing on the chance it might. Two that bite:
   comment saying how to switch them on.
 
 Most profiles are `classes: [app]`, `trustTier: certified`, `launch: tile`.
-`platform` trust unlocks fields that reach beyond the tenant (`forwardToken`,
-`rights`, `vouching`, a composition) and is for the platform's own components.
+`platform` trust unlocks what reaches beyond the tenant (`forwardToken`,
+`rights`, `vouching`) and a composition of the bundle's own, and is for the
+platform's own components.
 
 ## 4. The chart and its values
 
@@ -176,7 +177,8 @@ extraValues:
   ingress:
     enabled: false                       # the platform routes; a chart Ingress collides
   podAnnotations:
-    reloader.stakater.com/auto: "true"   # restart on credential rotation
+    reloader.stakater.com/auto: "true"   # restart on credential rotation; or
+    # secret.reloader.stakater.com/reload: example-ce-sensitive-values, for this app's Secret only
 ```
 
 - **`fullnameOverride` is the Service name**, and it is `metadata.name`. Every
@@ -219,10 +221,11 @@ maintenance burden and a source of drift.
 
 ### 4.3 Five placeholders
 
-The operator substitutes these, and only these, in `extraValues` and in hook
-scripts; the sign-in client's addresses take `${TENANT_DOMAIN}` and
-`${KERNEL_DOMAIN}`, and an extension's values additionally `${SIDECAR_ID}`,
-the extension's own name:
+The operator substitutes these in `extraValues`; a hook script gets the first
+four, and the sign-in client's addresses `${TENANT_DOMAIN}` and
+`${KERNEL_DOMAIN}`. An extension's values additionally take `${SIDECAR_ID}`,
+the extension's own name, and `${NODE_IP}` where a cluster states one (for a
+TURN edge):
 
 | Placeholder | Value |
 |---|---|
@@ -232,7 +235,8 @@ the extension's own name:
 | `${APP_ID}` | this profile's name |
 | `${KERNEL_DOMAIN}` | the cluster's own domain; the identity provider is `id.${KERNEL_DOMAIN}` |
 
-Anything else between `${` and `}` reaches the container as literal text. Never
+Anything else between `${` and `}`, and `${KERNEL_DOMAIN}` in a hook script,
+reaches the container as literal text. Never
 write a cluster's address, a namespace or a realm by hand: a value that holds
 on one cluster is wrong on the next.
 
@@ -259,8 +263,10 @@ phones home anyway does not fail cleanly; it waits for the timeout, on the hot
 path, on every request. Before publishing, read the app's configuration for
 telemetry, update checks, breached-password lookups, avatar and gravatar
 fetches, license pings and public CDN assets, and switch each off in
-`extraValues`. Docmost's `telemetry.disabled` and Nextcloud's
-`enforceHaveIBeenPwned` are the pattern. What the app legitimately needs from
+`extraValues`, or in the app's own configuration from a hook where it has no
+value for it: Docmost's `telemetry.disabled` is the first, Nextcloud's
+`occ config:app:set password_policy enforceHaveIBeenPwned --value=false` in
+its start-up script the second. What the app legitimately needs from
 outside is a privilege with a `reason` (`requires.privileges.egress`), granted
 by the tenant's approver.
 
@@ -276,8 +282,8 @@ CI checks that every chart and image a profile names exists where it says.
 
 ### 5.1 Exactly one of three
 
-`requires.services.identity` is `oidc`, `saml` or `sidecar`, and nothing is
-configured by hand in the realm. The platform creates the client in the
+`requires.services.identity` is `oidc`, `saml` or `sidecar`; declare one (the
+sidecar excludes the other two), and configure nothing by hand in the realm. The platform creates the client in the
 tenant's realm, hands the app its secret through `valueMapping.oidc`, and
 removes the client with the app.
 
@@ -311,7 +317,8 @@ requires:
   realm then posts its logout token to the app, server to server, when a
   person signs out anywhere. The app must verify that token (signature,
   issuer, audience, the logout event) before it ends a session; read the app's
-  code for this and record what it checks in `customization.md`. An app whose
+  code for this and record what it checks in the profile's `Customization`
+  record. An app whose
   library has no such endpoint (django-allauth) cannot declare it: write the
   comment, and the limitation is known rather than hidden.
 - **Prove it.** `e2e/oidc-sign-out/` signs in through a real Keycloak, signs
@@ -341,7 +348,8 @@ realm's issuer are what is unique; a username is unique within one realm only.
 A `surface: gateway`, `authMode: oidc` entry sits behind the tenant's session.
 The front door tells the app who is asking in the `x-gentian-subject`,
 `-email`, `-name`, `-realm` and `-session` headers, strips the client's
-`Authorization` header and cookies, and does not hand the app any token unless
+`Authorization` header and the session's cookies, and does not hand the app
+any token unless
 the profile asks: `exchangeToken: true` gives the app a short-lived token
 whose audience is the app alone, which it verifies against the realm's keys.
 An app that signs people in through its own OIDC client needs neither.
@@ -437,7 +445,9 @@ expose:
 ```
 
 - **One entry per host and purpose**, `surface: gateway` with `authMode: oidc`
-  for anything a person uses. A gateway entry is served only with `oidc`.
+  for anything a person uses. The schema also admits a gateway entry that
+  pins its caller (`source`) instead; the operator routes gateway entries
+  with `oidc` only.
 - **The backend is this app's own Service** on the port the chart serves; an
   addon's entry names its base with `backend.component` (§11.1).
 - **Some names are the platform's** in every tenant: `desktop`, `admin`,
@@ -473,9 +483,9 @@ The tile is the one piece of presentation in a profile, because the desktop
 must show what the cluster routes without asking a service outside it. Use the
 product's own name: the App Store shows this label for an entry it has no
 listing for, and a generic word there reads as a different app. The logo is a
-128x128 PNG drawn by `scripts/render-default-tile.py` (the same glyphs the
-desktop uses), inlined by `scripts/sync-profile-tile.py`; CI refuses a stale
-one. `launch: tile` says the tile is how people reach the app; an entry with
+128x128 PNG, the project's own mark or the neutral glyph
+`scripts/render-default-tile.py` draws, inlined by
+`scripts/sync-profile-tile.py`; CI refuses a stale one. `launch: tile` says the tile is how people reach the app; an entry with
 no tile is an API, and an app nobody opens says `launch: none` in words.
 
 ### 7.3 Running inside the desktop
@@ -533,7 +543,7 @@ hooks:
 Before writing one, check that the platform does not already do the thing
 generically: databases, buckets, caches, sign-in clients, mail and credentials
 are declarations, not scripts. A hook is for the app's own protocol. Write it
-to **exit non-zero until the app answers** (the platform retries) and to
+to **exit non-zero until the app answers** (the Job retries, ten times) and to
 **change nothing once the state matches** (it runs again whenever its script
 changes). Call the app by its Service name. Keep what it does in the header
 comment: a reviewer reads the comment, not the script.
@@ -605,8 +615,9 @@ spec:
   launch: tile
 ```
 
-An addon carries no chart, no `customization` block and no requirements of its
-own; the base declares how a selection is activated
+An addon carries no chart, no `customization` block and no
+`requires.services` of its own, only `requires.platform`; the base declares
+how a selection is activated
 (`customization.addonActivation`, `addonValues`), and
 [app-customization.md §4.2](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/app-customization.md)
 is the model. A preset that bundles several addons is an `AppPackage` under
@@ -627,9 +638,11 @@ and is reachable only inside the namespace.
 `spec.package.composition` names a Crossplane Composition the bundle brings,
 `app-<profile>`, for an app whose rollout needs objects the chart cannot
 express (Element's Synapse beside Element Web, Odoo's module activation). It
-needs `trustTier: platform`, travels only in a catalog of the whole cluster,
-and is used only together with a chart. Everything a hook or an extension can
-do is done there instead.
+is rendered only for a profile of `platform` trust (the operator refuses it
+with `CompositionRefused` otherwise, whatever the schema admitted), travels
+only in a catalog of the whole cluster, and is used beside a chart: a
+composition alone is `PackageUnsupported`. Everything a hook or an extension
+can do is done there instead.
 
 ## 12. The customization declaration
 
@@ -668,15 +681,15 @@ gentian-os [app-customization.md](https://github.com/gentian-org/gentian-os/blob
   sets the bare number and admits no `-dev` version, no `-develop.<sha7>`
   chart and no `develop-<sha7>` image.
 - **CI runs every validator** in `.github/workflows/apps-ci.yaml` on every pull
-  request; nothing needs to be run by hand, and each can be run locally with
-  `python3 scripts/<name>.py`:
+  request; nothing needs to be run by hand, and each script can be run locally
+  with `python3 scripts/<name>.py` (the kustomization check is a workflow step):
 
 | Check | What fails it |
 |---|---|
 | `build-catalogue-source.py --check` | a kind other than `ComponentProfile`; a duplicate name; an edition outside `ce me ie pe ee`; a companion with the wrong kind, name or labels; an `argocd.argoproj.io/*` annotation; a bundle over 180 KiB |
 | `validate-profile-versions.py` | a changed bundle with an unchanged `spec.version`; a `-dev` version or develop chart on `main` |
 | `validate-platform-schema.py` | a profile that does not fit the CRD of every line from `requires.platform` up |
-| `validate-chart-refs.py`, `validate-image-tags.py` | a chart or image that does not exist where the profile says |
+| `validate-chart-refs.py`, `validate-image-tags.py` | a chart or image that does not exist where the profile says; a `develop-<sha7>` image on `main` |
 | `validate-profile-tiles.py` | a `logo` that is not the 128x128 PNG of its `image` |
 | `validate-ingress-annotations.py` | an entry annotation other than the two that exist |
 | `validate-secret-refs.py`, `validate-secret-seeds.py` | a Secret name that is not this profile's; a composition that writes to the vault |
@@ -687,8 +700,8 @@ gentian-os [app-customization.md](https://github.com/gentian-org/gentian-os/blob
   `e2e/oidc-sign-out/` for a `backchannelLogout` declaration,
   `e2e/restore-rewrites/` for `backup.restore.post`, and
   `images/gentian-sidecar-sso-saml/e2e/` for the sign-in sidecar. A profile
-  that declares one of these adds its `<app>.e2e.js` to the suite; a
-  declaration that was never run is marked as such in the profile.
+  that declares one of these adds its `<app>.e2e.js` to the suite. Nothing
+  enforces that, so a declaration that was never run says so in a comment.
 
 ## 14. Checklist
 
@@ -711,7 +724,7 @@ Before opening a pull request:
       is written by hand; in-cluster calls use Service names
 - [ ] Telemetry, update checks and other outbound calls are off; what the app
       needs from outside is an egress privilege with a reason
-- [ ] `identity` is exactly one of `oidc`, `saml`, `sidecar`; an OIDC client has
+- [ ] `identity` is one of `oidc`, `saml`, `sidecar`; an OIDC client has
       `redirectUris` and `postLogoutRedirectUris` on `${TENANT_DOMAIN}` and
       `backchannelLogout` as a path, or a comment saying why not
 - [ ] The app gates on `gentian:tenant:<t>:app:<profile>`, not on members, and
