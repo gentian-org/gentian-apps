@@ -289,7 +289,7 @@ profile's **`composition.yaml`** (`app-ox`, `app-element-ce`, …).
 | **Profile annotation** | Operator or gateway reconciler must do the same thing for many apps; value is small and stable | `gentianos.io/deployment-role`, `gentianos.io/gateway-api-backends`, `gentianos.io/oidc-default-redirect-uris` |
 | **`spec.extraValues`** | Helm chart needs non-secret structured config; composition passes it through | Odoo `addon: crm`, chart feature flags |
 | **`spec.postInstallJob`** | Bootstrap must call the app's own runtime admin API (not Helm values, not `kernelRequirements`); small and self-contained | open-webui LiteLLM config seed (§13a) |
-| **`composition.yaml`** | Custom Crossplane MR graph, multi-Job/RBAC sequencing, chart-specific workarounds | OX bootstrap Job, Element Jitsi overlay, addon install Jobs |
+| **`composition.yaml`** | Custom Crossplane MR graph, multi-Job/RBAC sequencing, chart-specific workarounds | OX bootstrap Job, Element Jitsi overlay |
 | **Upstream chart / vendor** | Fix belongs in the supplier chart long-term | OX `initconfigdb -i`, Keycloak client scopes in openDesk |
 
 This table is the rung mapping in different words —
@@ -1642,7 +1642,6 @@ which is then named `app-<profile>`:
 |---|---|
 | *(omit)* | Standard apps — `app-default` is used automatically |
 | `app-element-ce` | Element — Synapse plus Element Web and the objects beside them |
-| `app-odoo-base-ce` | Odoo base edition |
 
 ---
 

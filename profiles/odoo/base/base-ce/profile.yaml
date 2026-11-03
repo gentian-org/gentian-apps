@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: LGPL-3.0
 # ComponentProfile — Odoo Community base runtime (odoo-base-ce)
 #
-# Deploys one Odoo OCB instance per tenant. Module profiles (odoo-crm, …) install
-# Odoo CE modules via app-odoo-base-ce Jobs in a later phase. OIDC uses app-default Client MR.
+# Deploys one Odoo OCB instance per tenant. Addon profiles (odoo-crm-ce, …) name
+# Odoo CE modules, which the chart installs on start (customization.addonActivation).
 apiVersion: gentianos.io/v1alpha1
 kind: ComponentProfile
 metadata:
@@ -22,18 +22,13 @@ metadata:
 spec:
   classes:
     - app
-  trustTier: platform
-  version: "0.5.1-dev.5"
+  trustTier: certified
+  version: "0.5.1-dev.6"
   package:
-    # The Composition that renders this chart AND the objects that have to
-    # exist beside it. A chart and a composition are the one legal pair in
-    # the package union: the chart is what is installed, the composition is
-    # what else is created.
-    composition: app-odoo-base-ce
     chart:
       repository: oci://ghcr.io/gentian-org/charts
       name: odoo
-      version: "0.1.25-develop.609543e"
+      version: "0.1.27-develop.5f3cb4b"
 
     valueMapping:
       oidc:
@@ -331,6 +326,14 @@ spec:
     supportedRungs: [L0, L1, L3, L4, L5, L6]   # L2 is always available, never listed
     ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/odoo/odoo-base-ce/customization.md
 
+    # The selected addons' modules, for the chart's start script: it adds them
+    # to the base modules in the one odoo-bin -i it runs on every start, which
+    # skips what is installed already. Not a script, although the field is
+    # called one: the chart reads the names (charts/odoo, gentian.addonModules).
+    addonActivation:
+      valuesPath: gentian.addonModules
+      script: "__GENTIAN_ADDON_IDS__"
+
     configure:
       valuesSchema: charts/odoo/values.schema.json
       hotReload: false
@@ -374,7 +377,6 @@ spec:
 
     repackage:
       chartOwnership: gentian-owned
-      compositionRef: app-odoo-base-ce
 
     patch:
       allowed: true
