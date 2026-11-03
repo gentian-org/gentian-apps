@@ -47,5 +47,5 @@ but note the ABI score above: addons have broken across Synapse releases, so pin
 ## Gotchas
 
 - Double CSP headers and `frame-ancestors` handling for portal embedding are L4 concerns
-  already solved in the composition — see `app-profile-guide.md` §6b.
+  already solved in the composition — see `app-profile-guide.md` §7.1.
 - Element SSO redirect URIs are host-sensitive; changing them is L0, not L1.

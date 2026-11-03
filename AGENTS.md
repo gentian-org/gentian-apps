@@ -18,7 +18,7 @@ Helm — same stack as [`apps/_template`](apps/_template) /
 * CI (`.github/workflows/apps-ci.yaml`) builds and pushes images + OCI charts for `apps/*`.
   `profiles/*` sync to clusters via the ArgoCD ApplicationSet `gentian-catalogue`.
 * **Don't build/push images or apply profile changes to a live cluster yourself.** Bump the
-  chart version and the profile's `spec.chart.version`, then let CI and ArgoCD do the rest.
+  chart version and the profile's `spec.package.chart.version`, then let CI and ArgoCD do the rest.
   Deleting a stuck Application/resource to speed up reconciliation is fine; hand-patching
   config in the cluster is not.
 
@@ -117,7 +117,7 @@ asked of the director, never read off the token.
 
 1. Bump `chart/Chart.yaml` version and image tags in `chart/values.yaml`.
 2. CI builds and pushes images + OCI chart.
-3. Update the matching `profiles/<app>/profile.yaml` `spec.chart.version`.
+3. Update the matching profile's `spec.package.chart.version`.
 4. AppProfile update reconciler rolls out to tenants.
 
 ### Local dev
@@ -160,5 +160,5 @@ cluster and keeps it in its own database. See
 are separate flat trees on purpose: a profile references its chart by OCI coordinate rather
 than by path, `charts/odoo` backs 10 profiles, and 7 profiles wrap external charts this repo
 never contains. The reasoning — this is a distribution repo, not an application monorepo — is
-in [docs/app-profile-guide.md](docs/app-profile-guide.md) §0. Read it before proposing layout
+in [docs/app-profile-guide.md](docs/app-profile-guide.md) §2. Read it before proposing layout
 changes.

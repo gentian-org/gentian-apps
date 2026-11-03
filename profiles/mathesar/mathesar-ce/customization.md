@@ -59,7 +59,7 @@ pre-provisioning the account by email when a member hasn't logged in yet, so the
 login links to it instead of creating a fresh non-admin account. This was the first
 `privilegedRole` protocol actually implemented in gentian-os; before this, `PrivilegedRoleSpec`
 existed on the CRD but `syncAppPrivilegedRole` unconditionally returned "not implemented" for
-every profile (including the `nextcloud` OCS-API case §6h of the app-profile-guide claimed was
+every profile (including the `nextcloud` OCS-API case §6 of the app-profile-guide claimed was
 supported — it never was; that section has been corrected).
 
 The technical account is excluded from its own sync (matched by the fixed username

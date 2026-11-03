@@ -4,7 +4,7 @@
 # Source: no upstream Helm chart exists for Docmost (docker-compose only), so
 #   this profile is backed by a first-party Gentian chart: charts/docmost/
 #   (same pattern as charts/mathesar and charts/odoo — see
-#   docs/app-profile-guide.md §0 Consequence 3). The chart wraps the official
+#   docs/app-profile-guide.md §2). The chart wraps the official
 #   docker.io/docmost/docmost image unmodified.
 #
 # ── Sign-in: the platform's sign-in sidecar ─────────────────────────────────
@@ -61,7 +61,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.5"
+  version: "0.5.1-dev.6"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -96,7 +96,7 @@ spec:
     # valueMapping above (the per-tenant Postgres the operator provisions),
     # not a static placeholder. Setting them here too would race the
     # composition's own injection at the same values paths — see
-    # docs/app-profile-guide.md §3 and §12 checklist. Redis needs nothing at
+    # docs/app-profile-guide.md §4.2 and §14. Redis needs nothing at
     # all: it is pod-local on 127.0.0.1 with no credentials (see the chart).
 
       s3:
@@ -115,7 +115,7 @@ spec:
     # usage-telemetry ping and (separately) SAML_DISABLE_REQUESTED_AUTHN_CONTEXT
     # as an ee/-adjacent knob; DISABLE_TELEMETRY is the only outbound-call
     # toggle confirmed in CE — audit for others (avatar/gravatar fetches,
-    # update checks) per docs/app-profile-guide.md §6g before going live.
+    # update checks) per docs/app-profile-guide.md §4.5 before going live.
       telemetry:
         disabled: true
 

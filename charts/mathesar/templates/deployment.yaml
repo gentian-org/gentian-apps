@@ -57,7 +57,7 @@ spec:
             # host. The operator reaches this app over
             # http://<svc>.<ns>.svc.cluster.local to reconcile app-admins into
             # is_superuser (PrivilegedRoleSpec "mathesar-rpc"), per the
-            # server-to-server rule in app-profile-guide.md §2 — and Django
+            # server-to-server rule in app-profile-guide.md §4.4 — and Django
             # answers any Host outside this list with a bare 400 DisallowedHost,
             # which reads like a malformed request rather than a config problem.
             # A leading dot matches subdomains, so ".svc.cluster.local" stays

@@ -51,7 +51,7 @@ else in the directory reaches a cluster. What a bundle may hold and how it is na
 or Gentian-authored — belongs in `charts/<name>/`, and its profile references it by OCI
 coordinates, not by path. Charts and images are **not** nested inside profiles: `charts/odoo`
 backs 10 profiles, and 7 profiles wrap external charts this repo never contains. See
-[docs/app-profile-guide.md](docs/app-profile-guide.md) §0 for why this repo is organized as a
+[docs/app-profile-guide.md](docs/app-profile-guide.md) §2 for why this repo is organized as a
 distribution repo rather than an application monorepo.
 
 ## Branches

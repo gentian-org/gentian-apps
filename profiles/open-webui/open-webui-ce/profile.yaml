@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.8"
+  version: "0.5.1-dev.9"
   package:
     chart:
       repository: "https://helm.openwebui.com"
@@ -362,7 +362,7 @@ spec:
   # itself (HS256, signed with WEBUI_SECRET_KEY, the same secret Open WebUI
   # verifies incoming tokens with) and POSTs the correct config — idempotent,
   # and a no-op once the persisted config already matches. See
-  # app-profile-guide.md, "Post-install bootstrap jobs".
+  # app-profile-guide.md §9.
   #
   # "Matches" means the address and the key, both. The platform can replace
   # this app's key at the gateway, and the old one stops authenticating there;
