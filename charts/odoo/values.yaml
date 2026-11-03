@@ -51,6 +51,12 @@ gentian:
   bindingsPath: /etc/gentian/bindings.json
   modulesPath: /opt/odoo/custom-addons
   initModules: "base,web,gentian_os"
+  # Modules of the addons the tenant selected, installed with initModules on
+  # every start. Written by the platform from the base profile's
+  # customization.addonActivation, space-separated; empty when none is selected.
+  # Deselecting one does not uninstall it: Odoo drops a module's tables when it
+  # does.
+  addonModules: ""
 
   # The URL this Odoo is actually reached on, e.g. https://odoo.tenant.example.org.
   #
