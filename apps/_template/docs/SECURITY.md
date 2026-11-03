@@ -76,7 +76,7 @@ only references contract **names** that match those definitions.
 |---|---|---|---|
 | **Declaration** | `provides` + `integrations` on ComponentProfile | Catalog / app developer | **Implemented** (CRD) |
 | **Wiring** | `IntegrationBinding` — credentials + OIDC between installed apps | Platform operator (auto when peers match) | **Implemented** |
-| **Grant (ReBAC)** | Future `AppGrant` — tenant-approved subset + OpenFGA tuples | Tenant admin at install | **Planned** (Stage 2 in security architecture) |
+| **Grant (ReBAC)** | `AppGrant` — the capabilities the tenant approved for a consumer, a subset of what the binding declares; the director projects it into OpenFGA | Tenant admin, after install | **Implemented** |
 
 `requires.services` (OIDC, Postgres, S3, …) is **separate** — it declares
 **kernel services**, not cross-app integration contracts.
@@ -85,7 +85,7 @@ only references contract **names** that match those definitions.
 |---|-------------|-----|
 | M18 | **Declare kernel needs honestly** | `requires.services` — only OIDC/DB/storage/mail the app actually uses |
 | M19 | **Declare integration contracts honestly** | `provides` / `integrations` — only contracts the app implements or consumes; see existing profiles under `gentian-apps/profiles/` |
-| M20 | **Never implement tenant grants in app code** | Cross-app access is wired by `IntegrationBinding` (today) and `AppGrant` + OpenFGA (future) — apps declare, they do not grant |
+| M20 | **Never implement tenant grants in app code** | Cross-app access is wired by `IntegrationBinding` and narrowed by `AppGrant`, which the director projects into OpenFGA — apps declare, they do not grant |
 
 Kernel-only repos (e.g. `gentian-ui`) skip M18–M20; they deploy via ApplicationSet, not ComponentProfile.
 
@@ -107,18 +107,19 @@ Enable these when the condition is true — not optional laziness.
 
 ---
 
-## Mandatory once platform Stage 2 is live
+## Authorization with the platform's store
 
-When OpenFGA is available in the cluster, these become mandatory for all apps
-(not just admin apps):
+An app that declares `requires.services.authorization` is given an OpenFGA store of its
+own with its own model, reached through the arbiter (gentian-os app-catalog.md §14.2).
+For such an app:
 
 | # | Requirement |
 |---|-------------|
 | S1 | Call OpenFGA **Check** (AuthZEN API) on every mutation and sensitive read |
-| S2 | Effective access = `ComponentProfile contract declaration ∩ tenant grant (AppGrant, future) ∩ user ceiling ∩ ABAC` |
+| S2 | Effective access = `ComponentProfile contract declaration ∩ tenant grant (AppGrant) ∩ user ceiling ∩ ABAC` |
 | S3 | Agent routes validate **delegation tuple + task TTL** before acting |
 
-Until then, M1–M4 + M26 are the minimum authorization bar.
+An app without a store of its own relies on M1–M4 and M26.
 
 ---
 
