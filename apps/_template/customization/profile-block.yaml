@@ -1,4 +1,4 @@
-# Paste into the app's AppProfile under spec: — this is what makes the ladder
+# Paste into the app's ComponentProfile under spec: — this is what makes the ladder
 # machine-readable for the App Store and for agents.
 # Replace <app-id> throughout. See gentian-os/docs/guides/app-customization.md §4.
 customization:

@@ -18,7 +18,7 @@ api:
     ENVIRONMENT: production
     # HTTPS origin for this app host — required (M9)
     BACKEND_CORS_ORIGINS: https://app.example.gentian.cloud
-    # From existingSecret via valueMapping in AppProfile
+    # From existingSecret via valueMapping in the ComponentProfile
     # OIDC_ISSUER, OIDC_CLIENT_ID, DATABASE_URL, OPENFGA_*
 
 web:

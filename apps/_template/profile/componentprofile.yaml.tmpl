@@ -1,13 +1,13 @@
-# ComponentProfile — the catalog entry for a component of the platform itself.
+# ComponentProfile — the catalog entry for what this repository builds.
 #
-# Use this file instead of appprofile.yaml.tmpl when what this repo builds is a
-# component rather than a catalog app: something the platform installs for
-# itself by creating a Component object that names this profile, not something a
-# tenant admin picks out of the app catalog and gets through Tenant.spec.apps.
-# README.md and docs/AGENTS.md carry the full distinction; the operator's half of
-# it is that gentian-os reconciles a Component into a provider-helm Release plus
-# one Gateway API route and one Envoy SecurityPolicy per gateway exposure, while
-# an AppProfile goes through the tenant app path and its Crossplane composition.
+# One kind for every component: a catalog app a tenant's administrator installs
+# (listed in Tenant.spec.apps, which the operator turns into a Component in the
+# tenant's namespace) and a component the platform places into tenants itself
+# (spec.placement). The operator reconciles either into a provider-helm Release,
+# a NetworkPolicy derived from spec.requires, and one Gateway API route plus one
+# Envoy SecurityPolicy per gateway exposure. The practices behind every field
+# are gentian-apps docs/app-profile-guide.md; the field reference is gentian-os
+# docs/guides/custom-catalogs.md §4.1.
 #
 # Replace COMPONENT_ID and the chart coordinates before committing. The resource
 # is cluster-scoped, so metadata.name is the name every Component's profileRef
@@ -45,8 +45,6 @@ spec:
   #               appear beside another class. It may expose a console, but
   #               only on the gateway, and that console's tile asks on the
   #               cluster.
-  #
-  # This was called `tenancy`, with the values system, shared and tenant.
   classes: [app]
 
   # How a person reaches this component. Required and undefaulted: an app
@@ -75,20 +73,19 @@ spec:
   # catalog now says.
   version: "0.1.0"
 
-  # Whether every tenant gets one of these without anybody declaring it. The
-  # operator creates a Component of this profile in each tenant, named after
-  # the profile, when the tenant is provisioned; the desktop is one such
-  # component and the administration console is another. Leave it off for a
-  # component a tenant installs on purpose. Only a profile of class app may say
-  # it: a service and a shared-app have one instance, so there is nothing to
-  # give each tenant.
-  # defaultForTenants: true
+  # Whether the platform places one of these into tenants without anybody
+  # installing it: the desktop and the administration console are placed into
+  # every tenant. Leave it out for a component a tenant installs on purpose.
+  # Only a profile of class app may say it: a service and a shared-app have one
+  # instance, so there is nothing to give each tenant.
+  # placement:
+  #   tenants: every          # every | platform | users
+  #   while: storeOffered     # optional: storeOffered | llm | credentialSet
 
   # What this component is made of, and it is exactly one thing: a chart, a
   # composition, an api or an addon. Delivery — whether the platform runs the
   # component, only routes to it, or does neither — is read from here rather
   # than stated beside it, so there is no second field to contradict this one.
-  # There used to be: deploymentMethod could say "api" beside a chart.
   package:
     # The chart the operator installs as a provider-helm Release in the
     # component's own namespace. All three fields are required. The version must
@@ -270,11 +267,8 @@ spec:
   # component uses but does not declare here is a connection Calico refuses.
   requires:
     # What the platform must fulfill before this component runs. Each is
-    # fulfilled by a component of class service, or by something outside the
-    # cluster entirely — a mail relay, a bucket at a cloud provider. It was
-    # called kernelRequirements, which named a fulfiller that is not the
-    # fulfiller, and then contracts, which is the word `provides` below
-    # already holds.
+    # fulfilled by a system engine, or by something outside the cluster
+    # entirely — a mail relay, a bucket at a cloud provider.
     services:
       # The OIDC client the platform registers in the tenant's realm. Declare it
       # only for a component that runs its own login; one that lives behind a
@@ -300,8 +294,8 @@ spec:
       #     platform builds the address -- that entry's own Service, inside
       #     the cluster -- and a profile states none. Declare it only for an
       #     app that checks the logout token (signature, issuer, audience,
-      #     event) before it ends a session, and say in customization.md what
-      #     it checks.
+      #     event) before it ends a session, and say in the profile's
+      #     Customization record what it checks.
       #     backchannelLogout:
       #       exposure: web
       #       path: /logout/backchannel
@@ -478,8 +472,7 @@ spec:
       # gateway is the authenticated tenant gateway and is always on: the entry
       # carries the session. perimeter is a publishing proxy in tenant-<t>-dmz
       # with a credential of its own, and is off until a perimeter approver
-      # enables it on the Component — the operator skips perimeter entries
-      # today, so one declared here routes nowhere yet.
+      # enables it on the Component.
       surface: gateway
       # oidc puts the edge session in front of this entry. The other values —
       # jwt, bearer, basic, signature, none — say what the backend itself
@@ -495,9 +488,7 @@ spec:
       paths: ["/api", "/healthz", "/readyz"]
       # Paths refused even where paths admits them, with deny winning
       # regardless of specificity so that a broad allow with narrow denials
-      # stays readable. The component reconciler does not render these yet, so
-      # today they document an intent the edge does not enforce — do not rely
-      # on one to keep an administrative path off the internet.
+      # stays readable; enforced at the front door for every method.
       # denyPaths: ["/api/internal"]
       # Removes the matched prefix before the request reaches the backend. Also
       # not rendered by the component reconciler yet, so a backend that needs it

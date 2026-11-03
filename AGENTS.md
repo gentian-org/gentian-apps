@@ -2,7 +2,7 @@
 
 ## Project overview
 
-`gentian-apps` is **the single source of truth for AppProfile catalog metadata** for Gentian
+`gentian-apps` is **the single source of truth for ComponentProfile catalog metadata** for Gentian
 OS — profile bundles (`profiles/[<family>/]<name>/`, published as the catalog a cluster installs
 from, one file and one digest per profile: [docs/profile-bundles.md](docs/profile-bundles.md)) plus
 first-party app implementations (`apps/<name>/`, FastAPI + React +
@@ -40,7 +40,7 @@ local operations: [docs/customization-ladder.md](docs/customization-ladder.md).
 
 1. **Restate** the request as a capability ("users must approve invoices > 10k"), not an
    implementation ("patch `account_move.py`"). Split multi-part requests and run this per part.
-2. **Read the app's ladder**: `AppProfile.spec.customization` in `profiles/<n>/profile.yaml`,
+2. **Read the app's ladder**: `ComponentProfile.spec.customization` in `profiles/<n>/profile.yaml`,
    and `profiles/<n>/customization.md`. If absent, assume `{grade: unknown, supportedRungs:
    [L0, L4]}` and raise a task to characterize the app — infer nothing more.
 3. **Walk L0 → L6 in order.** Stop at the first rung that (a) can express the change,
@@ -82,7 +82,7 @@ First-party apps share the FastAPI + React + Helm stack scaffolded by `apps/_tem
 | `frontend/src/api/client.ts` | Typed fetch helpers |
 | `frontend/src/stores/` | Zustand client state (when needed) |
 | `chart/` | Helm chart (Gateway API HTTPRoute, Pattern A secrets) |
-| `profile/appprofile.yaml.tmpl` | AppProfile skeleton |
+| `profile/componentprofile.yaml.tmpl` | ComponentProfile skeleton |
 | `docs/security.md` | Security checklist |
 | `docs/frontend-stack.md` | Frontend stack rationale |
 
@@ -118,7 +118,7 @@ asked of the director, never read off the token.
 1. Bump `chart/Chart.yaml` version and image tags in `chart/values.yaml`.
 2. CI builds and pushes images + OCI chart.
 3. Update the matching profile's `spec.package.chart.version`.
-4. AppProfile update reconciler rolls out to tenants.
+4. A tenant's install rolls over when it is moved to the new build (gentian-os docs/concepts/versioning.md).
 
 ### Local dev
 

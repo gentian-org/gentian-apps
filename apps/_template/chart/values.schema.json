@@ -90,7 +90,7 @@
         "mountPath": {
           "type": "string",
           "pattern": "^/.*",
-          "description": "Absolute path; must match the AppProfile's declared dropIns[].path."
+          "description": "Absolute path; must match the ComponentProfile's declared dropIns[].path."
         },
         "configMaps": {
           "type": "array",

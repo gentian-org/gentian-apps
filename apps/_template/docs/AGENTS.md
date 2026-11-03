@@ -17,8 +17,7 @@ Conventions for AI coding agents and humans extending Gentian first-party UI
 | `frontend/src/api/client.ts` | Typed fetch helpers |
 | `frontend/src/stores/` | Zustand client state (when needed) |
 | `chart/` | Helm chart (Gateway API HTTPRoute, Pattern A secrets) |
-| `profile/appprofile.yaml.tmpl` | AppProfile skeleton (catalog apps only) |
-| `profile/componentprofile.yaml.tmpl` | ComponentProfile skeleton (platform components only) |
+| `profile/componentprofile.yaml.tmpl` | ComponentProfile skeleton |
 | `.github/workflows/build.yaml` | CI — multi-arch images to GHCR, OCI chart publish |
 | `docs/SECURITY.md` | Security checklist |
 
@@ -43,29 +42,17 @@ do not start by editing source. **When building one**, keep the extension API a 
 `EXTENSION_API_VERSION` is semver, supported N-2, deprecations announced one minor ahead, and
 unstable surface lives under `proposed/`.
 
-## Which profile this app needs
+## The profile
 
-`AppProfile` and `ComponentProfile` are both cluster-scoped catalog entries, and the
-choice is not cosmetic — it decides which reconciler owns the install.
-
-An **AppProfile** is a catalog app: a tenant admin installs it by way of
-`Tenant.spec.apps`, the app reconciler drives it through a Crossplane App claim, and the
-profile carries the portal's presentation (`displayName`, `description`, `tile`) and the
-catalog identity.
-
-A **ComponentProfile** is a component of the platform: the platform installs it for
-itself by creating a `Component` that names the profile, and `component_reconciler.go`
-turns that into a provider-helm Release, a NetworkPolicy derived from `spec.requires`,
-and one HTTPRoute plus one Envoy SecurityPolicy per gateway entry in `spec.expose`. It
-carries tenancy (`system`, `shared`, `tenant`), a trust tier, privilege requests a named
-person grants on the `Component`, and one piece of presentation: the `tile` on an
-exposure, which is how the component appears on the portal and which relation decides
-who sees it. A profile that says `defaultForTenants: true` is created in every tenant
-without anyone declaring it, which is how the desktop and the administration console
-reach everyone.
-
-Only one of the two files belongs in a finished app. Delete the other rather than leaving
-a skeleton nobody maintains.
+`ComponentProfile` is the one cluster-scoped catalog entry kind. A tenant's administrator
+installs it by way of `Tenant.spec.apps`, or the platform places it (`spec.placement`);
+either way `component_reconciler.go` turns the resulting `Component` into a provider-helm
+Release, a NetworkPolicy derived from `spec.requires`, and one HTTPRoute plus one Envoy
+SecurityPolicy per gateway entry in `spec.expose`. It carries `classes`, a trust tier,
+privilege requests a named person grants on the `Component`, and one piece of
+presentation: the `tile` on an exposure, which is how the component appears on the
+desktop and which relation decides who sees it. How to write one:
+[docs/app-profile-guide.md](https://github.com/gentian-org/gentian-apps/blob/develop/docs/app-profile-guide.md).
 
 ## What the platform tells a component, and how
 
@@ -136,8 +123,8 @@ chart consumes it with `envFrom` under `existingSecret.name`: `DATABASE_URL`, an
 component that runs its own login, `OIDC_CLIENT_SECRET`. Nothing else in the environment
 is a secret; the issuer, client id and audience are facts, mapped as described above.
 
-Map keys in `profile/appprofile.yaml.tmpl` `valueMapping` — or `spec.package.valueMapping`
-in `profile/componentprofile.yaml.tmpl` — must match Helm `values.yaml`. A key that matches
+Map keys in `profile/componentprofile.yaml.tmpl` `spec.package.valueMapping` must match
+Helm `values.yaml`. A key that matches
 nothing is not an error anywhere: the value lands where nothing reads it.
 
 ## Edge routing
@@ -157,10 +144,8 @@ on only for a deployment nothing reconciles. See [docs/SECURITY.md](./SECURITY.m
    images for amd64 and arm64, rewrites the image tags in `chart/values.yaml` to this
    build's immutable tag, and pushes the chart to the OCI registry. Branches build but
    never publish, because publishing is what rolls a cluster over.
-3. Update the profile's chart version — `spec.chart.version` for an AppProfile,
-   `spec.package.chart.version` and `spec.version` for a ComponentProfile.
-4. The AppProfile update reconciler rolls tenants over; a component rolls over when its
-   `Component`'s profile names the new chart version.
+3. Update the profile's `spec.package.chart.version` and bump `spec.version`.
+4. A component rolls over when its `Component`'s profile names the new chart version.
 
 ## Local dev
 

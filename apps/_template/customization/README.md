@@ -21,7 +21,7 @@ decision procedure, and the record format live in
 | **L4** Repackage | yes | the chart is ours; prefer values and drop-ins first |
 | **L5/L6** Patch / Fork | n/a | we own the source — send a PR instead |
 
-Paste [`profile-block.yaml`](profile-block.yaml) into the app's `AppProfile` so this is
+Paste [`profile-block.yaml`](profile-block.yaml) into the app's `ComponentProfile` so this is
 machine-readable for the App Store and for agents.
 
 ## L0 — Configure
