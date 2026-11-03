@@ -6,8 +6,6 @@ metadata:
   labels:
     gentianos.io/profile-name: nextcloud-base-ce
 spec:
-  extraManagedByAttributeGroups:
-    - FileshareBaseAdmin
   mapperTemplates:
     gentian_useruuid:
       protocolMapper: oidc-usermodel-attribute-mapper
