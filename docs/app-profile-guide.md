@@ -637,7 +637,7 @@ and is reachable only inside the namespace.
 
 `spec.package.composition` names a Crossplane Composition the bundle brings,
 `app-<profile>`, for an app whose rollout needs objects the chart cannot
-express (Element's Synapse beside Element Web, Odoo's module activation). It
+express (Element's Synapse beside Element Web). It
 is rendered only for a profile of `platform` trust (the operator refuses it
 with `CompositionRefused` otherwise, whatever the schema admitted), travels
 only in a catalog of the whole cluster, and is used beside a chart: a
