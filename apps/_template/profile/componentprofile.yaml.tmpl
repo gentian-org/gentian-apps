@@ -52,13 +52,12 @@ spec:
   # has to be a word somebody wrote rather than a field they left out.
   #
   #   tile   at least one exposure below carries a tile. The usual answer.
-  #   from   another component opens it, named in launchFrom below: Collabora
-  #          from Nextcloud, a viewer from a file manager.
+  #   from   another component opens it: Collabora from Nextcloud, a viewer
+  #          from a file manager.
   #   none   nothing opens it — either it is the launcher itself, which is the
   #          desktop and only the desktop, or it has no human surface at all,
   #          which is a database.
   launch: tile
-  # launchFrom: file-store
 
   # The review level this entry has been through, required and undefaulted
   # because a trust tier is something a reviewer stated, not something that was
@@ -320,10 +319,11 @@ spec:
       database:
         # postgresql or mariadb.
         engine: postgresql
-        # A database of this component's own per tenant, which is what a
-        # component storing its own state wants. Setting it false puts every
-        # tenant in one schema and makes isolation the component's problem.
-        databasePerTenant: true
+        # Each tenant's install gets a database of its own, always.
+        # The most connections the component's account may hold at once on
+        # the shared server: 25 unless set here, at most 100. Raise it only
+        # for a component whose pools need more.
+        # connectionLimit: 25
         # Lets the component create databases at runtime. Ask for it only when
         # creating databases is what the component is for; a component that
         # merely stores its own state must not, because the grant it needs is
@@ -342,8 +342,7 @@ spec:
       # component that asks for write and only reads has widened the blast
       # radius of its own credential for nothing.
       # storage:
-      #   s3:
-      #     bucketPerTenant: true
+      #   s3: {}
       #   files:
       #     protocol: webdav
       #     capabilities: [read]
@@ -490,22 +489,6 @@ spec:
       # regardless of specificity so that a broad allow with narrow denials
       # stays readable; enforced at the front door for every method.
       # denyPaths: ["/api/internal"]
-      # Removes the matched prefix before the request reaches the backend. Also
-      # not rendered by the component reconciler yet, so a backend that needs it
-      # will currently see the full path.
-      # stripPrefix: false
-      # Pins who may call this entry, before authMode is even considered, and is
-      # evaluated at the proxy rather than in the component. Exactly one form:
-      # component names another installed component whose pods may call, and is
-      # preferred because a CIDR list ages badly. Not rendered by the component
-      # reconciler yet either.
-      # source:
-      #   component: other-component
-      # The other form, which replaces component and is never written beside
-      # it, is the list of ranges admitted once the edge has resolved the real
-      # client IP:
-      # source:
-      #   cidrs: ["203.0.113.0/24"]
       # Asks the front door for a token of the signed-in person that is valid
       # at this component and nowhere else. It exchanges the session's token
       # at the tenant's realm for one whose audience is this component's name,
@@ -575,11 +558,12 @@ spec:
         relation: can_launch
         # object: app
 
-  # Caps the component's own session, for a component that runs its own login.
-  # The edge bounds how long a request is let through; it does not refresh the
-  # groups the component captured at its own login, so this and not the access
-  # token's lifetime is what bounds what a user may still do inside the
-  # component after their rights change.
+  # Caps, at the realm, how long a sign-in through the component's OIDC
+  # clients lasts: past that age the realm refuses their refresh, so the
+  # component cannot renew its tokens without a new sign-in, which reads the
+  # person's groups again. It does not end a session the component keeps in
+  # its own cookie; a component that never goes back to the realm keeps that
+  # session as long as it allows.
   # sessionMaxAge: 8h
 
   # Containers shipped inside this component's own pod. It is the only escape
@@ -694,14 +678,6 @@ spec:
   #     post:
   #       - ["/usr/local/bin/component", "reindex"]
   #     verify: ["/usr/local/bin/component", "healthcheck"]
-  #   # Whether every store must be captured inside one quiesce window. app is
-  #   # the default and the right answer whenever the stores reference each
-  #   # other; perStore is only for a component whose stores do not.
-  #   consistency: app
-  #   # Refuses to restore a copy into a component older than this, expressed as
-  #   # the version the chart deploys. Older data into a newer component just
-  #   # runs the migrations; the reverse corrupts silently.
-  #   minRestoreVersion: "0.1.0"
 
   # What a tenant may change about this component without forking it — the
   # Gentian customization ladder, declared so that a human or an agent can pick

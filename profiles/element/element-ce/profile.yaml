@@ -13,7 +13,7 @@ spec:
   classes:
     - app
   trustTier: experimental
-  version: "0.5.1-dev.4"
+  version: "0.5.1-dev.5"
   package:
     # The Composition that renders this chart AND the objects that have to
     # exist beside it. A chart and a composition are the one legal pair in
@@ -97,7 +97,6 @@ spec:
         # port of the entry "matrix" inside the cluster. It has not been run.
       database:
         engine: postgresql
-        databasePerTenant: true
       mail:
         smtp: {}
 

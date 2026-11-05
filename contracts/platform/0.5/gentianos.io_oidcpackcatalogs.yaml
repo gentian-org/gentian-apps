@@ -28,9 +28,9 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          OIDCPackCatalog is a cluster-scoped catalogue of OIDC packs for tenant apps.
+          OIDCPackCatalog is a cluster-scoped catalog of OIDC packs for tenant apps.
           Shipped from gentian-apps (profiles/<app>/oidc-catalog.yaml) and consumed
-          by the operator and app-default composition for pack Jobs and ClientDefaultScopes.
+          by the operator for pack Jobs and an app's client default scopes.
         properties:
           apiVersion:
             description: |-
@@ -168,10 +168,6 @@ spec:
             type: object
           status:
             description: OIDCPackCatalogStatus is optional observed state.
-            properties:
-              packCount:
-                description: PackCount is the number of entries in spec.packs.
-                type: integer
             type: object
         type: object
     served: true

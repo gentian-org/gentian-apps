@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.21"
+  version: "0.5.1-dev.22"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -393,7 +393,6 @@ spec:
             path: /apps/user_oidc/backchannel-logout/gentian
       database:
         engine: postgresql
-        databasePerTenant: true
       cache:
         engine: redis
       mail:

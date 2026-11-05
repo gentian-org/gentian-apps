@@ -746,7 +746,7 @@ flowchart TB
 
 | Kernel function | Usage |
 |---|---|
-| **PostgreSQL** | One database `{tenant}_odoo` (`databasePerTenant: true`) |
+| **PostgreSQL** | One database `{tenant}_odoo` per tenant |
 | **S3** (optional) | Attachments via `ir_attachment` S3 backend or IntegrationBinding to Nextcloud |
 | **SMTP** | Outbound mail (`kernelRequirements.mail.smtp`) |
 | **OIDC** | As §4; enforced in Odoo by **`gentian_os`** |
