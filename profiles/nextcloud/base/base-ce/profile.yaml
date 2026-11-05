@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.22"
+  version: "0.5.1-dev.23"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -536,7 +536,8 @@ spec:
       # in maintenance mode, users held out, and the pod is rolled afterwards.
       post:
         # config.php: the database and its credentials (POSTGRES_* in this
-        # container), and every address and host on the old domain.
+        # container), the cache (REDIS_*) and its key prefix, and every
+        # address and host on the old domain.
         - - php
           - -r
           - |
@@ -562,6 +563,31 @@ spec:
                     $CONFIG[$key] = $value;
                     $changed[] = $key;
                 }
+            }
+            // The cache it was installed against, and its key prefix. Restoring the
+            // volume replaces the files the ConfigMap mounts over in this pod, so until
+            // the pod is rolled config.php alone decides, and the next step loads
+            // Nextcloud: on the source's Redis it cannot start. The values
+            // redis.config.php and gentian-proxy.config.php give a fresh pod.
+            if (getenv('REDIS_HOST') && isset($CONFIG['redis']) && is_array($CONFIG['redis'])) {
+                $redis = $CONFIG['redis'];
+                foreach (['host' => 'REDIS_HOST', 'port' => 'REDIS_HOST_PORT', 'user' => 'REDIS_HOST_USER', 'password' => 'REDIS_HOST_PASSWORD'] as $key => $var) {
+                    $value = getenv($var);
+                    if (is_string($value) && $value !== '') {
+                        $redis[$key] = $key === 'port' ? (int)$value : $value;
+                    }
+                }
+                if ($redis !== $CONFIG['redis']) {
+                    $CONFIG['redis'] = $redis;
+                    $changed[] = 'redis';
+                }
+            }
+            $tenant = trim((string)getenv('GENTIAN_RESTORE_TARGET_TENANT'));
+            $app = trim((string)getenv('GENTIAN_RESTORE_APP'));
+            if ($tenant !== '' && $app !== '' && isset($CONFIG['memcache_customprefix'])
+                && $CONFIG['memcache_customprefix'] !== "$tenant:$app:") {
+                $CONFIG['memcache_customprefix'] = "$tenant:$app:";
+                $changed[] = 'memcache_customprefix';
             }
             $src = strtolower(trim((string)getenv('GENTIAN_RESTORE_SOURCE_DOMAIN')));
             $dst = strtolower(trim((string)getenv('GENTIAN_RESTORE_TARGET_DOMAIN')));
