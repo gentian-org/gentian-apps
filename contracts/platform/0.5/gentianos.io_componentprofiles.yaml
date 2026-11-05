@@ -33,7 +33,7 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          ComponentProfile is a catalogue entry for a system service, an app or an
+          ComponentProfile is a catalog entry for a system service, an app or an
           agent. The cluster holds only the profiles something installed refers to.
         properties:
           apiVersion:
@@ -55,9 +55,9 @@ spec:
             type: object
           spec:
             description: |-
-              ComponentProfileSpec is one catalogue entry: what a component is, what it
+              ComponentProfileSpec is one catalog entry: what a component is, what it
               needs from the platform, and what it may expose. The presentation of a
-              catalogue listing stays the store's, outside the cluster. The one piece of
+              catalog listing stays the store's, outside the cluster. The one piece of
               presentation an entry carries here is the tile on an exposure, because the
               portal has to be able to show what the cluster routes without asking the
               store, and because an app that cannot appear on the portal until a service
@@ -83,7 +83,7 @@ spec:
 
               chart and composition together are the one legal pair, because they answer
               different halves of one question: the chart is WHAT is installed, and the
-              composition is WHAT ELSE is created beside it. Two catalogue entries are
+              composition is WHAT ELSE is created beside it. Two catalog entries are
               like this -- Odoo and Element each render their chart through a
               Composition that also emits an SSO sidecar or a stable service alias.
               Refusing the pair sent that fact into an annotation, where nothing
@@ -102,8 +102,8 @@ spec:
             properties:
               adapter:
                 description: |-
-                  Adapter is what an adapter adapts and the reviewed list of its tools.
-                  Present exactly when the class is adapter.
+                  Adapter is what an adapter adapts. Present exactly when the class is
+                  adapter.
                 properties:
                   adapts:
                     description: |-
@@ -122,7 +122,7 @@ spec:
                         type: string
                       versions:
                         description: |-
-                          Versions are the catalogue versions of the app this adapter was
+                          Versions are the catalog versions of the app this adapter was
                           reviewed against. Empty means the reviewer named none.
                         items:
                           maxLength: 64
@@ -133,122 +133,7 @@ spec:
                     required:
                     - profile
                     type: object
-                  speaksAs:
-                    allOf:
-                    - enum:
-                      - token
-                      - app-token
-                      - headers
-                    - enum:
-                      - token
-                      - app-token
-                      - headers
-                    description: |-
-                      SpeaksAs is how a call reaches the app as the person on whose behalf it
-                      is made, in the order of preference the platform has: a short token for
-                      this app from the identity provider, a per-person token of the app's
-                      own, or the platform's identity headers. An adapter never acts as
-                      itself where a person's data is concerned.
-                    type: string
-                  tools:
-                    description: |-
-                      Tools are the operations this adapter offers, each at a version. A
-                      change to what a tool does, what it needs or its class is a new
-                      version, so an adapter update never widens what a person allowed.
-                    items:
-                      description: ToolSpec is one named operation on the adapted
-                        app.
-                      properties:
-                        class:
-                          allOf:
-                          - enum:
-                            - read
-                            - change
-                            - irreversible
-                          - enum:
-                            - read
-                            - change
-                            - irreversible
-                          description: |-
-                            Class is whether the tool reads, changes, or changes irreversibly. A
-                            tool with no class counts as irreversible, and so does one that
-                            reaches outside the platform: what has left cannot be taken back.
-                          type: string
-                        description:
-                          additionalProperties:
-                            type: string
-                          description: |-
-                            Description is the tool in plain words, by language (en, de, ...). It
-                            is the text a person reads when asked to allow it.
-                          maxProperties: 16
-                          minProperties: 1
-                          type: object
-                        identifiers:
-                          description: |-
-                            Identifiers are the fields of the answer that the app made up, such as
-                            the number of a new task, by their JSON pointer into the answer. A plan
-                            replayed against the real app puts the real value in their place.
-                          items:
-                            maxLength: 256
-                            type: string
-                          maxItems: 32
-                          type: array
-                          x-kubernetes-list-type: set
-                        input:
-                          description: Input is the JSON Schema of the tool's arguments.
-                          type: object
-                          x-kubernetes-preserve-unknown-fields: true
-                        name:
-                          description: Name of the tool, for example create-task.
-                          maxLength: 63
-                          minLength: 1
-                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                          type: string
-                        output:
-                          description: Output is the JSON Schema of the tool's answer.
-                          type: object
-                          x-kubernetes-preserve-unknown-fields: true
-                        reverse:
-                          description: Reverse is the tool of this adapter that undoes
-                            this one.
-                          properties:
-                            name:
-                              maxLength: 63
-                              minLength: 1
-                              type: string
-                            version:
-                              pattern: ^v[0-9]+$
-                              type: string
-                          required:
-                          - name
-                          - version
-                          type: object
-                        version:
-                          description: Version of the tool, for example v1.
-                          maxLength: 8
-                          pattern: ^v[0-9]+$
-                          type: string
-                      required:
-                      - description
-                      - name
-                      - version
-                      type: object
-                    maxItems: 256
-                    minItems: 1
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    - version
-                    x-kubernetes-list-type: map
-                required:
-                - speaksAs
-                - tools
                 type: object
-                x-kubernetes-validations:
-                - message: a tool's reverse names a tool of this adapter, at a version
-                    it lists
-                  rule: self.tools.all(t, !has(t.reverse) || self.tools.exists(u,
-                    u.name == t.reverse.name && u.version == t.reverse.version))
               backup:
                 description: Backup declares what a consistent copy of this component
                   consists of.
@@ -298,22 +183,6 @@ spec:
                       - openBaoPath
                       type: object
                     type: array
-                  consistency:
-                    default: app
-                    description: |-
-                      Consistency selects whether all of this app's stores must be captured
-                      inside one quiesce window. Defaults to app.
-                    enum:
-                    - app
-                    - perStore
-                    type: string
-                  minRestoreVersion:
-                    description: |-
-                      MinRestoreVersion refuses to restore a bundle into an app older than this
-                      version, expressed as the app version the profile's chart deploys.
-                      Restoring older data into a newer app is allowed — that just runs the
-                      app's own migrations — but the reverse silently corrupts.
-                    type: string
                   quiesce:
                     description: Quiesce controls how writes are paused while the
                       app is captured.
@@ -614,7 +483,7 @@ spec:
                           description: |-
                             UpstreamDocumented reports whether upstream documents this path as an
                             extension point. When false the mount is really L4, not L1: upstream has
-                            made no promise about the path surviving a reorganisation.
+                            made no promise about the path surviving a reorganization.
                           type: boolean
                       required:
                       - format
@@ -703,7 +572,7 @@ spec:
                         type: boolean
                       owner:
                         description: |-
-                          Owner is the team or organisation accountable for the fork, including its
+                          Owner is the team or organization accountable for the fork, including its
                           CVE response. Free-form so an external maintainer can hold it later.
                         type: string
                       repo:
@@ -715,7 +584,7 @@ spec:
                     type: object
                   grade:
                     description: |-
-                      Grade rates customization readiness (see CustomizationGrade). It summarises
+                      Grade rates customization readiness (see CustomizationGrade). It summarizes
                       the rubric score recorded in the profile's customization.md. Empty is
                       equivalent to GradeUnknown — treat it that way rather than defaulting it
                       in the schema, which would make every profile that omits it permanently
@@ -847,34 +716,25 @@ spec:
                 type: object
               defaultForPlatform:
                 description: |-
-                  DefaultForPlatform means the platform tenant gets a Component of this
-                  profile, and no other tenant does: something the cluster has one of and
-                  that runs with a tenant's authority rather than the kernel's. Created
-                  and named the way DefaultForTenants creates its own.
+                  DefaultForPlatform is placement {tenants: platform}.
+
+                  Superseded by placement: read for one release so that catalogs
+                  published before it keep working.
                 type: boolean
               defaultForTenants:
                 description: |-
-                  DefaultForTenants means every tenant gets a Component of this profile,
-                  created by the operator when the tenant is provisioned and named after
-                  the profile. It is how the desktop reaches every tenant without anyone
-                  declaring it, and it is here as a field so that a second component the
-                  platform ships to everyone, such as the administration console, is
-                  declared the same way rather than by another name the operator knows.
-                  Only a profile of class "app" may say it: a service and a shared-app
-                  have one instance, so there is nothing to give each tenant.
+                  DefaultForTenants is placement {tenants: every}.
+
+                  Superseded by placement: read for one release so that catalogs
+                  published before it keep working.
                 type: boolean
               defaultWhereStoreOffered:
                 description: |-
-                  DefaultWhereStoreOffered means every tenant except the platform tenant
-                  gets a Component of this profile for as long as the cluster offers an
-                  App Store: usage statistics are on and the Cluster claim names a store
-                  (spec.catalogue.storeUrl). Created and named the way DefaultForTenants
-                  creates its own.
+                  DefaultWhereStoreOffered is placement {tenants: users, while:
+                  storeOffered}.
 
-                  Unlike the two above it is also taken away: when the cluster stops
-                  offering a store the Component is removed again, so a profile that says
-                  this must own no data. The platform tenant gets none because nobody
-                  installs apps there.
+                  Superseded by placement: read for one release so that catalogs
+                  published before it keep working.
                 type: boolean
               expose:
                 description: |-
@@ -889,26 +749,24 @@ spec:
                       additionalProperties:
                         type: string
                       description: |-
-                        Annotations are gateway policy for this host, by the same keys
-                        AppProfile's ingress carried: gentianos.io/gateway-frame-ancestors and
-                        gentianos.io/gateway-escaped-slashes-action.
+                        Annotations are gateway policy for this host. The one key read is
+                        gentianos.io/gateway-escaped-slashes-action: KeepUnchanged passes
+                        percent-encoded slashes in a path through to the backend unaltered.
 
                         Here rather than on the object, because they are per HOST and a profile
-                        may publish several. frame-ancestors decides which pages may embed this
-                        one in a frame, which is what lets the desktop open an app in a window
-                        instead of a browser tab — so it is not decoration, and a profile that
-                        lost it would open in a tab with no error to say why.
+                        may publish several. Who may embed this host in a frame is not set
+                        here: the operator gives every exposure the same frame policy, its
+                        tenant's desktop and the component's own other hosts.
 
-                        Not a free-form passthrough: the nginx ingress annotations that used to
-                        sit beside these — body size, read and send timeouts — are the gateway's
-                        own policy now and are not read from here.
+                        Not a free-form passthrough: body size, read and send timeouts are the
+                        gateway's own policy and are not read from here.
                       maxProperties: 16
                       type: object
                     apex:
                       description: |-
                         Apex publishes this entry on the cluster's bare domain -- its main
                         address -- instead of a host under the zone's domain. Only a perimeter
-                        entry may say it. The operator honours it for the platform tenant,
+                        entry may say it. The operator honors it for the platform tenant,
                         and for the one tenant that may hold the main address -- the tenant
                         the Cluster claim names (mainAddress.tenant), or the user tenant of a
                         single-tenancy cluster -- when that tenant's approver published the
@@ -1017,35 +875,6 @@ spec:
                       maxItems: 64
                       type: array
                       x-kubernetes-list-type: set
-                    source:
-                      description: Source restricts who may call this entry, before
-                        authMode is considered.
-                      properties:
-                        cidrs:
-                          description: CIDRs admitted, after the real client IP is
-                            resolved at the edge.
-                          items:
-                            maxLength: 43
-                            type: string
-                          maxItems: 64
-                          type: array
-                          x-kubernetes-list-type: set
-                        component:
-                          description: |-
-                            Component names another installed component whose pods may call this
-                            entry. Preferred over CIDRs, which age badly.
-                          maxLength: 63
-                          type: string
-                      type: object
-                      x-kubernetes-validations:
-                      - message: exactly one of cidrs or component
-                        rule: (has(self.cidrs) && self.cidrs.size() > 0) != (has(self.component)
-                          && self.component.size() > 0)
-                    stripPrefix:
-                      description: |-
-                        StripPrefix removes the matched path prefix before the request reaches
-                        the backend.
-                      type: boolean
                     subDomain:
                       description: |-
                         SubDomain is the host label of this entry in the tenant's zone. Empty
@@ -1093,7 +922,7 @@ spec:
                             not have to restate the fallback in a map.
 
                             It exists because the old AppProfile tile carried displayName as a map
-                            and thirty tiles across the catalogue were genuinely translated --
+                            and thirty tiles across the catalog were genuinely translated --
                             "Automatisierung", "Dateien", "Präsentation", every Odoo module. When the
                             tile path moved to this type those strings stopped being read, and
                             rewriting the profiles is the moment they would have been deleted rather
@@ -1114,7 +943,7 @@ spec:
                           description: |-
                             Logo is the tile's default image: a square PNG, 128x128, inline as a
                             data URI. Every component brings its own -- an app, an API entry and an
-                            addon alike -- because a tile is how a person recognises the thing
+                            addon alike -- because a tile is how a person recognizes the thing
                             before they can read the label. Where a component has no art of its
                             own, it is a rendering of a platform glyph.
 
@@ -1228,10 +1057,8 @@ spec:
                       the cluster''s main address passes no credential to an app'
                     rule: '!has(self.apex) || !self.apex || self.authMode == ''none'''
                   - message: a gateway entry is behind the zone's session (authMode
-                      oidc) or pins its caller (source). What needs neither is a perimeter
-                      surface
-                    rule: self.surface != 'gateway' || self.authMode == 'oidc' ||
-                      has(self.source)
+                      oidc). What needs no session is a perimeter surface
+                    rule: self.surface != 'gateway' || self.authMode == 'oidc'
                 maxItems: 32
                 type: array
                 x-kubernetes-list-map-keys:
@@ -1391,7 +1218,7 @@ spec:
                                 way are the app's by ownership: the app role owns each one it made, so
                                 an export copies them, a restore puts them back and a purge drops them
                                 with the role. They are not otherwise governed — the tenant chooses the
-                                names, and they do not appear in the catalogue's provisioning model.
+                                names, and they do not appear in the catalog's provisioning model.
 
                                 On mariadb a database has no owner and the server is shared by every
                                 tenant, so the app's databases are the ones named for it: the app may
@@ -1413,12 +1240,16 @@ spec:
                                 permanently diff against GitOps tooling that applies CRD defaults
                                 server-side.
                               type: boolean
-                            databasePerTenant:
-                              default: true
+                            connectionLimit:
                               description: |-
-                                DatabasePerTenant creates a separate database for each tenant (default true).
-                                Set to false only for shared-schema apps.
-                              type: boolean
+                                ConnectionLimit is the most connections the app's account may hold at
+                                once on the shared server, which every tenant's apps use. Unset is
+                                DefaultDatabaseConnectionLimit; a profile raises it for an app whose
+                                pools need more, within the maximum.
+                              format: int32
+                              maximum: 100
+                              minimum: 1
+                              type: integer
                             engine:
                               default: postgresql
                               description: Engine selects the database engine. Defaults
@@ -1439,7 +1270,7 @@ spec:
                                 the other.
 
                                 This is declared rather than inferred: the platform cannot know an app's
-                                migration behaviour from its name, and matching on the name is how a
+                                migration behavior from its name, and matching on the name is how a
                                 second app with the same need silently gets the wrong search_path.
                               enum:
                               - app-schema
@@ -1538,7 +1369,7 @@ spec:
                                     wrong with that. Every profile wrote the app's public address, where
                                     every path is behind a session, so the realm's own request was answered
                                     with a redirect to the sign-in and never arrived. And it let a
-                                    catalogue entry make the identity provider send a request to any
+                                    catalog entry make the identity provider send a request to any
                                     address at all, inside the cluster or outside it.
 
                                     The field stays in the definition so that a profile which still
@@ -1736,11 +1567,34 @@ spec:
                                 path to the gateway, and told so through valueMapping.llm.availableKey.
                                 When the key arrives the component is rendered again with it.
 
-                                Honoured for a component the platform places on tenants itself. For an
+                                Honored for a component the platform places on tenants itself. For an
                                 app a tenant installs the requirement holds the release as if this
-                                were not set: its chart is rendered by the app Composition, which
-                                reads the key from where it is kept and cannot render without it.
+                                were not set: its chart's values read the key from where it is kept,
+                                and its release cannot be rendered without it.
                               type: boolean
+                          type: object
+                        logDestination:
+                          description: |-
+                            LogDestination declares that the component receives the platform's log
+                            forwarder over HTTPS inside the cluster. See LogDestinationRequirement.
+                          properties:
+                            port:
+                              description: |-
+                                Port is the port that Service and its pods serve HTTPS on, the same
+                                number on both: it is the pods' port the network admits.
+                              format: int32
+                              maximum: 65535
+                              minimum: 1
+                              type: integer
+                            service:
+                              description: |-
+                                Service is the name of the component's Service the forwarder is sent
+                                to.
+                              pattern: ^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$
+                              type: string
+                          required:
+                          - port
+                          - service
                           type: object
                         mail:
                           description: Mail specifies SMTP and/or IMAP requirements.
@@ -1775,9 +1629,7 @@ spec:
                           description: |-
                             MCP declares that the component exposes a Model Context Protocol
                             endpoint. It is a declaration only: there is no MCP registry, and the
-                            platform registers nothing and wires no authentication for it. Its one
-                            effect today is that a chart component declaring it is installed
-                            through the app Composition.
+                            platform registers nothing and wires no authentication for it.
                           properties:
                             auth:
                               default: oidc
@@ -1845,6 +1697,19 @@ spec:
                             may use an app of its tenant, for a person who is not at a browser.
                             Only a component that declares it is given a key for that question and
                             a network path to where it is answered.
+                          properties:
+                            audit:
+                              description: |-
+                                Audit lets the same key ask three more questions, for a person of the
+                                platform tenant: may they audit the cluster (cluster#can_audit), may
+                                they configure it (cluster#can_configure), which keeps the evidence's
+                                own settings from its readers, and may they read one tenant's evidence
+                                (tenant#can_read_evidence, which the cluster's auditors and that
+                                tenant's auditor hold). It is for the
+                                service that keeps the evidence and the console that shows it, and is
+                                honored for a component of the platform tenant only: anywhere else
+                                the key asks the app question alone.
+                              type: boolean
                           type: object
                         storage:
                           description: Storage specifies object storage (S3) and/or
@@ -1872,10 +1737,15 @@ spec:
                               description: S3 requests a per-tenant S3 bucket from
                                 the platform's object store.
                               properties:
-                                bucketPerTenant:
-                                  default: true
-                                  description: BucketPerTenant creates a dedicated
-                                    bucket for each tenant. Defaults to true.
+                                objectLock:
+                                  description: |-
+                                    ObjectLock makes the bucket with S3 Object Lock, which cannot be
+                                    switched off again, and lets the app read and set the bucket's default
+                                    retention (GetBucketObjectLockConfiguration,
+                                    PutBucketObjectLockConfiguration). Nobody but the store's own
+                                    administrator may bypass a lock; the app is never given that right. A
+                                    purge keeps a bucket that still holds locked objects, and removes the
+                                    app's identity to it.
                                   type: boolean
                               type: object
                           type: object
@@ -2087,7 +1957,7 @@ spec:
                           The division is deliberate and load-bearing: resolving a Keycloak group,
                           detecting membership changes and running a Job to completion are platform
                           concerns, so they live here. Knowing that one app wants a JSON-RPC call
-                          and another an OCS POST is not, so it lives in the catalogue entry that
+                          and another an OCS POST is not, so it lives in the catalog entry that
                           owns that app. No application's protocol, endpoint or account model may
                           be encoded in the kernel — see the platform boundary in
                           gentian-apps/docs/app-profile-guide.md.
@@ -2144,15 +2014,18 @@ spec:
                             type: string
                           script:
                             description: |-
-                              Script executed with /bin/sh. It is re-run whenever membership changes,
-                              so it must be idempotent: converge the app to exactly the membership it
-                              is given rather than applying a delta.
+                              Script executed with /bin/sh. It is re-run whenever either membership
+                              changes, and whenever the profile changes the role or this Job, so it must be
+                              idempotent: converge the app to exactly the membership it is given
+                              rather than applying a delta.
 
                               The operator provides:
                                 GENTIAN_APP_ADMINS_FILE  path to a JSON array of the privileged
                                                          members, each {"id","username","email"};
                                                          email is the address the app receives in
                                                          the email claim
+                                GENTIAN_APP_USERS_FILE   path to a JSON array, of the same shape, of
+                                                         everyone the tenant entitled to the app
                                 GENTIAN_PRIVILEGED_ROLE  spec.provisioning.privilegedRole.name
                                 GENTIAN_TENANT           tenant name
                                 GENTIAN_APP              this profile's name
@@ -2206,14 +2079,6 @@ spec:
                 - from
                 - none
                 type: string
-              launchFrom:
-                description: |-
-                  LaunchFrom names the contract whose provider opens this component.
-                  Required when Launch is "from", meaningless otherwise. It records what
-                  the model could not say before: which component opens this one.
-                maxLength: 63
-                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                type: string
               package:
                 description: Package is how the component is deployed.
                 properties:
@@ -2245,7 +2110,7 @@ spec:
                   api:
                     description: |-
                       API describes a component the platform routes to rather than runs. It
-                      does not mean external: the catalogue's own example points at a Service
+                      does not mean external: the catalog's own example points at a Service
                       inside the cluster. Delivery: api.
                     properties:
                       baseUrl:
@@ -2327,7 +2192,7 @@ spec:
                               not have to restate the fallback in a map.
 
                               It exists because the old AppProfile tile carried displayName as a map
-                              and thirty tiles across the catalogue were genuinely translated --
+                              and thirty tiles across the catalog were genuinely translated --
                               "Automatisierung", "Dateien", "Präsentation", every Odoo module. When the
                               tile path moved to this type those strings stopped being read, and
                               rewriting the profiles is the moment they would have been deleted rather
@@ -2348,7 +2213,7 @@ spec:
                             description: |-
                               Logo is the tile's default image: a square PNG, 128x128, inline as a
                               data URI. Every component brings its own -- an app, an API entry and an
-                              addon alike -- because a tile is how a person recognises the thing
+                              addon alike -- because a tile is how a person recognizes the thing
                               before they can read the label. Where a component has no art of its
                               own, it is a rendering of a platform glyph.
 
@@ -2445,13 +2310,42 @@ spec:
                   composition:
                     description: |-
                       Composition names a Crossplane composition, for a component that is not
-                      a single chart. Delivery: workload.
+                      a single chart. Used only when the install is pinned to a bundle that
+                      brings it as app-<profile>, and only for a profile of trustTier
+                      platform: below that the component is held. Otherwise the operator
+                      renders the chart. Delivery: workload.
                     maxLength: 253
                     type: string
                   extraValues:
                     description: ExtraValues are static chart values.
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
+                  images:
+                    description: |-
+                      Images are the private images the component runs, each at the one
+                      build it may run. Admission refuses a pod in the component's namespace
+                      that names one of these repositories at any other build, whoever asks.
+                    items:
+                      description: PinnedImage is one image repository and the build
+                        of it a component runs.
+                      properties:
+                        digest:
+                          description: Digest is the build.
+                          pattern: ^sha256:[a-f0-9]{64}$
+                          type: string
+                        repository:
+                          description: Repository is the image's address without a
+                            tag.
+                          pattern: ^[a-z0-9.-]+(:[0-9]+)?(/[a-z0-9._-]+)+$
+                          type: string
+                      required:
+                      - digest
+                      - repository
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - repository
+                    x-kubernetes-list-type: map
                   valueMapping:
                     description: ValueMapping places what the platform granted into
                       the chart's values.
@@ -2568,11 +2462,11 @@ spec:
                           apiKeyKey:
                             description: |-
                               APIKeyKey is the Helm value key for the key the component presents.
-                              For an app a tenant installs, where the app Composition sets it from
-                              the vault. A component the platform places on tenants itself is
-                              rendered by the operator, whose release values are not a place for a
-                              key: such a profile names SecretNameKey instead, and is refused if it
-                              names this.
+                              For an app a tenant installs, which is given the key from the vault
+                              through the Secret its sensitive values are read from. A component the
+                              platform places on tenants itself is given its values inline in the
+                              release, which is not a place for a key: such a profile names
+                              SecretNameKey instead, and is refused if it names this.
                             type: string
                           availableKey:
                             description: |-
@@ -2720,6 +2614,18 @@ spec:
                             description: KernelDomainKey receives the cluster's kernel
                               domain.
                             type: string
+                          organizationKey:
+                            description: |-
+                              OrganizationKey receives who the tenant is, as one object: displayName,
+                              legalName, country, languages (the first is the tenant's own),
+                              currency, timeZone, fiscalYearStartMonth (1 when unset), address
+                              (street, postalCode, city, region), website, email, phone, taxId and
+                              registrationNumber. A field the tenant has not filled in is the empty
+                              string, and complete is false until legal name, country, currency, time
+                              zone and languages are all given. An app sets itself up from it; a
+                              later change re-renders the values but should not rewrite what the app
+                              already holds.
+                            type: string
                           realmKey:
                             description: RealmKey receives the name of the zone's
                               realm.
@@ -2738,7 +2644,7 @@ spec:
                           storeUrlKey:
                             description: |-
                               StoreURLKey receives the base address of the App Store API this cluster
-                              names (the Cluster claim's spec.catalogue.storeUrl), and the empty
+                              names (the Cluster claim's `spec.catalogue.storeUrl`), and the empty
                               string while the cluster offers no App Store: none is named, or license
                               reporting is off.
 
@@ -2758,6 +2664,13 @@ spec:
                               the usage statistics report names it by, and the one the store keys
                               its sign-in through the tenant's realm by. It never changes.
                             type: string
+                          timeZoneKey:
+                            description: |-
+                              TimeZoneKey receives the tenant's time zone (spec.organization.timeZone),
+                              an IANA name, for a chart that takes only the zone, such as a TZ
+                              variable. While the tenant names none the key is not set, so the
+                              profile's own value there stands.
+                            type: string
                           usherUrlKey:
                             description: |-
                               UsherURLKey receives the usher's in-cluster URL: where a desktop asks,
@@ -2774,7 +2687,7 @@ spec:
                           zoneKindKey:
                             description: |-
                               ZoneKindKey receives "kernel" for a component served in the kernel zone
-                              and "tenant" otherwise. A component whose behaviour differs between the
+                              and "tenant" otherwise. A component whose behavior differs between the
                               platform's own zone and a customer's decides that from this, rather
                               than from a list of capabilities the operator composes for it.
                             type: string
@@ -2846,6 +2759,38 @@ spec:
                             type: string
                         type: object
                     type: object
+                type: object
+              placement:
+                description: |-
+                  Placement makes this a component the platform places, and says where.
+                  A profile with a placement is placeable: the platform writes it into
+                  the tenants it names, as an entry of their spec.apps, and takes it out
+                  again when they no longer qualify; no tenant installs, moves or removes
+                  it. A profile without one is installable: a tenant's administrator
+                  installs it, and the platform never places it.
+                  Only a profile of class "app" is placed: a service and a shared-app
+                  have one instance, so there is nothing to give each tenant.
+                properties:
+                  tenants:
+                    description: Tenants are the tenants that get the component.
+                    enum:
+                    - every
+                    - platform
+                    - users
+                    type: string
+                  while:
+                    description: |-
+                      While names the condition the placement lasts for; absent, it lasts
+                      for the life of each tenant. A conditional placement is also taken
+                      away, so a profile placed under one must own no data; credentialSet,
+                      which never takes it away, is the exception.
+                    enum:
+                    - storeOffered
+                    - llm
+                    - credentialSet
+                    type: string
+                required:
+                - tenants
                 type: object
               provides:
                 description: |-
@@ -3278,7 +3223,7 @@ spec:
                     type: object
                   services:
                     description: |-
-                      Services are what the platform must fulfil before this component runs:
+                      Services are what the platform must fulfill before this component runs:
                       identity, database, object storage, cache, mail, MCP. Each is fulfilled
                       by a component of class "service", or by something outside the cluster
                       entirely -- a relay, a bucket at a cloud provider. It was called
@@ -3371,7 +3316,7 @@ spec:
                               way are the app's by ownership: the app role owns each one it made, so
                               an export copies them, a restore puts them back and a purge drops them
                               with the role. They are not otherwise governed — the tenant chooses the
-                              names, and they do not appear in the catalogue's provisioning model.
+                              names, and they do not appear in the catalog's provisioning model.
 
                               On mariadb a database has no owner and the server is shared by every
                               tenant, so the app's databases are the ones named for it: the app may
@@ -3393,12 +3338,16 @@ spec:
                               permanently diff against GitOps tooling that applies CRD defaults
                               server-side.
                             type: boolean
-                          databasePerTenant:
-                            default: true
+                          connectionLimit:
                             description: |-
-                              DatabasePerTenant creates a separate database for each tenant (default true).
-                              Set to false only for shared-schema apps.
-                            type: boolean
+                              ConnectionLimit is the most connections the app's account may hold at
+                              once on the shared server, which every tenant's apps use. Unset is
+                              DefaultDatabaseConnectionLimit; a profile raises it for an app whose
+                              pools need more, within the maximum.
+                            format: int32
+                            maximum: 100
+                            minimum: 1
+                            type: integer
                           engine:
                             default: postgresql
                             description: Engine selects the database engine. Defaults
@@ -3419,7 +3368,7 @@ spec:
                               the other.
 
                               This is declared rather than inferred: the platform cannot know an app's
-                              migration behaviour from its name, and matching on the name is how a
+                              migration behavior from its name, and matching on the name is how a
                               second app with the same need silently gets the wrong search_path.
                             enum:
                             - app-schema
@@ -3517,7 +3466,7 @@ spec:
                                   wrong with that. Every profile wrote the app's public address, where
                                   every path is behind a session, so the realm's own request was answered
                                   with a redirect to the sign-in and never arrived. And it let a
-                                  catalogue entry make the identity provider send a request to any
+                                  catalog entry make the identity provider send a request to any
                                   address at all, inside the cluster or outside it.
 
                                   The field stays in the definition so that a profile which still
@@ -3715,11 +3664,34 @@ spec:
                               path to the gateway, and told so through valueMapping.llm.availableKey.
                               When the key arrives the component is rendered again with it.
 
-                              Honoured for a component the platform places on tenants itself. For an
+                              Honored for a component the platform places on tenants itself. For an
                               app a tenant installs the requirement holds the release as if this
-                              were not set: its chart is rendered by the app Composition, which
-                              reads the key from where it is kept and cannot render without it.
+                              were not set: its chart's values read the key from where it is kept,
+                              and its release cannot be rendered without it.
                             type: boolean
+                        type: object
+                      logDestination:
+                        description: |-
+                          LogDestination declares that the component receives the platform's log
+                          forwarder over HTTPS inside the cluster. See LogDestinationRequirement.
+                        properties:
+                          port:
+                            description: |-
+                              Port is the port that Service and its pods serve HTTPS on, the same
+                              number on both: it is the pods' port the network admits.
+                            format: int32
+                            maximum: 65535
+                            minimum: 1
+                            type: integer
+                          service:
+                            description: |-
+                              Service is the name of the component's Service the forwarder is sent
+                              to.
+                            pattern: ^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$
+                            type: string
+                        required:
+                        - port
+                        - service
                         type: object
                       mail:
                         description: Mail specifies SMTP and/or IMAP requirements.
@@ -3754,9 +3726,7 @@ spec:
                         description: |-
                           MCP declares that the component exposes a Model Context Protocol
                           endpoint. It is a declaration only: there is no MCP registry, and the
-                          platform registers nothing and wires no authentication for it. Its one
-                          effect today is that a chart component declaring it is installed
-                          through the app Composition.
+                          platform registers nothing and wires no authentication for it.
                         properties:
                           auth:
                             default: oidc
@@ -3823,6 +3793,19 @@ spec:
                           may use an app of its tenant, for a person who is not at a browser.
                           Only a component that declares it is given a key for that question and
                           a network path to where it is answered.
+                        properties:
+                          audit:
+                            description: |-
+                              Audit lets the same key ask three more questions, for a person of the
+                              platform tenant: may they audit the cluster (cluster#can_audit), may
+                              they configure it (cluster#can_configure), which keeps the evidence's
+                              own settings from its readers, and may they read one tenant's evidence
+                              (tenant#can_read_evidence, which the cluster's auditors and that
+                              tenant's auditor hold). It is for the
+                              service that keeps the evidence and the console that shows it, and is
+                              honored for a component of the platform tenant only: anywhere else
+                              the key asks the app question alone.
+                            type: boolean
                         type: object
                       storage:
                         description: Storage specifies object storage (S3) and/or
@@ -3850,10 +3833,15 @@ spec:
                             description: S3 requests a per-tenant S3 bucket from the
                               platform's object store.
                             properties:
-                              bucketPerTenant:
-                                default: true
-                                description: BucketPerTenant creates a dedicated bucket
-                                  for each tenant. Defaults to true.
+                              objectLock:
+                                description: |-
+                                  ObjectLock makes the bucket with S3 Object Lock, which cannot be
+                                  switched off again, and lets the app read and set the bucket's default
+                                  retention (GetBucketObjectLockConfiguration,
+                                  PutBucketObjectLockConfiguration). Nobody but the store's own
+                                  administrator may bypass a lock; the app is never given that right. A
+                                  purge keeps a bucket that still holds locked objects, and removes the
+                                  app's identity to it.
                                 type: boolean
                             type: object
                         type: object
@@ -4064,10 +4052,14 @@ spec:
                 type: object
               sessionMaxAge:
                 description: |-
-                  SessionMaxAge caps the app's own session, for apps that run their own
-                  login. The edge bounds reachability; it does not refresh the groups an
-                  app captured at its own login, so this — not the access-token lifetime —
-                  bounds what a user may still do inside the app after their rights change.
+                  SessionMaxAge caps, at the realm, how long a sign-in through the app's
+                  own OIDC clients lasts: the operator sets it as the clients' session
+                  lifespan, and past that age from sign-in the realm refuses their
+                  refresh, so the app cannot renew its tokens for that person without a
+                  new sign-in, which reads the person's groups again. It does not end a
+                  session the app keeps in its own cookie: an app that does not go back
+                  to the realm once a person is signed in keeps that session for as long
+                  as the app itself allows. Unset, the clients keep the realm's limits.
                 type: string
               trustTier:
                 description: |-
@@ -4080,7 +4072,7 @@ spec:
                 - experimental
                 type: string
               version:
-                description: Version is the catalogue entry's version, not the upstream
+                description: Version is the catalog entry's version, not the upstream
                   project's.
                 maxLength: 64
                 minLength: 1
@@ -4131,6 +4123,10 @@ spec:
               rule: '!has(self.expose) || !(self.expose.exists(e, has(e.forwardToken)
                 && e.forwardToken) && self.expose.exists(e, has(e.exchangeToken) &&
                 e.exchangeToken))'
+            - message: 'requires.services.logDestination requires trustTier platform:
+                the component is sent every record the platform writes'
+              rule: '!has(self.requires) || !has(self.requires.services) || !has(self.requires.services.logDestination)
+                || self.trustTier == ''platform'''
             - message: 'requires.services.vouching requires trustTier platform: the
                 component can obtain a person''s token for any app of the tenant'
               rule: '!has(self.requires) || !has(self.requires.services) || !has(self.requires.services.vouching)
@@ -4156,6 +4152,16 @@ spec:
               rule: '!has(self.__package__.valueMapping) || !has(self.__package__.valueMapping.platform)
                 || !has(self.__package__.valueMapping.platform.storeUrlKey) || self.__package__.valueMapping.platform.storeUrlKey.size()
                 == 0 || self.trustTier == ''platform'''
+            - message: 'directorUrlKey, usherUrlKey, custodianUrlKey and registrarUrlKey
+                require trustTier platform: naming one opens the component a way into
+                the control namespace'
+              rule: '!has(self.__package__.valueMapping) || !has(self.__package__.valueMapping.platform)
+                || self.trustTier == ''platform'' || [has(self.__package__.valueMapping.platform.directorUrlKey)
+                ? self.__package__.valueMapping.platform.directorUrlKey : '''', has(self.__package__.valueMapping.platform.usherUrlKey)
+                ? self.__package__.valueMapping.platform.usherUrlKey : '''', has(self.__package__.valueMapping.platform.custodianUrlKey)
+                ? self.__package__.valueMapping.platform.custodianUrlKey : '''', has(self.__package__.valueMapping.platform.registrarUrlKey)
+                ? self.__package__.valueMapping.platform.registrarUrlKey : ''''].all(k,
+                k.size() == 0)'
             - message: 'desktopUrlKey requires trustTier platform: naming it opens
                 the component a way to the desktop''s API'
               rule: '!has(self.__package__.valueMapping) || !has(self.__package__.valueMapping.platform)
@@ -4205,13 +4211,6 @@ spec:
                 has(self.__package__.addon)].exists_one(x, x)'
             - message: an addon is package.addon on this kind, not customization.addon
               rule: '!has(self.customization) || !has(self.customization.addon)'
-            - message: 'launch from needs launchFrom: which contract''s provider opens
-                this'
-              rule: self.launch != 'from' || (has(self.launchFrom) && self.launchFrom.size()
-                > 0)
-            - message: launchFrom is meaningless unless launch is from
-              rule: self.launch == 'from' || !has(self.launchFrom) || self.launchFrom.size()
-                == 0
             - message: 'launch tile needs a tile on an exposure or on package.api:
                 an app nobody can open is installed and lost'
               rule: self.launch != 'tile' || (has(self.expose) && self.expose.exists(e,
@@ -4223,8 +4222,8 @@ spec:
                 never also the app it adapts'
               rule: '!has(self.classes) || !(''adapter'' in self.classes) || self.classes.size()
                 == 1'
-            - message: 'spec.adapter is for class adapter, and class adapter needs
-                it: the reviewed list of its tools'
+            - message: spec.adapter is for class adapter, and class adapter needs
+                it
               rule: (has(self.classes) && 'adapter' in self.classes) == has(self.adapter)
             - message: 'an adapter has launch none: nobody opens it'
               rule: '!has(self.adapter) || self.launch == ''none'''
@@ -4257,6 +4256,24 @@ spec:
               rule: '!has(self.adapter) || !((has(self.defaultForTenants) && self.defaultForTenants)
                 || (has(self.defaultForPlatform) && self.defaultForPlatform) || (has(self.defaultWhereStoreOffered)
                 && self.defaultWhereStoreOffered))'
+            - message: 'an adapter is never placed: a tenant''s administrator installs
+                it'
+              rule: '!has(self.adapter) || !has(self.placement)'
+            - message: 'placement is for class app: a service and a shared-app have
+                one instance'
+              rule: '!has(self.placement) || !has(self.classes) || (''app'' in self.classes)'
+            - message: placement while credentialSet is for the platform tenant, at
+                trustTier platform, with package.images naming what may be pulled
+              rule: '!has(self.placement) || !has(self.placement.while) || self.placement.while
+                != ''credentialSet'' || (self.placement.tenants == ''platform'' &&
+                self.trustTier == ''platform'' && has(self.__package__.images) &&
+                self.__package__.images.size() > 0)'
+            - message: 'a component the platform places on tenants declares requires.services.llm
+                only at trustTier platform: it is given a key at the model gateway
+                without a tenant having installed it'
+              rule: '!has(self.requires) || !has(self.requires.services) || !has(self.requires.services.llm)
+                || !has(self.placement) || (has(self.placement.while) && self.placement.while
+                == ''llm'') || self.trustTier == ''platform'''
           status:
             description: ComponentProfileStatus is the observed state of a ComponentProfile.
             properties:

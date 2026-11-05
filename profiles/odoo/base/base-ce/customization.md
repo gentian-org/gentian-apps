@@ -48,8 +48,8 @@ Three delivery routes are wired up:
   [app-customization.md](../../../../gentian-os/docs/guides/app-customization.md) §4.2.
 - **`image-layer`** — for airgapped or reproducibility-critical installs.
 
-Per-tenant module sets are permitted **because Odoo runs one instance per tenant namespace**
-(`databasePerTenant: true`). Activation is driven by Keycloak group attributes
+Per-tenant module sets are permitted **because Odoo runs one instance per tenant namespace**,
+with a database of its own. Activation is driven by Keycloak group attributes
 (`gentianos.io/keycloak-group-attributes` → `gentianOdooModules`), never by divergent module
 binaries. See §2.4 of the framework doc for why this is a hard rule.
 

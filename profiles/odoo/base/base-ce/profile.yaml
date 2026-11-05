@@ -23,7 +23,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.6"
+  version: "0.5.1-dev.7"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
@@ -129,7 +129,6 @@ spec:
         # than left blank, so the absence reads as a limit of the app.
       database:
         engine: postgresql
-        databasePerTenant: true
         allowDynamicDatabaseCreation: false
       mail:
         smtp: {}

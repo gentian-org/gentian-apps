@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.4"
+  version: "0.5.1-dev.5"
   package:
     chart:
       repository: "https://xwiki-contrib.github.io/xwiki-helm"
@@ -269,7 +269,6 @@ spec:
             path: /oidc/authenticator/backchannel_logout
       database:
         engine: postgresql
-        databasePerTenant: true
       mail:
         smtp: {}
 

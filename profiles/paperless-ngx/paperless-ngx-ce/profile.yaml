@@ -83,7 +83,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.10"
+  version: "0.5.1-dev.11"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -185,7 +185,6 @@ spec:
         # as an oversight to be filled in.
       database:
         engine: postgresql
-        databasePerTenant: true
       # Outbound mail only: password-reset and notification mail from
       # Paperless. Fetching documents from a mailbox is a mail rule a
       # person sets up in Paperless with a mailbox of their own.

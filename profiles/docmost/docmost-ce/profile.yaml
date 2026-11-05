@@ -61,7 +61,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.6"
+  version: "0.5.1-dev.7"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -269,10 +269,8 @@ spec:
           appPort: 3000
       database:
         engine: postgresql
-        databasePerTenant: true
       storage:
-        s3:
-          bucketPerTenant: true
+        s3: {}
     # No cache: requirement — Docmost runs its own dedicated in-pod Redis
     # (charts/docmost, values.yaml "redis"). It cannot use the shared kernel
     # Redis because parseRedisUrl drops the username and so can never
