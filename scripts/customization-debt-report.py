@@ -53,9 +53,9 @@ def load_grades() -> dict[str, str]:
     construction, and it names that base in spec.customization.addon.of.
 
     An edition does not. It shares a family name and nothing else:
-    the former nextcloud-base-od deployed the OpenDesk AIO chart from a credentialed registry,
-    nextcloud-base-ce the community chart with a Gentian image. Inheriting by family
-    reported the OpenDesk bundle as grade A on the strength of a different artifact,
+    the former nextcloud-base-od deployed a vendor's all-in-one chart from a credentialed
+    registry, nextcloud-base-ce the community chart with a Gentian image. Inheriting by
+    family reported that bundle as grade A on the strength of a different artifact,
     and hid it from the uncharacterized list below — the one place it should appear.
     """
     entries = []

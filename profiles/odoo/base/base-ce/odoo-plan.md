@@ -220,74 +220,41 @@ tiles only — not `/web#menu_id=…` settings URLs.
 Odoo module install Jobs run with admin API credentials from OpenBao (`appSecrets`),
 not end-user tokens.
 
-### 4.2 OIDC — no gentian-os pack required for Odoo
+### 4.2 OIDC — a client from the profile, no pack
 
-**OpenDesk OIDC packs** (`internal/oidc/packs/opendesk.yaml`, embedded in the
-operator) exist for apps that need **custom Keycloak client scopes, protocol
-mappers, and group → client-role mappings** (e.g. `opendesk_username`,
-`opendesk-matrix-scope`). That is **not** the default path for new catalog apps.
+A profile declares its OIDC client under `requires.services.identity.oidc`
+(client ID, display name, access type, redirect URIs) and the platform
+creates and owns the Keycloak client in every tenant realm. That is the only
+path a catalog app needs for sign-in.
 
-| Path | When | Gentian-os change per new app? |
-|---|---|---|
-| **`app-default` Client MR** | Standard OIDC client + redirect URIs; app uses generic claims | **No** — only `AppProfile.kernelRequirements.identity.oidc` |
-| **Operator OIDC pack Job** | openDesk-style custom scopes/mappers/roles | **Yes today** — pack keyed by `clientId` in embedded catalog |
-| **Minimal client Job** | Legacy fallback if composition does not emit Client MR | **No** — basic client only |
+An app whose vendor requires custom client scopes, protocol mappers or client
+roles declares them as an OIDC pack in an `OIDCPackCatalog` shipped with the
+catalog; the kernel ships one of its own for the platform's clients. A pack is
+the exception, not the default, and Odoo needs none.
 
-**Odoo** uses the **composition Client MR** path via **`app-default`** (omit
-`compositionRef` on the base AppProfile):
+**Odoo** uses the plain client:
 
-- `app-default` emits `openidclient.keycloak.crossplane.io/Client` when
-  `kernelRequirements.identity.oidc` is set (same as any catalog app).
-- Operator **skips** duplicate client/pack Jobs when `crossplaneOwnsOIDCClient` is
-  true (no pack on `clientId` — see `tenant_identity_manifests.go`).
-- **`gentian_os`** handles tier-3 RBAC via **Keycloak group/role membership** (mapped via OIDC token claims), not
-  Keycloak client roles directly — no `opendesk-*` scope or mapper pack needed.
-- SSO needs standard claims (`email`, `sub`) or direct token claims mapped inside Odoo.
+- The platform emits the Keycloak client from the profile's declaration and
+  seeds the client secret under the app's OpenBao path; the chart reads
+  issuer, client ID and secret through the `valueMappings.oidc` keys.
+- **`gentian_os`** handles tier-3 RBAC via **Keycloak group/role membership**
+  (mapped via OIDC token claims), not Keycloak client roles directly — no
+  custom scope or mapper needed.
+- SSO needs standard claims (`email`, `sub`) or direct token claims mapped
+  inside Odoo.
 
 ```yaml
-# odoo-base-ce/profile.yaml (OIDC — catalog only)
-kernelRequirements:
-  identity:
-    oidc:
-      clientId: odoo
-      name: Odoo
-      accessType: CONFIDENTIAL
-      redirectUris:
-        - "https://erp.${TENANT_DOMAIN}/auth_oauth/signin"
+# profiles/odoo/base/base-ce/profile.yaml (OIDC, as shipped)
+requires:
+  services:
+    identity:
+      oidc:
+        clientId: odoo-cb
+        name: Odoo
+        accessType: CONFIDENTIAL
+        redirectUris:
+          - "https://odoo.${TENANT_DOMAIN}/auth_oauth/signin"
 ```
-
-Do **not** add `odoo` to `internal/oidc/packs/opendesk.yaml`.
-
-#### Decoupling catalog from gentian-os (platform direction)
-
-Today, openDesk packs are **duplicated** in three places: operator embed,
-`app-default` hardcoded `oidcPackDefaultScopes` / `oidcPackFullScopeAllowed`
-dicts, and MBA group names in the portal reconciler. New apps should not extend
-that pattern.
-
-**Target model** — gentian-apps requests what it needs; gentian-os runs generic
-machinery:
-
-1. **`OIDCPackCatalog` cluster CR** (shape already sketched in
-   `packs/opendesk.yaml`) shipped from **`gentian-apps`** (e.g.
-   `profiles/opendesk-oidc-catalog/` or per-profile `assets/oidc-pack.yaml`) —
-   not `go:embed` in the operator.
-2. **Operator** loads packs from **cluster CRs** (and optionally keeps one
-   embedded `opendesk` catalog for backward compatibility until migrated).
-3. **`app-default`** reads default scopes / `fullScopeAllowed` from the catalog
-   CR via `function-extra-resources` — **remove** hardcoded clientId dicts.
-4. **`AppProfile.spec.kernelRequirements.identity.oidc`** remains the per-app
-   entry point (clientId, redirects); optional future field
-   `oidcPackRef: opendesk-openproject` links to a catalog pack when custom
-   mappers are required.
-5. Apps like **Odoo** that need **no custom Keycloak roles** omit `oidcPackRef`
-   entirely — composition-only.
-
-This matches the catalog security principle: **declarative data in
-gentian-apps**, **generic pipelines in gentian-os**.
-
-**Interim:** Odoo and other non-openDesk apps use Client MR with OIDC token claims mapping; openDesk
-apps keep embedded packs until the catalog CR migration lands.
 
 Prefer **OIDC portal SSO** mapping Keycloak group claims directly if the
 chosen Odoo auth stack supports it cleanly; otherwise **auth_oauth** only with
