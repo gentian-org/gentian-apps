@@ -41,7 +41,7 @@ Three delivery routes are wired up:
 - **`git-sidecar`** — the default. Push to `odoo-modules`; the sidecar syncs it into
   `/opt/odoo/custom-addons` on the interval in `gentian.git.syncInterval`.
 - **`addon-profile`** — when the module is a catalog *product*. Add a thin profile with
-  `deployment-role: addon` and `spec.customization.addon: {id: crm, of: odoo-base-ce}`
+  `deployment-role: addon` and `spec.package.addon: {id: crm, of: odoo-base-ce}`
   (the `odoo-crm-ce` pattern). It is never installed on its own — the base is installed
   and the addon selected into it. The earlier spelling of this route, `module-profile`
   with a `requires-profile` annotation, is retired; see

@@ -15,9 +15,9 @@ image:
   pullPolicy: IfNotPresent
 
 # Name of the Kubernetes Secret (created by the gentian-os operator from
-# AppProfile valueMapping/appSecrets) holding db-host/db-port/db-name/db-user/
+# ComponentProfile valueMapping/secrets) holding db-host/db-port/db-name/db-user/
 # db-password and internal-secret_key. Must match
-# "<AppProfile metadata.name>-sensitive-values".
+# "<ComponentProfile metadata.name>-sensitive-values".
 existingSecret:
   name: mathesar-ce-sensitive-values
 
@@ -100,6 +100,6 @@ extraVolumes: []
 extraVolumeMounts: []
 
 # Chart never manages its own Ingress/HTTPRoute — the gentian-os operator
-# creates the Gateway API route from AppProfile.spec.ingress.
+# creates the Gateway API route from ComponentProfile.spec.expose.
 ingress:
   enabled: false

@@ -31,7 +31,7 @@ needs no chart change.
 ## Staged, disabled — selected per tenant
 
 Each maps to an addon profile under `profiles/nextcloud/addons/`, whose
-`spec.customization.addon.id` is the id passed to `occ app:enable`.
+`spec.package.addon.id` is the id passed to `occ app:enable`.
 
 | App | Addon profile |
 |-----|---------------|

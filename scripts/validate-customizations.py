@@ -3,7 +3,7 @@
 
 Two things are checked:
 
-1. Every catalog AppProfile declares ``spec.customization`` — its position on the
+1. Every catalog ComponentProfile declares ``spec.customization`` — its position on the
    customization ladder. An app with no declaration is treated by agents as
    ``{grade: unknown, supportedRungs: [L0, L4]}``, which is a deliberate floor, not
    a default to leave in place.
@@ -76,7 +76,7 @@ def load_yaml(path: pathlib.Path):
 
 
 def check_surface(path: pathlib.Path, doc: dict) -> list[str]:
-    """Check one AppProfile's spec.customization declaration."""
+    """Check one ComponentProfile's spec.customization declaration."""
     errors: list[str] = []
     meta = doc.get("metadata", {}) or {}
     annotations = meta.get("annotations", {}) or {}

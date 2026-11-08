@@ -5,11 +5,11 @@ image:
 
 port: 8765
 
-# Where this sidecar's own Nextcloud account lives -- set by the AppProfile
-# (spec.sidecars[].extraValues), not a sensible chart-level default.
+# Where this sidecar's own Nextcloud account lives -- set by the ComponentProfile
+# (spec.extensions[].extraValues), not a sensible chart-level default.
 nextcloudBaseUrl: "http://nextcloud"
 nextcloudMcpUser: "mcp-service"
-# nextcloudMcpPassword is populated by the AppProfile's appSecrets ->
+# nextcloudMcpPassword is populated by the extension's appSecrets (spec.extensions[].appSecrets) ->
 # Release set[] mechanism (Crossplane resolves the OpenBao-seeded Secret
 # to a plain value at release time -- same pattern nextcloud-base-ce's own
 # admin_password/OIDC secrets already use). Never set this directly.
