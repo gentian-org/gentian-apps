@@ -89,7 +89,7 @@ flowchart LR
 
 | Instance | Purpose | Git / deploy | Who uses it |
 |---|---|---|---|
-| **Platform Odoo** | Sell Gentian apps, subscriptions, invoices | `aluvian` or kernel extension; not an ComponentProfile | Gentian operators, billing |
+| **Platform Odoo** | Sell Gentian apps, subscriptions, invoices | `aluvian` or kernel extension; not a ComponentProfile | Gentian operators, billing |
 | **Tenant Odoo** | Customer organization ERP (CRM, accounting, …) | `gentian-apps/profiles/odoo-*` | Tenant users + tenant admin |
 
 They must **not** share a database or Keycloak client. Contracts between them
@@ -192,7 +192,7 @@ technical names, depends-on lists, and Job commands are **not** platform CRD fie
 
 ## 4. Identity and access
 
-Follow the **standard Gentian ComponentProfile IdM pattern**
+Follow the **standard Gentia ComponentProfile IdM pattern**
 ([app-profile-guide.md](../../../docs/app-profile-guide.md) §4.4, §5):
 
 | Concern | Configuration |
