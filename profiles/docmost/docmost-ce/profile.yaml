@@ -61,12 +61,12 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.7"
+  version: "0.5.1"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: docmost
-      version: "0.2.12-develop.76d6231"
+      version: "0.2.12"
 
     valueMapping:
       database:

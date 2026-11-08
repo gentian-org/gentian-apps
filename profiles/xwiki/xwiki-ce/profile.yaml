@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.5"
+  version: "0.5.1"
   package:
     chart:
       repository: "https://xwiki-contrib.github.io/xwiki-helm"
@@ -63,7 +63,7 @@ spec:
     # build of images/xwiki, and its IMAGE_TAG on a release (docs/releasing.md).
       image:
         name: ghcr.io/gentian-org/xwiki
-        tag: "develop-4f1a61d"
+        tag: "17.10.9-gentian2"
         pullPolicy: IfNotPresent
 
       mysql:

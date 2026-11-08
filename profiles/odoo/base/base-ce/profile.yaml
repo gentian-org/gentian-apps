@@ -23,12 +23,12 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1-dev.7"
+  version: "0.5.1"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
       name: odoo
-      version: "0.1.27-develop.5f3cb4b"
+      version: "0.1.27"
 
     valueMapping:
       oidc:
