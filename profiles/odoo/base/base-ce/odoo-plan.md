@@ -192,7 +192,7 @@ technical names, depends-on lists, and Job commands are **not** platform CRD fie
 
 ## 4. Identity and access
 
-Follow the **standard Gentia ComponentProfile IdM pattern**
+Follow the **standard Gentian ComponentProfile IdM pattern**
 ([app-profile-guide.md](../../../docs/app-profile-guide.md) §4.4, §5):
 
 | Concern | Configuration |
