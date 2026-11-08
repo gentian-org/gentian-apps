@@ -1,14 +1,17 @@
 # odoo-website-ce — withdrawn from the catalog
 
 This addon is **not synced to any cluster**. Its profile is parked as
-`profile.yaml.disabled`, and the ArgoCD ApplicationSet `gentian-catalogue` globs
-`profiles/**/profile.yaml`, so nothing here is generated into an `AppProfile`. The
-addon selection window lists an addon only when an `AppProfile` declares
-`spec.customization.addon.of: odoo-base-ce`, so with no profile in the cluster the
-addon does not appear. The repo validators under `scripts/` glob the same pattern
-and skip this directory for the same reason.
+`profile.yaml.disabled`, and the catalog build (`scripts/build-catalogue-source.py`)
+and the ArgoCD ApplicationSet `gentian-catalogue` only pick up `profiles/**/profile.yaml`,
+so no `ComponentProfile` is generated from this directory. The addon selection
+window lists an addon only when a `ComponentProfile` declares
+`spec.package.addon.of: odoo-base-ce`, so with no profile in the cluster the addon
+does not appear. The repo validators under `scripts/` glob the same pattern and
+skip this directory for the same reason.
 
-The content is kept intact so re-enabling is a rename, not a rewrite.
+The parked file is in the retired `AppProfile` format. Re-enabling means rewriting
+it as a `ComponentProfile` ([app-profile-guide.md](../../../../docs/app-profile-guide.md)),
+not renaming it; the group mapping and the assets are what is worth keeping.
 
 ## Why it is parked
 

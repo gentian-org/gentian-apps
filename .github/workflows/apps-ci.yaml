@@ -552,17 +552,17 @@ jobs:
             echo "Checking ${d}"
             python3 -c "import yaml; yaml.safe_load(open('${f}'))"
 
-            # The ApplicationSet names each Application after the AppProfile's
+            # The ApplicationSet names each Application after the ComponentProfile's
             # metadata.name, not its directory, so directory naming is free — but
             # metadata.name must be globally unique or two bundles collapse into one
-            # Application. AppProfile is cluster-scoped, so the API server would
+            # Application. ComponentProfile is cluster-scoped, so the API server would
             # reject the duplicate too; catching it here names both offenders.
             cr="$(python3 -c "import yaml; print((yaml.safe_load(open('${f}')).get('metadata') or {}).get('name',''))")"
             if [ -z "$cr" ]; then
               echo "${d}: profile.yaml has no metadata.name" >&2; exit 1
             fi
             if [ -n "${SEEN[$cr]:-}" ]; then
-              echo "duplicate AppProfile name '${cr}': ${SEEN[$cr]} and ${d}" >&2
+              echo "duplicate ComponentProfile name '${cr}': ${SEEN[$cr]} and ${d}" >&2
               echo "  Application names derive from metadata.name, so these would collide." >&2
               exit 1
             fi

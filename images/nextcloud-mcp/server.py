@@ -1,13 +1,13 @@
 """Minimal MCP server exposing a Nextcloud tenant's files over WebDAV.
 
-Proof of concept for AppProfile.spec.sidecars — a small companion service
-deployed alongside Nextcloud, authenticating as its own dedicated,
-low-privilege Nextcloud account (never the tenant admin). See
-gentian-apps/profiles/nextcloud/drive/nextcloud-drive-ce/profile.yaml for how this is wired in.
+A ComponentProfile extension (spec.extensions, docs/app-profile-guide.md
+§11.2): a small companion service deployed alongside Nextcloud,
+authenticating as its own dedicated, low-privilege Nextcloud account (never
+the tenant admin). profiles/nextcloud/base/base-ce/profile.yaml mounts the
+account's secret and provisions the account in its post-installation hook.
 
-Exposes three tools, deliberately narrow (files only, no tasks/calendar/etc
-— see the AppProfile decision record for why): listFiles, searchFiles,
-readFile.
+Exposes three tools, deliberately narrow (files only, no tasks/calendar/etc):
+listFiles, searchFiles, readFile.
 """
 
 import os
