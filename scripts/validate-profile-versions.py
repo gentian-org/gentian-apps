@@ -38,6 +38,10 @@ BUILD = REPO / "scripts" / "build-catalogue-source.py"
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$")
 
 
+class CatalogDoesNotBuild(Exception):
+    """This commit's catalog build refuses a tree."""
+
+
 def index_of(repo: pathlib.Path, out: pathlib.Path) -> dict[str, dict]:
     """name -> index entry, as the catalog build of this commit writes it for repo."""
     result = subprocess.run(
@@ -47,7 +51,7 @@ def index_of(repo: pathlib.Path, out: pathlib.Path) -> dict[str, dict]:
     )
     if result.returncode != 0:
         print(result.stdout, result.stderr, sep="\n", file=sys.stderr)
-        raise SystemExit(f"the catalog of {repo} does not build")
+        raise CatalogDoesNotBuild(f"the catalog of {repo} does not build")
     entries = (yaml.safe_load((out / "index.yaml").read_text()) or {}).get("entries") or []
     return {e["name"]: e for e in entries}
 
@@ -81,7 +85,17 @@ def main() -> int:
                            check=True, capture_output=True)
             try:
                 head = index_of(REPO, tmp_path / "head")
-                base = index_of(base_tree, tmp_path / "base-out") if (base_tree / "profiles").is_dir() else {}
+                # The base is built with this commit's builder. A base it
+                # refuses -- main before the first release of a new bundle
+                # format, whose profiles are of a kind the builder no longer
+                # takes -- holds no bundle this tree can be compared with, so
+                # every bundle counts as new, as it does when the base has no
+                # profiles at all. The head still has to build.
+                try:
+                    base = index_of(base_tree, tmp_path / "base-out") if (base_tree / "profiles").is_dir() else {}
+                except CatalogDoesNotBuild as refused:
+                    print(f"::warning::{refused}; every bundle is compared as new")
+                    base = {}
             finally:
                 subprocess.run(["git", "-C", str(REPO), "worktree", "remove", "--force", str(base_tree)],
                                check=False, capture_output=True)
