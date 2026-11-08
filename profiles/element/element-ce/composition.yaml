@@ -11,7 +11,7 @@ spec:
   mode: Pipeline
   pipeline:
 
-    # ── Step 1: Fetch AppProfile + kernel/cluster ConfigMaps ──────────────────
+    # ── Step 1: Fetch ComponentProfile + kernel/cluster ConfigMaps ──────────────────
     - step: fetch-extra-resources
       functionRef:
         name: function-extra-resources

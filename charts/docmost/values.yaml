@@ -149,6 +149,6 @@ persistence:
   storageClass: ""
 
 # Chart never manages its own Ingress/HTTPRoute — the gentian-os operator
-# creates the Gateway API route from AppProfile.spec.ingress.
+# creates the Gateway API route from ComponentProfile.spec.expose.
 ingress:
   enabled: false
