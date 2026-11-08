@@ -27,6 +27,10 @@ spec:
       app.kubernetes.io/name: {{ include "odoo.name" . }}
   template:
     metadata:
+      annotations:
+        # A start is what writes the organization onto the company, so a
+        # tenant filling in its settings after the install restarts Odoo.
+        gentianos.io/organization: {{ .Values.organization | default dict | toJson | sha256sum | trunc 16 | quote }}
       labels:
         app.kubernetes.io/name: {{ include "odoo.name" . }}
         {{- if .Values.podLabels }}
@@ -92,7 +96,7 @@ spec:
         {{- $autoReload := default (dict "enabled" false "periodSeconds" 30 "failureThreshold" 3) .Values.gentian.git.autoReload -}}
         {{- $autoReloadOn := and $autoReload.enabled (gt (len $gitSources) 0) -}}
         {{- if .Values.dropIns.odooConf.enabled }}
-        # Customization ladder rung L1 (docs/app-customization.md §2.2). Odoo has no
+        # Customization ladder rung L1 (docs/guides/app-customization.md §2.2). Odoo has no
         # native conf.d — merge platform/profile/tenant fragments into the rendered
         # base config before Odoo starts, so the effect is a drop-in directory even
         # though Odoo itself only understands a single file. Fragments apply in
@@ -227,6 +231,14 @@ spec:
               GENTIAN_PYEOF
               fi
               {{- end }}
+              {{- /* The tenant's addons join the same -i as the base modules:
+                   one start-up, Odoo resolving dependencies between them, and
+                   -i skipping what is installed already. The platform writes
+                   them space-separated, after a comment line when they are
+                   appended to a value already there. Comment lines are dropped
+                   and anything but a module name's characters separates names,
+                   so nothing else reaches the command line. */}}
+              {{- $modules := regexReplaceAll "[^a-z0-9_]+" (printf "%s,%s" .Values.gentian.initModules (regexReplaceAll "(?m)^\\s*#.*$" (default "" .Values.gentian.addonModules) "")) "," | trimAll "," }}
               python3 /opt/odoo/src/odoo/odoo-bin \
                 -d "${DB_NAME}" \
                 --db_host="${DB_HOST}" \
@@ -234,7 +246,7 @@ spec:
                 --db_user="${DB_USER}" \
                 --db_password="${DB_PASSWORD}" \
                 --config=/etc/odoo/odoo.conf \
-                -i {{ .Values.gentian.initModules }} \
+                -i {{ $modules | quote }} \
                 --without-demo=all \
                 --stop-after-init || true
               {{- if .Values.gentian.baseUrl }}
@@ -269,6 +281,16 @@ spec:
               env.cr.commit()
               GENTIAN_BASEURL_EOF
               {{- end }}
+              # Who the tenant is, onto the company Odoo made, once
+              # (files/organization.py).
+              python3 /opt/odoo/src/odoo/odoo-bin shell \
+                -d "${DB_NAME}" \
+                --db_host="${DB_HOST}" \
+                --db_port="${DB_PORT}" \
+                --db_user="${DB_USER}" \
+                --db_password="${DB_PASSWORD}" \
+                --config=/etc/odoo/odoo.conf \
+                --no-http --shell-interface=python < /etc/gentian/organization.py || true
               exec python3 /opt/odoo/src/odoo/odoo-bin \
                 -d "${DB_NAME}" \
                 --db_host="${DB_HOST}" \
@@ -328,7 +350,7 @@ spec:
             #
             # The browser still goes to the public issuer; only this leg is
             # internal. Empty means "use the public issuer", which is the old
-            # behaviour for anything not running against a kernel Keycloak.
+            # behavior for anything not running against a kernel Keycloak.
             - name: OIDC_INTERNAL_ISSUER
               value: {{ .Values.gentian.oidc.internalIssuer | default "" | quote }}
             - name: GENTIAN_TENANT_ID
@@ -511,6 +533,10 @@ spec:
             items:
               - key: config.json
                 path: config.json
+              - key: organization.json
+                path: organization.json
+              - key: organization.py
+                path: organization.py
         - name: tmp
           emptyDir: {}
         {{- range $gitSources }}

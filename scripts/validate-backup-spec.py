@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that spec.backup declarations are ones the platform can actually honour.
+"""Check that spec.backup declarations are ones the platform can actually honor.
 
 Nothing else catches a mistake here. The CRD schema constrains enums and the
 OpenBao path shape, but a profile is never validated against the CRD in this
@@ -13,7 +13,7 @@ about it.
 The checks below are therefore the ones whose failure mode is silent data loss
 or an app left paused, not stylistic preferences.
 
-See gentian-os/docs/plans/backup-plan.md §5 for the contract.
+See gentian-os/docs/concepts/operations.md §9 for the contract.
 """
 
 from __future__ import annotations
@@ -183,6 +183,14 @@ def check_restore(where: str, restore: object) -> list[str]:
                         f"an argv (a list of strings), not a shell line."
                     )
 
+    # A string "true" would be pruned or refused by the API server, and the
+    # app's data restored onto a domain it cannot run on.
+    if "domainBound" in restore and not isinstance(restore["domainBound"], bool):
+        errors.append(
+            f"{where}: backup.restore.domainBound must be true or false, not "
+            f"{restore['domainBound']!r}."
+        )
+
     verify = restore.get("verify")
     if verify is not None and not _is_argv(verify):
         errors.append(
@@ -244,7 +252,7 @@ def main() -> int:
             print(f"  - {err}")
         return 1
 
-    print(f"Checked {declared} spec.backup declaration(s). All are honourable.")
+    print(f"Checked {declared} spec.backup declaration(s). All are honorable.")
     return 0
 
 

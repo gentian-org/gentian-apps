@@ -17,7 +17,7 @@ Published as `ghcr.io/gentian-org/xwiki:<IMAGE_TAG>` (see `versions.env`).
 | Layer | Version | Purpose | Source |
 |-------|---------|---------|--------|
 | Standard Flavor (offline XIP) | 17.10.9 | Wiki UI / apps installed on first boot | `xwiki-platform-distribution-flavor-xip` (nexus.xwiki.org) |
-| OpenID Connect Authenticator | 2.20.2 | OIDC SSO (`org.xwiki.contrib.oidc.auth.OIDCAuthServiceImpl`) | `org.xwiki.contrib.oidc:oidc-authenticator` (+ deps) |
+| OpenID Connect Authenticator | 2.29.1 | OIDC SSO (`org.xwiki.contrib.oidc.auth.OIDCAuthServiceImpl`) | `org.xwiki.contrib.oidc:oidc-authenticator` (+ deps) |
 
 ### 1. Standard Flavor (offline)
 

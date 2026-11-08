@@ -1,20 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+# What this profile's published bundle holds beside profile.yaml
+# (scripts/build-catalogue-source.py reads this file; docs/profile-bundles.md).
+#
+# The family's AppPackage presets (../../packages) are not here: nothing on a
+# cluster reads a preset, so it is not a companion. They are published beside
+# the bundles, under packages/, for the App Store.
 resources:
   - profile.yaml
   - oidc-catalog.yaml
-  # AppPackage presets for this family. They sync with the base rather than as their
-  # own Application because the catalogue ApplicationSet discovers bundles by
-  # profile.yaml, and a preset is not an AppProfile.
-  - ../../packages
-configMapGenerator:
-  - name: nextcloud-base-ce-portal-bridge-sso
-    namespace: crossplane-system
-    files:
-      - nextcloud-portal-sso.html=assets/nextcloud-portal-sso.html
-generatorOptions:
-  disableNameSuffixHash: true
-  labels:
-    gentianos.io/profile-name: nextcloud-base-ce
-    gentianos.io/asset: portal-bridge-sso
-    app.kubernetes.io/managed-by: gentian-os

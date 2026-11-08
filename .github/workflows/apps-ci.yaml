@@ -7,179 +7,184 @@ on:
   # to test a commit without pushing an empty one.
   workflow_dispatch:
   push:
-    # Feature branches too, so a push is checked before a pull request exists.
-    # Nothing here publishes from one: every image push and helm push is gated
-    # on the ref, not merely on "not a pull request" — a branch that pushed a
-    # chart version would overwrite a released one.
-    branches: [main, develop, "feat/**", "fix/**", "chore/**"]
-    paths:
-      - "apps/**"
-      - "profiles/**"
-      - "images/**"
-      - "charts/odoo/**"
-      - "charts/gentian-sidecar-git-modules/**"
-      - "charts/gentian-sidecar-sso-saml/**"
-      - "charts/activepieces/**"
-      - "charts/mathesar/**"
-      - "charts/docmost/**"
-      - ".github/workflows/apps-ci.yaml"
-      - ".github/actions/**"
-  pull_request:
+    # What is merged, and nothing else: a branch is checked as a pull request,
+    # and one that ran on its push as well did the same work twice. A branch
+    # without a pull request is not checked; open one, as a draft if need be,
+    # or start the workflow by hand. main releases, under the names the files
+    # state; develop publishes the same artifacts under names marked develop,
+    # which no release ever carries (see release-gate).
     branches: [main, develop]
     paths:
       - "apps/**"
       - "profiles/**"
       - "images/**"
+      - "e2e/**"
       - "charts/odoo/**"
       - "charts/gentian-sidecar-git-modules/**"
-      - "charts/gentian-sidecar-sso-saml/**"
-      - "charts/activepieces/**"
       - "charts/mathesar/**"
       - "charts/docmost/**"
+      - "charts/erpnext/**"
+      # The validators: a change to one is checked by running it.
+      - "scripts/**"
+      - ".github/workflows/apps-ci.yaml"
       - ".github/actions/**"
+  # Every pull request, whatever it touches: the `gate` job at the end is a
+  # status the branch rules require, and a check that is never started never
+  # reports, so a path filter here would block the merge of a change outside
+  # the paths above. The `scope` job applies the same filter instead and the
+  # jobs it governs are skipped.
+  pull_request:
+    branches: [main, develop]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_ORG: gentian-org
 
 jobs:
-  # Computed once here instead of repeated on every job below (it used to be
-  # the exact same boolean expression pasted into ~13 places) — every
-  # image/chart job reads it via needs.should-publish.outputs.publish.
-  should-publish:
+  # What this run publishes, and under which names. Decided in one place and
+  # read by every job below.
+  #
+  #   release      main only. Artifacts go out under the names the files
+  #                state: an image at its version, a chart at the version in
+  #                its Chart.yaml. Those names are what a released catalog
+  #                pins, so nothing but main may write to them.
+  #   develop      develop only. The same artifacts, under names no release
+  #                carries: an image as develop-<sha7>, a chart as
+  #                <version>-develop.<sha7> (immutable) and <version>-develop
+  #                (moving, its appVersion naming the immutable one). The rule
+  #                is gentian-ui's, so one convention covers both repositories.
+  #   publish      either of the two. Every other branch, and every pull
+  #                request, builds and pushes nothing.
+  release-gate:
     runs-on: ubuntu-latest
     outputs:
-      publish: ${{ steps.check.outputs.publish }}
+      release: ${{ steps.decide.outputs.release }}
+      develop: ${{ steps.decide.outputs.develop }}
+      publish: ${{ steps.decide.outputs.publish }}
+      develop_tag: ${{ steps.decide.outputs.develop_tag }}
     steps:
-      - id: check
-        run: echo "publish=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}" >> "$GITHUB_OUTPUT"
+      - id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          release=false
+          develop=false
+          develop_tag=""
+          if [ "${EVENT}" != "pull_request" ]; then
+            case "${REF}" in
+              refs/heads/main) release=true ;;
+              refs/heads/develop)
+                develop=true
+                develop_tag="develop-${GITHUB_SHA::7}"
+                ;;
+            esac
+          fi
+          publish=false
+          if [ "${release}" = "true" ] || [ "${develop}" = "true" ]; then
+            publish=true
+          fi
+          {
+            echo "release=${release}"
+            echo "develop=${develop}"
+            echo "publish=${publish}"
+            echo "develop_tag=${develop_tag}"
+          } >> "$GITHUB_OUTPUT"
 
-  build-app-store:
-    needs: [should-publish]
+  # Whether this run has anything to check or build. A push or a manual run
+  # always has: the push trigger is path-filtered. A pull request is compared
+  # with its base against the same paths, and when none of them changed every
+  # job that needs this one is skipped. When the comparison cannot be answered
+  # — too large to list, API error — everything runs.
+  scope:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+    outputs:
+      relevant: ${{ steps.decide.outputs.relevant }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Read app-store release versions
-        id: versions
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          IMAGE_TAG=$(grep 'tag:' apps/app-store/chart/values.yaml | head -1 | awk '{print $2}' | tr -d '"')
-          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          relevant=true
+          if [ "${EVENT}" = "pull_request" ] \
+            && gh api "repos/${GITHUB_REPOSITORY}/compare/${PR_BASE}...${PR_HEAD}" \
+                 --jq '.files[].filename' > /tmp/changed \
+            && [ "$(wc -l < /tmp/changed)" -gt 0 ] \
+            && [ "$(wc -l < /tmp/changed)" -lt 300 ]; then
+            if ! grep -qE '^(apps/|profiles/|images/|e2e/|charts/(odoo|gentian-sidecar-git-modules|mathesar|docmost|erpnext|paperless-ngx)/|scripts/|\.github/workflows/apps-ci\.yaml$|\.github/actions/)' /tmp/changed; then
+              relevant=false
+            fi
+          fi
+          echo "relevant=${relevant}" >> "$GITHUB_OUTPUT"
+          if [ "${relevant}" = "false" ]; then
+            echo "Nothing this workflow checks or builds was changed; its jobs are skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-      # linux/arm64 needs QEMU here (unlike gentian-os's Go binary, cross-
-      # compiled natively via TARGETARCH) — these Dockerfiles run pip/npm
-      # during the build, which only works for a foreign arch under emulation.
-      - name: Build and push API image
-        uses: ./.github/actions/build-push-image
-        with:
-          context: apps/app-store/backend
-          platforms: linux/amd64,linux/arm64
-          qemu-arch: arm64
-          push: ${{ needs.should-publish.outputs.publish }}
-          image-tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:${{ steps.versions.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-api:${{ github.sha }}
-
-      - name: Build and push Web image
-        uses: ./.github/actions/build-push-image
-        with:
-          context: apps/app-store/frontend
-          platforms: linux/amd64,linux/arm64
-          qemu-arch: arm64
-          build-args: |
-            VITE_AUTH_DISABLED=true
-          push: ${{ needs.should-publish.outputs.publish }}
-          image-tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:${{ steps.versions.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/app-store-web:${{ github.sha }}
-
-      - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
-        with:
-          chart-path: apps/app-store/chart
-          push: ${{ needs.should-publish.outputs.publish }}
-
-  # The administration console: a component of the platform, built from
-  # apps/_template and a client of the director. Same shape as the app-store
-  # job, because it is the same kind of thing; the web image takes no build
-  # arguments, since its configuration arrives at container start.
-  build-admin-console:
-    needs: [should-publish]
+  # Whether this run has to sign anybody in. The two end-to-end jobs start
+  # Keycloak and the apps' real images and take longer than everything else in
+  # this workflow together, and what they exercise is the sign-in sidecar, the
+  # suites themselves and the profiles the suites read their handlers and
+  # clients from. A change to none of those — a chart, another image — cannot
+  # change their answer, so it does not wait for it.
+  #
+  # Asked of the API and not of a checkout: the comparison is with the commit
+  # the branch was at before the push, or with the base of the pull request.
+  # Whenever that cannot be answered — a new branch, a manual run, a comparison
+  # too large to list in full — the suites run.
+  e2e-scope:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Read admin-console release versions
-        id: versions
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          IMAGE_TAG=$(grep 'tag:' apps/admin-console/chart/values.yaml | head -1 | awk '{print $2}' | tr -d '"')
-          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
-
-      - name: Backend tests
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version: "3.12"
-      - run: pip install uv && cd apps/admin-console/backend && uv pip install --system -e ".[dev]" && ruff check app tests && pytest -q
-        shell: bash
-
-      - name: Frontend typecheck and build
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
-        with:
-          node-version: "22"
-      - run: cd apps/admin-console/frontend && npm ci --no-audit --no-fund && npm run build
-        shell: bash
-
-      - name: Build and push API image
-        uses: ./.github/actions/build-push-image
-        with:
-          context: apps/admin-console/backend
-          platforms: linux/amd64,linux/arm64
-          qemu-arch: arm64
-          push: ${{ needs.should-publish.outputs.publish }}
-          image-tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/admin-console-api:${{ steps.versions.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/admin-console-api:${{ github.sha }}
-
-      - name: Build and push Web image
-        uses: ./.github/actions/build-push-image
-        with:
-          context: apps/admin-console/frontend
-          platforms: linux/amd64,linux/arm64
-          qemu-arch: arm64
-          push: ${{ needs.should-publish.outputs.publish }}
-          image-tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/admin-console-web:${{ steps.versions.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/admin-console-web:${{ github.sha }}
-
-      - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
-        with:
-          chart-path: apps/admin-console/chart
-          lint: "true"
-          # The chart names the images of the build it came from, by their
-          # immutable name. Both images are ours, which is what makes the
-          # blanket rewrite safe here.
-          pin-image-tag: ${{ github.sha }}
-          # And the chart itself is published per commit, because a Helm
-          # release under an unchanged version string is never upgraded: a
-          # chart republished at 0.1.1 reaches no cluster that already has
-          # 0.1.1. The installer resolves the moving version to the immutable
-          # one, the way it already does for the desktop.
-          branch-versions: "true"
-          push: ${{ needs.should-publish.outputs.publish }}
+          run=true
+          case "${EVENT}" in
+            pull_request) base="${PR_BASE}"; head="${PR_HEAD}" ;;
+            push) base="${BEFORE}"; head="${GITHUB_SHA}" ;;
+            *) base="" ;;
+          esac
+          if [ -n "${base}" ] && [ -z "${base//0/}" ]; then
+            base=""   # all zeros: the branch is new
+          fi
+          if [ -n "${base}" ] \
+            && gh api "repos/${GITHUB_REPOSITORY}/compare/${base}...${head}" \
+                 --jq '.files[].filename' > /tmp/changed \
+            && [ "$(wc -l < /tmp/changed)" -gt 0 ] \
+            && [ "$(wc -l < /tmp/changed)" -lt 300 ]; then
+            # The charts are those the restore suites render (odoo, mathesar);
+            # XWiki's chart is upstream, and its suites run the image built
+            # from images/xwiki.
+            if ! grep -qE '^(images/gentian-sidecar-sso-saml/|images/xwiki/|e2e/|profiles/|charts/(odoo|mathesar)/|\.github/workflows/apps-ci\.yaml$)' /tmp/changed; then
+              run=false
+            fi
+          fi
+          echo "run=${run}" >> "$GITHUB_OUTPUT"
+          if [ "${run}" = "false" ]; then
+            echo "Nothing the end-to-end suites exercise was changed; they are skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   build-nextcloud:
-    needs: [should-publish]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -203,11 +208,12 @@ jobs:
           echo "spreed_version=${SPREED_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Nextcloud bundle image
-        uses: ./.github/actions/build-push-image
+        uses: ./.github/actions/image
         with:
-          context: images/nextcloud
-          push: ${{ needs.should-publish.outputs.publish }}
-          build-args: |
+          dir: images/nextcloud
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
+          args: |
             NEXTCLOUD_VERSION=${{ steps.versions.outputs.nextcloud_version }}
             USER_OIDC_VERSION=${{ steps.versions.outputs.user_oidc_version }}
             RICHDOCUMENTS_VERSION=${{ steps.versions.outputs.richdocuments_version }}
@@ -219,16 +225,18 @@ jobs:
             DECK_VERSION=${{ steps.versions.outputs.deck_version }}
             COLLECTIVES_VERSION=${{ steps.versions.outputs.collectives_version }}
             SPREED_VERSION=${{ steps.versions.outputs.spreed_version }}
-          image-tags: |
+          refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud:${{ github.sha }}
 
   build-nextcloud-mcp:
-    needs: [should-publish]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -239,26 +247,66 @@ jobs:
           echo "chart_version=${CHART_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push image
-        uses: ./.github/actions/build-push-image
+        uses: ./.github/actions/image
         with:
-          context: images/nextcloud-mcp
-          push: ${{ needs.should-publish.outputs.publish }}
-          image-tags: |
+          dir: images/nextcloud-mcp
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
+          refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud-mcp:${{ steps.version.outputs.chart_version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/nextcloud-mcp:${{ github.sha }}
 
       - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
+        uses: ./.github/actions/chart
         with:
-          chart-path: images/nextcloud-mcp/chart
-          push: ${{ needs.should-publish.outputs.publish }}
+          dir: images/nextcloud-mcp/chart
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
+          pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
 
-  build-xwiki:
-    needs: [should-publish]
+  build-paperless-ngx-mcp:
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Read chart version
+        id: version
+        run: |
+          CHART_VERSION=$(grep '^version:' images/paperless-ngx-mcp/chart/Chart.yaml | awk '{print $2}')
+          echo "chart_version=${CHART_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        uses: ./.github/actions/image
+        with:
+          dir: images/paperless-ngx-mcp
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
+          refs: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/paperless-ngx-mcp:${{ steps.version.outputs.chart_version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/paperless-ngx-mcp:${{ github.sha }}
+
+      - name: Package and push chart
+        uses: ./.github/actions/chart
+        with:
+          dir: images/paperless-ngx-mcp/chart
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
+          pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
+
+  build-xwiki:
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -273,22 +321,223 @@ jobs:
           echo "oidc_version=${OIDC_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push XWiki bundle image
-        uses: ./.github/actions/build-push-image
+        uses: ./.github/actions/image
         with:
-          context: images/xwiki
-          push: ${{ needs.should-publish.outputs.publish }}
-          build-args: |
+          dir: images/xwiki
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
+          args: |
             XWIKI_VERSION=${{ steps.versions.outputs.xwiki_version }}
             FLAVOR_XIP_SHA256=${{ steps.versions.outputs.flavor_xip_sha256 }}
             OIDC_VERSION=${{ steps.versions.outputs.oidc_version }}
-          image-tags: |
+          refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ github.sha }}
 
-  validate-profiles:
+  # The catalog source, served over https for directors to fetch from.
+  #
+  # GitHub Pages because this repository is public and these are the same
+  # files it already shows: publishing them flattened discloses nothing new,
+  # and it gives the catalog a URL that does not depend on anything of ours
+  # staying up. A cluster names it on its Cluster claim under
+  # spec.catalogue.sources, and the bytes are admitted by digest, never by
+  # where they came from (AD-3) -- so this host is not trusted, only
+  # convenient.
+  #
+  # Two catalogs, one site. A repository has ONE Pages site and a deployment
+  # replaces all of it, so every deployment carries both:
+  #
+  #   /           the released catalog, built from main
+  #   /develop/   the catalog of the branch work lands on, built from develop
+  #
+  # Whichever branch was pushed is built at the pushed commit, the other at its
+  # head, each with its own copy of the build script -- the script is part of
+  # what a branch publishes. Nothing in the output names where it is served
+  # from: a director asks for <address>/index.yaml and
+  # <address>/profiles/<name>.yaml, so the same files work under either path.
+  assemble-catalogue-site:
+    needs: [validate-profiles]
+    if: >-
+      github.event_name != 'pull_request'
+      && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      deployable: ${{ steps.policy.outputs.deployable }}
+    steps:
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.ref == 'refs/heads/main' && github.sha || 'main' }}
+          path: src/main
+      - name: Check out develop
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.ref == 'refs/heads/develop' && github.sha || 'develop' }}
+          path: src/develop
+      - name: Install PyYAML
+        run: pip install pyyaml
+      - name: Build both catalogs
+        env:
+          LIVE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        run: |
+          # The root first: the script empties the directory it writes to.
+          if [ -f src/main/scripts/build-catalogue-source.py ]; then
+            (cd src/main && python3 scripts/build-catalogue-source.py --out "${GITHUB_WORKSPACE}/site" --with-landing-page)
+          else
+            # main is at a commit from before the build script, so it cannot
+            # build a catalog. The released catalog stays the one being
+            # served: copy it as it is, and publish develop beside it.
+            echo "::warning::main has no scripts/build-catalogue-source.py; the released catalog is kept as served at ${LIVE}"
+            mkdir -p site/profiles
+            curl -fsS --retry 3 -o site/index.yaml "${LIVE}/index.yaml"
+            curl -fsS --retry 3 -o site/index.html "${LIVE}/index.html"
+            python3 -c 'import sys, yaml; print("\n".join(e["name"] for e in yaml.safe_load(open("site/index.yaml"))["entries"]))' > /tmp/released-names
+            while IFS= read -r name; do
+              curl -fsS --retry 3 -o "site/profiles/${name}.yaml" "${LIVE}/profiles/${name}.yaml"
+            done < /tmp/released-names
+            echo "kept $(wc -l < /tmp/released-names) released profile(s) as served"
+          fi
+          (cd src/develop && python3 scripts/build-catalogue-source.py --out "${GITHUB_WORKSPACE}/site/develop" --with-landing-page)
+
+      # A push to develop must leave the released catalog exactly as it is:
+      # what a cluster installs from changes when main does and at no other
+      # time. main has not moved, so its build has to come out as the bytes
+      # already served. If it does not -- a tool on the runner changed, the
+      # script reads something outside the tree -- this stops the deployment
+      # rather than publishing a release nobody made.
+      - name: The released catalog is unchanged
+        if: github.ref == 'refs/heads/develop'
+        env:
+          LIVE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        run: |
+          cd site
+          checked=0
+          differ=0
+          while IFS= read -r f; do
+            checked=$((checked + 1))
+            if ! curl -fsS --retry 3 -o /tmp/live-file "${LIVE}/${f}"; then
+              echo "::error::${LIVE}/${f} is not served; refusing to replace the site" >&2
+              differ=$((differ + 1))
+              continue
+            fi
+            if ! cmp -s "${f}" /tmp/live-file; then
+              echo "::error::${f} built from main differs from ${LIVE}/${f}" >&2
+              differ=$((differ + 1))
+            fi
+          done < <(find . -path ./develop -prune -o -type f -print | sed 's|^\./||' | sort)
+          echo "compared ${checked} file(s) of the released catalog with ${LIVE}: ${differ} differ"
+          [ "${differ}" = "0" ]
+
+      - name: The develop catalog's digests are its files'
+        run: |
+          python3 - <<'PY'
+          import hashlib, pathlib, yaml
+          root = pathlib.Path("site/develop")
+          entries = yaml.safe_load((root / "index.yaml").read_text())["entries"]
+          for e in entries:
+              got = "sha256:" + hashlib.sha256((root / "profiles" / f"{e['name']}.yaml").read_bytes()).hexdigest()
+              assert got == e["digest"], f"{e['name']}: index says {e['digest']}, file is {got}"
+          print(f"{len(entries)} entries, every digest matches its file")
+          PY
+
+      # The github-pages environment says which branches may deploy to it. That
+      # is a repository setting, not something a workflow can grant itself: a
+      # deployment from a branch it does not name is rejected and the run goes
+      # red on every push. So ask first, and say what to change instead.
+      - name: May this branch deploy the site?
+        id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          gh api "repos/${REPO}/environments/github-pages" > /tmp/env.json
+          gh api "repos/${REPO}/environments/github-pages/deployment-branch-policies" > /tmp/policies.json
+          deployable="$(python3 - <<'PY'
+          import fnmatch, json, os
+          env = json.load(open("/tmp/env.json"))
+          policy = env.get("deployment_branch_policy")
+          branch = os.environ["BRANCH"]
+          if policy is None:
+              print("true")  # every branch may deploy
+          elif policy.get("custom_branch_policies"):
+              names = [p["name"] for p in json.load(open("/tmp/policies.json")).get("branch_policies", [])
+                       if p.get("type", "branch") == "branch"]
+              print("true" if any(fnmatch.fnmatchcase(branch, n) for n in names) else "false")
+          else:
+              # Protected branches only; the deployment itself is the test.
+              print("true" if branch == "main" else "false")
+          PY
+          )"
+          echo "deployable=${deployable}" >> "$GITHUB_OUTPUT"
+          if [ "${deployable}" != "true" ]; then
+            msg="The github-pages environment does not let '${BRANCH}' deploy, so the site was assembled and NOT published. Add '${BRANCH}' under Settings > Environments > github-pages > Deployment branches and tags, then re-run this workflow."
+            echo "::warning::${msg}"
+            echo "${msg}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
+        with:
+          path: site
+
+  publish-catalogue:
+    needs: [assemble-catalogue-site]
+    if: needs.assemble-catalogue-site.outputs.deployable == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    # One deployment at a time, and never a canceled one: each replaces the
+    # whole site, and the later of two is the one that has seen both branches.
+    concurrency:
+      group: catalogue-site
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d  # v6.0.0
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1
+
+  # Known vulnerabilities in the Python the images install: the template
+  # backend's lockfile and the Nextcloud MCP sidecar's requirements. The
+  # lockfile check is strict; the audit is advisory until the backlog is
+  # triaged (control K4, gentian-os docs/security/controls.md).
+  audit-python:
+    needs: [scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        with:
+          version: "0.13.3"
+      - name: The template lockfile matches its pyproject
+        working-directory: apps/_template/backend
+        run: uv lock --check
+      - name: Audit
+        continue-on-error: true
+        run: |
+          (cd apps/_template/backend && uv export --locked --no-dev --no-hashes --no-emit-project -o /tmp/template.txt)
+          uvx pip-audit --strict -r /tmp/template.txt
+          uvx pip-audit --strict -r images/nextcloud-mcp/requirements.txt
+          uvx pip-audit --strict -r images/paperless-ngx-mcp/requirements.txt
+
+  validate-profiles:
+    needs: [scope]
+    if: needs.scope.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # The version check compares the published bundles with the base
+          # branch, or with the commit before the push.
+          fetch-depth: 0
       - name: Install PyYAML
         run: pip install pyyaml
       - name: Validate profile bundles
@@ -303,17 +552,17 @@ jobs:
             echo "Checking ${d}"
             python3 -c "import yaml; yaml.safe_load(open('${f}'))"
 
-            # The ApplicationSet names each Application after the AppProfile's
+            # The ApplicationSet names each Application after the ComponentProfile's
             # metadata.name, not its directory, so directory naming is free — but
             # metadata.name must be globally unique or two bundles collapse into one
-            # Application. AppProfile is cluster-scoped, so the API server would
+            # Application. ComponentProfile is cluster-scoped, so the API server would
             # reject the duplicate too; catching it here names both offenders.
             cr="$(python3 -c "import yaml; print((yaml.safe_load(open('${f}')).get('metadata') or {}).get('name',''))")"
             if [ -z "$cr" ]; then
               echo "${d}: profile.yaml has no metadata.name" >&2; exit 1
             fi
             if [ -n "${SEEN[$cr]:-}" ]; then
-              echo "duplicate AppProfile name '${cr}': ${SEEN[$cr]} and ${d}" >&2
+              echo "duplicate ComponentProfile name '${cr}': ${SEEN[$cr]} and ${d}" >&2
               echo "  Application names derive from metadata.name, so these would collide." >&2
               exit 1
             fi
@@ -329,6 +578,40 @@ jobs:
           done < <(find profiles -name profile.yaml | sort)
           echo "Validated ${found} profile bundle(s)"
 
+      - name: Build the catalog source
+        # The flat, https-served shape a director fetches from and the App
+        # Store ingests, with the index that lets a cluster say what is in
+        # this catalog at all (AD-14). Built on every run, not only when
+        # publishing: a bundle that cannot be published is a bundle that
+        # silently disappears from every cluster's catalog, and finding
+        # that on main is finding it late.
+        run: python3 scripts/build-catalogue-source.py --check
+
+      # A profile's version moves with its bundle, and a release carries no
+      # development number (gentian-os docs/guides/deployment.md §5.5). Compared
+      # with the base of the pull request, or with the commit before the push.
+      - name: Validate profile versions
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+          TARGET: ${{ github.base_ref || github.ref_name }}
+        run: |
+          args=()
+          if [ -n "${BASE}" ] && git rev-parse --verify --quiet "${BASE}^{commit}" >/dev/null; then
+            args+=(--base "${BASE}")
+          fi
+          if [ "${TARGET}" = "main" ]; then
+            args+=(--released)
+          fi
+          python3 scripts/validate-profile-versions.py "${args[@]}"
+
+      # Every bundle conforms to the schema of each platform line its floor
+      # admits (contracts/platform/<line>/), so a profile is refused here and
+      # not at a tenant's install.
+      - name: Validate against the platform's schemas
+        run: |
+          pip install jsonschema
+          python3 scripts/validate-platform-schema.py
+
       - name: Validate profile tile specs
         run: python3 scripts/validate-profile-tiles.py
       - name: Validate gateway ingress annotations
@@ -339,15 +622,28 @@ jobs:
         run: python3 scripts/validate-chart-refs.py
       - name: Validate secret references
         run: python3 scripts/validate-secret-refs.py
+      - name: Validate that no Composition writes an app's secrets
+        run: python3 scripts/validate-secret-seeds.py
+      # On develop a profile names an image built here by its develop-<sha7>,
+      # the only name a develop build publishes; into main it names the
+      # version, which the release publishes (docs/releasing.md).
       - name: Validate image tags
-        run: python3 scripts/validate-image-tags.py
+        env:
+          TARGET: ${{ github.base_ref || github.ref_name }}
+        run: |
+          args=()
+          if [ "${TARGET}" = "main" ]; then
+            args+=(--released)
+          fi
+          python3 scripts/validate-image-tags.py "${args[@]}"
       - name: Validate backup contract
         run: python3 scripts/validate-backup-spec.py
       - name: Customization debt report
         run: python3 scripts/customization-debt-report.py >> "$GITHUB_STEP_SUMMARY"
 
   build-odoo-chart:
-    needs: [should-publish]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -355,65 +651,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
+        uses: ./.github/actions/chart
         with:
-          chart-path: charts/odoo
-          push: ${{ needs.should-publish.outputs.publish }}
-
-  build-activepieces-chart:
-    needs: [should-publish]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Install Helm
-        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310  # v5.0.1
-
-      # The chart is not vendored: upstream is fetched at the pinned version and
-      # the local patch series is applied on top. This step runs on pull requests
-      # too — a series that no longer applies must fail review, not merge.
-      #
-      # Not a package-push-chart candidate like the plain charts below: the tgz
-      # comes out of this build script directly, there's no separate `helm
-      # package` of a vendored directory.
-      - name: Build chart from pinned upstream + patch series
-        id: build
-        run: scripts/build-activepieces-chart.sh --out /tmp/ap-dist
-
-      - name: Push chart
-        if: needs.should-publish.outputs.publish == 'true'
-        run: |
-          # shellcheck source=/dev/null
-          source charts/activepieces/UPSTREAM
-          helm push "/tmp/ap-dist/activepieces-${CHART_VERSION}.tgz" \
-            oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts
-
-  build-sso-saml-sidecar-chart:
-    needs: [should-publish]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
-        with:
-          chart-path: charts/gentian-sidecar-sso-saml
-          push: ${{ needs.should-publish.outputs.publish }}
+          dir: charts/odoo
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
 
   build-git-modules-sidecar-chart:
-    needs: [should-publish]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -421,13 +667,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
+        uses: ./.github/actions/chart
         with:
-          chart-path: charts/gentian-sidecar-git-modules
-          push: ${{ needs.should-publish.outputs.publish }}
+          dir: charts/gentian-sidecar-git-modules
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
+          pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
 
   build-mathesar-chart:
-    needs: [should-publish]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -435,14 +684,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
+        uses: ./.github/actions/chart
         with:
-          chart-path: charts/mathesar
+          dir: charts/mathesar
           lint: "true"
-          push: ${{ needs.should-publish.outputs.publish }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
 
   build-docmost-chart:
-    needs: [should-publish]
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -450,42 +701,192 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Package and push chart
-        uses: ./.github/actions/package-push-chart
+        uses: ./.github/actions/chart
         with:
-          chart-path: charts/docmost
+          dir: charts/docmost
           lint: "true"
-          push: ${{ needs.should-publish.outputs.publish }}
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
 
-  build-git-modules-sidecar-image:
-    needs: [should-publish]
+  build-erpnext-chart:
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Package and push chart
+        uses: ./.github/actions/chart
+        with:
+          dir: charts/erpnext
+          lint: "true"
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
+
+  build-paperless-ngx-chart:
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Package and push chart
+        uses: ./.github/actions/chart
+        with:
+          dir: charts/paperless-ngx
+          lint: "true"
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
+
+  build-git-modules-sidecar-image:
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Build and push image
-        uses: ./.github/actions/build-push-image
+        uses: ./.github/actions/image
         with:
-          context: images/gentian-sidecar-git-modules
-          push: ${{ needs.should-publish.outputs.publish }}
-          image-tags: |
+          dir: images/gentian-sidecar-git-modules
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
+          refs: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/gentian-sidecar-git-modules:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/gentian-sidecar-git-modules:${{ github.sha }}
 
+  # The platform's sign-in sidecar. Its tests are what say that it refuses
+  # an answer it should refuse, so the image is not built from a tree in
+  # which they fail.
+  test-sso-saml-sidecar:
+    needs: [scope]
+    if: needs.scope.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: images/gentian-sidecar-sso-saml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm test
+      # Known vulnerabilities in the production dependencies. Advisory until
+      # the backlog is triaged (control K4, gentian-os docs/security/controls.md).
+      - name: Dependency audit
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+
+  # The same sidecar against the real things: Keycloak, and the apps of this
+  # catalog that are signed in to through it, each at the version its chart
+  # pins and with its profile's own handler. Not a gate of the image build: it
+  # pulls large images from registries this repository does not run.
+  e2e-sso-saml-sidecar:
+    needs: [test-sso-saml-sidecar, e2e-scope]
+    if: needs.e2e-scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: "22"
+      - name: Sign in through the sidecar, end to end
+        run: images/gentian-sidecar-sso-saml/e2e/run.sh
+
+  # The catalog's apps that sign people in themselves and say where they are
+  # told of a sign-out, each as its real image against Keycloak: the notice
+  # arrives at the address the platform builds from the profile, and the
+  # app's session is over. Not a gate of any build: it pulls large images.
+  e2e-oidc-sign-out:
+    needs: [test-sso-saml-sidecar, e2e-scope]
+    if: needs.e2e-scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: "22"
+      - name: Log in to the registry the catalog's own images are in
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Sign out of the apps, end to end
+        run: e2e/oidc-sign-out/run.sh
+
+  # The apps whose data remembers where it ran, each as its real image: data
+  # written under one domain and database, put back under another as an
+  # import puts it back, and the profile's post-restore commands run as the
+  # platform runs them. Not a gate of any build: it pulls large images.
+  e2e-restore-rewrites:
+    needs: [e2e-scope, scope]
+    if: needs.scope.outputs.relevant == 'true' && needs.e2e-scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: "22"
+      - name: Log in to the registry the catalog's own images are in
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Restore into another cluster and domain, end to end
+        run: e2e/restore-rewrites/run.sh
+
   build-sso-saml-sidecar-image:
-    needs: [should-publish]
+    needs: [release-gate, test-sso-saml-sidecar]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Read the sidecar's version
+        id: version
+        run: echo "version=$(node -p "require('./images/gentian-sidecar-sso-saml/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: Build and push image
-        uses: ./.github/actions/build-push-image
+        uses: ./.github/actions/image
         with:
-          context: images/gentian-sidecar-sso-saml
-          push: ${{ needs.should-publish.outputs.publish }}
-          image-tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:latest
+          dir: images/gentian-sidecar-sso-saml
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
+          # No "latest": the platform names the build it runs, and a name that
+          # moves is not one it could name.
+          refs: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/sidecar-sso-saml:${{ github.sha }}
+
+  # The one status the branch rules require. It passes when every job above
+  # succeeded or was skipped because this run gave it nothing to do, and fails
+  # when any of them failed or was canceled. The three deciders must have
+  # run: a decision that was skipped is not a decision.
+  gate:
+    runs-on: ubuntu-latest
+    needs: [release-gate, scope, e2e-scope, audit-python, build-nextcloud, build-nextcloud-mcp, build-xwiki, assemble-catalogue-site, publish-catalogue, validate-profiles, build-odoo-chart, build-git-modules-sidecar-chart, build-mathesar-chart, build-docmost-chart, build-erpnext-chart, build-paperless-ngx-chart, build-paperless-ngx-mcp, build-git-modules-sidecar-image, test-sso-saml-sidecar, e2e-sso-saml-sidecar, e2e-oidc-sign-out, e2e-restore-rewrites, build-sso-saml-sidecar-image]
+    if: always()
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          printf '%s' "${RESULTS}" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          if printf '%s' "${RESULTS}" | jq -e '[.[] | .result] | any(. == "failure" or . == "cancelled")' > /dev/null; then
+            echo "a job this gate needs failed" >&2
+            exit 1
+          fi
+          for j in release-gate scope e2e-scope; do
+            test "$(printf '%s' "${RESULTS}" | jq -r --arg j "$j" '.[$j].result')" = "success"
+          done

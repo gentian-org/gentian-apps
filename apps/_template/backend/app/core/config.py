@@ -77,6 +77,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
+        if not self.auth_disabled and not self.oidc_issuer:
+            raise ValueError("OIDC_ISSUER is required unless AUTH_DISABLED is true")
         if self.is_production and self.cors_origins.strip() == "*":
             raise ValueError("BACKEND_CORS_ORIGINS must not be '*' in production (M9)")
         if self.is_production and self.auth_disabled:
@@ -99,6 +101,6 @@ def get_dropin_config() -> dict:
     ``auth_disabled`` or ``cors_origins``. Read feature configuration from here;
     read security configuration from ``get_settings()``.
     """
-    from app.core.dropins import load_dropins
+    from gentian_app_runtime.dropins import load_dropins
 
     return load_dropins()

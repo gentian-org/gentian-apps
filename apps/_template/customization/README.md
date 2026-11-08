@@ -1,11 +1,11 @@
 # Customizing this app
 
-This app is built from `gentian-app-template` and ships a customization surface so
-you can change its behaviour **without patching or forking it**.
+This app is built from `apps/_template` and ships a customization surface so
+you can change its behavior **without patching or forking it**.
 
 The rungs below come from the Gentian customization ladder — the full framework, the
 decision procedure, and the record format live in
-[gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
+[gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md).
 
 > **Pick the lowest rung that can express your change.** The cost of a customization is
 > not writing it — it is writing it again at every release.
@@ -21,7 +21,7 @@ decision procedure, and the record format live in
 | **L4** Repackage | yes | the chart is ours; prefer values and drop-ins first |
 | **L5/L6** Patch / Fork | n/a | we own the source — send a PR instead |
 
-Paste [`profile-block.yaml`](profile-block.yaml) into the app's `AppProfile` so this is
+Paste [`profile-block.yaml`](profile-block.yaml) into the app's `ComponentProfile` so this is
 machine-readable for the App Store and for agents.
 
 ## L0 — Configure
@@ -37,7 +37,7 @@ who wins:
 | Prefix | Owner |
 |---|---|
 | `00-`–`49-` | platform |
-| `50-`–`89-` | profile / catalogue maintainer |
+| `50-`–`89-` | profile / catalog maintainer |
 | `90-`–`99-` | tenant (self-service, via the Admin Console) |
 
 Full precedence chain: image defaults → chart values → profile `extraValues` → profile

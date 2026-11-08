@@ -1,9 +1,9 @@
 # Customization ladder — Nextcloud (family `nextcloud`)
 
-**Grade: A** · rubric score **7/8** · characterised 2026-08-06
+**Grade: A** · rubric score **7/8** · characterized 2026-08-06
 Applies to `nextcloud-base-ce` and the `nextcloud-office-*` / `nextcloud-suite-*` profiles.
 
-Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
+Framework: [gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md).
 
 ## Rubric
 
@@ -32,7 +32,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 
 ## L2 vs L3 here
 
-Nextcloud is the clearest case in the catalogue of both rungs being first-class, and upstream
+Nextcloud is the clearest case in the catalog of both rungs being first-class, and upstream
 names them: a **PHP app** runs inside the server (L3); an **ExApp** (AppAPI) is a container
 alongside it (L2). Apply the framework's tie-breaker — if the function must appear in the
 Nextcloud UI and touch its data model, write an app; otherwise write an ExApp or a Gentian
@@ -47,3 +47,33 @@ companion, which survives major-version upgrades unchanged.
   re-renders, so it belongs in a post-install Job, not in values.
 - `appcodechecker` rejects apps using private APIs — a good early signal that a customization
   is reaching past the supported extension point.
+
+## Signing out
+
+When a person signs out at the platform, the realm tells Nextcloud, and Nextcloud ends that
+person's session: `requires.services.identity.oidc.backchannelLogout` names the path
+`/apps/user_oidc/backchannel-logout/gentian` on the entry `web`, and the platform registers it
+with the realm at Nextcloud's own Service inside the cluster
+(`http://nextcloud.<namespace>.svc.cluster.local:8080/…`), not at `https://nextcloud.<domain>`.
+
+What `user_oidc` 8.11.0 checks before it ends anything (`lib/Controller/LoginController.php`,
+`backChannelLogout`): the logout token's signature against the realm's published keys; that it
+carries the claims a logout token must; that its audience is this client; and that it carries the
+back-channel logout event and no nonce. A token that fails any of these is refused and ends
+nothing. It then looks for the session it recorded at sign-in for the token's session id, person
+and issuer together, and invalidates that one session's Nextcloud token. When there is none -- the
+session already ended, or the token was sent before -- it answers 200 and ends nothing, as the
+back-channel logout specification asks.
+
+It ends the session of the browser that signed out, by the realm's session id; the same person
+signed in elsewhere from another realm session stays signed in there.
+
+Nextcloud answers under its Service's name without that name being listed under
+`trustedDomains`: `overwritehost` is set (`gentian-proxy.config.php`), and Nextcloud does not
+hold a request to that list then.
+
+Shown against the catalog's image and Keycloak 26.8.0 in `e2e/oidc-sign-out/nextcloud.e2e.js`:
+the realm posts to the Service's address, the cookie of the person who signed out is refused
+afterwards, another person's is not, and a token signed with another key, an unsigned one and
+the realm's own token a second time end nothing. The realm posts once: if Nextcloud is not
+running at that moment the session lasts as long as Nextcloud keeps it.

@@ -1,0 +1,27 @@
+--- a/lib/Service/SettingsService.php
++++ b/lib/Service/SettingsService.php
+@@ -333,7 +333,7 @@
+ 			$type = explode('/', $type)[0];
+ 		}
+ 
+-		return $this->urlGenerator->linkToRouteAbsolute(
++		$path = $this->urlGenerator->linkToRoute(
+ 			'richdocuments.settings.getSettingsFile',
+ 			[
+ 				'type' => $type,
+@@ -343,6 +343,15 @@
+ 				'identifier' => $identifier,
+ 			]
+ 		);
++
++		// Gentian: Collabora fetches these files itself, so they are addressed
++		// the way it already reaches Nextcloud for WOPI (wopi_callback_url),
++		// not through the public host, which asks for a sign-in it cannot give.
++		$callbackUrl = rtrim($this->config->getAppValue(Application::APPNAME, 'wopi_callback_url', ''), '/');
++		if ($callbackUrl !== '') {
++			return $callbackUrl . $path;
++		}
++		return $this->urlGenerator->getAbsoluteURL($path);
+ 	}
+ 
+ 	/**

@@ -1,13 +1,13 @@
 """Minimal MCP server exposing a Nextcloud tenant's files over WebDAV.
 
-Proof of concept for AppProfile.spec.sidecars — a small companion service
-deployed alongside Nextcloud, authenticating as its own dedicated,
-low-privilege Nextcloud account (never the tenant admin). See
-gentian-apps/profiles/nextcloud/drive/nextcloud-drive-ce/profile.yaml for how this is wired in.
+A ComponentProfile extension (spec.extensions, docs/app-profile-guide.md
+§11.2): a small companion service deployed alongside Nextcloud,
+authenticating as its own dedicated, low-privilege Nextcloud account (never
+the tenant admin). profiles/nextcloud/base/base-ce/profile.yaml mounts the
+account's secret and provisions the account in its post-installation hook.
 
-Exposes three tools, deliberately narrow (files only, no tasks/calendar/etc
-— see the AppProfile decision record for why): listFiles, searchFiles,
-readFile.
+Exposes three tools, deliberately narrow (files only, no tasks/calendar/etc):
+listFiles, searchFiles, readFile.
 """
 
 import os
@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 from urllib.parse import quote, unquote, urlparse
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 NEXTCLOUD_BASE_URL = os.environ.get("NEXTCLOUD_BASE_URL", "http://nextcloud")
 NEXTCLOUD_MCP_USER = os.environ["NEXTCLOUD_MCP_USER"]
@@ -31,13 +31,7 @@ DAV_NS = "{DAV:}"
 MAX_READ_BYTES = 1_000_000
 MAX_SEARCH_RESULTS = 50
 
-# host must be 0.0.0.0 -- FastMCP defaults to 127.0.0.1, unreachable from
-# other pods/containers even though this runs in Nextcloud's own pod.
-mcp = FastMCP(
-    "nextcloud-files",
-    host="0.0.0.0",
-    port=int(os.environ.get("MCP_PORT", "8765")),
-)
+mcp = MCPServer("nextcloud-files")
 
 
 def _dav_client() -> httpx.Client:
@@ -152,4 +146,10 @@ def readFile(path: str) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    # host must be 0.0.0.0 -- the default is 127.0.0.1, unreachable from
+    # other pods/containers even though this runs in Nextcloud's own pod.
+    mcp.run(
+        transport="streamable-http",
+        host="0.0.0.0",
+        port=int(os.environ.get("MCP_PORT", "8765")),
+    )

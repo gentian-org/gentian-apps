@@ -4,11 +4,8 @@ kind: OIDCPackCatalog
 metadata:
   name: nextcloud-base-ce-oidc
   labels:
-    gentianos.io/oidc-catalog: nextcloud-base-ce
     gentianos.io/profile-name: nextcloud-base-ce
 spec:
-  extraManagedByAttributeGroups:
-    - FileshareBaseAdmin
   mapperTemplates:
     gentian_useruuid:
       protocolMapper: oidc-usermodel-attribute-mapper
@@ -20,9 +17,12 @@ spec:
         access.token.claim: "true"
         userinfo.token.claim: "true"
     gentian_username:
+      # The Keycloak username, which people cannot change themselves. The realm
+      # stores no "uid" attribute; reading one left the claim out of the token.
+      # Keycloak lists the username among a user's attributes.
       protocolMapper: oidc-usermodel-attribute-mapper
       config:
-        user.attribute: uid
+        user.attribute: username
         claim.name: gentian_username
         jsonType.label: String
         id.token.claim: "true"
@@ -31,7 +31,14 @@ spec:
     email:
       protocolMapper: oidc-usermodel-property-mapper
       config:
-        user.attribute: email
+        # The USERNAME, not the email field. Keycloak's password reset mails the
+        # email field and can be pointed at nothing else, so that field holds the
+        # user's recovery address — a personal inbox they can still read when
+        # locked out. The workspace address is the username
+        # (christian@corp.example is the login and the mailbox), which is what
+        # this app should receive as the user's identity. Reading the field here
+        # handed the app a personal address instead.
+        user.attribute: username
         claim.name: email
         jsonType.label: String
         id.token.claim: "true"

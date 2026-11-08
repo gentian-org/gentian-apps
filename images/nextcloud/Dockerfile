@@ -28,29 +28,31 @@
 #
 # Build args must match versions.env. See BUNDLE.md beside this file.
 
-ARG NEXTCLOUD_VERSION=33.0.6-apache
+ARG NEXTCLOUD_VERSION=33.0.10-apache
 
 FROM docker.io/library/nextcloud:${NEXTCLOUD_VERSION} AS base
 
 USER root
 
+COPY patches /tmp/patches
+
 # Platform SSO — always present, always enabled.
-ARG USER_OIDC_VERSION=8.10.1
+ARG USER_OIDC_VERSION=8.11.0
 
 # Optional apps, staged disabled. Selected per tenant via spec.apps[].addons.
-ARG RICHDOCUMENTS_VERSION=10.2.0
-ARG FORMS_VERSION=5.3.2
+ARG RICHDOCUMENTS_VERSION=10.3.2
+ARG FORMS_VERSION=5.4.1
 ARG MAIL_VERSION=5.10.5
 ARG CALENDAR_VERSION=6.5.0
 ARG CONTACTS_VERSION=8.7.2
 ARG TASKS_VERSION=0.18.1
 ARG DECK_VERSION=1.17.4
-ARG COLLECTIVES_VERSION=3.5.0
+ARG COLLECTIVES_VERSION=4.7.1
 ARG SPREED_VERSION=23.0.8
 
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates curl; \
+    apt-get install -y --no-install-recommends ca-certificates curl patch; \
     rm -rf /var/lib/apt/lists/*; \
     \
     # --- platform SSO: enabled, so it belongs in apps/ ---------------------- \
@@ -77,6 +79,20 @@ RUN set -eux; \
     fetch_addon "https://github.com/nextcloud/collectives/releases/download/v${COLLECTIVES_VERSION}/collectives-${COLLECTIVES_VERSION}.tar.gz"; \
     fetch_addon "https://github.com/nextcloud-releases/spreed/releases/download/v${SPREED_VERSION}/spreed-v${SPREED_VERSION}.tar.gz"; \
     rm -f /tmp/*.tar.gz; \
+    \
+    # --- our patches on staged apps, patches/<app>/*.patch ------------------ \
+    # A patch that no longer applies fails the build, so a version bump in \
+    # versions.env cannot drop one silently. .gentian-patches records what was \
+    # applied, so the profile's start hook re-copies an app whose patches \
+    # changed although its version did not. \
+    for app_dir in /tmp/patches/*/; do \
+      app="$(basename "$app_dir")"; \
+      for p in "$app_dir"*.patch; do \
+        patch -p1 --forward --no-backup-if-mismatch -d "/usr/src/gentian-addons/$app" < "$p"; \
+      done; \
+      (cd "$app_dir" && sha256sum *.patch) > "/usr/src/gentian-addons/$app/.gentian-patches"; \
+    done; \
+    rm -rf /tmp/patches; \
     chown -R www-data:www-data /usr/src/gentian-addons; \
     \
     # --- Gentian runtime adjustments --------------------------------------- \
@@ -85,6 +101,11 @@ RUN set -eux; \
     sed -i 's/<VirtualHost \*:80>/<VirtualHost \*:8080>/' /etc/apache2/sites-available/000-default.conf; \
     chown -R www-data:www-data /usr/local/etc/php/conf.d; \
     chown -R www-data:www-data /var/run/apache2 /var/log/apache2 /var/lock/apache2 /var/lib/apache2 /etc/apache2
+
+# Where the platform's Office tiles land (apps/gentian_launch, this repository).
+# Enabled like user_oidc: the profile's hooks copy it from apps/ into
+# custom_apps/ on every start, so an existing install receives it too.
+COPY --chown=www-data:www-data apps/gentian_launch /usr/src/nextcloud/apps/gentian_launch
 
 USER www-data
 

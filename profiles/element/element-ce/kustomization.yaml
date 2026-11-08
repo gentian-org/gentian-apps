@@ -1,16 +1,8 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+# What this profile's published bundle holds beside profile.yaml
+# (scripts/build-catalogue-source.py reads this file; docs/profile-bundles.md).
 resources:
   - profile.yaml
   - composition.yaml
   - oidc-catalog.yaml
-configMapGenerator:
-  - name: gentian-jitsi-oidc-overlays
-    namespace: crossplane-system
-    files:
-      - gentian-portal-sso.html=assets/gentian-portal-sso.html
-generatorOptions:
-  disableNameSuffixHash: true
-  labels:
-    gentianos.io/config-type: jitsi-oidc-overlays
-    app.kubernetes.io/managed-by: gentian-os

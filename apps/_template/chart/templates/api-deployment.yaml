@@ -47,10 +47,12 @@ spec:
             {{- /* Token verification. Under edge the forwarded token is
                  verified against the zone's issuer and must carry the
                  director's audience; the platform supplies both. Without an
-                 issuer the API verifies nothing, which the backend treats as
-                 "auth is not configured" rather than as "everyone is
-                 allowed" (see backend/app/core/auth.py). api.env wins when it
+                 issuer the API cannot verify anyone and refuses to start,
+                 so this refuses first. api.env wins when it
                  names the same variable, so a developer can override. */}}
+            {{- if not (or .Values.auth.disabled .Values.auth.issuer (hasKey (default dict .Values.api.env) "OIDC_ISSUER")) }}
+            {{- fail "auth.issuer is required unless auth.disabled is true" }}
+            {{- end }}
             {{- if and .Values.auth.issuer (not (hasKey (default dict .Values.api.env) "OIDC_ISSUER")) }}
             - name: OIDC_ISSUER
               value: {{ .Values.auth.issuer | quote }}
@@ -145,7 +147,7 @@ spec:
           projected into the same directory, lowest precedence first. Filenames
           carry precedence (00-49 platform, 50-89 profile, 90-99 tenant), so any
           number of layers can coexist without the chart knowing which is which —
-          see docs/app-customization.md §2.2.
+          see docs/guides/app-customization.md §2.2.
         */}}
         {{- if and .Values.dropIns .Values.dropIns.enabled }}
         - name: dropins

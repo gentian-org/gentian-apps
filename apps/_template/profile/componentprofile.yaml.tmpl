@@ -1,24 +1,24 @@
-# ComponentProfile — the catalogue entry for a component of the platform itself.
+# ComponentProfile — the catalog entry for what this repository builds.
 #
-# Use this file instead of appprofile.yaml.tmpl when what this repo builds is a
-# component rather than a catalogue app: something the platform installs for
-# itself by creating a Component object that names this profile, not something a
-# tenant admin picks out of the app catalogue and gets through Tenant.spec.apps.
-# README.md and docs/AGENTS.md carry the full distinction; the operator's half of
-# it is that gentian-os reconciles a Component into a provider-helm Release plus
-# one Gateway API route and one Envoy SecurityPolicy per gateway exposure, while
-# an AppProfile goes through the tenant app path and its Crossplane composition.
+# One kind for every component: a catalog app a tenant's administrator installs
+# (listed in Tenant.spec.apps, which the operator turns into a Component in the
+# tenant's namespace) and a component the platform places into tenants itself
+# (spec.placement). The operator reconciles either into a provider-helm Release,
+# a NetworkPolicy derived from spec.requires, and one Gateway API route plus one
+# Envoy SecurityPolicy per gateway exposure. The practices behind every field
+# are gentian-apps docs/app-profile-guide.md; the field reference is gentian-os
+# docs/guides/custom-catalogs.md §4.1.
 #
 # Replace COMPONENT_ID and the chart coordinates before committing. The resource
 # is cluster-scoped, so metadata.name is the name every Component's profileRef
 # points at: renaming it later does not migrate anything, it orphans every
 # install, which then reports ProfileMissing and waits forever.
 #
-# Nothing here describes how the component looks. The CRD has no displayName,
-# description, icon or tile — presentation belongs to the store, outside the
-# cluster, and a field for it here would be a second place to maintain it and a
-# second place to disagree. If you came looking for spec.tile, that is an
-# AppProfile field and has no ComponentProfile equivalent.
+# The catalog listing -- name, summary, description, categories, links,
+# author, license, logo -- is the App Store's, kept in its own database outside
+# the cluster. The one piece of presentation here is the tile on an exposure
+# (spec.expose[].tile), because the portal has to show what the cluster routes
+# without asking the store.
 #
 # Nothing here grants anything either. Every permissive statement below is a
 # request; who answers it, and when, is recorded on the Component by a named
@@ -29,41 +29,62 @@ kind: ComponentProfile
 metadata:
   name: COMPONENT_ID
 spec:
-  # The modes this component is certified to run under, and a claim rather than
-  # a choice: the Component picks exactly one of them at install and admission
-  # rejects a mode that is not listed here. "tenant" is a dedicated release in
-  # tenant-<t> and is the only mode the operator reconciles today — a Component
-  # of any other tenancy reports TenancyUnsupported and does nothing. "shared"
-  # is one backend in shared-<app> serving several tenants and is refused unless
-  # trustTier is platform. "system" serves contracts to other components from
-  # system-<function>, serves no human, is exclusive (it may not appear next to
-  # another mode) and must declare no exposure at all.
-  tenancy: [tenant]
+  # Who this component serves, and therefore who is responsible for it. A
+  # claim rather than a choice: the Component picks exactly one of these at
+  # install and admission rejects one that is not listed here.
+  #
+  #   app         a dedicated release in tenant-<t>, serving the people of one
+  #               tenant. The only class the operator reconciles today — a
+  #               Component of any other reports ClassUnsupported and does
+  #               nothing.
+  #   shared-app  one backend in shared-<app> serving several tenants, each of
+  #               which still installs the app for itself. Refused unless
+  #               trustTier is platform.
+  #   service     serves other components over contracts, and operators at its
+  #               own console, from system-<function>. Exclusive: it may not
+  #               appear beside another class. It may expose a console, but
+  #               only on the gateway, and that console's tile asks on the
+  #               cluster.
+  classes: [app]
+
+  # How a person reaches this component. Required and undefaulted: an app
+  # nobody can open should be refused at admission, and "nothing opens this"
+  # has to be a word somebody wrote rather than a field they left out.
+  #
+  #   tile   at least one exposure below carries a tile. The usual answer.
+  #   from   another component opens it: Collabora from Nextcloud, a viewer
+  #          from a file manager.
+  #   none   nothing opens it — either it is the launcher itself, which is the
+  #          desktop and only the desktop, or it has no human surface at all,
+  #          which is a database.
+  launch: tile
 
   # The review level this entry has been through, required and undefaulted
   # because a trust tier is something a reviewer stated, not something that was
   # left out. Setting "platform" on an entry nobody reviewed at that depth is
-  # how a component ends up eligible for shared tenancy and for forwardToken,
+  # how a component ends up eligible for class shared-app and for forwardToken,
   # both of which are refused at any lower tier.
   trustTier: certified
 
-  # The version of this catalogue entry, not of the upstream project it
+  # The version of this catalog entry, not of the upstream project it
   # packages. Bump it when anything in this file changes, including a chart
   # version bump, so that what an install pinned can be told apart from what the
-  # catalogue now says.
+  # catalog now says.
   version: "0.1.0"
 
-  # Whether every tenant gets one of these without anybody declaring it. The
-  # operator creates a Component of this profile in each tenant, named after
-  # the profile, when the tenant is provisioned; the desktop is one such
-  # component and the administration console is another. Leave it off for a
-  # component a tenant installs on purpose. Only a tenant-tenancy profile may
-  # say it, since there is no tenant to give a shared component to.
-  # defaultForTenants: true
+  # Whether the platform places one of these into tenants without anybody
+  # installing it: the desktop and the administration console are placed into
+  # every tenant. Leave it out for a component a tenant installs on purpose.
+  # Only a profile of class app may say it: a service and a shared-app have one
+  # instance, so there is nothing to give each tenant.
+  # placement:
+  #   tenants: every          # every | platform | users
+  #   while: storeOffered     # optional: storeOffered | llm | credentialSet
 
-  # How the component is deployed. Exactly one of chart, compositionRef or
-  # apiIntegration must be present, and an entry with none of them is rejected
-  # at admission unless it is an addon riding on another component's base.
+  # What this component is made of, and it is exactly one thing: a chart, a
+  # composition, an api or an addon. Delivery — whether the platform runs the
+  # component, only routes to it, or does neither — is read from here rather
+  # than stated beside it, so there is no second field to contradict this one.
   package:
     # The chart the operator installs as a provider-helm Release in the
     # component's own namespace. All three fields are required. The version must
@@ -92,7 +113,12 @@ spec:
       platform:
         issuerKey: "auth.issuer"
         zoneClientIdKey: "auth.clientId"
-        audienceKey: "auth.audience"
+        # Not audienceKey: that is the audience the zone's own token carries,
+        # the director's, and is for a platform-trust component that is
+        # handed that token (forwardToken below). This component is handed a
+        # token made out to itself, and requires its own name as the
+        # audience: auth.audience in extraValues.
+        # audienceKey: "auth.audience"
         tenantKey: "platform.tenant"
         kernelDomainKey: "platform.kernelDomain"
         realmKey: "platform.realm"
@@ -190,6 +216,10 @@ spec:
       auth:
         disabled: false
         mode: edge
+        # What a token must be made out to for this API to accept it: this
+        # component's own name, which is the audience of the token the front
+        # door exchanges for it (exchangeToken on the api entry below).
+        audience: COMPONENT_ID
       gateway:
         enabled: false
       rbac:
@@ -201,28 +231,33 @@ spec:
           ENVIRONMENT: production
 
     # How the orchestrator delivers this entry. The component reconciler does
-    # not read it — it installs package.chart as a provider-helm Release and
-    # reports PackageUnsupported for anything else — so it is a statement of
-    # intent for now, and "api" is the value that marks an entry with no
-    # workload at all.
-    # deploymentMethod: crossplane
-
     # A Crossplane composition, for a component that is not one chart. Naming a
     # composition the cluster does not have leaves the install waiting on a
     # claim nothing reconciles, which looks like a slow install rather than a
-    # missing one.
-    # compositionRef: COMPONENT_ID-composition
+    # missing one. Delivery: workload.
+    # composition: COMPONENT_ID-composition
 
-    # A component that is an API client rather than a workload: no pods are
-    # created and the tenant is sent to an external origin instead. runtime
-    # chooses between redirecting the browser (redirect), a kernel API proxy
-    # (proxy, reserved) and a same-origin relay through the portal BFF
-    # (portal-proxy); tenantBinding chooses whether the tenant's effective
-    # domain is passed along at all.
-    # apiIntegration:
+    # A component the platform routes to rather than runs: no pods are created
+    # and the request is sent to an origin that is already serving. It does not
+    # mean external — the catalog's own example points at a Service inside
+    # the cluster. runtime chooses between redirecting the browser (redirect),
+    # a kernel API proxy (proxy, reserved and not built) and a same-origin
+    # relay through the desktop's BFF (portal-proxy); tenantBinding chooses
+    # whether the tenant's effective domain is passed along.
+    # Delivery: api.
+    # api:
     #   runtime: redirect
     #   baseUrl: "https://example.gentian.org"
     #   tenantBinding: tenant-domain
+
+    # A component the platform does not deploy at all: it flips a switch inside
+    # another component's own addon system. id is what that component calls it
+    # — an Odoo module name, a Nextcloud app id — and of names the profile it
+    # activates into. An addon's exposure routes into its base, so its backend
+    # names that component. Delivery: addon.
+    # addon:
+    #   id: richdocuments
+    #   of: nextcloud-base-ce
 
   # What the platform owes this component before it may run. An unmet
   # requirement is the platform's fault, not the tenant's: the operator holds
@@ -230,7 +265,10 @@ spec:
   # and the component's NetworkPolicy is written from this block, so a store the
   # component uses but does not declare here is a connection Calico refuses.
   requires:
-    contracts:
+    # What the platform must fulfill before this component runs. Each is
+    # fulfilled by a system engine, or by something outside the cluster
+    # entirely — a mail relay, a bucket at a cloud provider.
+    services:
       # The OIDC client the platform registers in the tenant's realm. Declare it
       # only for a component that runs its own login; one that lives behind a
       # gateway exposure with authMode oidc already has a session and does not
@@ -250,7 +288,16 @@ spec:
       #       - "https://COMPONENT_ID.${TENANT_DOMAIN}/oauth/callback"
       #     postLogoutRedirectUris:
       #       - "https://COMPONENT_ID.${TENANT_DOMAIN}/"
-      #     backchannelLogoutUrl: "https://COMPONENT_ID.${TENANT_DOMAIN}/logout/backchannel"
+      #     Where the app is told that a person signed out, if it can be: a
+      #     path, and the entry (spec.expose) whose backend serves it. The
+      #     platform builds the address -- that entry's own Service, inside
+      #     the cluster -- and a profile states none. Declare it only for an
+      #     app that checks the logout token (signature, issuer, audience,
+      #     event) before it ends a session, and say in the profile's
+      #     Customization record what it checks.
+      #     backchannelLogout:
+      #       exposure: web
+      #       path: /logout/backchannel
       #     Enables the password grant, which hands a component the user's
       #     credentials directly. Leave it off unless a CLI really needs it.
       #     directAccessGrantsEnabled: false
@@ -272,10 +319,11 @@ spec:
       database:
         # postgresql or mariadb.
         engine: postgresql
-        # A database of this component's own per tenant, which is what a
-        # component storing its own state wants. Setting it false puts every
-        # tenant in one schema and makes isolation the component's problem.
-        databasePerTenant: true
+        # Each tenant's install gets a database of its own, always.
+        # The most connections the component's account may hold at once on
+        # the shared server: 25 unless set here, at most 100. Raise it only
+        # for a component whose pools need more.
+        # connectionLimit: 25
         # Lets the component create databases at runtime. Ask for it only when
         # creating databases is what the component is for; a component that
         # merely stores its own state must not, because the grant it needs is
@@ -294,8 +342,7 @@ spec:
       # component that asks for write and only reads has widened the blast
       # radius of its own credential for nothing.
       # storage:
-      #   s3:
-      #     bucketPerTenant: true
+      #   s3: {}
       #   files:
       #     protocol: webdav
       #     capabilities: [read]
@@ -358,7 +405,7 @@ spec:
     #         ports:
     #           - protocol: TCP
     #             port: 443
-    #       reason: "The component synchronises with the vendor's hosted API, which publishes no fixed address range."
+    #       reason: "The component synchronizes with the vendor's hosted API, which publishes no fixed address range."
     #   # Kubernetes API access for the component's ServiceAccount. The rarest
     #   # request of the three: a component that needs the API is most of the
     #   # way to being a controller, and should usually be one instead.
@@ -408,9 +455,10 @@ spec:
     derived:
       - key: SESSION_SECRET_KEY
 
-  # The entry points this component has. Forbidden entirely for system tenancy,
-  # and every entry states its authMode because there is no default to fall back
-  # on. The operator renders one HTTPRoute per gateway entry in the component's
+  # The entry points this component has. A service may have them — a console
+  # is not a contract surface — but only on the gateway, since the perimeter
+  # has no session. Every entry states its authMode because there is no
+  # default to fall back on. The operator renders one HTTPRoute per gateway entry in the component's
   # namespace and one SecurityPolicy over all of the oidc ones, so two entries
   # on one host share a single session — which is why forwardToken below is
   # effectively the component's and not the entry's.
@@ -423,8 +471,7 @@ spec:
       # gateway is the authenticated tenant gateway and is always on: the entry
       # carries the session. perimeter is a publishing proxy in tenant-<t>-dmz
       # with a credential of its own, and is off until a perimeter approver
-      # enables it on the Component — the operator skips perimeter entries
-      # today, so one declared here routes nowhere yet.
+      # enables it on the Component.
       surface: gateway
       # oidc puts the edge session in front of this entry. The other values —
       # jwt, bearer, basic, signature, none — say what the backend itself
@@ -440,32 +487,21 @@ spec:
       paths: ["/api", "/healthz", "/readyz"]
       # Paths refused even where paths admits them, with deny winning
       # regardless of specificity so that a broad allow with narrow denials
-      # stays readable. The component reconciler does not render these yet, so
-      # today they document an intent the edge does not enforce — do not rely
-      # on one to keep an administrative path off the internet.
+      # stays readable; enforced at the front door for every method.
       # denyPaths: ["/api/internal"]
-      # Removes the matched prefix before the request reaches the backend. Also
-      # not rendered by the component reconciler yet, so a backend that needs it
-      # will currently see the full path.
-      # stripPrefix: false
-      # Pins who may call this entry, before authMode is even considered, and is
-      # evaluated at the proxy rather than in the component. Exactly one form:
-      # component names another installed component whose pods may call, and is
-      # preferred because a CIDR list ages badly. Not rendered by the component
-      # reconciler yet either.
-      # source:
-      #   component: other-component
-      # The other form, which replaces component and is never written beside
-      # it, is the list of ranges admitted once the edge has resolved the real
-      # client IP:
-      # source:
-      #   cidrs: ["203.0.113.0/24"]
-      # Asks the gateway to hand the edge access token to this backend. Without
-      # it a backend gets identity headers, which is what most components
-      # should want: the edge token is also valid at the director and at every
-      # sibling, so forwarding it turns one compromised backend into all of
-      # them. It requires trustTier platform, and it is meaningless on a
-      # perimeter entry, which has no session.
+      # Asks the front door for a token of the signed-in person that is valid
+      # at this component and nowhere else. It exchanges the session's token
+      # at the tenant's realm for one whose audience is this component's name,
+      # and every request arrives with it as its bearer. The API verifies it
+      # (backend/app/core/auth.py) and takes nothing else for who is asking:
+      # not a header, which anything that reached the pod could have set.
+      exchangeToken: true
+      # The other way to be told, and not both: the session's own token,
+      # handed on as it is. That token is also valid at the director and at
+      # every sibling, so forwarding it turns one compromised backend into all
+      # of them. It is for a component that relays the caller's token to the
+      # director, requires trustTier platform, and then takes audienceKey
+      # above in place of auth.audience.
       # forwardToken: false
       # The Service this entry routes to, in the component's own namespace. The
       # name is the one the chart actually creates: <fullnameOverride>-api,
@@ -473,6 +509,11 @@ spec:
       # before the release exists. A typo here produces a route whose backend
       # never resolves, and a 500 at the edge rather than anything that names
       # this profile.
+      # The Service this entry routes to. It defaults to this component's own
+      # namespace; `component: <other>` routes into another component's
+      # instead, which is what an addon's tile needs — an addon has no Service
+      # of its own and points into its base. Admission bounds it to a
+      # component this one is already bound to.
       backend:
         service: COMPONENT_ID-api
         port: 8000
@@ -487,25 +528,42 @@ spec:
         service: COMPONENT_ID-web
         port: 8080
       # How this component appears on the portal, and who may open it. Without
-      # a tile the component is routed but never shown. The relation is a
+      # a tile the component is routed but never shown, which is why `launch`
+      # above has to say so. The relation is a
       # permission of the authorization model, asked per caller by the
       # director before the tile is put on their page; "on" says which object
       # it is asked on. app, the default, is this component's own app object,
       # where using an installed app is decided. A component that exists to
       # administer the tenant it runs in asks on the tenant instead, which is
       # where administering is decided: object: tenant, relation: can_administer.
+      # A service's console asks on the cluster instead, where the relations
+      # that govern one live: object: cluster, relation: can_operate_system.
       tile:
         displayName: "My Gentian Component"
+        # displayNames are translations of the label, keyed by locale. The
+        # fallback above is what a viewer whose language is not here sees, so
+        # a component with one language needs nothing else.
+        # displayNames:
+        #   de_DE: "Meine Gentian-Komponente"
         description: "What this component does, in a sentence for the person using it."
-        icon: app
+        # The tile's picture: a 128x128 PNG, inline. `image` names the file a
+        # reviewer reads; `logo` is what the cluster reads, and
+        # scripts/sync-profile-tile.py writes it from that file. The default
+        # is a platform glyph on the neutral square, drawn by
+        # scripts/render-default-tile.py <glyph> assets/tile.png -- pick the
+        # glyph that says what the component is, redraw, re-run the sync.
+        # The app's own logo is the App Store's to show.
+        image: assets/tile.png
+        logo: "data:image/png;base64,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"
         relation: can_launch
         # object: app
 
-  # Caps the component's own session, for a component that runs its own login.
-  # The edge bounds how long a request is let through; it does not refresh the
-  # groups the component captured at its own login, so this and not the access
-  # token's lifetime is what bounds what a user may still do inside the
-  # component after their rights change.
+  # Caps, at the realm, how long a sign-in through the component's OIDC
+  # clients lasts: past that age the realm refuses their refresh, so the
+  # component cannot renew its tokens without a new sign-in, which reads the
+  # person's groups again. It does not end a session the component keeps in
+  # its own cookie; a component that never goes back to the realm keeps that
+  # session as long as it allows.
   # sessionMaxAge: 8h
 
   # Containers shipped inside this component's own pod. It is the only escape
@@ -620,14 +678,6 @@ spec:
   #     post:
   #       - ["/usr/local/bin/component", "reindex"]
   #     verify: ["/usr/local/bin/component", "healthcheck"]
-  #   # Whether every store must be captured inside one quiesce window. app is
-  #   # the default and the right answer whenever the stores reference each
-  #   # other; perStore is only for a component whose stores do not.
-  #   consistency: app
-  #   # Refuses to restore a copy into a component older than this, expressed as
-  #   # the version the chart deploys. Older data into a newer component just
-  #   # runs the migrations; the reverse corrupts silently.
-  #   minRestoreVersion: "0.1.0"
 
   # What a tenant may change about this component without forking it — the
   # Gentian customization ladder, declared so that a human or an agent can pick
@@ -637,7 +687,7 @@ spec:
   customization:
     # The summary of the rubric score below. CI checks that the two agree —
     # A needs 7 or more, B is 5 to 6, C is 3 to 4, D is 2 or less — so an
-    # optimistic grade fails the catalogue build rather than misleading anyone.
+    # optimistic grade fails the catalog build rather than misleading anyone.
     grade: A
     rubricScore: 7
     # The rungs this component can be customized at. L2 must not be listed: a
@@ -654,7 +704,7 @@ spec:
     # L1, directories the component already treats as extension points. Content
     # is parsed at admission so a malformed fragment fails there rather than at
     # boot. upstreamDocumented false means the path is really L4 — upstream has
-    # promised nothing about it surviving a reorganisation — and tenantEditable
+    # promised nothing about it surviving a reorganization — and tenantEditable
     # decides whether tenant admins may write here at all, which a policy file
     # usually must not allow.
     dropIns:
@@ -711,14 +761,11 @@ spec:
       upstream: ""
       owner: ""
       cveWatch: false
-    # The three addon fields below turn this profile into part of somebody
-    # else's component. addon says this entry is not deployable on its own but
-    # activates into the base named by "of", using the id the base's own addon
-    # system knows it by — an Odoo module name, a Nextcloud app id — which is
-    # what keeps per-component parsing out of the reconciler.
-    # addon:
-    #   id: COMPONENT_ID
-    #   of: some-base-component
+    # Saying this entry IS an addon is package.addon, above, not here: it is
+    # what the platform delivers rather than how changeable the component is,
+    # and having it here is why the package's one-of rule used to reach out of
+    # package to finish itself.
+    #
     # addonActivation and addonValues are the base's side of the same
     # relationship and belong on the base profile, never on the addon.
     # Activation renders a script at a values path with __GENTIAN_ADDON_IDS__

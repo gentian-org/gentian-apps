@@ -1,11 +1,9 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: app-element
+  name: app-element-ce
   labels:
-    gentianos.io/composition: app
-    gentianos.io/profile: element-ce
-    gentianos.io/app-variant: element-ce
+    gentianos.io/profile-name: element-ce
 spec:
   compositeTypeRef:
     apiVersion: gentianos.io/v1alpha1
@@ -13,7 +11,7 @@ spec:
   mode: Pipeline
   pipeline:
 
-    # ── Step 1: Fetch AppProfile + kernel/cluster ConfigMaps ──────────────────
+    # ── Step 1: Fetch ComponentProfile + kernel/cluster ConfigMaps ──────────────────
     - step: fetch-extra-resources
       functionRef:
         name: function-extra-resources
@@ -22,8 +20,8 @@ spec:
         kind: Input
         spec:
           extraResources:
-            - kind: AppProfile
-              into: appProfile
+            - kind: ComponentProfile
+              into: componentProfile
               apiVersion: gentianos.io/v1alpha1
               type: Selector
               selector:
@@ -65,17 +63,6 @@ spec:
                     type: FromCompositeFieldPath
                     valueFromFieldPath: spec.profileRef.name
             - kind: ConfigMap
-              into: jitsiOidcOverlays
-              apiVersion: v1
-              type: Selector
-              selector:
-                maxMatch: 1
-                minMatch: 0
-                matchLabels:
-                  - key: gentianos.io/config-type
-                    type: Value
-                    value: jitsi-oidc-overlays
-            - kind: ConfigMap
               into: platformSecurity
               apiVersion: v1
               type: Selector
@@ -105,27 +92,26 @@ spec:
             {{- $tenant := trimPrefix "tenant-" $ns }}
 
             {{- $extraRes  := index .context "apiextensions.crossplane.io/extra-resources" }}
-            {{- $profiles  := dig "appProfile" list $extraRes }}
+            {{- $profiles  := dig "componentProfile" list $extraRes }}
             {{- if eq (len $profiles) 0 }}
-              {{- fail (printf "AppProfile %q not found in cluster" $spec.profileRef.name) }}
+              {{- fail (printf "ComponentProfile %q not found in cluster" $spec.profileRef.name) }}
             {{- end }}
             {{- $profile   := index $profiles 0 }}
             {{- $pSpec     := dig "spec" dict $profile }}
-            {{- $vm        := default dict $pSpec.valueMapping }}
-            {{- $appSecrets := default list $pSpec.appSecrets }}
-            {{- $chart     := $pSpec.chart }}
+            {{- $package   := dig "package" dict $pSpec }}
+            {{- $vm        := dig "valueMapping" dict $package }}
+            {{- $appSecrets := dig "secrets" "generated" list $pSpec }}
+            {{- $chart     := dig "chart" nil $package }}
 
             {{- $ccRes      := dig "clusterConfig" list $extraRes }}
             {{- $ccCM       := default dict (index $ccRes 0) }}
             {{- $ccData     := dig "data" dict $ccCM }}
-            {{- $jitsiOidcOverlaysRes := dig "jitsiOidcOverlays" list $extraRes }}
-            {{- $jitsiOverlayCM := default dict (index $jitsiOidcOverlaysRes 0) }}
-            {{- $jitsiOverlayData := dig "data" dict $jitsiOverlayCM }}
-            {{- $secretMode    := dig "secretMode"     "derived" $ccData }}
-            {{- $cnpgHost      := dig "cnpg.host"      "" $ccData }}
+            {{- /* The namespace Crossplane and its providers run in, taken from
+                 where the cluster composition put gentian-cluster-config: v4
+                 named crossplane-system here, which a v5 cluster does not have. */}}
+            {{- $provNs     := dig "metadata" "namespace" "kernel-provisioning" $ccCM }}
             {{- $nodeIP        := dig "node.ip"        "" $ccData }}
-            {{- $appInitImage  := dig "appInit.image"  "ghcr.io/gentian-org/gentian-app-init:develop" $ccData }}
-            {{- $kr            := default dict $pSpec.kernelRequirements }}
+            {{- $kr            := dig "requires" "services" dict $pSpec }}
             {{- $identity      := default dict $kr.identity }}
             {{- $oidcPackDefaultScopes := dict }}
             {{- $oidcPackFullScopeAllowed := dict }}
@@ -211,62 +197,6 @@ spec:
             {{- end }}
             {{- end }}
 
-            {{- /* ── Emit OpenBao KV seeders for app-internal secrets ────────── */}}
-            {{- range $s := $appSecrets }}
-            {{- if and $s.name $s.valuePath }}
-            {{- $safeName := $s.name | replace "_" "-" }}
-            {{- $seedName := printf "%s-%s-seed" $xrName $safeName }}
-            {{- $kvPath   := printf "gentian-os/tenants/%s/apps/%s/internal/%s" $tenant $app $s.name }}
-            {{- $seedVal  := sha256sum (printf "%s:%s:%s" $xrName $app $s.name) }}
-            ---
-            apiVersion: kubernetes.crossplane.io/v1alpha2
-            kind: Object
-            metadata:
-              annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $safeName }}-seed-secret
-              name: {{ $seedName }}
-            spec:
-              forProvider:
-                manifest:
-                  apiVersion: v1
-                  kind: Secret
-                  metadata:
-                    name: {{ $seedName }}
-                    namespace: crossplane-system
-                  type: Opaque
-                  stringData:
-                    data.json: '{"value":"{{ $seedVal }}"}'
-              providerConfigRef:
-                name: kubernetes
-            ---
-            apiVersion: kv.vault.upbound.io/v1alpha1
-            kind: SecretV2
-            metadata:
-              annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-{{ $safeName }}-kv
-                # Identify this resource by its KV path, not by the install that
-                # created it: without an external-name the provider sees no
-                # existing resource and Creates, overwriting a secret the app's
-                # database is still hashed against. Mirrors app-default.
-                crossplane.io/external-name: secret/data/{{ $kvPath }}
-              name: {{ $seedName }}-kv
-            spec:
-              deletionPolicy: Orphan
-              managementPolicies:
-                - Observe
-                - Create
-              forProvider:
-                mount: secret
-                name: {{ $kvPath }}
-                dataJsonSecretRef:
-                  name: {{ $seedName }}
-                  namespace: crossplane-system
-                  key: data.json
-              providerConfigRef:
-                name: openbao
-            {{- end }}
-            {{- end }}
-
             {{- /* ── Set up Helm Release / Deployment values mapping ── */}}
             {{- $extraVals    := default dict $spec.parameters.extraValues }}
             {{- $imagePull    := list (dict "name" "registry-credentials") }}
@@ -314,10 +244,36 @@ spec:
             {{- end }}
             {{- end }}
 
+            {{- /* Mail is optional: a cluster without the relay's credentials
+                   leaves them empty, and provider-helm refuses an empty --set
+                   value, which would keep the whole app from installing. So
+                   the SMTP values do not go through set. The ExternalSecret
+                   writes each one, when it is not empty, as a values document
+                   of its own (values-smtp-*), and the Release reads those as
+                   optional valuesFrom: an empty credential is simply not set,
+                   the app installs and sends no mail, and the value reaches
+                   it on the next sync once it exists. Mirrors app-default. */}}
+            {{- $relValuesFrom := list }}
+            {{- $esTemplate := dict }}
             {{- if $vm.smtp }}
-            {{- if $vm.smtp.passwordKey }}
-            {{- $relSet = append $relSet (dict "name" $vm.smtp.passwordKey
-                "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" "smtp-password"))) }}
+            {{- $optional := list
+                (dict "path" $vm.smtp.hostKey "key" "smtp-host" "raw" false)
+                (dict "path" $vm.smtp.portKey "key" "smtp-port" "raw" true)
+                (dict "path" $vm.smtp.userKey "key" "smtp-user" "raw" false)
+                (dict "path" $vm.smtp.passwordKey "key" "smtp-password" "raw" false) }}
+            {{- range $o := $optional }}
+            {{- if $o.path }}
+            {{- $head := "" }}
+            {{- $tail := "" }}
+            {{- range $part := splitList "." $o.path }}
+            {{- $head = printf "%s{%s:" $head (toJson $part) }}
+            {{- $tail = printf "%s}" $tail }}
+            {{- end }}
+            {{- $value := ternary " . " " . | toJson " $o.raw }}
+            {{- $docKey := printf "values-%s" $o.key }}
+            {{- $esTemplate = set $esTemplate $docKey (printf "%s with index . %q %s%s%s%s%s%s%s end %s" "{{" $o.key "}}" $head "{{" $value "}}" $tail "{{" "}}") }}
+            {{- $relValuesFrom = append $relValuesFrom (dict "secretKeyRef" (dict "name" $secretName "namespace" $ns "key" $docKey "optional" true)) }}
+            {{- end }}
             {{- end }}
             {{- end }}
 
@@ -349,13 +305,22 @@ spec:
                     namespace: {{ $ns }}
                   spec:
                     refreshInterval: 1h
+                    {{- /* The tenant's own store: the kernel's is not usable
+                         from a tenant's namespace. */}}
                     secretStoreRef:
                       kind: ClusterSecretStore
-                      name: openbao
+                      name: openbao-tenant-{{ $tenant }}
                     target:
                       name: {{ $secretName }}
                       creationPolicy: Owner
                       deletionPolicy: Retain
+                      {{- if gt (len $esTemplate) 0 }}
+                      template:
+                        engineVersion: v2
+                        mergePolicy: Merge
+                        data:
+                          {{ toYaml $esTemplate | nindent 26 }}
+                      {{- end }}
                     data:
                       {{ toYaml $esData | nindent 22 }}
               providerConfigRef:
@@ -395,8 +360,6 @@ spec:
                           "preferred_domain": "meet.jit.si"
                         }
                       }
-                  binaryData:
-                    gentian-portal-sso.html: {{ index $jitsiOverlayData "gentian-portal-sso.html" | default "" | b64enc | quote }}
               providerConfigRef:
                 name: kubernetes
 
@@ -458,9 +421,6 @@ spec:
                               - name: config
                                 mountPath: /app/config.json
                                 subPath: config.json
-                              - name: config
-                                mountPath: /app/gentian-portal-sso.html
-                                subPath: gentian-portal-sso.html
                               - name: cache
                                 mountPath: /var/cache/nginx
                               - name: run
@@ -558,9 +518,6 @@ spec:
                     (dict "name" "AUTHLIB_INSECURE_TRANSPORT" "value" "1")
                     (dict "name" "OAUTHLIB_INSECURE_TRANSPORT" "value" "1")
                   )
-                  "extraCommands" (list
-                    (printf "(python -c \"import socket, time; any(socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex(('127.0.0.1', 8008)) == 0 or time.sleep(1) for _ in range(300))\" && register_new_matrix_user -c /synapse/config/homeserver.yaml -c /synapse/config/conf.d/secrets.yaml -u gentian-portal-bridge -p \"portal-bridge-not-used-for-login\" -a || true) &")
-                  )
                   "resources" (dict
                     "limits" (dict "cpu" "1" "memory" "2Gi")
                     "requests" (dict "cpu" "250m" "memory" "512Mi")
@@ -634,193 +591,23 @@ spec:
                   version: "3.12.30"
                 namespace: {{ $ns }}
                 wait: false
+                # The tenant's namespace exists, and the account the release
+                # is installed as may not create one.
+                skipCreateNamespace: true
                 values:
                   {{ toYaml $synapseVals | nindent 18 }}
+                {{- if gt (len $relValuesFrom) 0 }}
+                valuesFrom:
+                  {{ toYaml $relValuesFrom | nindent 18 }}
+                {{- end }}
                 {{- if gt (len $relSet) 0 }}
                 set:
                   {{ toYaml $relSet | nindent 18 }}
                 {{- end }}
+              # A tenant's chart is installed as the narrow account, not as the
+              # kernel's cluster-admin one (gentian-os provider-configs.yaml).
               providerConfigRef:
-                name: kubernetes
-
-            {{- /* ── Emit database-init resources (when AppProfile requires database.databasePerTenant ── */}}
-            {{- $dbRequirements := default dict $kr.database }}
-            {{- if and $dbRequirements.databasePerTenant (eq (default "" $dbRequirements.engine) "postgresql") $cnpgHost }}
-            ---
-            apiVersion: kubernetes.crossplane.io/v1alpha2
-            kind: Object
-            metadata:
-              annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-db-init-sa
-              name: {{ $xrName }}-db-init-sa
-            spec:
-              forProvider:
-                manifest:
-                  apiVersion: v1
-                  kind: ServiceAccount
-                  metadata:
-                    name: app-init
-                    namespace: {{ $ns }}
-              providerConfigRef:
-                name: kubernetes
-            ---
-            apiVersion: kubernetes.crossplane.io/v1alpha2
-            kind: Object
-            metadata:
-              annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-db-init-cm
-              name: {{ $xrName }}-db-init-cm
-            spec:
-              forProvider:
-                manifest:
-                  apiVersion: v1
-                  kind: ConfigMap
-                  metadata:
-                    name: {{ $app }}-db-init
-                    namespace: {{ $ns }}
-                  data:
-                    init.sh: |
-                      #!/bin/sh
-                      set -eu
-                      JWT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-                      BAO_TOKEN=$(curl -k -sf "${BAO_ADDR}/v1/auth/kubernetes/login" \
-                        -H 'Content-Type: application/json' \
-                        -d "{\"role\":\"app-init\",\"jwt\":\"${JWT}\"}" \
-                        | jq -r '.auth.client_token')
-                      EXISTING=$(curl -k -sf \
-                        -H "X-Vault-Token: ${BAO_TOKEN}" \
-                        "${BAO_ADDR}/v1/secret/data/gentian-os/tenants/${TENANT}/apps/${APP}/database" \
-                        2>/dev/null || echo '{}')
-                      CNPG=$(curl -k -sf \
-                        -H "X-Vault-Token: ${BAO_TOKEN}" \
-                        "${BAO_ADDR}/v1/secret/data/gentian-os/kernel/database/cnpg")
-                      SU_USER=$(echo "${CNPG}" | jq -r '.data.data.superuser_username')
-                      SU_PASS=$(echo "${CNPG}" | jq -r '.data.data.superuser_password')
-                      ROLE=$(printf '%s_%s' "${TENANT}" "${APP}" | tr '-' '_')
-                      DBNAME="${ROLE}"
-                      export PGPASSWORD="${SU_PASS}"
-                      SKIP_BAO_WRITE=false
-                      if echo "${EXISTING}" | jq -e '.data.data.password' >/dev/null 2>&1; then
-                        PASSWORD=$(echo "${EXISTING}" | jq -r '.data.data.password')
-                        ROLE_EXISTS=$(psql -h "${CNPG_HOST}" -U "${SU_USER}" -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = '${ROLE}'" 2>/dev/null || echo "")
-                        if [ "${ROLE_EXISTS}" = "1" ]; then
-                          echo "[db-init] credential and Postgres role present for ${TENANT}/${APP} — skipping"
-                          exit 0
-                        fi
-                        echo "[db-init] OpenBao credential present but Postgres role missing — reconciling"
-                        SKIP_BAO_WRITE=true
-                      elif [ "${SECRET_MODE}" = "random" ]; then
-                        PASSWORD=$(openssl rand -hex 32)
-                      else
-                        MASTER=$(curl -k -sf \
-                          -H "X-Vault-Token: ${BAO_TOKEN}" \
-                          "${BAO_ADDR}/v1/secret/data/gentian-os/kernel/internal/master-password" \
-                          | jq -r '.data.data.value')
-                        PASSWORD=$(printf '%s:%s:database' "${TENANT}" "${APP}" \
-                          | openssl dgst -sha256 -hmac "${MASTER}" | awk '{print $2}')
-                      fi
-                      psql -h "${CNPG_HOST}" -U "${SU_USER}" -d postgres -v ON_ERROR_STOP=1 <<SQL
-                      DO \$\$
-                      BEGIN
-                        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${ROLE}') THEN
-                          CREATE ROLE "${ROLE}" WITH LOGIN PASSWORD '${PASSWORD}';
-                        ELSE
-                          ALTER ROLE "${ROLE}" WITH PASSWORD '${PASSWORD}';
-                        END IF;
-                      END \$\$;
-                      SQL
-                      psql -h "${CNPG_HOST}" -U "${SU_USER}" -d postgres -v ON_ERROR_STOP=1 \
-                        -c "SELECT 'CREATE DATABASE \"${DBNAME}\" OWNER \"${ROLE}\"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${DBNAME}')" \
-                        | grep -q 'CREATE DATABASE' \
-                        && psql -h "${CNPG_HOST}" -U "${SU_USER}" -d postgres \
-                             -c "CREATE DATABASE \"${DBNAME}\" OWNER \"${ROLE}\"" || true
-                      psql -h "${CNPG_HOST}" -U "${SU_USER}" -d "${DBNAME}" -v ON_ERROR_STOP=1 \
-                        -c "CREATE SCHEMA IF NOT EXISTS \"${DBNAME}\" AUTHORIZATION \"${ROLE}\";"
-                      psql -h "${CNPG_HOST}" -U "${SU_USER}" -d "${DBNAME}" -v ON_ERROR_STOP=1 \
-                        -c "GRANT ALL ON SCHEMA \"${DBNAME}\" TO \"${ROLE}\";"
-                      psql -h "${CNPG_HOST}" -U "${SU_USER}" -d postgres -v ON_ERROR_STOP=1 \
-                        -c "ALTER ROLE \"${ROLE}\" SET search_path TO \"${DBNAME}\", public;"
-                      echo "[db-init] role ${ROLE}, database ${DBNAME}, and schema ${DBNAME} ensured"
-                      if [ "${SKIP_BAO_WRITE}" != "true" ]; then
-                        curl -k -sf \
-                          -H "X-Vault-Token: ${BAO_TOKEN}" \
-                          -H 'Content-Type: application/json' \
-                          -X POST \
-                          -d "{\"data\":{\"host\":\"${CNPG_HOST}\",\"port\":\"5432\",\"name\":\"${DBNAME}\",\"user\":\"${ROLE}\",\"password\":\"${PASSWORD}\"}}" \
-                          "${BAO_ADDR}/v1/secret/data/gentian-os/tenants/${TENANT}/apps/${APP}/database"
-                        echo "[db-init] OpenBao credential written for ${TENANT}/${APP}"
-                      fi
-              providerConfigRef:
-                name: kubernetes
-            ---
-            apiVersion: kubernetes.crossplane.io/v1alpha2
-            kind: Object
-            metadata:
-              annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ $app }}-db-init-job
-              name: {{ $xrName }}-db-init-job
-            spec:
-              forProvider:
-                manifest:
-                  apiVersion: batch/v1
-                  kind: Job
-                  metadata:
-                    name: {{ $app }}-db-init
-                    namespace: {{ $ns }}
-                    labels:
-                      app.kubernetes.io/managed-by: gentian-os
-                      gentianos.io/tenant: {{ $tenant }}
-                      gentianos.io/app: {{ $app }}
-                  spec:
-                    ttlSecondsAfterFinished: 600
-                    backoffLimit: 10
-                    template:
-                      metadata:
-                        labels:
-                          app.kubernetes.io/managed-by: gentian-os
-                          gentianos.io/tenant: {{ $tenant }}
-                          gentianos.io/app: {{ $app }}
-                          gentianos.io/component: app-init
-                      spec:
-                        serviceAccountName: app-init
-                        restartPolicy: OnFailure
-                        securityContext:
-                          seccompProfile:
-                            type: RuntimeDefault
-                        volumes:
-                          - name: scripts
-                            configMap:
-                              name: {{ $app }}-db-init
-                        containers:
-                          - name: database-init
-                            image: {{ $appInitImage | quote }}
-                            securityContext:
-                              allowPrivilegeEscalation: false
-                              capabilities:
-                                drop:
-                                  - ALL
-                              seccompProfile:
-                                type: RuntimeDefault
-                            command:
-                              - /bin/sh
-                              - /scripts/init.sh
-                            volumeMounts:
-                              - name: scripts
-                                mountPath: /scripts
-                            env:
-                              - name: TENANT
-                                value: {{ $tenant }}
-                              - name: APP
-                                value: {{ $app }}
-                              - name: BAO_ADDR
-                                value: "https://openbao.openbao.svc.cluster.local:8200"
-                              - name: CNPG_HOST
-                                value: {{ $cnpgHost | quote }}
-                              - name: SECRET_MODE
-                                value: {{ $secretMode | quote }}
-              providerConfigRef:
-                name: kubernetes
-            {{- end }}
+                name: tenant-apps
 
     # ── Step 3: Mark XR Ready when all composed resources are Ready ───────────
     - step: automatically-detect-ready-composed-resources

@@ -1,29 +1,69 @@
 #!/usr/bin/env python3
-"""Check that profiles request the image tag CI actually builds.
+"""Check that every image a profile names exists, and that an image built here
+is asked for at the tag this repository builds.
 
 Each images/<name>/versions.env pins an IMAGE_TAG, and CI pushes
 ghcr.io/gentian-org/<name>:$IMAGE_TAG. A profile naming any other tag either
 pulls a stale image or fails to pull at all — and a stale one is worse, because
-everything reports healthy while the container is simply the wrong build.
+everything reports healthy while the container is simply the wrong build. That
+is what happened to Nextcloud: collapsing four bundle images into one left the
+profile asking for the old "33.0.6-base-gentian5", so no addon could be enabled.
+And a profile renamed to its edition (xwiki -> xwiki-ce) asked for
+ghcr.io/gentian-org/xwiki-ce, which nothing builds.
 
-That is exactly what happened to Nextcloud. The old multi-target build tagged
-per bundle (33.0.6-base-gentian5, -office-, -officeplus-, -suite-). Collapsing to
-a single image left the profile still asking for "33.0.6-base-gentian5", so the
-tenant ran the pre-conversion image: no addons staged in custom_apps, and
-therefore no addon could ever be enabled.
+Where a profile names images:
 
-Only images built in this repo are checked; upstream images are out of scope.
+  spec.package.extraValues, spec.extensions[].extraValues
+      any `image` value, at any depth: a full reference as a string, or a map
+      in one of the shapes charts use — {name, tag} (name is the full
+      reference: XWiki), {repository, tag} (repository carries the registry),
+      {registry, repository, tag}. A map that leaves the repository to the
+      chart ({tag: ...} alone: Open WebUI) is completed from the chart's own
+      values.yaml at the same path.
+  anywhere else in spec (hooks, provisioning Jobs, ...)
+      any `image` string. spec.expose[].tile.image is a picture, not an image.
+
+What is checked:
+
+  ghcr.io/gentian-org/<name>   CI must build <name> (a ref in
+      .github/workflows/apps-ci.yaml). If images/<name>/versions.env pins an
+      IMAGE_TAG, the tag must be it -- or, on develop, a develop-<sha7> build
+      -- and on develop the registry must hold it: IMAGE_TAG is there only
+      once a release has published it. Otherwise the registry must hold the
+      tag.
+
+A build of develop publishes an image only as develop-<sha7>; its IMAGE_TAG is
+published by the release from main (docs/releasing.md). A develop profile
+asking for IMAGE_TAG therefore asked for an image nobody could pull until the
+next release: Nextcloud's 33.0.6-gentian7 sat in ImagePullBackOff, and its
+Helm install with it. So on develop a profile names the develop build, as it
+names a chart's -develop.<sha7>; --released (a pull request into main, or main
+itself) refuses a develop tag and asks for IMAGE_TAG again.
+  any other image              the registry must hold a manifest for it, asked
+      anonymously as a cluster without pull secrets would. Docker Hub, which
+      answers an unknown repository with 401, is asked through its own API.
+
+A definite "not there" fails. A registry that cannot be reached, rate-limits,
+or wants credentials before it says anything is a warning: an outage must not
+fail a pull request, and a private registry cannot be checked without its
+credentials. VALIDATE_OFFLINE=1 skips the network.
 """
 
 from __future__ import annotations
 
+import argparse
 import pathlib
+import re
 import sys
 
 import yaml
 
+from _artefacts import FOUND, MISSING, OFFLINE, chart_uses, helm_chart_values, image_exists, parse_image
+
 REPO = pathlib.Path(__file__).resolve().parent.parent
-ORG = "gentian-org"
+OWN = "ghcr.io/gentian-org/"
+WORKFLOW = REPO / ".github/workflows/apps-ci.yaml"
+DEVELOP = re.compile(r"^develop-[0-9a-f]{7}$")
 
 
 def built_tags() -> dict[str, str]:
@@ -37,43 +77,197 @@ def built_tags() -> dict[str, str]:
     return tags
 
 
+def images_ci_builds() -> set[str]:
+    """Every <name> CI pushes as ${REGISTRY}/${IMAGE_ORG}/<name>:<tag>."""
+    text = WORKFLOW.read_text()
+    return set(re.findall(r"\$\{\{\s*env\.IMAGE_ORG\s*\}\}/([a-z0-9][a-z0-9._/-]*):", text))
+
+
+def local_chart_values(name: str) -> dict | None:
+    for pattern in ("charts/*/Chart.yaml", "images/*/chart/Chart.yaml", "apps/*/chart/Chart.yaml"):
+        for path in REPO.glob(pattern):
+            if (yaml.safe_load(path.read_text()) or {}).get("name") == name:
+                values = path.parent / "values.yaml"
+                return (yaml.safe_load(values.read_text()) or {}) if values.exists() else None
+    return None
+
+
+def compose(image: dict) -> str | None:
+    """A full reference from a chart-style image map, or None if it has none."""
+    tag = image.get("tag")
+    digest = image.get("digest")
+    if image.get("name"):
+        base = str(image["name"])
+    elif image.get("repository"):
+        base = str(image["repository"])
+        registry = str(image.get("registry") or "")
+        if registry and not base.startswith(registry.rstrip("/") + "/"):
+            base = f"{registry.rstrip('/')}/{base}"
+    else:
+        return None
+    if digest:
+        return f"{base}@{digest}"
+    if tag in (None, ""):
+        return None
+    return f"{base}:{tag}"
+
+
+def at_path(tree, path: list[str]):
+    for key in path:
+        if not isinstance(tree, dict) or key not in tree:
+            return None
+        tree = tree[key]
+    return tree
+
+
+def values_images(values, path: list[str], defaults_for):
+    """(where, reference or None, why) for every image in a values tree."""
+    if isinstance(values, dict):
+        for key, value in values.items():
+            here = path + [str(key)]
+            if key == "image" and isinstance(value, str):
+                yield ".".join(here), value, ""
+            elif key == "image" and isinstance(value, dict):
+                ref = compose(value)
+                if ref is None and not (value.get("name") or value.get("repository")):
+                    default = at_path(defaults_for(), here)
+                    if isinstance(default, dict):
+                        ref = compose({**default, **value})
+                yield ".".join(here), ref, "the chart chooses the repository or tag" if ref is None else ""
+            else:
+                yield from values_images(value, here, defaults_for)
+    elif isinstance(values, list):
+        for i, value in enumerate(values):
+            yield from values_images(value, path + [str(i)], defaults_for)
+
+
+def other_images(node, path: list[str]):
+    """`image` strings outside the chart values, skipping tiles."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "tile":
+                continue
+            here = path + [str(key)]
+            if key == "image" and isinstance(value, str):
+                yield ".".join(here), value
+            else:
+                yield from other_images(value, here)
+    elif isinstance(node, list):
+        for i, value in enumerate(node):
+            yield from other_images(value, path + [f"[{i}]"])
+
+
+def profile_images(spec: dict):
+    for where, chart, extra in chart_uses(spec):
+        prefix = where.rsplit(".chart", 1)[0] + ".extraValues"
+        cache: dict = {}
+
+        def defaults_for(chart=chart, cache=cache):
+            if "v" not in cache:
+                name = str(chart.get("name") or "")
+                repo = str(chart.get("repository") or "").rstrip("/")
+                cache["v"] = (local_chart_values(name) if repo == "oci://ghcr.io/gentian-org/charts" else None) or (
+                    helm_chart_values(repo, name, str(chart.get("version") or "")) or {}
+                )
+            return cache["v"]
+
+        for sub, ref, why in values_images(extra, [], defaults_for):
+            yield f"{prefix}.{sub}", ref, why
+    rest = {k: v for k, v in spec.items() if k not in ("package", "extensions")}
+    rest["package"] = {k: v for k, v in (spec.get("package") or {}).items() if k != "extraValues"}
+    rest["extensions"] = [
+        {k: v for k, v in e.items() if k != "extraValues"} if isinstance(e, dict) else e
+        for e in spec.get("extensions") or []
+    ]
+    for where, ref in other_images(rest, ["spec"]):
+        yield where, ref, ""
+
+
 def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--released", action="store_true", help="refuse develop builds: a release names IMAGE_TAG")
+    args = ap.parse_args()
     tags = built_tags()
+    built = images_ci_builds()
     errors: list[str] = []
+    warnings: list[str] = []
     checked = 0
+    seen: dict[str, object] = {}
 
     for path in sorted(REPO.glob("profiles/**/profile.yaml")):
         doc = yaml.safe_load(path.read_text()) or {}
-        spec = doc.get("spec") or {}
-        image = (spec.get("extraValues") or {}).get("image") or {}
-        repo, tag = image.get("repository"), image.get("tag")
-        if not repo or not tag:
-            continue
+        rel = path.relative_to(REPO)
+        for where, ref_text, why in profile_images(doc.get("spec") or {}):
+            at = f"{rel}: {where}"
+            if ref_text is None:
+                warnings.append(f"{at}: not checked, {why}")
+                continue
+            ref = parse_image(ref_text)
+            if ref is None:
+                warnings.append(f"{at}: not checked, {ref_text!r} is filled in at install time")
+                continue
+            checked += 1
+            full = f"{ref.registry}/{ref.repository}"
 
-        prefix = f"{ORG}/"
-        if not str(repo).startswith(prefix):
-            continue
-        name = str(repo)[len(prefix):]
-        if name not in tags:
-            continue
+            if full.startswith(OWN):
+                name = full[len(OWN) :]
+                if name not in built:
+                    errors.append(
+                        f"{at} asks for {ref_text}, but CI builds no image {OWN}{name}. "
+                        f"Built: {', '.join(sorted(built))}"
+                    )
+                    continue
+                if name in tags:
+                    if DEVELOP.match(ref.reference or "") and args.released:
+                        errors.append(
+                            f"{at} asks for {ref_text}, a develop build; a released profile names "
+                            f"IMAGE_TAG={tags[name]} from images/{name}/versions.env"
+                        )
+                        continue
+                    if not DEVELOP.match(ref.reference or ""):
+                        if ref.reference != tags[name]:
+                            errors.append(
+                                f"{at} asks for {ref_text}, but images/{name}/versions.env builds "
+                                f"IMAGE_TAG={tags[name]}. The tenant would run a different build than "
+                                f"the one this repo produces."
+                            )
+                            continue
+                        if args.released:
+                            # The release publishes IMAGE_TAG, after this check.
+                            continue
+                    # A develop build, or IMAGE_TAG on develop: the registry has
+                    # to hold it, since a develop build publishes only
+                    # develop-<sha7> and IMAGE_TAG waits for the release.
 
-        checked += 1
-        if str(tag) != tags[name]:
-            errors.append(
-                f"{path.relative_to(REPO)}: profile "
-                f"{(doc.get('metadata') or {}).get('name')!r} requests "
-                f"{repo}:{tag}, but images/{name}/versions.env builds "
-                f"IMAGE_TAG={tags[name]}. The tenant would run a different build "
-                f"than the one this repo produces."
-            )
+            key = f"{full}:{ref.reference}"
+            if key not in seen:
+                seen[key] = image_exists(ref, owned=full.startswith(OWN))
+            answer = seen[key]
+            if answer.state == MISSING:
+                hint = ""
+                if full.startswith(OWN) and not DEVELOP.match(ref.reference or ""):
+                    hint = (
+                        f"; a develop build publishes only develop-<sha7>, so on develop name the "
+                        f"develop build of images/{full[len(OWN) :]}"
+                    )
+                errors.append(f"{at} asks for {ref_text}, which does not exist: {answer.detail}{hint}")
+            elif answer.state != FOUND:
+                warnings.append(f"{at}: could not confirm {ref_text}: {answer.detail}")
 
+    for warning in warnings:
+        print(f"::warning::{warning}" if not OFFLINE else f"warning: {warning}")
     if errors:
-        print("Image tag errors:\n")
+        print("Image reference errors:\n")
         for err in errors:
             print(f"  - {err}")
         return 1
 
-    print(f"Checked {checked} first-party image reference(s). All match versions.env.")
+    print(
+        f"Checked {checked} image reference(s): every one exists, and every image built here is "
+        f"asked for at the tag it is built with or at a develop build"
+        + (f" ({len(warnings)} not confirmed, see warnings)" if warnings else "")
+        + "."
+    )
     return 0
 
 

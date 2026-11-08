@@ -8,13 +8,13 @@ browser never holds a second audience's session.
 
 What this deliberately does not do
 ----------------------------------
-It holds no credential of its own and makes no authorisation decision. Every
+It holds no credential of its own and makes no authorization decision. Every
 call forwards the CALLER's bearer, which under edge is the zone's token the
 Gateway put on the request, and the director decides from the authorization
 graph what that person may see or change. Whatever it answers comes back
 unchanged, including a refusal: a 403 from the director means the caller does
 not hold the relation, and turning that into a friendlier status here would be
-this component inventing an authorisation answer it is not entitled to give.
+this component inventing an authorization answer it is not entitled to give.
 
 Only a platform-trust component may relay: forwardToken on an exposure
 requires trustTier platform, and without forwardToken there is no token here

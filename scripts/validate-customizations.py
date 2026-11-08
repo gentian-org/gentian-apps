@@ -3,7 +3,7 @@
 
 Two things are checked:
 
-1. Every catalogue AppProfile declares ``spec.customization`` — its position on the
+1. Every catalog ComponentProfile declares ``spec.customization`` — its position on the
    customization ladder. An app with no declaration is treated by agents as
    ``{grade: unknown, supportedRungs: [L0, L4]}``, which is a deliberate floor, not
    a default to leave in place.
@@ -16,7 +16,7 @@ The policy mirrors gentian-os/internal/customization/policy.go — the operator
 enforces the same rules at admission. This script exists so authors and agents get
 the answer before pushing, not after.
 
-See gentian-os/docs/app-customization.md.
+See gentian-os/docs/guides/app-customization.md.
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ GRADE_BANDS = [(7, "A"), (5, "B"), (3, "C"), (0, "D")]
 
 # Module profiles inherit their base profile's declaration rather than repeating it.
 # "module" is the deprecated spelling of "addon"; both are accepted while the
-# catalogue migrates.
+# catalog migrates.
 INHERITING_ROLES = {"addon", "module"}
 
 
@@ -76,7 +76,7 @@ def load_yaml(path: pathlib.Path):
 
 
 def check_surface(path: pathlib.Path, doc: dict) -> list[str]:
-    """Check one AppProfile's spec.customization declaration."""
+    """Check one ComponentProfile's spec.customization declaration."""
     errors: list[str] = []
     meta = doc.get("metadata", {}) or {}
     annotations = meta.get("annotations", {}) or {}
@@ -92,20 +92,20 @@ def check_surface(path: pathlib.Path, doc: dict) -> list[str]:
         # same plugin API, so the base's ladder is its ladder by construction, and it
         # names that base in spec.customization.addon.of.
         #
-        # An edition shares only a family name. nextcloud-base-od deploys the OpenDesk
-        # AIO chart from a credentialed registry — a locked-down bundle with a fixed
+        # An edition shares only a family name. The former nextcloud-base-od deployed a
+        # vendor's all-in-one chart from a credentialed registry — a locked-down bundle with a fixed
         # app set — and nextcloud-base-ce deploys the community chart with a Gentian
         # image that stages addons for `occ app:enable`. Treating the second as
         # evidence about the first asserted a reachability that does not exist, and
-        # nothing at runtime honoured the inheritance anyway: the operator reads
+        # nothing at runtime honored the inheritance anyway: the operator reads
         # spec.customization directly, so an edition without one is [L0, L4] there
-        # while this check called it characterised.
+        # while this check called it characterized.
         if role in INHERITING_ROLES:
             return errors
         return [
-            f"{path}: missing spec.customization — characterise the app "
+            f"{path}: missing spec.customization — characterize the app "
             f"(see docs/customization-ladder.md) or mark it deployment-role: addon. "
-            f"If it genuinely has not been characterised, say so explicitly with "
+            f"If it genuinely has not been characterized, say so explicitly with "
             f"grade: unknown and supportedRungs: [L0, L4]"
         ]
 
@@ -133,7 +133,7 @@ def check_surface(path: pathlib.Path, doc: dict) -> list[str]:
         errors.append(f"{path}: spec.customization.grade is required")
     # grade: unknown is the honest answer for an app nobody has scored, and a score
     # alongside it would be a contradiction — so it is the one grade that may omit
-    # rubricScore. The debt report lists these as uncharacterised, which is the point.
+    # rubricScore. The debt report lists these as uncharacterized, which is the point.
     if score is None and grade != "unknown":
         errors.append(
             f"{path}: spec.customization.rubricScore is required (or set "

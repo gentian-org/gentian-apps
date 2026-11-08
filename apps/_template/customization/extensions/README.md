@@ -10,7 +10,7 @@ survive major upgrades untouched.
 
 ## The contract
 
-`backend/app/extensions/api.py` is public API:
+`gentian_app_runtime.extensions.api` is public API:
 
 ```python
 EXTENSION_API_VERSION = "1.0.0"   # semver
@@ -19,7 +19,7 @@ SUPPORTED_MAJOR_VERSIONS = (1,)   # N-2 support
 
 - **minor** bumps are additive; your plugin keeps working.
 - **major** bumps are breaking, announced one minor ahead.
-- Anything under `app.extensions.proposed` is unstable — do not ship it to tenants.
+- Anything under `gentian_app_runtime.extensions.proposed` is unstable — do not ship it to tenants.
 
 A plugin declaring an unsupported major is **refused at load**, with the reason
 reported at `GET /api/v1/extensions`. It is never partially loaded.

@@ -34,7 +34,7 @@ spec:
           # empty POSTGRES_* value makes Mathesar silently start the Postgres
           # bundled in the image and write tenant data to container-local
           # storage that vanishes on restart. Without it the pod fails loudly
-          # instead, which is the correct behaviour for a tenant app whose
+          # instead, which is the correct behavior for a tenant app whose
           # database is provisioned by the kernel.
           #   -n  use the system gunicorn, not a venv
           #   -s  run migrations + collectstatic before serving
@@ -57,7 +57,7 @@ spec:
             # host. The operator reaches this app over
             # http://<svc>.<ns>.svc.cluster.local to reconcile app-admins into
             # is_superuser (PrivilegedRoleSpec "mathesar-rpc"), per the
-            # server-to-server rule in app-profile-guide.md §2 — and Django
+            # server-to-server rule in app-profile-guide.md §4.4 — and Django
             # answers any Host outside this list with a bare 400 DisallowedHost,
             # which reads like a malformed request rather than a config problem.
             # A leading dot matches subdomains, so ".svc.cluster.local" stays

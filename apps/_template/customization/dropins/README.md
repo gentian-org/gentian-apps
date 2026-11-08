@@ -6,7 +6,7 @@ order**, exactly like systemd's `*.conf.d`. Later files win.
 | Prefix | Owner | Set by |
 |---|---|---|
 | `00-`–`49-` | platform | `gentian-os` kernel defaults |
-| `50-`–`89-` | profile | catalogue maintainer, `profiles/<n>/dropins/` |
+| `50-`–`89-` | profile | catalog maintainer, `profiles/<n>/dropins/` |
 | `90-`–`99-` | tenant | tenant admin, via `Tenant.spec.apps[].config.dropIns` or the Admin Console |
 
 The operator enforces the range on write, so a tenant cannot claim a `50-` file and

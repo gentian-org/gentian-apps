@@ -51,8 +51,14 @@ gentian:
   bindingsPath: /etc/gentian/bindings.json
   modulesPath: /opt/odoo/custom-addons
   initModules: "base,web,gentian_os"
+  # Modules of the addons the tenant selected, installed with initModules on
+  # every start. Written by the platform from the base profile's
+  # customization.addonActivation, space-separated; empty when none is selected.
+  # Deselecting one does not uninstall it: Odoo drops a module's tables when it
+  # does.
+  addonModules: ""
 
-  # The URL this Odoo is actually reached on, e.g. https://erp.tenant.example.org.
+  # The URL this Odoo is actually reached on, e.g. https://odoo.tenant.example.org.
   #
   # Odoo keeps this in ir_config_parameter (web.base.url), not in odoo.conf, and
   # defaults it to http://localhost:8069. Every absolute URL it generates comes
@@ -130,7 +136,7 @@ resources:
     memory: "4Gi"
 
 # Customization ladder rung L1 (see gentian-apps/profiles/odoo/base/odoo-base-ce/customization.md
-# and gentian-os/docs/app-customization.md §2.2). Off by default so a plain install
+# and gentian-os/docs/guides/app-customization.md §2.2). Off by default so a plain install
 # has no extra init container or volumes.
 #
 # odoo.conf has no native conf.d support — fragments are merged into the rendered
@@ -143,3 +149,11 @@ dropIns:
   branding:
     enabled: false
     configMaps: []   # static assets, mounted read-only at /opt/odoo/custom-branding
+
+# Who the tenant is, as the platform tells it (valueMapping.platform
+# organizationKey). The first start that finds it complete writes it onto the
+# company Odoo made ("My Company"): name, country, currency, address, website,
+# email, phone, VAT and register numbers, the fiscal year where accounting is
+# installed, and the tenant's language and time zone for its accounts. Once:
+# the company is the tenant's to change after that.
+organization: {}

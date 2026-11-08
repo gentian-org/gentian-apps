@@ -1,8 +1,8 @@
 # Customization ladder — Mathesar (family `mathesar-ce`)
 
-**Grade: C** · rubric score **3/8** · characterised 2026-08-11 (revised — see Notes)
+**Grade: C** · rubric score **3/8** · characterized 2026-08-11 (revised — see Notes)
 
-Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
+Framework: [gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md).
 
 ## Rubric
 
@@ -32,7 +32,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 ## Notes
 
 Mathesar ships no upstream Helm chart at all (docker-compose only), so unlike most profiles in
-this catalogue `charts/mathesar` is a **first-party Gentian chart** wrapping the official,
+this catalog `charts/mathesar` is a **first-party Gentian chart** wrapping the official,
 unmodified `mathesar/mathesar` image — the same shape as `charts/odoo`, not a vendored/patched
 upstream chart. `repackage.chartOwnership: gentian-owned` reflects that; there is no upstream
 chart repo to point `patch.buildRepo`/`fork.repo` at.
@@ -59,8 +59,17 @@ pre-provisioning the account by email when a member hasn't logged in yet, so the
 login links to it instead of creating a fresh non-admin account. This was the first
 `privilegedRole` protocol actually implemented in gentian-os; before this, `PrivilegedRoleSpec`
 existed on the CRD but `syncAppPrivilegedRole` unconditionally returned "not implemented" for
-every profile (including the `nextcloud` OCS-API case §6h of the app-profile-guide claimed was
+every profile (including the `nextcloud` OCS-API case §6 of the app-profile-guide claimed was
 supported — it never was; that section has been corrected).
 
 The technical account is excluded from its own sync (matched by the fixed username
 `gentian-bootstrap-admin`, not group membership) so the reconciler can never lock itself out.
+
+## Restore
+
+A restore, even on the same cluster, brings back the data in every table, but not Mathesar's
+saved explorations, forms, column order and display settings: Mathesar keys that metadata by
+PostgreSQL table OIDs, and a restore recreates the tables with new OIDs. Database roles created
+inside Mathesar are not brought back either; the restore recreates only the app's own login, so
+connections that use such a role must be set up again. The `spec.backup.restore.post` command
+names each of them in its output.

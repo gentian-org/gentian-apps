@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "erpnext.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "erpnext.name" . }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ include "erpnext.name" . }}
+  ports:
+    # nginx: the only port of the pod that is served. gunicorn, the realtime
+    # server and Redis are reached from inside the pod.
+    - name: http
+      port: 8080
+      targetPort: http

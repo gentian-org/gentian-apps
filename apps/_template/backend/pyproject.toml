@@ -8,7 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
     "pydantic-settings>=2.6.0",
     "httpx>=0.28.0",
-    "pyjwt[crypto]>=2.10.0",
+    "gentian-app-runtime==0.1.0",
     "kubernetes>=31.0.0",
     "gitpython>=3.1.43",
     "sqlmodel>=0.0.22",
@@ -17,7 +17,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0.0", "ruff>=0.16,<0.17"]
+dev = ["pytest>=8.0.0", "ruff>=0.16,<0.17", "pyjwt[crypto]>=2.10.0"]
+
+[tool.uv.sources]
+gentian-app-runtime = { url = "https://github.com/gentian-org/gentian-ui/releases/download/app-runtime-v0.1.0/gentian_app_runtime-0.1.0-py3-none-any.whl" }
 
 [build-system]
 requires = ["hatchling"]

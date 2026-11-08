@@ -15,8 +15,8 @@ appUrl: ""
 port: 3000
 
 # Delivered as literal Helm values via valueMapping (profile.yaml) rather than
-# secretKeyRef, matching the openproject-ce/activepieces-me convention — see
-# docs/app-profile-guide.md §3. DATABASE_URL/REDIS_URL are single connection
+# secretKeyRef, matching the openproject-ce convention — see
+# docs/app-profile-guide.md §4.2. DATABASE_URL/REDIS_URL are single connection
 # strings (Docmost has no discrete-field option), so they must be assembled at
 # render time from these pieces; secretKeyRef can't do that composition.
 database:
@@ -26,7 +26,7 @@ database:
   user: ""
   password: ""
 
-# Dedicated in-pod Redis, NOT the shared kernel Redis.
+# Dedicated in-pod Redis (Valkey), NOT the shared kernel Redis.
 #
 # Docmost cannot use the kernel's per-app Redis ACL user: parseRedisUrl
 # (apps/server/src/common/helpers/utils.ts) destructures only
@@ -49,8 +49,12 @@ redis:
   enabled: true
   port: 6379
   image:
-    repository: docker.io/library/redis
-    tag: "7-alpine"
+    # Valkey, the BSD-licensed fork of Redis 7.2: same protocol and
+    # commands, so the app's redis:// URL is unchanged. Pinned by the digest
+    # of the multi-arch index; the tag is only the readable label.
+    repository: docker.io/valkey/valkey
+    tag: "8.1.11-alpine"
+    digest: "sha256:2602ace2be6569bc2bbb06f873776516ab9089821525be34f4305c67eb9db02a"
     pullPolicy: IfNotPresent
   # BullMQ stores job state here, so eviction would silently drop queued jobs.
   # noeviction makes memory pressure a visible error instead.
@@ -80,59 +84,14 @@ smtp:
   secure: false
   fromAddress: ""
 
-# Django/Rails-style "app secret" equivalent — Docmost's JWT session-signing
-# key (min. 32 chars). Must be pinned via appSecrets: pods are ephemeral and
-# an unpinned/regenerated value invalidates every session on restart (same
-# rationale as Mathesar's SECRET_KEY — see charts/mathesar/values.yaml).
+# Docmost's session-signing key (min. 32 chars). Must be pinned via
+# secrets.generated: pods are ephemeral and an unpinned/regenerated value
+# invalidates every session on restart (same rationale as Mathesar's
+# SECRET_KEY — see charts/mathesar/values.yaml). The platform's sign-in
+# sidecar signs sessions with the same key (see the profile's
+# requires.services.identity.sidecar), which is how people get in: this
+# chart runs nothing for sign-in itself.
 appSecret: ""
-
-# Bridge admin account: a machine-only Docmost workspace admin used solely by
-# the "bridge" container below to provision/log in real users on Keycloak
-# SAML's behalf. Consumed by the bridge container as plain literal Helm
-# values (same mechanism as appSecret above) — deliberately NOT delivered via
-# Kubernetes envFrom to the sso-saml sidecar: gentian-os's app-default
-# composition documents that kubelet silently drops any envFrom-materialized
-# key that isn't a C_IDENTIFIER, which "internal-admin_password" (the fixed
-# appSecrets flat-secret naming convention) is not. See
-# profiles/docmost/docmost-ce/profile.yaml header for the full design.
-adminUser:
-  email: "admin@docmost.internal"
-  password: ""
-  # Display name for the machine account the bridge authenticates as. Docmost
-  # CE has no service-account concept -- API keys are an Enterprise feature --
-  # so this row shows up in the member list like a person, and the name is the
-  # only thing marking it as machinery. Reconciled on every boot, so changing
-  # it here renames existing installs too.
-  name: "Config Account"
-  # Name of the single workspace the bridge creates at startup, so no human
-  # ever meets Docmost's "Create Workspace" first-run wizard. Shown in
-  # Docmost's own UI chrome; set it per tenant from the profile if a tenant
-  # name reads better than the product name.
-  workspaceName: "Docmost"
-
-# Shared space created at first start and granted to the default "Everyone"
-# group, so every user sees it. Set from the profile to the tenant, since
-# naming it after the tenant is the point; falls back to the workspace name.
-tenantSpace:
-  name: ""
-
-# HMAC key the bridge derives each user's stable, never-displayed local
-# Docmost password from. Same "must stay pinned" rationale as appSecret.
-bridge:
-  enabled: true
-  port: 8090
-  image:
-    repository: docker.io/library/node
-    tag: "20-alpine"
-    pullPolicy: IfNotPresent
-  secret: ""
-  resources:
-    requests:
-      cpu: "25m"
-      memory: "64Mi"
-    limits:
-      cpu: "250m"
-      memory: "128Mi"
 
 telemetry:
   disabled: true
@@ -149,7 +108,7 @@ telemetry:
 # `frame-ancestors` policy stays authoritative. Listing origins here instead
 # would make Docmost emit a second CSP header, and the browser enforces the
 # intersection of both -- the double-CSP failure in
-# docs/app-profile-guide.md §6b.
+# docs/app-profile-guide.md §7.1.
 iframe:
   embedAllowed: true
   allowedOrigins: ""
@@ -190,6 +149,6 @@ persistence:
   storageClass: ""
 
 # Chart never manages its own Ingress/HTTPRoute — the gentian-os operator
-# creates the Gateway API route from AppProfile.spec.ingress.
+# creates the Gateway API route from ComponentProfile.spec.expose.
 ingress:
   enabled: false

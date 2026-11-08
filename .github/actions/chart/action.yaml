@@ -1,0 +1,139 @@
+name: Helm chart
+description: >
+  Packages one chart and, when asked to publish, pushes it to the registry's
+  charts repository. The chart's name and version are read from its own
+  Chart.yaml, not the directory name — a chart may live at a path like
+  apps/<name>/chart, where the two differ.
+inputs:
+  dir:
+    description: Directory holding Chart.yaml.
+    required: true
+  lint:
+    description: '"true" lints the chart, whether or not it is published.'
+    required: false
+    default: "false"
+  pin-image-tag:
+    description: >
+      Rewrite every `tag: ...` in the chart's values.yaml to this value
+      before packaging, so the published chart names an immutable image
+      instead of one that moves. A chart on a moving tag never rolls a
+      Deployment by itself, and a node with the tag cached goes on serving an
+      older build after a newer one is published — which is how a cluster ran
+      last week's console for an afternoon.
+
+      ONLY for a chart whose every image this repository builds. It rewrites
+      all of them, so a chart that also names an upstream image would have
+      that pinned to our tag, which is worse than the problem. Pass a tag
+      that never moves (github.sha, develop-<sha7>), not a branch name.
+    required: false
+    default: ""
+  branch-versions:
+    description: >
+      Publish the chart as a moving prerelease per branch and an immutable one
+      per commit — `<version>-<branch>` and `<version>-<branch>.<sha>` — instead
+      of the bare version from Chart.yaml.
+
+      This is how a cluster that follows a branch takes a new build at all: a
+      Helm release is never upgraded under an unchanged version string, so a
+      chart republished at the same version reaches nobody. The moving chart's
+      appVersion names the immutable one it is a copy of, which is what lets
+      the installer read the pin off the moving chart and install the immutable
+      one.
+    required: false
+    default: "false"
+  publish:
+    description: '"true" pushes the chart; anything else stops before packaging.'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Helm
+      uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310  # v5.0.1
+
+    - name: Lint
+      if: inputs.lint == 'true'
+      shell: bash
+      run: helm lint "${CHART_DIR}"
+      env:
+        CHART_DIR: ${{ inputs.dir }}
+
+    - name: Registry login
+      if: inputs.publish == 'true'
+      shell: bash
+      run: echo "${TOKEN}" | helm registry login "${{ env.REGISTRY }}" --username "${{ github.actor }}" --password-stdin
+      env:
+        TOKEN: ${{ github.token }}
+
+    # Before packaging and before linting reports success on it: a chart that
+    # is published naming a tag that moves is the bug this prevents, and doing
+    # it on every build — not only on the ones that push — means a pull
+    # request proves the rewrite still matches the values file.
+    - name: Name this build's images in the chart
+      if: inputs.pin-image-tag != ''
+      shell: bash
+      run: |
+        values="${{ inputs.dir }}/values.yaml"
+        tag="${{ inputs.pin-image-tag }}"
+        before="$(grep -cE '^[[:space:]]*tag: [^[:space:]#]' "${values}")"
+        if [ "${before}" -lt 1 ]; then
+          echo "::error::${values} names no image tag to pin; remove pin-image-tag or fix the chart" >&2
+          exit 1
+        fi
+        sed -i -E "s|^([[:space:]]*tag:) [^[:space:]#].*$|\1 \"${tag}\"|" "${values}"
+        after="$(grep -cF "tag: \"${tag}\"" "${values}")"
+        if [ "${before}" != "${after}" ]; then
+          echo "::error::pinned ${after} of ${before} image tags in ${values}" >&2
+          exit 1
+        fi
+        echo "pinned ${after} image tag(s) to ${tag}"
+
+    - name: Package and publish
+      if: inputs.publish == 'true'
+      shell: bash
+      run: |
+        chart_field() { helm show chart "${{ inputs.dir }}" | sed -n "s/^${1}:[[:space:]]*//p" | tr -d "\"'" | head -n 1; }
+        CHART_NAME="$(chart_field name)"
+        CHART_VERSION="$(chart_field version)"
+        if [ "${{ inputs.branch-versions }}" = "true" ]; then
+          BRANCH="${GITHUB_REF_NAME//\//-}"
+          SHORT="${GITHUB_SHA::7}"
+          IMMUTABLE="${CHART_VERSION}-${BRANCH}.${SHORT}"
+          MOVING="${CHART_VERSION}-${BRANCH}"
+          # The immutable chart is the release; the moving one is a copy of it
+          # that names it in appVersion, so whoever follows the branch can read
+          # the pin off it and install the version that does not move.
+          helm package "${{ inputs.dir }}" --version "${IMMUTABLE}" --app-version "${IMMUTABLE}" -d /tmp
+          helm package "${{ inputs.dir }}" --version "${MOVING}" --app-version "${IMMUTABLE}" -d /tmp
+          CHART_VERSIONS="${IMMUTABLE} ${MOVING}"
+        else
+          helm package "${{ inputs.dir }}" -d /tmp
+          CHART_VERSIONS="${CHART_VERSION}"
+        fi
+
+        # GHCR intermittently 404s the manifest it was just handed, failing the
+        # push with `Tag on destination: sha256:...: not found`. The identical
+        # push succeeds moments later, so a registry hiccup should cost a retry
+        # rather than a red pipeline. A genuine rejection still fails, just
+        # three attempts later.
+        push_chart() {
+            helm push "/tmp/${CHART_NAME}-${1}.tgz" \
+                "oci://${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/charts"
+        }
+
+        for version in ${CHART_VERSIONS}; do
+            pushed=0
+            for attempt in 1 2 3; do
+                if push_chart "${version}"; then
+                    pushed=1
+                    break
+                fi
+                if [ "$attempt" -lt 3 ]; then
+                    echo "push failed (attempt ${attempt}/3); retrying in $((attempt * 10))s" >&2
+                    sleep $((attempt * 10))
+                fi
+            done
+            if [ "${pushed}" != "1" ]; then
+                exit 1
+            fi
+        done
+        exit 0

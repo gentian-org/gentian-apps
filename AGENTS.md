@@ -2,23 +2,23 @@
 
 ## Project overview
 
-`gentian-apps` is **the single source of truth for AppProfile catalogue metadata** for Gentian
-OS — profile bundles (`profiles/[<family>/]<name>/`, synced to clusters by the ArgoCD ApplicationSet
-`gentian-catalogue`) plus first-party app implementations (`apps/<name>/`, FastAPI + React +
-Helm — same stack as [gentian-app-template](https://github.com/gentian-org/gentian-app-template) /
-[gentian-ui](https://github.com/gentian-org/gentian-ui)). This includes commercial
-(`license: proprietary`) profiles, not just OSS ones — [gentian-pro](https://github.com/gentian-org/gentian-pro)
-holds only the private chart/image artifacts those profiles reference, it does not sync its own
-catalogue. See [README.md](README.md) for full scope and
+`gentian-apps` is **the single source of truth for ComponentProfile catalog metadata** for Gentian
+OS — profile bundles (`profiles/[<family>/]<name>/`, published as the catalog a cluster installs
+from, one file and one digest per profile: [docs/profile-bundles.md](docs/profile-bundles.md)) plus
+first-party app implementations (`apps/<name>/`, FastAPI + React +
+Helm — same stack as [`apps/_template`](apps/_template) /
+[gentian-ui](https://github.com/gentian-org/gentian-ui)). See [README.md](README.md) for full scope and
 [docs/app-profile-guide.md](docs/app-profile-guide.md) /
 [docs/custom-app-guide.md](docs/custom-app-guide.md) for the two main workflows.
 
 ## Build & deployment — CI/GitOps only
 
+* Work lands on `develop`; `main` is what is released; `v05` is frozen. What CI publishes from
+  each, and under which names: [docs/releasing.md](docs/releasing.md).
 * CI (`.github/workflows/apps-ci.yaml`) builds and pushes images + OCI charts for `apps/*`.
   `profiles/*` sync to clusters via the ArgoCD ApplicationSet `gentian-catalogue`.
 * **Don't build/push images or apply profile changes to a live cluster yourself.** Bump the
-  chart version and the profile's `spec.chart.version`, then let CI and ArgoCD do the rest.
+  chart version and the profile's `spec.package.chart.version`, then let CI and ArgoCD do the rest.
   Deleting a stuck Application/resource to speed up reconciliation is fine; hand-patching
   config in the cluster is not.
 
@@ -27,7 +27,7 @@ catalogue. See [README.md](README.md) for full scope and
 * **Never commit secrets.** Kernel-injected values (`DATABASE_URL`, `OIDC_ISSUER`,
   `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, etc.) arrive via ExternalSecret at runtime — never
   hardcode or commit them.
-* **Respect third-party license terms** for patched/vendored charts (`charts/activepieces/`) and upstream app
+* **Respect third-party license terms** for patched or vendored charts and upstream app
   images (Nextcloud, XWiki, Odoo, OpenProject, ...) — check upstream licensing before modifying
   or repackaging.
 
@@ -35,14 +35,14 @@ catalogue. See [README.md](README.md) for full scope and
 
 **Before adding a feature to an app that already exists, run this procedure.** Do not start
 from "which file do I edit" — start from "what is the cheapest rung that can express this".
-Full framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md);
+Full framework: [gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md);
 local operations: [docs/customization-ladder.md](docs/customization-ladder.md).
 
 1. **Restate** the request as a capability ("users must approve invoices > 10k"), not an
    implementation ("patch `account_move.py`"). Split multi-part requests and run this per part.
-2. **Read the app's ladder**: `AppProfile.spec.customization` in `profiles/<n>/profile.yaml`,
+2. **Read the app's ladder**: `ComponentProfile.spec.customization` in `profiles/<n>/profile.yaml`,
    and `profiles/<n>/customization.md`. If absent, assume `{grade: unknown, supportedRungs:
-   [L0, L4]}` and raise a task to characterise the app — infer nothing more.
+   [L0, L4]}` and raise a task to characterize the app — infer nothing more.
 3. **Walk L0 → L6 in order.** Stop at the first rung that (a) can express the change,
    (b) is in `supportedRungs` (L2 is always available), and (c) is permitted at the requested
    scope. Record a one-line reason for every rung skipped.
@@ -51,7 +51,7 @@ local operations: [docs/customization-ladder.md](docs/customization-ladder.md).
 5. **Gate**: at **L4 or above**, search upstream first, record what you found, and **stop for
    human approval** — do not proceed autonomously. At L5+ platform trust tier and a named
    owner are also required. A cluster hotfix is never a valid outcome.
-6. **Minimise scope** independently of rung: tenant → profile → platform.
+6. **Minimize scope** independently of rung: tenant → profile → platform.
 7. **Write the `Customization` record before the code** (`profiles/<n>/customizations/<name>.yaml`),
    required from L2 up. It is the design review.
 8. **Emit into the repo that owns that rung** (table in `docs/customization-ladder.md`), never
@@ -64,9 +64,9 @@ Rung → where it lives here: L0 `spec.extraValues` · L1 `profiles/<n>/dropins/
 L2 `apps/<new>/` plus a contract · L3 the addon repo (`odoo-modules`, …) ·
 L4 `charts/` or `composition.yaml` · L5 the build repo (`ocb`) · L6 a fork repo.
 
-## First-party app development (`apps/app-store`, `apps/_template`)
+## First-party app development (`apps/_template`)
 
-Both first-party apps share the FastAPI + React + Helm stack from gentian-app-template.
+First-party apps share the FastAPI + React + Helm stack scaffolded by `apps/_template`.
 
 ### Directory map
 
@@ -82,7 +82,7 @@ Both first-party apps share the FastAPI + React + Helm stack from gentian-app-te
 | `frontend/src/api/client.ts` | Typed fetch helpers |
 | `frontend/src/stores/` | Zustand client state (when needed) |
 | `chart/` | Helm chart (Gateway API HTTPRoute, Pattern A secrets) |
-| `profile/appprofile.yaml.tmpl` | AppProfile skeleton |
+| `profile/componentprofile.yaml.tmpl` | ComponentProfile skeleton |
 | `docs/security.md` | Security checklist |
 | `docs/frontend-stack.md` | Frontend stack rationale |
 
@@ -107,19 +107,18 @@ Production uses **Gateway API** (`chart/templates/httproute.yaml`), not nginx In
 Gateway routes `/api`, `/healthz`, `/readyz` to the API Service and `/` to the static web
 Service.
 
-### Auth model (app-store)
+### Auth model
 
-- **Embedded in portal:** `auth.disabled: true` — shell gates tenant-admin access; API uses a
-  synthetic admin user.
-- **Direct URL access:** backend `/oauth/*` BFF stores tokens in `localStorage`; iframe uses
-  popup sign-in.
+The gateway holds the session. An app behind it receives the identity the
+gateway asserts and runs no code flow of its own; what the caller may do is
+asked of the director, never read off the token.
 
 ### Publish a new app version
 
 1. Bump `chart/Chart.yaml` version and image tags in `chart/values.yaml`.
 2. CI builds and pushes images + OCI chart.
-3. Update the matching `profiles/<app>/profile.yaml` `spec.chart.version`.
-4. AppProfile update reconciler rolls out to tenants.
+3. Update the matching profile's `spec.package.chart.version`.
+4. A tenant's install rolls over when it is moved to the new build (gentian-os docs/concepts/versioning.md).
 
 ### Local dev
 
@@ -131,10 +130,20 @@ docker compose -f docker-compose.dev.yaml up --build
 
 ## Adding/editing profiles (`profiles/[<family>/]<name>/`, OSS or commercial)
 
-Each profile bundle holds `kustomization.yaml` (required), `profile.yaml` (the AppProfile CR —
-describe the app there, not in a separate catalogue doc), and optionally `oidc-catalog.yaml`,
-`composition.yaml`, `assets/`. Commercial profiles set `spec.license: proprietary`; the App
-Store surfaces those with a Buy button and the operator gates install on entitlement. See
+Each profile bundle holds `kustomization.yaml` (required), `profile.yaml` (the ComponentProfile),
+`assets/tile.png` (its tile, drawn by `scripts/render-default-tile.py` and inlined by
+`scripts/sync-profile-tile.py`), and optionally `oidc-catalog.yaml`, `composition.yaml`, further
+`assets/`. `profile.yaml` carries what installing the app needs: its edition and family as the
+labels `gentianos.io/profile-edition` and `gentianos.io/profile-family`, and the app's license as
+an `SPDX-License-Identifier:` comment on its first line. The edition is the label, never the name:
+`ce` community, `me` the community edition's code curated and maintained by Aluvian because it runs
+it itself, `ie` an operator's own (internal), `pe` proprietary and free, `ee` proprietary and paid.
+A `ce` and an `me` profile are both named `<app>-ce`, and this catalog holds only those two:
+proprietary profiles live in their supplier's catalog. A profile every cluster installs on its own
+is annotated `gentianos.io/store-listed: "false"`, which the catalog index carries as
+`listed: false` and the App Store does not offer. The listing — display name, summary,
+description, categories, links, author, logo — is the App Store's, which runs outside the
+cluster and keeps it in its own database. See
 [docs/app-profile-guide.md](docs/app-profile-guide.md) for the full workflow.
 
 **Layout rules — CI enforces both:**
@@ -151,5 +160,5 @@ Store surfaces those with a Buy button and the operator gates install on entitle
 are separate flat trees on purpose: a profile references its chart by OCI coordinate rather
 than by path, `charts/odoo` backs 10 profiles, and 7 profiles wrap external charts this repo
 never contains. The reasoning — this is a distribution repo, not an application monorepo — is
-in [docs/app-profile-guide.md](docs/app-profile-guide.md) §0. Read it before proposing layout
+in [docs/app-profile-guide.md](docs/app-profile-guide.md) §2. Read it before proposing layout
 changes.

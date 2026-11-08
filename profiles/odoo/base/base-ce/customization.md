@@ -1,9 +1,9 @@
 # Customization ladder — Odoo (family `odoo`)
 
-**Grade: A** · rubric score **8/8** · characterised 2026-08-06
+**Grade: A** · rubric score **8/8** · characterized 2026-08-06
 Applies to `odoo-base-ce` and every `odoo-<module>-ce` module profile, which inherit this declaration.
 
-Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
+Framework: [gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md).
 
 ## Rubric
 
@@ -26,7 +26,7 @@ Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org
 | **L1** Drop-in | yes | `odoo-conf` (ini fragments merged into `odoo.conf` by an init container — Odoo has no native conf.d, so this is a Gentian mechanism, not an upstream promise) and `branding` (static files, tenant-editable) |
 | **L2** Companion | always | consume the `erp-core` contract from a separate app |
 | **L3** Extension | yes | Odoo addon in [`odoo-modules`](https://github.com/gentian-org/odoo-modules), synced by `gentian-sidecar-git-modules` into `/opt/odoo/custom-addons` |
-| **L4** Repackage | yes | `charts/odoo` (Gentian-owned) + `profiles/odoo/odoo-base-ce/composition.yaml` (`app-odoo`) |
+| **L4** Repackage | yes | `charts/odoo` (Gentian-owned) |
 | **L5** Patch | yes | patch series in [`ocb`](https://github.com/gentian-org/ocb) — platform approval required |
 | **L6** Fork | yes | `ocb` is the fork; owner `platform-erp` |
 
@@ -40,16 +40,16 @@ Three delivery routes are wired up:
 
 - **`git-sidecar`** — the default. Push to `odoo-modules`; the sidecar syncs it into
   `/opt/odoo/custom-addons` on the interval in `gentian.git.syncInterval`.
-- **`addon-profile`** — when the module is a catalogue *product*. Add a thin profile with
-  `deployment-role: addon` and `spec.customization.addon: {id: crm, of: odoo-base-ce}`
+- **`addon-profile`** — when the module is a catalog *product*. Add a thin profile with
+  `deployment-role: addon` and `spec.package.addon: {id: crm, of: odoo-base-ce}`
   (the `odoo-crm-ce` pattern). It is never installed on its own — the base is installed
   and the addon selected into it. The earlier spelling of this route, `module-profile`
   with a `requires-profile` annotation, is retired; see
-  [app-customization.md](../../../../gentian-os/docs/app-customization.md) §4.2.
+  [app-customization.md](../../../../gentian-os/docs/guides/app-customization.md) §4.2.
 - **`image-layer`** — for airgapped or reproducibility-critical installs.
 
-Per-tenant module sets are permitted **because Odoo runs one instance per tenant namespace**
-(`databasePerTenant: true`). Activation is driven by Keycloak group attributes
+Per-tenant module sets are permitted **because Odoo runs one instance per tenant namespace**,
+with a database of its own. Activation is driven by Keycloak group attributes
 (`gentianos.io/keycloak-group-attributes` → `gentianOdooModules`), never by divergent module
 binaries. See §2.4 of the framework doc for why this is a hard rule.
 
@@ -62,8 +62,9 @@ belong in `patches/` with DEP-3 headers, not in the tree — see `ocb/patches/RE
 
 ## Gotchas
 
-- Addon *installation* is a runtime operation, not a Helm one — modules land on disk via the
-  sidecar but are activated by the `app-odoo` composition Job.
+- Addon *installation* is a runtime operation, not a Helm one. The platform writes the selected
+  addons' modules into `gentian.addonModules` (`customization.addonActivation`), and the chart's
+  start script installs them with `initModules` in one `odoo-bin -i` on every start.
 - `gentian.initModules` (`base,web,gentian_os`) is the bootstrap set; adding to it changes
-  first-boot behaviour for every new tenant.
+  first-boot behavior for every new tenant.
 - Assets are cached aggressively; a branding drop-in usually needs an asset regeneration.

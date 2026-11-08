@@ -1,141 +1,143 @@
+# SPDX-License-Identifier: Apache-2.0
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: element-ce
   labels:
     gentianos.io/profile-name: element-ce
+    gentianos.io/profile-family: element
+    gentianos.io/profile-edition: ce
   annotations:
-    gentianos.io/kernel-egress-namespaces: envoy-gateway-system
-    gentianos.io/portal-auth-mode: matrix-bridge
+    gentianos.io/portal-auth-mode: oidc
 spec:
-  displayName: "Element"
-  family: element
-  edition: ce
-  compositionRef: app-element
-  description: "Federated team chat and collaboration based on the Matrix protocol, with Synapse homeserver."
-  license: Apache-2.0
-  author: Element
-  tile:
-    icon: chat
+  classes:
+    - app
+  trustTier: experimental
+  version: "0.5.1"
+  package:
+    # The Composition that renders this chart AND the objects that have to
+    # exist beside it. A chart and a composition are the one legal pair in
+    # the package union: the chart is what is installed, the composition is
+    # what else is created.
+    composition: app-element-ce
+    chart:
+      repository: "https://ananace.gitlab.io/charts"
+      name: "matrix-synapse"
+      version: "3.12.30"
 
-  portalTiles:
-    - name: element-ce
-      displayName:
-        de_DE: "Chat"
-        en_US: "Chat"
-      linkTarget: embedded
-      allowedGroup: "App Users"
-
-  kernelRequirements:
-    identity:
+    valueMapping:
       oidc:
-        clientId: "gentian-synapse"
-        name: "Element (Synapse)"
-        accessType: CONFIDENTIAL
-        redirectUris:
-          - "https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback"
-        postLogoutRedirectUris:
-          - "https://chat.${TENANT_DOMAIN}/*"
-        # Synapse is the relying party here, not Element, so the notification
-        # goes to the homeserver — it owns the session Element is holding.
+        issuerKey: "extraConfig.oidc_issuer"
+        clientIdKey: "extraConfig.oidc_client_id"
+        clientSecretKey: "extraConfig.oidc_client_secret"
+      database:
+        hostKey: "externalPostgresql.host"
+        portKey: "externalPostgresql.port"
+        nameKey: "externalPostgresql.database"
+        userKey: "externalPostgresql.username"
+        passwordKey: "externalPostgresql.password"
+      smtp:
+        passwordKey: "extraConfig.email.smtp_pass"
+
+    extraValues:
+      serverName: "${TENANT_DOMAIN}"
+      publicServerName: "matrix.${TENANT_DOMAIN}"
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 1
+          memory: 512Mi
+      wellknown:
+        enabled: false
+      postgresql:
+        enabled: false
+      redis:
+        enabled: false
+      externalPostgresql:
+        existingSecret: "element-ce-sensitive-values"
+        existingSecretPasswordKey: "db-password"
+      extraConfig:
+        email:
+          enable_notifs: true
+          require_transport_security: true
+          notif_from: "matrix@${TENANT_DOMAIN}"
+          smtp_host: "smtp.${KERNEL_DOMAIN}"
+          smtp_port: 587
+          smtp_user: "matrix@${TENANT_DOMAIN}"
+
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
+    services:
+      identity:
+        oidc:
+          clientId: "gentian-synapse"
+          name: "Element (Synapse)"
+          accessType: CONFIDENTIAL
+          redirectUris:
+            - "https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/callback"
+          postLogoutRedirectUris:
+            - "https://element.${TENANT_DOMAIN}/*"
+            - "https://desktop.${TENANT_DOMAIN}/*"
+        # No backchannelLogout: a sign-out at the platform does not end the
+        # session Synapse holds for Element. Two things are missing, and
+        # declaring the field here would supply neither:
         #
-        # INCOMPLETE: Synapse ignores this endpoint unless its own provider
-        # config carries backchannel_logout_enabled: true, which this profile
-        # does not set today. Keycloak will POST and be refused until it does,
-        # which is harmless but achieves nothing. The flag belongs next to the
-        # oidc_issuer value this profile already maps.
-          - "https://portal.${KERNEL_DOMAIN}/*"
-        backchannelLogoutUrl: "https://matrix.${TENANT_DOMAIN}/_synapse/client/oidc/backchannel_logout"
-    database:
-      engine: postgresql
-      databasePerTenant: true
-    mail:
-      smtp: {}
+        #   - This profile is rendered by its own Composition
+        #     (composition.yaml), and the address the realm is told to call is
+        #     built by the platform's. Nothing registers one for this client.
+        #   - Synapse is the relying party, not Element, and it answers
+        #     /_synapse/client/oidc/backchannel_logout only when its provider
+        #     settings carry backchannel_logout_enabled: true, which this
+        #     profile's Composition does not write.
+        #
+        # The address, once both are done, is that path at the Service and
+        # port of the entry "matrix" inside the cluster. It has not been run.
+      database:
+        engine: postgresql
+      mail:
+        smtp: {}
 
   provides:
     - name: chat
       protocol: matrix
 
-  chart:
-    repository: "https://ananace.gitlab.io/charts"
-    name: "matrix-synapse"
-    version: "3.12.30"
+  backup:
+    restore:
+      # Synapse writes the server name -- the tenant's domain -- into every
+      # user, room and event id it stores, and refuses to start under
+      # another. A restore onto another domain leaves its data out and
+      # leaves the app as it is installed there; on the same domain it is
+      # restored as any app is.
+      domainBound: true
 
-  valueMapping:
-    oidc:
-      issuerKey: "extraConfig.oidc_issuer"
-      clientIdKey: "extraConfig.oidc_client_id"
-      clientSecretKey: "extraConfig.oidc_client_secret"
-    database:
-      hostKey: "externalPostgresql.host"
-      portKey: "externalPostgresql.port"
-      nameKey: "externalPostgresql.database"
-      userKey: "externalPostgresql.username"
-      passwordKey: "externalPostgresql.password"
-    smtp:
-      passwordKey: "extraConfig.email.smtp_pass"
+  secrets:
+    generated:
+      - name: registration_shared_secret
+        valuePath: "config.registrationSharedSecret"
 
-  appSecrets:
-    - name: registration_shared_secret
-      valuePath: "config.registrationSharedSecret"
-
-  extraValues:
-    serverName: "${TENANT_DOMAIN}"
-    publicServerName: "matrix.${TENANT_DOMAIN}"
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: 1
-        memory: 512Mi
-    wellknown:
-      enabled: false
-    postgresql:
-      enabled: false
-    redis:
-      enabled: false
-    externalPostgresql:
-      existingSecret: "element-ce-sensitive-values"
-      existingSecretPasswordKey: "db-password"
-    extraConfig:
-      email:
-        enable_notifs: true
-        require_transport_security: true
-        notif_from: "matrix@${TENANT_DOMAIN}"
-        smtp_host: "smtp.${KERNEL_DOMAIN}"
-        smtp_port: 587
-        smtp_user: "matrix@${TENANT_DOMAIN}"
-
-  deploymentMethod: crossplane
-
-  ingress:
-    subDomain: "chat"
-    serviceName: "element-ce"
-    servicePort: 8080
-    tlsEnabled: true
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "100M"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
-
-  additionalIngresses:
-    - subDomain: matrix
-      serviceName: synapse-web
-      servicePort: 8008
-      tlsEnabled: true
-      annotations:
-        nginx.ingress.kubernetes.io/proxy-body-size: "100M"
-        nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
-        nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
-
-  browserProxy:
-    - path: matrix
-      target: "http://synapse-web.{namespace}.svc/_matrix/"
-      authMode: forward-bearer
-      stripPrefix: true
-
-  # Customization ladder — see customization.md
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: "element"
+      backend:
+        service: "element-ce"
+        port: 8080
+      tile:
+        displayName: "Chat"
+        logo: data:image/png;base64,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
+        image: assets/tile.png
+        relation: can_launch
+    - name: matrix
+      surface: gateway
+      authMode: oidc
+      subDomain: matrix
+      backend:
+        service: synapse-web
+        port: 8008
   customization:
     grade: B
     rubricScore: 6
@@ -179,3 +181,4 @@ spec:
       requiresApproval: platform-team
     fork:
       allowed: false
+  launch: tile

@@ -8,7 +8,7 @@
  *
  * Plugin bundles are loaded at runtime from the app's static root, so adding UI
  * does not require rebuilding the app image. See
- * gentian-os/docs/app-customization.md.
+ * gentian-os/docs/guides/app-customization.md.
  */
 
 import type { ComponentType } from 'react'

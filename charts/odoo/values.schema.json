@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Gentian Odoo chart values",
-  "description": "Rung L0 of the customization ladder for Odoo. See gentian-os/docs/app-customization.md and profiles/odoo-cb-base/customization.md.",
+  "description": "Rung L0 of the customization ladder for Odoo. See gentian-os/docs/guides/app-customization.md and profiles/odoo-cb-base/customization.md.",
   "type": "object",
   "additionalProperties": true,
   "required": [
@@ -121,6 +121,11 @@
         "initModules": {
           "type": "string",
           "description": "Comma-separated technical module names installed on first boot."
+        },
+        "addonModules": {
+          "type": "string",
+          "description": "Technical module names of the selected addons, separated by spaces or commas, installed with initModules on every start.",
+          "default": ""
         },
         "baseUrl": {
           "type": "string",

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: erpnext
+description: ERPNext (Frappe Framework) for Gentian OS tenants, one site per release
+type: application
+version: 0.1.0
+appVersion: "v16.51.1"

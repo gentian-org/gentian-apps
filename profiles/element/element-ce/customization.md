@@ -1,8 +1,8 @@
 # Customization ladder — Element + Synapse (family `element-ce`)
 
-**Grade: B** · rubric score **6/8** · characterised 2026-08-06
+**Grade: B** · rubric score **6/8** · characterized 2026-08-06
 
-Framework: [gentian-os/docs/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md).
+Framework: [gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md).
 
 This profile deploys **two** components with different customization surfaces. The grade is
 the lower of the two, because a request usually lands on whichever one is less accommodating.
@@ -36,16 +36,16 @@ the lower of the two, because a request usually lands on whichever one is less a
 
 Anything the request phrases as "change how the chat *client* behaves" is **not** L3 — Element
 Web has no plugin API. The options are L1 (`config.json` knobs, including branding and feature
-flags) or L2 (a companion widget/app). Rebuilding the Element bundle to inject behaviour is L5
+flags) or L2 (a companion widget/app). Rebuilding the Element bundle to inject behavior is L5
 and is not permitted here; treat a request that seems to need it as a signal to redesign toward
 a widget.
 
-Server-side behaviour (auth, spam checking, event hooks) *is* L3 via the Synapse Module API —
+Server-side behavior (auth, spam checking, event hooks) *is* L3 via the Synapse Module API —
 but note the ABI score above: addons have broken across Synapse releases, so pin
 `testMatrix` and expect to re-verify on every bump.
 
 ## Gotchas
 
 - Double CSP headers and `frame-ancestors` handling for portal embedding are L4 concerns
-  already solved in the composition — see `app-profile-guide.md` §6b.
+  already solved in the composition — see `app-profile-guide.md` §7.1.
 - Element SSO redirect URIs are host-sensitive; changing them is L0, not L1.

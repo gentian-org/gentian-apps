@@ -1,0 +1,6 @@
+apiVersion: v2
+name: paperless-ngx-mcp
+description: MCP server companion exposing a Paperless-ngx tenant's documents to AI agents
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,8 +1,9 @@
-# AppProfile — Mathesar (self-hosted, spreadsheet-like Postgres data explorer)
+# SPDX-License-Identifier: GPL-3.0
+# ComponentProfile — Mathesar (self-hosted, spreadsheet-like Postgres data explorer)
 #
 # Source: no upstream Helm chart exists for Mathesar (docker-compose only), so
 #   this profile is backed by a first-party Gentian chart: charts/mathesar/
-#   (same pattern as charts/odoo — see docs/app-profile-guide.md §0
+#   (same pattern as charts/odoo — see docs/app-profile-guide.md §2
 #   Consequence 3). The chart wraps the official image unmodified.
 #
 # Docker image: docker.io/mathesar/mathesar:0.12.0 — upstream's "production"
@@ -53,53 +54,92 @@
 #   (REQUIRE_SSO_LOGIN=false) only because Mathesar requires it to exist as a
 #   toggle — app-admins members are expected to use SSO like everyone else.
 apiVersion: gentianos.io/v1alpha1
-kind: AppProfile
+kind: ComponentProfile
 metadata:
   name: mathesar-ce
   labels:
     gentianos.io/profile-name: mathesar-ce
-  annotations:
-    # allauth performs OIDC discovery server-side against the same public issuer
-    # the browser uses (it has one server_url, so the internal-URL split in
-    # app-profile-guide.md §2 is not available here). That request leaves the
-    # pod for the edge gateway via the CoreDNS hairpin, so without this the
-    # login endpoint dies with a connect timeout behind a bare "Server Error
-    # (500)". The staging CA the hairpin then requires is mounted generically by
-    # the app-default composition — see extraEnvVars in charts/mathesar.
-    gentianos.io/kernel-egress-namespaces: envoy-gateway-system
+    gentianos.io/profile-family: mathesar
+    gentianos.io/profile-edition: ce
 spec:
-  displayName: "Mathesar"
-  description: "Spreadsheet-like interface for viewing, editing, and querying Postgres data directly."
-  family: mathesar
-  catalogueVersion: "1.0.0"
-  edition: ce
+  classes:
+    - app
   trustTier: certified
-  license: GPL-3.0
-  author: Mathesar Foundation
-  tile:
-    icon: database
+  version: "0.5.1"
+  package:
+    chart:
+      repository: "oci://ghcr.io/gentian-org/charts"
+      name: mathesar
+      version: "0.1.3"
 
-  kernelRequirements:
-    identity:
+    valueMapping:
       oidc:
+        # The issuer the platform seeded for this tenant's realm, the same
+        # string the client is registered under. Taken from there rather than
+        # spelled here from ${KERNEL_DOMAIN} and ${TENANT_ID}: a tenant's realm
+        # is not always called what the tenant is, and an issuer that differs
+        # from the seeded one fails token validation on the claim.
+        issuerKey: "oidc.serverUrl"
+        clientSecretKey: "oidc.clientSecret"
+      database:
+        hostKey: "database.host"
+        portKey: "database.port"
+        nameKey: "database.name"
+        userKey: "database.user"
+        passwordKey: "database.password"
+
+    extraValues:
+      fullnameOverride: "mathesar-ce"
+
+      allowedHosts: ".${TENANT_DOMAIN}"
+      instanceName: "Mathesar"
+
+      oidc:
+        enabled: true
+        providerKey: keycloak
         clientId: "gentian-mathesar"
-        name: "Mathesar"
-        accessType: CONFIDENTIAL
+      # No serverUrl here: it arrives through valueMapping.oidc.issuerKey as
+      # https://id.<kernel>/auth/realms/<realm>. allauth runs its discovery
+      # server-side against that same public issuer (it has one server_url), so
+      # the request leaves the pod for the edge gateway. The path there, and
+      # the trust anchor a cluster without a public certificate needs for it,
+      # both follow from requires.services.identity below; nothing in this
+      # profile names a namespace.
+
+      ingress:
+        enabled: false
+
+      persistence:
+        enabled: true
+        size: "5Gi"
+
+      podAnnotations:
+        secret.reloader.stakater.com/reload: mathesar-ce-sensitive-values
+
+  # Customization ladder — see customization.md
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
+    services:
+      identity:
+        oidc:
+          clientId: "gentian-mathesar"
+          name: "Mathesar"
+          accessType: CONFIDENTIAL
         # Provider key "keycloak" must match extraValues.oidc.providerKey below —
         # Mathesar builds this path from the SSO_CONFIG_DICT provider key.
-        redirectUris:
-          - "https://data.${TENANT_DOMAIN}/auth/oidc/keycloak/login/callback/"
-        postLogoutRedirectUris:
-          - "https://data.${TENANT_DOMAIN}/"
-        # No backchannelLogoutUrl: this app signs in through django-allauth,
+          redirectUris:
+            - "https://data.${TENANT_DOMAIN}/auth/oidc/keycloak/login/callback/"
+          postLogoutRedirectUris:
+            - "https://data.${TENANT_DOMAIN}/"
+        # No backchannelLogout: this app signs in through django-allauth,
         # whose OpenID Connect provider implements no endpoint for receiving a
         # logout_token. Signing out of the portal therefore leaves this app's own
         # session running until it expires on its own. Recorded rather than left
         # blank, so the absence reads as a limit of the app and not as an
         # oversight to be filled in.
-    database:
-      engine: postgresql
-      databasePerTenant: true
+      database:
+        engine: postgresql
       # Mathesar exists to explore Postgres data, and its "create a database"
       # flow issues CREATE DATABASE on this same server as the app role — so
       # without this the app installs successfully and is then unusable, with
@@ -109,74 +149,222 @@ spec:
       #
       # Safe to purge: everything the role creates is owned by it, and
       # `gtnctl apps uninstall --purge` drops every database that role owns.
-      allowDynamicDatabaseCreation: true
+        allowDynamicDatabaseCreation: true
 
   provides:
     - name: data-explorer
       protocol: http-html
 
-  optionalIntegrations:
+  integrations:
     - contract: central-navigation
       provider: portal
       capabilities:
         - navigation:register
 
-  portalTiles:
-    - name: mathesar-ce
-      displayName:
-        de_DE: "Mathesar"
-        en_US: "Mathesar"
-      # Direct OIDC Flow (guide §8a). Open allauth's provider login endpoint
-      # rather than "/": Mathesar's own landing page renders a "Log in to
-      # Mathesar" form with an SSO button and has no auto-redirect setting, so
-      # "/" would stop at that form even though the portal has already warmed up
-      # the Keycloak session cookie. Going straight here redirects to Keycloak,
-      # which returns immediately on an existing session — the tile opens
-      # already logged in. The path is allauth's, so it tracks
-      # SSO_CONFIG_DICT's provider key ("keycloak"), same as redirectUris above.
-      linkSuffix: "/auth/oidc/keycloak/login/"
-      linkTarget: embedded
-      allowedGroup: "App Users"
-
-  chart:
-    repository: "oci://ghcr.io/gentian-org/charts"
-    name: mathesar
-    version: "0.1.3"
-
-  deploymentMethod: crossplane
-
-  valueMapping:
-    oidc:
-      clientSecretKey: "oidc.clientSecret"
-    database:
-      hostKey: "database.host"
-      portKey: "database.port"
-      nameKey: "database.name"
-      userKey: "database.user"
-      passwordKey: "database.password"
-
-  appSecrets:
-    - name: secret_key
-      valuePath: "secretKey"
-    - name: bootstrap_admin_password
-      valuePath: "bootstrapAdminPassword"   # not consumed by the chart itself —
+  secrets:
+    generated:
+      - name: secret_key
+        valuePath: "secretKey"
+      - name: bootstrap_admin_password
+        valuePath: "bootstrapAdminPassword" # not consumed by the chart itself —
         # only via existingSecret key internal-bootstrap_admin_password, by
         # spec.postInstallJob and spec.provisioning.syncJob.
+
+  backup:
+    restore:
+      # What the restored data remembers of where it ran. Mathesar's own
+      # database keeps, for every database it connects to, the server's host
+      # and port, the database's name, the role it connects as and that role's
+      # password (encrypted with SECRET_KEY, which a bundle brings back). The
+      # databases it made itself are on the platform's server, as this app's
+      # role; a restore puts them back under the names it reports and makes the
+      # role's password new. Those entries are pointed at the server, role and
+      # password this pod is given and at the databases' names here; a
+      # connection to any other server is left as it was. Form redirects on
+      # the old domain name the new one. Idempotent; skips what a bundle that
+      # does not say where it was written (GENTIAN_RESTORE_* empty) cannot
+      # tell it. Nothing secret is passed in argv or printed.
+      #
+      # What a restore does not bring back, even on the same cluster: the
+      # tables' data returns intact, but Mathesar keys its saved explorations,
+      # forms, column order and display settings by PostgreSQL table OIDs, and
+      # a restore recreates the tables with new ones, so that metadata is lost.
+      # Database roles created inside Mathesar are not restored either: only
+      # this app's own login is recreated, and connections using such a role
+      # must be set up again (the command below names each one).
+      post:
+        - - python3
+          - -c
+          - |
+            import os, re, sys
+            os.chdir("/code")
+            sys.path.insert(0, "/code")
+            os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
+            import django
+            django.setup()
+            from django.db import connection, transaction
+            from config.database_config import get_internal_database_config
+            from mathesar.models.base import ConfiguredRole, Database, Form, Server
+
+            def say(m):
+                print("gentian-restore: " + m)
+
+            def pairs(var):
+                out = {}
+                for p in os.environ.get(var, "").split():
+                    old, _, new = p.partition("=")
+                    if old and new:
+                        out[old] = new
+                return out
+
+            here = get_internal_database_config()
+            databases = pairs("GENTIAN_RESTORE_DATABASES")
+            roles = pairs("GENTIAN_RESTORE_ROLES")
+            with connection.cursor() as c:
+                c.execute("SELECT datname FROM pg_database")
+                present = {r[0] for r in c.fetchall()}
+                c.execute("SELECT rolname FROM pg_roles")
+                logins = {r[0] for r in c.fetchall()}
+
+            def where(s):
+                return "%s:%s" % (s.host, s.port)
+
+            # The platform's server: the one this pod connects to, or one the
+            # bundle's own databases and login were on.
+            ours_dbs = set(databases) | set(databases.values())
+            ours_roles = set(roles) | set(roles.values()) | {here.role}
+            def ours(s):
+                if s.host == here.host and s.port == here.port:
+                    return True
+                return (s.roles.filter(name__in=ours_roles).exists()
+                        and s.databases.filter(name__in=ours_dbs).exists())
+
+            # An entry under a name in the bundle takes its name here, once that
+            # is on this server. A name here that is another's name in the bundle
+            # could not tell a second run that it was already renamed, so such an
+            # entry is left as it is and named.
+            def rename(rows, mapping, there, what):
+                rows = list(rows)
+                taken = {r.name for r in rows}
+                for r in rows:
+                    new = mapping.get(r.name)
+                    if not new or new == r.name or new not in there:
+                        continue
+                    if mapping.get(new, new) != new:
+                        say("%s %s would be named %s, itself a name in the bundle; left as it is" % (what, r.name, new))
+                    elif new in taken:
+                        say("%s %s would be named %s, which Mathesar already has; left as it is" % (what, r.name, new))
+                    else:
+                        taken.discard(r.name)
+                        taken.add(new)
+                        say("%s %s is now %s" % (what, r.name, new))
+                        r.name = new
+                        r.save(update_fields=["name"])
+
+            with transaction.atomic():
+                servers = [s for s in Server.objects.all() if ours(s)]
+                target = next((s for s in servers if s.host == here.host and s.port == here.port), None)
+                for s in servers:
+                    if s is target:
+                        continue
+                    if target is not None:
+                        say("Mathesar connects to %s and to %s, the server here; %s is left as it is" % (where(s), where(target), where(s)))
+                        continue
+                    old = where(s)
+                    s.host, s.port = here.host, here.port
+                    s.save(update_fields=["host", "port"])
+                    target = s
+                    say("connections to %s now go to %s" % (old, where(s)))
+
+                if target is not None:
+                    rename(target.databases.all(), databases, present, "database")
+                    rename(target.roles.all(), roles, logins, "role")
+                    for r in target.roles.all():
+                        if r.name == here.role:
+                            try:
+                                same = r.password == here.password
+                            except Exception:
+                                same = False  # not readable with this SECRET_KEY
+                            if not same:
+                                r.password = here.password
+                                r.save(update_fields=["password"])
+                                say("role %s connects with the password this pod is given" % r.name)
+                        elif r.name not in logins:
+                            say("role %s is not on this server: a restore brings back only this app's own login, "
+                                "so what connects as it fails until an administrator creates it again" % r.name)
+
+                src = os.environ.get("GENTIAN_RESTORE_SOURCE_DOMAIN", "").strip().lower()
+                dst = os.environ.get("GENTIAN_RESTORE_TARGET_DOMAIN", "").strip().lower()
+                if src and dst and src != dst:
+                    url = re.compile(r"(https?://)((?:[a-z0-9-]+\.)*)" + re.escape(src) + r"(?![a-z0-9-]|\.[a-z0-9])", re.I)
+                    for f in Form.objects.exclude(submit_redirect_url=None):
+                        new = url.sub(lambda m: m.group(1) + m.group(2) + dst, f.submit_redirect_url)
+                        if new != f.submit_redirect_url:
+                            f.submit_redirect_url = new
+                            f.save(update_fields=["submit_redirect_url"])
+                            say("form %d redirects to %s" % (f.id, dst))
 
   # Maps gentian:tenant:<t>:app-admins members to Mathesar is_superuser —
   # never the portalTiles allowedGroup above, which only gates the tile/OIDC
   # entitlement.
-  provisioning:
-    privilegedRole:
-      kind: group
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: "data"
+      backend:
+        service: "mathesar-ce"
+        port: 8000
+      tile:
+        displayName: "Mathesar"
+        logo: data:image/png;base64,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
+        image: assets/tile.png
+        path: /auth/oidc/keycloak/login/
+        relation: can_launch
+  hooks:
+    postInstall:
+      image: docker.io/mathesar/mathesar:0.12.0
+      script: |
+        #!/bin/sh
+        set -eu
+        export DJANGO_SETTINGS_MODULE=config.settings.production
+        export POSTGRES_HOST="$DB_HOST"
+        export POSTGRES_PORT="$DB_PORT"
+        export POSTGRES_DB="$DB_NAME"
+        export POSTGRES_USER="$DB_USER"
+        export POSTGRES_PASSWORD="$DB_PASSWORD"
+
+        # Idempotent: mirrors installation_incomplete's own gate
+        # (mathesar/views/installation/decorators.py) — a no-op once any
+        # superuser exists, so re-running this Job on every tenant reconcile is
+        # safe. The password never touches the Python source (os.environ, not
+        # string interpolation) so it can't break out of the quoted literal.
+        python3 manage.py shell -c "
+        import os
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        if not User.objects.filter(is_superuser=True).exists():
+            User.objects.create_superuser(
+                username='gentian-bootstrap-admin',
+                email='gentian-bootstrap-admin@internal.invalid',
+                password=os.environ['BOOTSTRAP_ADMIN_PASSWORD'],
+            )
+            print('created bootstrap superuser')
+        else:
+            print('a superuser already exists; nothing to do')
+        "
+
+    provisioning:
+      privilegedRole:
+        kind: group
       # Mathesar's privilege model is the boolean is_superuser, not a named
       # group, so this is descriptive only — the script below is what decides
       # what it means.
-      name: superuser
+        name: superuser
 
     # How this app applies that role. The platform resolves app-admins
     # membership, publishes it as JSON and runs this Job; everything below is
-    # Mathesar's own protocol and stays in Mathesar's catalogue entry, because
+    # Mathesar's own protocol and stays in Mathesar's catalog entry, because
     # the kernel must not know any application's admin API (app-profile-guide.md,
     # "Platform boundary").
     #
@@ -184,162 +372,95 @@ spec:
     # Idempotent by construction: it converges Mathesar to exactly the
     # membership it is handed rather than applying a delta, so re-running it is
     # always safe.
-    syncJob:
-      image: docker.io/mathesar/mathesar:0.12.0
+      syncJob:
+        image: docker.io/mathesar/mathesar:0.12.0
       # Bound key by key, not envFrom: the Secret's keys are hyphenated and
       # Kubernetes drops those from envFrom without a word, so the variable
       # would simply never appear.
-      env:
-        - name: BOOTSTRAP_ADMIN_PASSWORD
-          secretKeyRef:
-            name: mathesar-ce-sensitive-values
-            key: internal-bootstrap_admin_password
-      script: |
-        #!/bin/sh
-        set -eu
-        exec python3 - <<'PY'
-        import json, os, sys, urllib.request, base64
+        env:
+          - name: BOOTSTRAP_ADMIN_PASSWORD
+            secretKeyRef:
+              name: mathesar-ce-sensitive-values
+              key: internal-bootstrap_admin_password
+        script: |
+          #!/bin/sh
+          set -eu
+          exec python3 - <<'PY'
+          import json, os, sys, urllib.request, base64
 
-        # HTTP Basic Auth as the technical bootstrap superuser: the only auth
-        # mode users.* accepts (mathesar/rpc/decorators.py upstream). That
-        # account is created by spec.postInstallJob and is never a human.
-        USER = "gentian-bootstrap-admin"
-        PASSWORD = os.environ["BOOTSTRAP_ADMIN_PASSWORD"]
-        APP = os.environ["GENTIAN_APP"]
-        URL = "http://%s:8000/api/rpc/v0/" % APP
+          # HTTP Basic Auth as the technical bootstrap superuser: the only auth
+          # mode users.* accepts (mathesar/rpc/decorators.py upstream). That
+          # account is created by spec.postInstallJob and is never a human.
+          USER = "gentian-bootstrap-admin"
+          PASSWORD = os.environ["BOOTSTRAP_ADMIN_PASSWORD"]
+          APP = os.environ["GENTIAN_APP"]
+          URL = "http://%s:8000/api/rpc/v0/" % APP
 
-        def rpc(method, params=None):
-            body = json.dumps({
-                "jsonrpc": "2.0", "method": method,
-                "params": params or {}, "id": 1,
-            }).encode()
-            token = base64.b64encode(("%s:%s" % (USER, PASSWORD)).encode()).decode()
-            req = urllib.request.Request(URL, data=body, headers={
-                "Content-Type": "application/json",
-                "Authorization": "Basic " + token,
-                # ALLOWED_HOSTS covers the Service name; without a matching Host
-                # Django answers 400 DisallowedHost.
-                "Host": APP,
-            })
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                payload = json.load(resp)
-            if payload.get("error"):
-                raise SystemExit("mathesar rpc %s failed: %s" % (method, payload["error"]))
-            return payload.get("result")
+          def rpc(method, params=None):
+              body = json.dumps({
+                  "jsonrpc": "2.0", "method": method,
+                  "params": params or {}, "id": 1,
+              }).encode()
+              token = base64.b64encode(("%s:%s" % (USER, PASSWORD)).encode()).decode()
+              req = urllib.request.Request(URL, data=body, headers={
+                  "Content-Type": "application/json",
+                  "Authorization": "Basic " + token,
+                  # ALLOWED_HOSTS covers the Service name; without a matching Host
+                  # Django answers 400 DisallowedHost.
+                  "Host": APP,
+              })
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  payload = json.load(resp)
+              if payload.get("error"):
+                  raise SystemExit("mathesar rpc %s failed: %s" % (method, payload["error"]))
+              return payload.get("result")
 
-        with open(os.environ["GENTIAN_APP_ADMINS_FILE"]) as fh:
-            members = json.load(fh)
-        want = {m["email"].lower(): m for m in members if m.get("email")}
+          with open(os.environ["GENTIAN_APP_ADMINS_FILE"]) as fh:
+              members = json.load(fh)
+          want = {m["email"].lower(): m for m in members if m.get("email")}
 
-        existing = {u["email"].lower(): u for u in rpc("users.list") if u.get("email")}
+          existing = {u["email"].lower(): u for u in rpc("users.list") if u.get("email")}
 
-        for email, member in want.items():
-            user = existing.get(email)
-            if user is None:
-                # Pre-provision so the member's first SSO login links to this
-                # account instead of creating a fresh non-admin one
-                # (mathesar/sso.py save_user). The password is throwaway: the
-                # account is claimed via SSO, never by password login.
-                rpc("users.add", {"user_def": {
-                    "username": member.get("username") or email,
-                    "password": base64.urlsafe_b64encode(os.urandom(24)).decode(),
-                    "is_superuser": True,
-                    "email": email,
-                }})
-                print("provisioned %s" % email)
-            elif not user.get("is_superuser"):
-                rpc("users.patch_other", {
-                    "user_id": user["id"], "username": user["username"],
-                    "is_superuser": True, "email": user.get("email", ""),
-                    "full_name": user.get("full_name", ""),
-                    "display_language": user.get("display_language", "en"),
-                })
-                print("promoted %s" % email)
+          for email, member in want.items():
+              user = existing.get(email)
+              if user is None:
+                  # Pre-provision so the member's first SSO login links to this
+                  # account instead of creating a fresh non-admin one
+                  # (mathesar/sso.py save_user). The password is throwaway: the
+                  # account is claimed via SSO, never by password login.
+                  rpc("users.add", {"user_def": {
+                      "username": member.get("username") or email,
+                      "password": base64.urlsafe_b64encode(os.urandom(24)).decode(),
+                      "is_superuser": True,
+                      "email": email,
+                  }})
+                  print("provisioned %s" % email)
+              elif not user.get("is_superuser"):
+                  rpc("users.patch_other", {
+                      "user_id": user["id"], "username": user["username"],
+                      "is_superuser": True, "email": user.get("email", ""),
+                      "full_name": user.get("full_name", ""),
+                      "display_language": user.get("display_language", "en"),
+                  })
+                  print("promoted %s" % email)
 
-        # Demote anyone who lost membership. The bootstrap account is matched by
-        # username, not membership — it is what authenticates this very call and
-        # must never lock itself out.
-        for email, user in existing.items():
-            if user["username"] == USER or not user.get("is_superuser") or email in want:
-                continue
-            rpc("users.patch_other", {
-                "user_id": user["id"], "username": user["username"],
-                "is_superuser": False, "email": user.get("email", ""),
-                "full_name": user.get("full_name", ""),
-                "display_language": user.get("display_language", "en"),
-            })
-            print("demoted %s" % email)
+          # Demote anyone who lost membership. The bootstrap account is matched by
+          # username, not membership — it is what authenticates this very call and
+          # must never lock itself out.
+          for email, user in existing.items():
+              if user["username"] == USER or not user.get("is_superuser") or email in want:
+                  continue
+              rpc("users.patch_other", {
+                  "user_id": user["id"], "username": user["username"],
+                  "is_superuser": False, "email": user.get("email", ""),
+                  "full_name": user.get("full_name", ""),
+                  "display_language": user.get("display_language", "en"),
+              })
+              print("demoted %s" % email)
 
-        print("app administrators synchronised: %d" % len(want))
-        PY
+          print("app administrators synchronized: %d" % len(want))
+          PY
 
-  postInstallJob:
-    image: docker.io/mathesar/mathesar:0.12.0
-    script: |
-      #!/bin/sh
-      set -eu
-      export DJANGO_SETTINGS_MODULE=config.settings.production
-      export POSTGRES_HOST="$DB_HOST"
-      export POSTGRES_PORT="$DB_PORT"
-      export POSTGRES_DB="$DB_NAME"
-      export POSTGRES_USER="$DB_USER"
-      export POSTGRES_PASSWORD="$DB_PASSWORD"
-
-      # Idempotent: mirrors installation_incomplete's own gate
-      # (mathesar/views/installation/decorators.py) — a no-op once any
-      # superuser exists, so re-running this Job on every tenant reconcile is
-      # safe. The password never touches the Python source (os.environ, not
-      # string interpolation) so it can't break out of the quoted literal.
-      python3 manage.py shell -c "
-      import os
-      from django.contrib.auth import get_user_model
-      User = get_user_model()
-      if not User.objects.filter(is_superuser=True).exists():
-          User.objects.create_superuser(
-              username='gentian-bootstrap-admin',
-              email='gentian-bootstrap-admin@internal.invalid',
-              password=os.environ['BOOTSTRAP_ADMIN_PASSWORD'],
-          )
-          print('created bootstrap superuser')
-      else:
-          print('a superuser already exists; nothing to do')
-      "
-
-  ingress:
-    subDomain: "data"
-    serviceName: "mathesar-ce"
-    servicePort: 8000
-    tlsEnabled: true
-
-  extraValues:
-    fullnameOverride: "mathesar-ce"
-
-    allowedHosts: ".${TENANT_DOMAIN}"
-    instanceName: "Mathesar"
-
-    oidc:
-      enabled: true
-      providerKey: keycloak
-      clientId: "gentian-mathesar"
-      # Note the /auth prefix: Gentian's Keycloak serves realms under it, so
-      # .../realms/<tenant>/.well-known/openid-configuration returns 404 and
-      # allauth turns that into a bare "Server Error (500)" at login. Same base
-      # as xwiki-ce's oidc.provider — the issuer this returns
-      # (https://id.<kernel>/auth/realms/<tenant>) must also match the one the
-      # operator seeds, or token validation fails on the claim instead.
-      serverUrl: "https://id.${KERNEL_DOMAIN}/auth/realms/${TENANT_ID}"
-
-    ingress:
-      enabled: false
-
-    persistence:
-      enabled: true
-      size: "5Gi"
-
-    podAnnotations:
-      secret.reloader.stakater.com/reload: mathesar-ce-sensitive-values
-
-  # Customization ladder — see customization.md
   customization:
     grade: C
     rubricScore: 3
@@ -366,3 +487,4 @@ spec:
       requiresApproval: platform-team
     fork:
       allowed: false
+  launch: tile

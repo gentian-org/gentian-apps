@@ -1,4 +1,7 @@
 {{- if .Values.networkPolicy.create }}
+{{- /* The edge is selected by the labels its namespace carries, not by its
+     name: the name is the cluster's to choose, and the one written here before
+     was a namespace the platform no longer has. */}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -14,7 +17,8 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: envoy-gateway-system
+              gentianos.io/tier: kernel
+              gentianos.io/function: edge
   egress:
     - to:
         - namespaceSelector:
@@ -26,5 +30,6 @@ spec:
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: envoy-gateway-system
+              gentianos.io/tier: kernel
+              gentianos.io/function: edge
 {{- end }}
