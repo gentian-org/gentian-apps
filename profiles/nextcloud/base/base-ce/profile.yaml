@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.2-dev.1"
+  version: "0.5.2-dev.2"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -752,41 +752,52 @@ spec:
                     }
                     $addr = preg_replace('/_/', '@', $key, 1);
                     $local = explode('@', $addr)[0];
-                    if (!$users->userExists($local)) {
-                        continue;
+                    // The mailbox's users: those whose address it is, here or on the
+                    // domain the data came from, and one named after its local part.
+                    // Someone who signs in through the realm has the ID user_oidc derives
+                    // (--unique-uid), never the name, so only the address finds them.
+                    $owners = $users->getByEmail($addr);
+                    if ($src !== '') {
+                        $owners = array_merge($owners, $users->getByEmail("$local@$src"));
                     }
-                    $accounts = json_decode($run($export, ['user-id' => $local, '--output' => 'json']), true) ?: [];
-                    foreach ($accounts as $account) {
-                        $email = strtolower((string)($account['email'] ?? ''));
-                        if ($email !== strtolower($addr) && !($src !== '' && $email === strtolower("$local@$src"))) {
-                            continue;
+                    $uids = array_map(fn ($user) => $user->getUID(), $owners);
+                    if ($users->userExists($local)) {
+                        $uids[] = $local;
+                    }
+                    foreach (array_unique($uids) as $uid) {
+                        $accounts = json_decode($run($export, ['user-id' => $uid, '--output' => 'json']), true) ?: [];
+                        foreach ($accounts as $account) {
+                            $email = strtolower((string)($account['email'] ?? ''));
+                            if ($email !== strtolower($addr) && !($src !== '' && $email === strtolower("$local@$src"))) {
+                                continue;
+                            }
+                            $args = [
+                                'account-id' => (string)$account['id'],
+                                '--email' => $addr,
+                                '--imap-user' => $addr,
+                                '--imap-password' => rtrim((string)file_get_contents($path), "\n"),
+                                '--imap-host' => getenv('GENTIAN_IMAP_HOST') ?: 'dovecot-prod.platform-kernel.svc.cluster.local',
+                                '--imap-port' => getenv('GENTIAN_IMAP_PORT') ?: '143',
+                                '--imap-ssl-mode' => getenv('GENTIAN_IMAP_SSL') ?: 'none',
+                            ];
+                            if (getenv('SMTP_HOST')) {
+                                $args['--smtp-host'] = getenv('SMTP_HOST');
+                                $args['--smtp-port'] = getenv('SMTP_PORT') ?: '587';
+                            }
+                            if (strtolower((string)($account['name'] ?? '')) === $email) {
+                                $args['--name'] = $addr;
+                            }
+                            $run($update, $args);
+                            // mail:account:update sets the IMAP user only together with an
+                            // SMTP user, and these accounts have none.
+                            if (strtolower((string)($account['imap']['user'] ?? '')) !== strtolower($addr)) {
+                                $mapper = \OCP\Server::get(\OCA\Mail\Db\MailAccountMapper::class);
+                                $row = $mapper->findById((int)$account['id']);
+                                $row->setInboundUser($addr);
+                                $mapper->save($row);
+                            }
+                            $say("mail account {$account['id']} of $uid set to this cluster's credential");
                         }
-                        $args = [
-                            'account-id' => (string)$account['id'],
-                            '--email' => $addr,
-                            '--imap-user' => $addr,
-                            '--imap-password' => rtrim((string)file_get_contents($path), "\n"),
-                            '--imap-host' => getenv('GENTIAN_IMAP_HOST') ?: 'dovecot-prod.platform-kernel.svc.cluster.local',
-                            '--imap-port' => getenv('GENTIAN_IMAP_PORT') ?: '143',
-                            '--imap-ssl-mode' => getenv('GENTIAN_IMAP_SSL') ?: 'none',
-                        ];
-                        if (getenv('SMTP_HOST')) {
-                            $args['--smtp-host'] = getenv('SMTP_HOST');
-                            $args['--smtp-port'] = getenv('SMTP_PORT') ?: '587';
-                        }
-                        if (strtolower((string)($account['name'] ?? '')) === $email) {
-                            $args['--name'] = $addr;
-                        }
-                        $run($update, $args);
-                        // mail:account:update sets the IMAP user only together with an
-                        // SMTP user, and these accounts have none.
-                        if (strtolower((string)($account['imap']['user'] ?? '')) !== strtolower($addr)) {
-                            $mapper = \OCP\Server::get(\OCA\Mail\Db\MailAccountMapper::class);
-                            $row = $mapper->findById((int)$account['id']);
-                            $row->setInboundUser($addr);
-                            $mapper->save($row);
-                        }
-                        $say("mail account {$account['id']} of $local set to this cluster's credential");
                     }
                 }
             }
