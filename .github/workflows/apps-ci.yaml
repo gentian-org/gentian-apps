@@ -299,56 +299,6 @@ jobs:
           branch-versions: ${{ needs.release-gate.outputs.develop }}
           pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
 
-  test-odoo-adapter:
-    needs: [scope]
-    if: needs.scope.outputs.relevant == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
-        with:
-          version: "0.13.3"
-      - name: The engine, the shipped tool packs and the MCP server
-        working-directory: images/odoo-adapter
-        run: uv run --python 3.12 --with-requirements requirements.txt --with pytest==8.4.2 -- python -m pytest -q tests
-
-  build-odoo-adapter:
-    needs: [release-gate, scope, test-odoo-adapter]
-    if: needs.scope.outputs.relevant == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Read chart version
-        id: version
-        run: |
-          CHART_VERSION=$(grep '^version:' images/odoo-adapter/chart/Chart.yaml | awk '{print $2}')
-          echo "chart_version=${CHART_VERSION}" >> "$GITHUB_OUTPUT"
-
-      - name: Build and push image
-        uses: ./.github/actions/image
-        with:
-          dir: images/odoo-adapter
-          publish: ${{ needs.release-gate.outputs.publish }}
-          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
-          refs: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/odoo-adapter:${{ steps.version.outputs.chart_version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/odoo-adapter:${{ github.sha }}
-
-      - name: Package and push chart
-        uses: ./.github/actions/chart
-        with:
-          dir: images/odoo-adapter/chart
-          publish: ${{ needs.release-gate.outputs.publish }}
-          branch-versions: ${{ needs.release-gate.outputs.develop }}
-          pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
-
   build-xwiki:
     needs: [release-gate, scope]
     if: needs.scope.outputs.relevant == 'true'
@@ -577,7 +527,6 @@ jobs:
           uvx pip-audit --strict -r /tmp/template.txt
           uvx pip-audit --strict -r images/nextcloud-mcp/requirements.txt
           uvx pip-audit --strict -r images/paperless-ngx-mcp/requirements.txt
-          uvx pip-audit --strict -r images/odoo-adapter/requirements.txt
 
   validate-profiles:
     needs: [scope]
@@ -927,7 +876,7 @@ jobs:
   # run: a decision that was skipped is not a decision.
   gate:
     runs-on: ubuntu-latest
-    needs: [release-gate, scope, e2e-scope, audit-python, build-nextcloud, build-nextcloud-mcp, build-xwiki, assemble-catalogue-site, publish-catalogue, validate-profiles, build-odoo-chart, build-git-modules-sidecar-chart, build-mathesar-chart, build-docmost-chart, build-erpnext-chart, build-paperless-ngx-chart, build-paperless-ngx-mcp, test-odoo-adapter, build-odoo-adapter, build-git-modules-sidecar-image, test-sso-saml-sidecar, e2e-sso-saml-sidecar, e2e-oidc-sign-out, e2e-restore-rewrites, build-sso-saml-sidecar-image]
+    needs: [release-gate, scope, e2e-scope, audit-python, build-nextcloud, build-nextcloud-mcp, build-xwiki, assemble-catalogue-site, publish-catalogue, validate-profiles, build-odoo-chart, build-git-modules-sidecar-chart, build-mathesar-chart, build-docmost-chart, build-erpnext-chart, build-paperless-ngx-chart, build-paperless-ngx-mcp, build-git-modules-sidecar-image, test-sso-saml-sidecar, e2e-sso-saml-sidecar, e2e-oidc-sign-out, e2e-restore-rewrites, build-sso-saml-sidecar-image]
     if: always()
     steps:
       - env:
