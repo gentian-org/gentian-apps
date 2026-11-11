@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: LGPL-3.0
+# ComponentProfile -- the Odoo adapter (odoo-adapter-ce)
+#
+# Turns the tenant's Odoo into tools for a program that acts for a person:
+# images/odoo-adapter, an MCP server at odoo-adapter:8765/mcp. Its tools are
+# the tool packs in its chart (images/odoo-adapter/chart/packs), one per Odoo
+# module, reviewed with this entry. A pack's tools are offered only while its
+# module is active.
+#
+# It holds no credential of Odoo. Each MCP request carries one in
+# Authorization, which goes on to Odoo's JSON-2 API with the calls that
+# request makes, so Odoo decides what the call may see and change, by the
+# rights of whoever the credential belongs to.
+#
+# As an adapter it reaches odoo-base-ce and nothing else in the tenant, and
+# only the tenant's components that speak as a person reach it.
+apiVersion: gentianos.io/v1alpha1
+kind: ComponentProfile
+metadata:
+  name: odoo-adapter-ce
+  labels:
+    gentianos.io/profile-name: odoo-adapter-ce
+    gentianos.io/profile-family: odoo
+    gentianos.io/profile-edition: ce
+spec:
+  classes:
+    - adapter
+  launch: none
+  trustTier: certified
+  version: "0.1.0"
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
+  adapter:
+    adapts:
+      profile: odoo-base-ce
+      versions: ["0.5.1"]
+  package:
+    chart:
+      repository: oci://ghcr.io/gentian-org/charts
+      name: odoo-adapter
+      version: "0.1.0-develop.095d9d4"
+    extraValues:
+      # The Service's name, where callers reach the adapter.
+      fullnameOverride: odoo-adapter
+      image:
+        repository: ghcr.io/gentian-org/odoo-adapter
+        tag: "develop-095d9d4"
+      # odoo-base-ce's Service, in the same namespace.
+      odooUrl: http://odoo:8069

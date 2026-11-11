@@ -102,6 +102,10 @@ def check_surface(path: pathlib.Path, doc: dict) -> list[str]:
         # while this check called it characterized.
         if role in INHERITING_ROLES:
             return errors
+        # An adapter is not an app a tenant customizes: it is the catalog's own
+        # code over another app's interface, and has no ladder to climb.
+        if "adapter" in (spec.get("classes") or []):
+            return errors
         return [
             f"{path}: missing spec.customization — characterize the app "
             f"(see docs/customization-ladder.md) or mark it deployment-role: addon. "
