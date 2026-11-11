@@ -1,0 +1,50 @@
+image:
+  repository: ghcr.io/gentian-org/odoo-adapter
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+# The Service's name: where the platform's callers reach the adapter.
+fullnameOverride: ""
+
+port: 8765
+
+# Where Odoo is, inside the namespace: odoo-base-ce's Service.
+odooUrl: "http://odoo:8069"
+# The database to ask for in X-Odoo-Database. Empty leaves the choice to
+# Odoo, which serves its one database.
+odooDatabase: ""
+
+# The Odoo modules whose tool packs are offered. null offers every pack the
+# chart carries; a list offers only those modules' packs, and an empty list
+# offers none.
+activeModules: null
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 192Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+# Extra labels for the pod template. The platform sets gentianos.io/app and
+# gentianos.io/tenant here; the adapter's network rules select on them.
+podLabels: {}

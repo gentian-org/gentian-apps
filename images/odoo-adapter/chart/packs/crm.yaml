@@ -1,0 +1,183 @@
+# Tool pack: Odoo CRM (module crm, model crm.lead).
+# The format is in images/odoo-adapter/odoo_tools.py. A change to what a tool
+# does, needs or is classed as is a new version of that tool.
+#
+# Every tool here works on opportunities only (type = opportunity), never on
+# leads that were not qualified yet.
+module: crm
+tools:
+  - name: search-opportunities
+    version: 1
+    class: read
+    description: >-
+      Find opportunities by part of their name, their customer or the
+      contact's e-mail, and by stage. Answers the newest first.
+    model: crm.lead
+    operation: search
+    domain: [[type, "=", opportunity]]
+    fields: [id, name, partner_id, stage_id, expected_revenue, probability, date_deadline, user_id]
+    inputs:
+      query:
+        description: Part of the opportunity's name, its customer's name or the contact's e-mail.
+        match: [name, partner_id.name, contact_name, email_from]
+      stage:
+        description: Part of the stage's name, as list-stages answers it.
+        match: [stage_id.name]
+      limit:
+        description: How many opportunities to answer at most.
+        limit: true
+        default: 20
+        maximum: 100
+
+  - name: get-opportunity
+    version: 1
+    class: read
+    description: One opportunity with its customer, contact, stage, figures and notes, by its id.
+    model: crm.lead
+    operation: read
+    domain: [[type, "=", opportunity]]
+    fields: [id, name, partner_id, contact_name, email_from, phone, stage_id, expected_revenue, probability, date_deadline, user_id, tag_ids, description, create_date]
+    inputs:
+      opportunity_id:
+        description: The opportunity's id, as search-opportunities answers it.
+        target: true
+
+  - name: list-stages
+    version: 1
+    class: read
+    description: The stages an opportunity can be in, in their order.
+    model: crm.stage
+    operation: search
+    fields: [id, name, sequence, is_won]
+    inputs:
+      limit:
+        description: How many stages to answer at most.
+        limit: true
+        default: 50
+        maximum: 100
+
+  - name: create-opportunity
+    version: 1
+    class: change
+    description: Create an opportunity, for a customer contact if one is given.
+    model: crm.lead
+    operation: create
+    values:
+      type: opportunity
+    inputs:
+      name:
+        description: What the opportunity is about.
+        field: name
+        required: true
+      customer_id:
+        type: integer
+        description: The customer's contact id, as search-contacts answers it.
+        field: partner_id
+      expected_revenue:
+        type: number
+        description: Expected revenue, in the company's currency.
+        field: expected_revenue
+      date_deadline:
+        type: date
+        description: Expected closing date, YYYY-MM-DD.
+        field: date_deadline
+      description:
+        type: text
+        description: Notes about the opportunity.
+        field: description
+
+  - name: update-opportunity
+    version: 1
+    class: change
+    description: >-
+      Change an opportunity's name, stage, expected revenue, probability,
+      closing date, salesperson or notes.
+    model: crm.lead
+    operation: write
+    domain: [[type, "=", opportunity]]
+    inputs:
+      opportunity_id:
+        description: The opportunity's id.
+        target: true
+      name:
+        description: New name.
+        field: name
+      stage_id:
+        type: integer
+        description: The new stage's id, as list-stages answers it.
+        field: stage_id
+      expected_revenue:
+        type: number
+        description: New expected revenue.
+        field: expected_revenue
+      probability:
+        type: number
+        description: New probability of winning, 0 to 100.
+        field: probability
+      date_deadline:
+        type: date
+        description: New expected closing date, YYYY-MM-DD.
+        field: date_deadline
+      salesperson_id:
+        type: integer
+        description: The id of the user who is to own the opportunity.
+        field: user_id
+      description:
+        type: text
+        description: New notes, replacing the old ones.
+        field: description
+
+  - name: log-note
+    version: 1
+    class: change
+    description: >-
+      Add an internal note to an opportunity's history. Nobody outside the
+      company is told.
+    model: crm.lead
+    operation: call
+    method: message_post
+    domain: [[type, "=", opportunity]]
+    arguments:
+      message_type: comment
+      subtype_xmlid: mail.mt_note
+    inputs:
+      opportunity_id:
+        description: The opportunity's id.
+        target: true
+      body:
+        type: text
+        description: The note, as plain text.
+        argument: body
+        required: true
+
+  - name: send-email
+    version: 1
+    class: irreversible
+    description: >-
+      Send an e-mail from an opportunity to the contacts given, from the
+      person's own address, and keep it in the opportunity's history. The
+      opportunity's followers are told as well. Sent mail cannot be taken back.
+    model: crm.lead
+    operation: call
+    method: message_post
+    domain: [[type, "=", opportunity]]
+    arguments:
+      message_type: comment
+      subtype_xmlid: mail.mt_comment
+    inputs:
+      opportunity_id:
+        description: The opportunity's id.
+        target: true
+      recipient_ids:
+        type: integers
+        description: The ids of the contacts to send it to, as search-contacts answers them.
+        argument: partner_ids
+        required: true
+      subject:
+        description: The subject line.
+        argument: subject
+      body:
+        type: text
+        description: The message, as plain text.
+        argument: body
+        required: true
