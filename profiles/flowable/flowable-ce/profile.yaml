@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: Apache-2.0
+# ComponentProfile — Flowable (process, case and decision engines)
+#
+# Source: Flowable publishes no Helm chart for its REST application, so this
+#   profile is backed by a first-party Gentian chart: charts/flowable/. The
+#   chart wraps the official docker.io/flowable/flowable-rest image
+#   unmodified.
+#
+# Nobody opens it. It has no route and no tile: it is reached inside the
+# tenant's namespace, by an app the tenant's administrator granted its
+# contract to, and by nothing else.
+#
+# ── The contract and its credential ─────────────────────────────────────────
+# Flowable's REST API has accounts of its own and no single sign-on. This
+# profile gives it exactly one account, and that account is the credential
+# of the contract process-engine: the platform generates the pair per tenant
+# and hands it to this component (valueMapping.integrations below) and to the
+# app that consumes the contract. The consumer learns the address only once
+# the contract is granted, and the network path between the two is opened
+# with the same grant.
+#
+# Secret inventory:
+#   Platform-provided:
+#     database host/port/name/user/password (valueMapping.database)
+#     the contract's user and password (valueMapping.integrations)
+#   Generated: none.
+apiVersion: gentianos.io/v1alpha1
+kind: ComponentProfile
+metadata:
+  name: flowable-ce
+  labels:
+    gentianos.io/profile-name: flowable-ce
+    gentianos.io/profile-family: flowable
+    gentianos.io/profile-edition: ce
+spec:
+  classes:
+    - app
+  trustTier: certified
+  version: "0.1.0"
+  launch: none
+  package:
+    chart:
+      repository: "oci://ghcr.io/gentian-org/charts"
+      name: flowable
+      version: "0.1.0"
+
+    valueMapping:
+      database:
+        hostKey: "database.host"
+        portKey: "database.port"
+        nameKey: "database.name"
+        userKey: "database.user"
+        passwordKey: "database.password"
+      integrations:
+        process-engine:
+          userKey: "admin.user"
+          passwordKey: "admin.password"
+
+    extraValues:
+      fullnameOverride: "flowable-ce"
+
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
+    services:
+      database:
+        engine: postgresql
+
+  provides:
+    - name: process-engine
+      protocol: http-json
+      endpoint:
+        service: flowable-ce
+        port: 8080
+        path: /flowable-rest
+
+  # Not characterized against the customization ladder.
+  customization:
+    grade: unknown
+    supportedRungs: [L0, L4]
