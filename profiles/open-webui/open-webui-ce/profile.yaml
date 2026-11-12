@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.2-dev"
+  version: "0.5.2-dev.1"
   package:
     chart:
       repository: "https://helm.openwebui.com"
@@ -241,6 +241,11 @@ spec:
       extraEnvFrom:
         - secretRef:
             name: llm-credentials-open-webui-ce
+
+      # The cache's address and password reach the app as env from this
+      # Secret, read once at start: a restart when it changes picks them up.
+      podAnnotations:
+        secret.reloader.stakater.com/reload: open-webui-ce-sensitive-values
 
       copyAppData:
         command: ["sh", "-c", "cp -R -n /app/backend/data/. /tmp/app-data/ || true"]
