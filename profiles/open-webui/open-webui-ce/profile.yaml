@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.2-dev"
+  version: "0.5.2-dev.1"
   package:
     chart:
       repository: "https://helm.openwebui.com"
