@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1"
+  version: "0.5.2-dev"
   package:
     chart:
       repository: "https://helm.openwebui.com"
@@ -154,12 +154,15 @@ spec:
       # found an empty model picker: "No results found", while an admin saw the
       # same instance offering the model perfectly well.
       #
-      # The entitlement boundary is already drawn twice before this point, and
-      # both are stronger than this list. A member reaches this app at all only
-      # by holding gentian:tenant:<t>:app:open-webui-ce, and the LiteLLM key this
-      # instance carries is scoped to the tenant's own team, so the models on
-      # offer are the tenant's models. A third check that defaults to denying
-      # everyone adds no boundary, only an empty dropdown.
+      # Who may use which model is decided in two places before this one. A
+      # member reaches this app at all only by holding
+      # gentian:tenant:<t>:app:open-webui-ce. The LiteLLM key this instance
+      # carries is the operator's: it names the tenant's team, lists the
+      # tenant's models (the cluster's local models plus the providers granted
+      # to the tenant, spec.llm.providers on its Tenant) and reaches only the
+      # chat, embeddings and model-list routes, so the gateway refuses any
+      # other model. A third check that defaults to denying everyone adds no
+      # boundary, only an empty dropdown.
         - name: BYPASS_MODEL_ACCESS_CONTROL
           value: "true"
         - name: ENABLE_OAUTH_ROLE_MANAGEMENT
