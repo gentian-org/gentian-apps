@@ -335,6 +335,43 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ steps.versions.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/xwiki:${{ github.sha }}
 
+  # Open WebUI: upstream's slim image with its frontend rebuilt from the same
+  # release plus images/open-webui/patches (an L5 patch, gentian-apps#306).
+  build-open-webui:
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Read Open WebUI versions
+        id: versions
+        run: |
+          # shellcheck disable=SC1091
+          source images/open-webui/versions.env
+          {
+            echo "image_tag=${IMAGE_TAG}"
+            echo "open_webui_version=${OPEN_WEBUI_VERSION}"
+            echo "open_webui_commit=${OPEN_WEBUI_COMMIT}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Open WebUI image
+        uses: ./.github/actions/image
+        with:
+          dir: images/open-webui
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
+          args: |
+            OPEN_WEBUI_VERSION=${{ steps.versions.outputs.open_webui_version }}
+            OPEN_WEBUI_COMMIT=${{ steps.versions.outputs.open_webui_commit }}
+          refs: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/open-webui:${{ steps.versions.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/open-webui:${{ github.sha }}
+
   # The catalog source, served over https for directors to fetch from.
   #
   # GitHub Pages because this repository is public and these are the same
