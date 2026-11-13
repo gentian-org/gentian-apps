@@ -53,8 +53,15 @@ updates:
       - /images/gentian-sidecar-sso-saml
       - /images/nextcloud-mcp
       - /images/xwiki
+      - /images/open-webui
     schedule:
       interval: weekly
+    # Open WebUI's runtime image moves only together with OPEN_WEBUI_VERSION,
+    # the source tag its frontend is rebuilt from and the patch series checked
+    # against it (images/open-webui/versions.env); a bump of the image alone
+    # would run one release's backend under another's frontend.
+    ignore:
+      - dependency-name: "*open-webui/open-webui"
     groups:
       base-images:
         patterns: ["*"]
