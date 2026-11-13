@@ -23,12 +23,12 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1"
+  version: "0.5.2"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
       name: odoo
-      version: "0.1.27"
+      version: "0.1.28"
 
     valueMapping:
       oidc:
@@ -90,6 +90,10 @@ spec:
         # the kernel gateway. ${TENANT_ID} is the realm, which matches the
         # public issuer's realm segment.
           internalIssuer: "http://gentian-idp-keycloak-keycloakx-http.kernel-authentication.svc.cluster.local:8080/auth/realms/${TENANT_ID}"
+        # What the realm names as the audience of a token it issues for this
+        # Odoo alone (exchangeToken on the web entry): the profile's name. The
+        # platform module accepts such a token on the JSON-2 API.
+          tokenAudience: odoo-base-ce
       # The chart's own git-sync, running in Odoo's pod: an init container that
       # clones once before Odoo starts, and a sidecar that re-syncs on the
       # interval. Both are upstream git-sync at 999:999, writing the emptyDir
@@ -308,6 +312,10 @@ spec:
       surface: gateway
       authMode: oidc
       subDomain: odoo
+      # The realm issues a person's token for this Odoo alone, which is what a
+      # program acting for that person presents on the JSON-2 API. The browser's
+      # requests are handed one too; Odoo's pages do not read it.
+      exchangeToken: true
       backend:
         service: odoo
         port: 8069
