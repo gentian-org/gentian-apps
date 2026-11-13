@@ -216,6 +216,9 @@
           "properties": {
             "internalIssuer": {
               "type": "string"
+            },
+            "tokenAudience": {
+              "type": "string"
             }
           },
           "additionalProperties": false
