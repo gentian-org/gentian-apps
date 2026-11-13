@@ -76,22 +76,22 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+          # The port, not a page: every path of the REST application asks
+          # for the administrator's account, its health page included, and a
+          # probe holds none. The port opens once the engines have started.
           startupProbe:
-            httpGet:
-              path: /flowable-rest/actuator/health
+            tcpSocket:
               port: http
             periodSeconds: 10
             failureThreshold: 60
           livenessProbe:
-            httpGet:
-              path: /flowable-rest/actuator/health
+            tcpSocket:
               port: http
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 5
           readinessProbe:
-            httpGet:
-              path: /flowable-rest/actuator/health
+            tcpSocket:
               port: http
             periodSeconds: 10
             timeoutSeconds: 5
