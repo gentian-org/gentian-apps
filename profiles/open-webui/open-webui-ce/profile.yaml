@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.2-dev.1"
+  version: "0.5.2-dev.2"
   package:
     chart:
       repository: "https://helm.openwebui.com"
@@ -223,8 +223,11 @@ spec:
       ingress:
         enabled: false
 
+      # Our build of upstream's 0.10.2-slim, with a patched sign-in page
+      # (images/open-webui, customizations/sign-in-page-patch.yaml).
       image:
-        tag: "0.10.2-slim"
+        repository: ghcr.io/gentian-org/open-webui
+        tag: "develop-71f8715"
 
       persistence:
         enabled: true

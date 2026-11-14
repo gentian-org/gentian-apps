@@ -14,7 +14,10 @@ const { test, before, after } = require('node:test');
 const r = require('./lib/restore');
 
 const PROFILE = r.profileOf('profiles/open-webui/open-webui-ce');
-const IMAGE = `ghcr.io/open-webui/open-webui:${PROFILE.spec.package.extraValues.image.tag}`;
+// The repository the profile names, and the chart's default where it names
+// none: the profile runs our own build (images/open-webui) at times.
+const IMAGE_VALUES = PROFILE.spec.package.extraValues.image;
+const IMAGE = `${IMAGE_VALUES.repository || 'ghcr.io/open-webui/open-webui'}:${IMAGE_VALUES.tag}`;
 const DATA = '/app/backend/data';
 
 const OLD = { url: 'https://ai-chat.old.e2e.test', gateway: 'http://gateway.zrh-1.example/v1', key: 'old-gateway-key-0123456789' };
