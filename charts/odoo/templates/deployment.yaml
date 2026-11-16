@@ -353,6 +353,12 @@ spec:
             # behavior for anything not running against a kernel Keycloak.
             - name: OIDC_INTERNAL_ISSUER
               value: {{ .Values.gentian.oidc.internalIssuer | default "" | quote }}
+            # The audience the realm puts into a person's token issued for this
+            # Odoo alone (the profile's name). With it set, the platform module
+            # accepts such a token on the JSON-2 API beside Odoo's own API keys;
+            # empty, it accepts none.
+            - name: GENTIAN_TOKEN_AUDIENCE
+              value: {{ .Values.gentian.oidc.tokenAudience | default "" | quote }}
             - name: GENTIAN_TENANT_ID
               value: {{ .Values.tenantId | quote }}
             - name: GENTIAN_CONFIG_PATH

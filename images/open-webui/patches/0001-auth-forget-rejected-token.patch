@@ -1,0 +1,96 @@
+Description: Forget a token the server rejects, and stop the sign-in page's redirect loop
+ After a sign-out elsewhere (back-channel logout), the browser keeps the
+ token the server has revoked. The sign-in page then (a) skips the SSO
+ auto-redirect because a token cookie is present and ends on "invalid
+ token", or (b) leaves /auth for / because the layout set the user to null
+ and `null !== undefined`, and / sends it back to /auth, re-running the
+ auto-redirect each time until the page freezes. This patch forgets a
+ rejected token (cookie and local storage), leaves /auth only for a
+ signed-in user, and allows one automatic SSO redirect per 15 seconds.
+Author: Gentian platform team
+Origin: other, https://github.com/gentian-org/gentian-apps/issues/306
+Bug-Upstream: none yet
+Forwarded: no
+Applied-Upstream: no
+Last-Update: 2026-11-13
+---
+diff --git a/src/routes/auth/+page.svelte b/src/routes/auth/+page.svelte
+index 1ccfecf..72c8973 100644
+--- a/src/routes/auth/+page.svelte
++++ b/src/routes/auth/+page.svelte
+@@ -113,6 +113,15 @@
+ 		}
+ 	};
+ 
++	// [gentian] A token the server no longer accepts -- revoked by a sign-out
++	// elsewhere (back-channel logout) -- is forgotten, from the cookie the
++	// OAuth callback sets and from local storage. Left in place it stops the
++	// SSO auto-redirect below and the page ends on "invalid token".
++	const forgetToken = () => {
++		localStorage.removeItem('token');
++		document.cookie = 'token=; Max-Age=0; path=/';
++	};
++
+ 	const oauthCallbackHandler = async () => {
+ 		// Get the value of the 'token' cookie
+ 		function getCookie(name) {
+@@ -127,12 +136,10 @@
+ 			return;
+ 		}
+ 
+-		const sessionUser = await getSessionUser(token).catch((error) => {
+-			toast.error(`${error}`);
+-			return null;
+-		});
++		const sessionUser = await getSessionUser(token).catch(() => null);
+ 
+ 		if (!sessionUser) {
++			forgetToken(); // [gentian]
+ 			return;
+ 		}
+ 
+@@ -167,7 +174,10 @@
+ 
+ 	onMount(async () => {
+ 		const redirectPath = $page.url.searchParams.get('redirect');
+-		if ($user !== undefined) {
++		// [gentian] Only a signed-in user leaves this page. The layout sets the
++		// user to null when the session is rejected, and leaving on null sent
++		// the page back to / and from there here again, in a loop.
++		if ($user) {
+ 			goto(redirectPath || '/');
+ 		} else {
+ 			if (redirectPath) {
+@@ -183,6 +193,14 @@
+ 		await oauthCallbackHandler();
+ 		form = $page.url.searchParams.get('form');
+ 
++		// [gentian] A token kept in local storage only is checked the same way.
++		if (localStorage.token && !$user) {
++			const sessionUser = await getSessionUser(localStorage.token).catch(() => null);
++			if (!sessionUser) {
++				forgetToken();
++			}
++		}
++
+ 		// Auto-redirect to SSO when OAUTH_AUTO_REDIRECT is enabled and the
+ 		// deployment is unambiguously SSO-only (single provider, no login form,
+ 		// no LDAP). Suppressed by ?form=, ?error=, onboarding, trusted-header
+@@ -199,8 +217,15 @@
+ 				!localStorage.token &&
+ 				!document.cookie.split('; ').some((c) => c.startsWith('token='))
+ 			) {
+-				window.location.href = `${WEBUI_BASE_URL}/oauth/${providers[0]}/login`;
+-				return;
++				// [gentian] At most one automatic redirect in 15 seconds: should
++				// anything bring the page back here at once, it shows the sign-in
++				// button instead of redirecting again.
++				const last = Number(sessionStorage.getItem('gentian-sso-redirect-at') || 0);
++				if (Date.now() - last > 15000) {
++					sessionStorage.setItem('gentian-sso-redirect-at', String(Date.now()));
++					window.location.href = `${WEBUI_BASE_URL}/oauth/${providers[0]}/login`;
++					return;
++				}
+ 			}
+ 		}
+ 

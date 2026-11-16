@@ -1,0 +1,93 @@
+# Customization record — see gentian-os/docs/guides/app-customization.md §5
+#
+# Covers the patch to Open WebUI's sign-in page that our image carries
+# (images/open-webui/patches/), gentian-apps#306.
+apiVersion: gentianos.io/v1alpha1
+kind: Customization
+metadata:
+  # Named after the profile it travels with. No namespace: a companion in a
+  # profile bundle states none, and the cluster puts it where its catalog
+  # is applied.
+  name: open-webui-ce.sign-in-page-patch
+  labels:
+    gentianos.io/profile-name: open-webui-ce
+spec:
+  summary: "Sign people in again by SSO after a sign-out, instead of stopping on 'invalid token' or a redirect loop"
+
+  target:
+    family: open-webui
+    profile: open-webui-ce
+    appVersion: "0.10.2"
+    chartVersion: "15.2.0"
+
+  rung: L5
+  scope: profile
+
+  rungJustification:
+    L0: >-
+      No setting decides it. OAUTH_AUTO_REDIRECT, ENABLE_LOGIN_FORM=false and a
+      single provider are already set; the sign-in page itself skips the
+      redirect while a token it holds is present, valid or not, and leaves the
+      page on a null user.
+    L1: >-
+      Open WebUI has no drop-in surface for its frontend: the sign-in page is
+      compiled into the image's static build.
+    L2: >-
+      A companion runs beside the app and cannot change what the app's own page
+      does in the browser with the token it stores there.
+    L3: >-
+      Open WebUI's plugin surfaces (functions, tools, pipelines) run in the
+      backend and have no hook in the sign-in page.
+    L4: >-
+      The chart and its values decide what runs, not what the page's code does;
+      the fault is in src/routes/auth/+page.svelte.
+
+  upstreamFirst:
+    attempted: true
+    forwarded: "no"
+    reason: >-
+      Not reported upstream yet, by the owner's decision of 2026-11-13: the
+      tenant needed Open WebUI working first. gentian-apps#309 holds the full
+      report, the source lines and the steps for forwarding it and for
+      returning to upstream's image.
+
+  artifacts:
+    - repo: gentian-org/gentian-apps
+      path: images/open-webui/patches/0001-auth-forget-rejected-token.patch
+      version: "0.10.2-slim-gentian1"
+    - repo: gentian-org/gentian-apps
+      path: images/open-webui
+      version: "0.10.2-slim-gentian1"
+
+  origin:
+    authorship: gentian
+    repoOwnership: gentian
+    reviewedBy: platform-team
+    supportContract: none
+
+  owner: platform-team
+  created: 2026-11-13
+  reviewBy: 2027-05-13
+  exitCriteria: >-
+    Gone when an Open WebUI release forgets a token the server rejects and
+    leaves its sign-in page only for a signed-in user (gentian-apps#309); the
+    profile then names upstream's image again and images/open-webui, its CI
+    job and this record are removed. Until then, on every Open WebUI upgrade:
+    bump images/open-webui/versions.env and both FROM lines together; the
+    build fails if the patch series no longer applies to the new tag.
+  upgradeRisk: medium
+  testedAgainst: ["0.10.2"]
+
+  security:
+    macWaivers: []
+    newEgress: []
+    handlesPersonalData: false
+
+  licensing:
+    effect: none
+    notes: >-
+      Open WebUI's frontend is rebuilt from its own source with one patch to
+      the sign-in page. No branding, license check or paid feature is touched.
+      Trust tier: the guide reserves L5 for trustTier platform; Open WebUI stays
+      certified as an accepted exception until gentian-os#1064 settles which
+      rung obligations hold and enforces them.

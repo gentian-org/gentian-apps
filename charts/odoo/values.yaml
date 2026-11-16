@@ -47,6 +47,9 @@ gentian:
   # browser is sent. Empty means "the same as OIDC_ISSUER".
   oidc:
     internalIssuer: ""
+    # The audience of a person's token the realm issues for this Odoo alone.
+    # Empty means the API accepts Odoo's own API keys and nothing else.
+    tokenAudience: ""
   configPath: /etc/gentian/config.json
   bindingsPath: /etc/gentian/bindings.json
   modulesPath: /opt/odoo/custom-addons

@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: Apache-2.0
+# Flowable's REST application: the process, case and decision engines behind
+# their REST API. Nobody opens it; another app of the tenant deploys and runs
+# processes on it.
+nameOverride: flowable
+fullnameOverride: flowable-ce
+replicaCount: 1
+
+image:
+  repository: docker.io/flowable/flowable-rest
+  tag: "7.2.0"
+  pullPolicy: IfNotPresent
+
+# The tenant's PostgreSQL database, supplied by the platform
+# (profile valueMapping.database).
+database:
+  host: ""
+  port: 5432
+  name: ""
+  user: ""
+  password: ""
+
+# The one account of the REST API. Supplied by the platform as the credential
+# of the contract this component provides (profile
+# valueMapping.integrations.process-engine), so the app the tenant's
+# administrator granted the contract to holds the same pair and nobody else
+# does. The engine makes the account at its first start.
+admin:
+  user: ""
+  password: ""
+
+# Jobs, timers and the continuation of a step a worker completed run on the
+# engine's own executor.
+asyncExecutor: true
+
+javaOpts: "-XX:MaxRAMPercentage=70"
+
+service:
+  port: 8080
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "768Mi"
+  limits:
+    cpu: "1"
+    memory: "1536Mi"
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+podLabels: {}
+podAnnotations: {}
+extraEnvVars: []
