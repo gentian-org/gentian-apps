@@ -23,7 +23,10 @@ RUN apt-get update \
 # .NET 9 wasm workload links against.
 RUN git clone --branch "${EMSDK_VERSION}" --depth 1 https://github.com/emscripten-core/emsdk /opt/emsdk \
  && /opt/emsdk/emsdk install "${EMSDK_VERSION}" \
- && /opt/emsdk/emsdk activate "${EMSDK_VERSION}"
+ && /opt/emsdk/emsdk activate "${EMSDK_VERSION}" \
+ && ln -s /opt/emsdk/node/*/bin/node /usr/local/bin/node
+# The Node emscripten brings is also the one the app's TypeScript build
+# (Microsoft.TypeScript.MSBuild) runs; upstream's build container has one.
 RUN dotnet workload install wasm-tools
 WORKDIR /src
 RUN git init -q . \
