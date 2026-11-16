@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.2-dev.5"
+  version: "0.5.2"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
