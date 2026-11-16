@@ -36,13 +36,13 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.1.0-dev.1"
+  version: "0.1.0"
   launch: none
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: flowable
-      version: "0.1.0-develop.ec5d68f"
+      version: "0.1.0"
 
     valueMapping:
       database:

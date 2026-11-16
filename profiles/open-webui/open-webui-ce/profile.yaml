@@ -36,7 +36,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.2-dev.2"
+  version: "0.5.2"
   package:
     chart:
       repository: "https://helm.openwebui.com"
@@ -227,7 +227,7 @@ spec:
       # (images/open-webui, customizations/sign-in-page-patch.yaml).
       image:
         repository: ghcr.io/gentian-org/open-webui
-        tag: "develop-71f8715"
+        tag: "0.10.2-slim-gentian1"
 
       persistence:
         enabled: true
