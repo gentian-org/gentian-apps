@@ -1,0 +1,21 @@
+diff --git a/src/Calculator.Shared/Telemetry/AnalyticsService.Wasm.cs b/src/Calculator.Shared/Telemetry/AnalyticsService.Wasm.cs
+index 1c86adf..4e449ce 100644
+--- a/src/Calculator.Shared/Telemetry/AnalyticsService.Wasm.cs
++++ b/src/Calculator.Shared/Telemetry/AnalyticsService.Wasm.cs
+@@ -8,14 +8,14 @@ namespace CalculatorApp.Telemetry
+ {
+ 	internal static partial class AnalyticsService
+ 	{
++		// Gentian: no analytics. Upstream loads Google's gtag.js here and
++		// reports every view; a tenant's calculator reports nothing.
+ 		static partial void InitializePartial()
+ 		{
+-			WebAssemblyRuntime.InvokeJS("Uno.UI.Demo.Analytics.reportPageView('main');");
+ 		}
+ 
+ 		static partial void TrackViewPartial(string viewName)
+ 		{
+-			WebAssemblyRuntime.InvokeJS($"Uno.UI.Demo.Analytics.reportPageView('{viewName}');");
+ 		}
+ 	}
+ }
