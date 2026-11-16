@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# ComponentProfile — Nextcloud Sync (bridge)
+#
+# Connects an installed Nextcloud to programs on a person's own devices: a
+# file sync program, a calendar, an address book. Nothing is deployed for it.
+# Nextcloud speaks WebDAV, CalDAV and CardDAV itself, so the platform routes
+# the paths below to Nextcloud's own Service, at the tenant's door
+# (sync.<the tenant's domain>).
+#
+# A program signs the person in at the tenant's realm and presents the token
+# it is given. The platform checks it on every request, asks whether the
+# person may use Nextcloud, and hands Nextcloud a token of that person made
+# out to Nextcloud alone. Nextcloud takes it as a sign-in (user_oidc,
+# check-bearer, which nextcloud-base-ce switches on).
+#
+# Served once the tenant's perimeter approver has approved it.
+apiVersion: gentianos.io/v1alpha1
+kind: ComponentProfile
+metadata:
+  name: nextcloud-sync-ce
+  labels:
+    gentianos.io/profile-name: nextcloud-sync-ce
+    gentianos.io/profile-family: nextcloud
+    gentianos.io/profile-edition: ce
+spec:
+  classes:
+    - bridge
+  launch: none
+  trustTier: certified
+  version: "0.1.0-dev"
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
+  bridge:
+    kind: external
+    app:
+      profile: nextcloud-base-ce
+    # Nextcloud's own DAV paths, each protocol's and no other: not the DAV
+    # root, under which Nextcloud also answers for trash, versions, comments
+    # and what else a sync program has no use for.
+    protocols:
+      - name: webdav
+        paths:
+          - /remote.php/dav/files/
+          # Where a large file is uploaded in parts before it is put
+          # together under files/.
+          - /remote.php/dav/uploads/
+      - name: caldav
+        paths:
+          - /remote.php/dav/calendars/
+          - /remote.php/dav/principals/
+      - name: carddav
+        paths:
+          - /remote.php/dav/addressbooks/
+          - /remote.php/dav/principals/
+  package:
+    api:
+      backend:
+        service: nextcloud
+        port: 8080
