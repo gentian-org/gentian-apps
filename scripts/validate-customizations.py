@@ -102,6 +102,12 @@ def check_surface(path: pathlib.Path, doc: dict) -> list[str]:
         # while this check called it characterized.
         if role in INHERITING_ROLES:
             return errors
+        # A bridge connects an app to programs outside and runs nothing of
+        # its own: there is no image, no configuration and no plugin API to
+        # customize. What can be changed of what it serves is the ladder of
+        # the app it names (spec.bridge.app).
+        if "bridge" in (spec.get("classes") or []):
+            return errors
         return [
             f"{path}: missing spec.customization — characterize the app "
             f"(see docs/customization-ladder.md) or mark it deployment-role: addon. "
