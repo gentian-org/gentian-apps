@@ -13,7 +13,7 @@
 # out to Nextcloud alone. Nextcloud takes it as a sign-in (user_oidc,
 # check-bearer, which nextcloud-base-ce switches on).
 #
-# Served once the tenant's perimeter approver has approved it.
+# Each way is served once the tenant's perimeter approver has approved it.
 apiVersion: gentianos.io/v1alpha1
 kind: ComponentProfile
 metadata:
@@ -27,29 +27,41 @@ spec:
     - bridge
   launch: none
   trustTier: certified
-  version: "0.1.0-dev"
+  version: "0.2.0-dev"
   requires:
     # The oldest platform version line this build runs on (docs/profile-bundles.md).
     platform: ">=0.5"
   bridge:
-    kind: external
     app:
       profile: nextcloud-base-ce
     # Nextcloud's own DAV paths, each protocol's and no other: not the DAV
     # root, under which Nextcloud also answers for trash, versions, comments
-    # and what else a sync program has no use for.
-    protocols:
-      - name: webdav
+    # and what else a sync program has no use for. Each way is approved on
+    # its own: a tenant may allow files and not contacts.
+    ways:
+      - name: files
+        caller: device
+        callee: app
+        protocol: webdav
+        speaksAs: person
         paths:
           - /remote.php/dav/files/
           # Where a large file is uploaded in parts before it is put
           # together under files/.
           - /remote.php/dav/uploads/
-      - name: caldav
+      - name: calendars
+        caller: device
+        callee: app
+        protocol: caldav
+        speaksAs: person
         paths:
           - /remote.php/dav/calendars/
           - /remote.php/dav/principals/
-      - name: carddav
+      - name: contacts
+        caller: device
+        callee: app
+        protocol: carddav
+        speaksAs: person
         paths:
           - /remote.php/dav/addressbooks/
           - /remote.php/dav/principals/
