@@ -8,10 +8,16 @@
 # (sync.<the tenant's domain>).
 #
 # A program signs the person in at the tenant's realm and presents the token
-# it is given. The platform checks it on every request, asks whether the
+# it is given, or presents the person's username and a device password made
+# for it. The platform checks either on every request, asks whether the
 # person may use Nextcloud, and hands Nextcloud a token of that person made
 # out to Nextcloud alone. Nextcloud takes it as a sign-in (user_oidc,
 # check-bearer, which nextcloud-base-ce switches on).
+#
+# A calendar or contact program set up with the door's name alone finds
+# Nextcloud through the discovery addresses (/.well-known/caldav,
+# /.well-known/carddav), which send it to the principals: Nextcloud tells it
+# there who the person is and where their calendars and address books are.
 #
 # Each way is served once the tenant's perimeter approver has approved it.
 apiVersion: gentianos.io/v1alpha1
@@ -27,7 +33,7 @@ spec:
     - bridge
   launch: none
   trustTier: certified
-  version: "0.2.0-dev"
+  version: "0.3.0-dev"
   requires:
     # The oldest platform version line this build runs on (docs/profile-bundles.md).
     platform: ">=0.5"
@@ -57,6 +63,7 @@ spec:
         paths:
           - /remote.php/dav/calendars/
           - /remote.php/dav/principals/
+        root: /remote.php/dav/principals/
       - name: contacts
         caller: device
         callee: app
@@ -65,6 +72,7 @@ spec:
         paths:
           - /remote.php/dav/addressbooks/
           - /remote.php/dav/principals/
+        root: /remote.php/dav/principals/
   package:
     api:
       backend:
