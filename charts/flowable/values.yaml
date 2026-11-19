@@ -33,7 +33,10 @@ admin:
 # engine's own executor.
 asyncExecutor: true
 
-javaOpts: "-XX:MaxRAMPercentage=70"
+# -XX:-UseBASE64Intrinsics turns off the JVM's accelerated Base64 decoder, the
+# code CVE-2026-114938 is in: the image carries a JDK that has it, and the REST
+# API decodes a Basic-auth header before it has checked the credentials.
+javaOpts: "-XX:MaxRAMPercentage=70 -XX:-UseBASE64Intrinsics"
 
 service:
   port: 8080
