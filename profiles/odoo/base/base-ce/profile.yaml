@@ -23,7 +23,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.2"
+  version: "0.5.3-dev"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
@@ -161,6 +161,49 @@ spec:
     - name: erp-core
       protocol: http-json
 
+
+  # Odoo keeps meetings and contacts in its own tables, which its pages read.
+  # The tenant's home sync keeps them equal to the tenant's home, per person
+  # who signs in here (gentian-os#1156); Odoo runs no sync code of its own.
+  # Its API takes the person's token of the realm (gentian_os realm_token).
+  # Recurrence is not mapped yet: Odoo needs its own recurrency flag beside
+  # the rule.
+  homeSync:
+    endpoint: {service: odoo, port: 8069}
+    calendar:
+      driver: odoo
+      model: calendar.event
+      fields:
+        summary: name
+        description: description
+        location: location
+        start: start
+        end: stop
+        allDay: allday
+        startDate: start_date
+        endDate: stop_date
+      # The person's meetings: those they attend.
+      filter: [[partner_ids, in, ["$partner"]]]
+      defaults:
+        user_id: "$user"
+        partner_ids: [[4, "$partner"]]
+    contacts:
+      driver: odoo
+      model: res.partner
+      fields:
+        name: name
+        email: email
+        phone: phone
+        organization: company_name
+        title: function
+        street: street
+        city: city
+        zip: zip
+        website: website
+      # A person's own contacts: those they are the salesperson of.
+      filter: [[user_id, "=", "$user"], [is_company, "=", false]]
+      defaults:
+        user_id: "$user"
 
   integrations:
     - contract: file-store
