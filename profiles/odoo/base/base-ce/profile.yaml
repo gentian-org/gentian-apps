@@ -23,7 +23,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.3-dev"
+  version: "0.5.4-dev"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
@@ -166,8 +166,9 @@ spec:
   # The tenant's home sync keeps them equal to the tenant's home, per person
   # who signs in here (gentian-os#1156); Odoo runs no sync code of its own.
   # Its API takes the person's token of the realm (gentian_os realm_token).
-  # Recurrence is not mapped yet: Odoo needs its own recurrency flag beside
-  # the rule.
+  # A recurring meeting is one series in Odoo and one entry at the home: the
+  # driver keeps the series' base event and writes a change to the whole
+  # series. Single occurrences moved or cancelled are not kept equal.
   homeSync:
     endpoint: {service: odoo, port: 8069}
     calendar:
@@ -182,6 +183,7 @@ spec:
         allDay: allday
         startDate: start_date
         endDate: stop_date
+        rrule: rrule
       # The person's meetings: those they attend.
       filter: [[partner_ids, in, ["$partner"]]]
       defaults:
@@ -194,6 +196,7 @@ spec:
         name: name
         email: email
         phone: phone
+        mobile: mobile
         organization: company_name
         title: function
         street: street
