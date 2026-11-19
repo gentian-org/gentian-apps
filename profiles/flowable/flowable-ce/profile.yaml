@@ -32,6 +32,9 @@ metadata:
     gentianos.io/profile-name: flowable-ce
     gentianos.io/profile-family: flowable
     gentianos.io/profile-edition: ce
+  annotations:
+    # Not offered: it comes with the app that uses its contract.
+    gentianos.io/store-listed: "false"
 spec:
   classes:
     - app
