@@ -72,6 +72,10 @@ spec:
               with no browser session in front. That its host is no other entry's is the
               operator's to hold (ConditionTokenEntry, HostShared): the entries' hosts
               are known only in a tenant's zone.
+              Vouching at trustTier platform yields a person's token for any app of the
+              tenant. A certified component may vouch only to call the homes it consumes
+              as the person (integrations[].asPerson), and only with keys of its own:
+              its client is given the scopes of the homes granted to it and no other.
               A service may expose -- a console is not a contract surface -- but only on
               the gateway. The perimeter has no session, and a service console published
               there is never what anybody meant.
@@ -1914,14 +1918,14 @@ spec:
                               description: |-
                                 Optional means the component runs without the gateway. While the
                                 cluster serves no models, or the component's key is not delivered yet,
-                                it is released all the same: without credentials, without a network
-                                path to the gateway, and told so through valueMapping.llm.availableKey.
-                                When the key arrives the component is rendered again with it.
+                                it is released all the same: without credentials and without a network
+                                path to the gateway. When the key arrives the component is rendered
+                                again with it.
 
-                                Honored for a component the platform places on tenants itself. For an
-                                app a tenant installs the requirement holds the release as if this
-                                were not set: its chart's values read the key from where it is kept,
-                                and its release cannot be rendered without it.
+                                A component the platform places on tenants itself is told so through
+                                valueMapping.llm.availableKey. An app a tenant installs is given
+                                neither valueMapping.llm.baseUrlKey nor apiKeyKey until then, so its
+                                chart's defaults for the two are what say there is no gateway.
                               type: boolean
                           type: object
                         logDestination:
@@ -2251,6 +2255,14 @@ spec:
                                 exchange is what came in through such an entry: a person present, who
                                 connected a program and need not be linked.
                               type: boolean
+                            homes:
+                              description: |-
+                                Homes gives the component's client the scopes of the tenant's homes
+                                (home-<profile> for the provider of calendar-store, contacts-store and
+                                file-store), and has the people who sign in to an app that declares
+                                homeSync linked to it: what the platform's home sync acts with. It
+                                needs keys, and trustTier platform as all vouching for any app does.
+                              type: boolean
                             keys:
                               description: |-
                                 Keys says where the component publishes the keys its statements are
@@ -2290,6 +2302,9 @@ spec:
                               for the director is obtained with a signed statement'
                             rule: has(self.keys) || !has(self.director) || size(self.director)
                               == 0
+                          - message: 'vouching.homes needs vouching.keys: a person''s
+                              token for a home is obtained with a signed statement'
+                            rule: has(self.keys) || !has(self.homes) || !self.homes
                       type: object
                     name:
                       description: |-
@@ -2358,6 +2373,155 @@ spec:
                   - name
                   type: object
                 type: array
+              homeSync:
+                description: |-
+                  HomeSync is how an app that keeps calendars or contacts of its own
+                  keeps them, so that the platform keeps them equal to the tenant's home.
+                properties:
+                  calendar:
+                    description: Calendar is how the app keeps calendar entries.
+                    properties:
+                      defaults:
+                        additionalProperties:
+                          x-kubernetes-preserve-unknown-fields: true
+                        description: |-
+                          Defaults are written onto a record made from the home, in the
+                          driver's form, with the same placeholders.
+                        maxProperties: 16
+                        type: object
+                      driver:
+                        description: Driver is the driver of the app's framework.
+                        enum:
+                        - odoo
+                        type: string
+                      fields:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Fields maps a part of an entry to the app's field. The parts of a
+                          calendar entry are summary, description, location, start, end,
+                          startDate, endDate, allDay and rrule; of a contact name, email,
+                          phone, mobile, organization, title, note, street, city, zip, country
+                          and website.
+                        maxProperties: 16
+                        type: object
+                        x-kubernetes-validations:
+                        - message: a field is one of the parts of a calendar entry
+                            or a contact
+                          rule: self.all(k, k in ['summary', 'description', 'location',
+                            'start', 'end', 'startDate', 'endDate', 'allDay', 'rrule',
+                            'name', 'email', 'phone', 'mobile', 'organization', 'title',
+                            'note', 'street', 'city', 'zip', 'country', 'website'])
+                      filter:
+                        description: |-
+                          Filter selects a person's records, in the driver's form (for Odoo, a
+                          domain); "$user" and "$partner" stand for the person in the app.
+                        x-kubernetes-preserve-unknown-fields: true
+                      model:
+                        description: 'Model is the app''s record type (for Odoo, the
+                          model: calendar.event).'
+                        maxLength: 128
+                        minLength: 1
+                        type: string
+                    required:
+                    - driver
+                    - fields
+                    - model
+                    type: object
+                    x-kubernetes-validations:
+                    - message: a mapping names at least one field
+                      rule: self.fields.size() > 0
+                  contacts:
+                    description: Contacts is how the app keeps contacts.
+                    properties:
+                      defaults:
+                        additionalProperties:
+                          x-kubernetes-preserve-unknown-fields: true
+                        description: |-
+                          Defaults are written onto a record made from the home, in the
+                          driver's form, with the same placeholders.
+                        maxProperties: 16
+                        type: object
+                      driver:
+                        description: Driver is the driver of the app's framework.
+                        enum:
+                        - odoo
+                        type: string
+                      fields:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Fields maps a part of an entry to the app's field. The parts of a
+                          calendar entry are summary, description, location, start, end,
+                          startDate, endDate, allDay and rrule; of a contact name, email,
+                          phone, mobile, organization, title, note, street, city, zip, country
+                          and website.
+                        maxProperties: 16
+                        type: object
+                        x-kubernetes-validations:
+                        - message: a field is one of the parts of a calendar entry
+                            or a contact
+                          rule: self.all(k, k in ['summary', 'description', 'location',
+                            'start', 'end', 'startDate', 'endDate', 'allDay', 'rrule',
+                            'name', 'email', 'phone', 'mobile', 'organization', 'title',
+                            'note', 'street', 'city', 'zip', 'country', 'website'])
+                      filter:
+                        description: |-
+                          Filter selects a person's records, in the driver's form (for Odoo, a
+                          domain); "$user" and "$partner" stand for the person in the app.
+                        x-kubernetes-preserve-unknown-fields: true
+                      model:
+                        description: 'Model is the app''s record type (for Odoo, the
+                          model: calendar.event).'
+                        maxLength: 128
+                        minLength: 1
+                        type: string
+                    required:
+                    - driver
+                    - fields
+                    - model
+                    type: object
+                    x-kubernetes-validations:
+                    - message: a mapping names at least one field
+                      rule: self.fields.size() > 0
+                  endpoint:
+                    description: |-
+                      Endpoint is where the app's API answers inside the tenant: its
+                      Service, the port and the path the driver's calls go under.
+                    properties:
+                      path:
+                        description: |-
+                          Path is appended to the address the consumer is told, for an API
+                          served below the root.
+                        maxLength: 253
+                        pattern: ^/[A-Za-z0-9._~/-]*$
+                        type: string
+                      port:
+                        description: |-
+                          Port is the Service's port, and must be the port the provider's pods
+                          listen on: a network policy matches the port a pod listens on, and
+                          the way it opens is to this port and no other.
+                        format: int32
+                        maximum: 65535
+                        minimum: 1
+                        type: integer
+                      service:
+                        description: Service is the provider's Service, in the namespace
+                          it is installed in.
+                        maxLength: 63
+                        minLength: 1
+                        pattern: ^[a-z]([-a-z0-9]*[a-z0-9])?$
+                        type: string
+                    required:
+                    - port
+                    - service
+                    type: object
+                required:
+                - endpoint
+                type: object
+                x-kubernetes-validations:
+                - message: homeSync keeps calendar, contacts or both
+                  rule: has(self.calendar) || has(self.contacts)
               hooks:
                 description: Hooks are lifecycle actions at install, upgrade and resync.
                 properties:
@@ -2548,6 +2712,17 @@ spec:
                   description: IntegrationRef identifies an optional integration contract
                     this app can consume.
                   properties:
+                    asPerson:
+                      description: |-
+                        AsPerson says the app calls the contract's provider -- the tenant's
+                        home for that kind of data -- as the person it acts for, with that
+                        person's rights there. The app signs statements as a vouching
+                        component does (requires.services.vouching.keys), and the tenant's
+                        realm answers them with a token valid at that provider and nowhere
+                        else, for as long as the tenant's administrator grants the contract. A
+                        person is linked when they sign in to the app. For file-store,
+                        calendar-store and contacts-store only.
+                      type: boolean
                     capabilities:
                       description: Capabilities lists the specific capabilities required
                         from the contract.
@@ -2565,6 +2740,11 @@ spec:
                   required:
                   - contract
                   type: object
+                  x-kubernetes-validations:
+                  - message: 'asPerson is for a home''s contract: file-store, calendar-store
+                      or contacts-store'
+                    rule: '!has(self.asPerson) || !self.asPerson || self.contract
+                      in [''file-store'', ''calendar-store'', ''contacts-store'']'
                 type: array
               launch:
                 description: |-
@@ -4261,14 +4441,14 @@ spec:
                             description: |-
                               Optional means the component runs without the gateway. While the
                               cluster serves no models, or the component's key is not delivered yet,
-                              it is released all the same: without credentials, without a network
-                              path to the gateway, and told so through valueMapping.llm.availableKey.
-                              When the key arrives the component is rendered again with it.
+                              it is released all the same: without credentials and without a network
+                              path to the gateway. When the key arrives the component is rendered
+                              again with it.
 
-                              Honored for a component the platform places on tenants itself. For an
-                              app a tenant installs the requirement holds the release as if this
-                              were not set: its chart's values read the key from where it is kept,
-                              and its release cannot be rendered without it.
+                              A component the platform places on tenants itself is told so through
+                              valueMapping.llm.availableKey. An app a tenant installs is given
+                              neither valueMapping.llm.baseUrlKey nor apiKeyKey until then, so its
+                              chart's defaults for the two are what say there is no gateway.
                             type: boolean
                         type: object
                       logDestination:
@@ -4595,6 +4775,14 @@ spec:
                               exchange is what came in through such an entry: a person present, who
                               connected a program and need not be linked.
                             type: boolean
+                          homes:
+                            description: |-
+                              Homes gives the component's client the scopes of the tenant's homes
+                              (home-<profile> for the provider of calendar-store, contacts-store and
+                              file-store), and has the people who sign in to an app that declares
+                              homeSync linked to it: what the platform's home sync acts with. It
+                              needs keys, and trustTier platform as all vouching for any app does.
+                            type: boolean
                           keys:
                             description: |-
                               Keys says where the component publishes the keys its statements are
@@ -4634,6 +4822,9 @@ spec:
                             for the director is obtained with a signed statement'
                           rule: has(self.keys) || !has(self.director) || size(self.director)
                             == 0
+                        - message: 'vouching.homes needs vouching.keys: a person''s
+                            token for a home is obtained with a signed statement'
+                          rule: has(self.keys) || !has(self.homes) || !self.homes
                     type: object
                 type: object
               secrets:
@@ -4900,10 +5091,22 @@ spec:
               rule: '!has(self.classes) || (''app'' in self.classes) || !has(self.expose)
                 || !self.expose.exists(e, e.surface == ''gateway'' && e.authMode ==
                 ''bearer'')'
-            - message: 'requires.services.vouching requires trustTier platform: the
-                component can obtain a person''s token for any app of the tenant'
+            - message: requires.services.vouching requires trustTier platform, or
+                trustTier certified for a component that calls a home as the person
+                (integrations[].asPerson) with keys of its own and no exchange, director
+                or homes
               rule: '!has(self.requires) || !has(self.requires.services) || !has(self.requires.services.vouching)
-                || self.trustTier == ''platform'''
+                || self.trustTier == ''platform'' || (self.trustTier == ''certified''
+                && has(self.integrations) && self.integrations.exists(i, has(i.asPerson)
+                && i.asPerson) && has(self.requires.services.vouching.keys) && !(has(self.requires.services.vouching.exchange)
+                && self.requires.services.vouching.exchange) && !(has(self.requires.services.vouching.director)
+                && self.requires.services.vouching.director.size() > 0) && !(has(self.requires.services.vouching.homes)
+                && self.requires.services.vouching.homes))'
+            - message: 'integrations[].asPerson needs requires.services.vouching.keys:
+                the component signs the statements a person''s token is asked with'
+              rule: '!has(self.integrations) || !self.integrations.exists(i, has(i.asPerson)
+                && i.asPerson) || (has(self.requires) && has(self.requires.services)
+                && has(self.requires.services.vouching) && has(self.requires.services.vouching.keys))'
             - message: 'a service exposes on the gateway only: the perimeter has no
                 session'
               rule: '!has(self.classes) || !(''service'' in self.classes) || !has(self.expose)
