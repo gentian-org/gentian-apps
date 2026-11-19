@@ -39,7 +39,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.1.0"
+  version: "0.1.1-dev"
   launch: none
   package:
     chart:
