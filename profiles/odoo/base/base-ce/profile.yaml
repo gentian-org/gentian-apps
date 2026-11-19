@@ -23,7 +23,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.4-dev"
+  version: "0.5.5-dev"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
@@ -195,8 +195,8 @@ spec:
       fields:
         name: name
         email: email
+        # Odoo 19 keeps one number on a contact; it has no mobile.
         phone: phone
-        mobile: mobile
         organization: company_name
         title: function
         street: street
