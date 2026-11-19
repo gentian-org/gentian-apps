@@ -195,8 +195,8 @@ spec:
       fields:
         name: name
         email: email
+        # Odoo 19 keeps one number on a contact; it has no mobile.
         phone: phone
-        mobile: mobile
         organization: company_name
         title: function
         street: street
