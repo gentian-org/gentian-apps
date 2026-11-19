@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.3-dev"
+  version: "0.5.4-dev"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -419,9 +419,31 @@ spec:
           policy: gentian-require-seccomp
           scope: collabora
           reason: 'REVIEW: say why this component needs the waiver'
+  # The tenant's home for files, calendars and contacts (gentian-os#1149):
+  # Nextcloud's DAV server answers all three under one root, and takes a
+  # person's token made out to its own sign-in client with gentian_username
+  # (user_oidc, check-bearer), which is the token the realm's home-<profile>
+  # scope issues. A consumer is told the root and finds a person's
+  # calendars and address books from there (current-user-principal).
   provides:
     - name: file-store
       protocol: webdav
+      endpoint:
+        service: nextcloud
+        port: 8080
+        path: /remote.php/dav/
+    - name: calendar-store
+      protocol: caldav
+      endpoint:
+        service: nextcloud
+        port: 8080
+        path: /remote.php/dav/
+    - name: contacts-store
+      protocol: carddav
+      endpoint:
+        service: nextcloud
+        port: 8080
+        path: /remote.php/dav/
     - name: filepicker
       protocol: ocs
   integrations:
