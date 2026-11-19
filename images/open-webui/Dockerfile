@@ -14,7 +14,7 @@ ARG OPEN_WEBUI_VERSION=0.10.2
 ARG OPEN_WEBUI_COMMIT=ecd48e2f718220a6400ecf49eafd4867a38feb10
 
 # Stage 1: the frontend, built the way upstream's Dockerfile builds it.
-FROM --platform=$BUILDPLATFORM docker.io/library/node:22-alpine3.20@sha256:2289fb1fba0f4633b08ec47b94a89c7e20b829fc5679f9b7b298eaa2f1ed8b7e AS build
+FROM --platform=$BUILDPLATFORM docker.io/library/node:24-alpine3.20@sha256:8fe019e0d57dbdce5f5c27c0b63d2775cf34b00e3755a7dea969802d7e0c2b25 AS build
 ARG OPEN_WEBUI_VERSION
 ARG OPEN_WEBUI_COMMIT
 WORKDIR /app
