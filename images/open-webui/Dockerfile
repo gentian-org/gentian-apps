@@ -21,7 +21,10 @@ WORKDIR /app
 RUN apk add --no-cache git
 RUN git clone --depth 1 --branch "v${OPEN_WEBUI_VERSION}" https://github.com/open-webui/open-webui.git . \
     && test "$(git rev-parse HEAD)" = "${OPEN_WEBUI_COMMIT}"
-RUN npm ci --force
+# Without onnxruntime-node's CUDA provider: its install script downloads the
+# GPU binaries from the onnxruntime releases, which answer 404 for the version
+# this release pins, and a frontend build runs no model.
+RUN npm ci --force --onnxruntime-node-install-cuda=skip
 COPY patches /patches
 # The series in order; a patch that does not apply fails the build, which is
 # what makes a version bump re-validate every patch.
