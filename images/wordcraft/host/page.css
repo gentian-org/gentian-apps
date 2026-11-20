@@ -1,0 +1,27 @@
+:root { color-scheme: light dark; --line: #8884; --accent: #2f6fde; font: 14px/1.4 system-ui, sans-serif; }
+html, body { height: 100%; margin: 0; }
+body { display: flex; flex-direction: column; background: Canvas; color: CanvasText; }
+header { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid var(--line); min-height: 32px; }
+#where { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#status { margin-left: auto; opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#status.failed { color: #c62828; opacity: 1; font-weight: 600; }
+#actions { display: flex; gap: 6px; }
+iframe { flex: 1; border: 0; width: 100%; }
+button { font: inherit; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: ButtonFace; color: ButtonText; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+dialog { width: min(560px, 92vw); border: 1px solid var(--line); border-radius: 10px; padding: 16px; background: Canvas; color: CanvasText; }
+dialog::backdrop { background: #0006; }
+dialog h1 { font-size: 16px; margin: 0 0 8px; }
+#crumbs { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 8px; }
+#crumbs button { border: 0; background: none; color: var(--accent); padding: 2px 4px; }
+#entries { list-style: none; margin: 0; padding: 0; height: 44vh; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+#entries button { display: flex; width: 100%; gap: 8px; border: 0; border-radius: 0; background: none; color: inherit; text-align: left; padding: 7px 10px; }
+#entries button:hover, #entries button:focus { background: #8882; }
+#entries .folder { font-weight: 600; }
+#entries .size { margin-left: auto; opacity: .6; }
+#browser-note { min-height: 1.4em; margin: 8px 0 0; opacity: .8; }
+#name-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+#name { flex: 1; font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: Field; color: FieldText; }
+menu { display: flex; justify-content: flex-end; gap: 8px; margin: 12px 0 0; padding: 0; }
+[hidden] { display: none !important; }

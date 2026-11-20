@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WordCraft</title>
+<link rel="stylesheet" href="/host/page.css">
+</head>
+<body>
+<header>
+  <button id="open" type="button" disabled>Open from files…</button>
+  <span id="where"></span>
+  <span id="status" role="status"></span>
+  <span id="actions"></span>
+</header>
+<iframe id="app" title="WordCraft" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+
+<dialog id="browser">
+  <form method="dialog">
+    <h1 id="browser-title"></h1>
+    <nav id="crumbs"></nav>
+    <ul id="entries"></ul>
+    <p id="browser-note"></p>
+    <label id="name-row" hidden>Name <input id="name" type="text" autocomplete="off" spellcheck="false"></label>
+    <menu>
+      <button id="cancel" type="button">Cancel</button>
+      <button id="confirm" type="button" hidden>Save here</button>
+    </menu>
+  </form>
+</dialog>
+<script src="/host/page.js"></script>
+</body>
+</html>
