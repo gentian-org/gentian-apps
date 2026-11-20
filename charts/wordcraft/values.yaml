@@ -13,7 +13,19 @@ image:
 
 port: 8080
 
-# nginx serving static files; the app runs in the browser.
+# The tenant's home for files (the platform's file-store contract). With an
+# address, and the scope the platform writes into the Secret once the tenant's
+# administrator grants the contract, the app opens and saves there as the
+# signed-in person. Without, files stay on the person's device.
+home:
+  # Where the home answers WebDAV. The platform fills it in.
+  url: ""
+  # The platform's Secret for this app: the client it asks the tenant's realm
+  # with and the home's scope. Mounted as files; it may not exist yet.
+  vouchingSecret: vouching-wordcraft-ce
+
+# One small server for the app's files, the framing page and the file calls;
+# the app runs in the browser.
 resources:
   requests:
     cpu: "5m"
