@@ -5,23 +5,37 @@
 #   Crafting Apps. Upstream publishes neither an image nor a chart, but every
 #   release carries the browser build as static files, so this repository
 #   builds both: images/wordcraft serves the pinned release's web build
-#   unchanged from unprivileged nginx, and charts/wordcraft runs that one
-#   container. The app is WebAssembly and runs in the browser; the pod only
-#   serves files. The chart names its image; a develop build of the chart
-#   names the same commit's develop image.
+#   unchanged, and charts/wordcraft runs that one container. The app is
+#   WebAssembly and runs in the browser. The chart names its image; a develop
+#   build of the chart names the same commit's develop image.
 #
-# Nothing differs from upstream: the release's files are served as they are.
+# Nothing of upstream's is changed: the release's files are served as they
+# are. What this repository adds is the server in the image (images/wordcraft/
+# host): beside the build it serves a page that frames the app, by the app's
+# own host messages, and four file calls.
 #
 # ── Files ──
-# The app keeps nothing on a server. Open is the browser's file picker, Save
-# and Export are downloads, preferences are the browser's localStorage. A
-# document that was not saved is lost with the tab.
+# The tenant's home for files (the file-store contract), as the signed-in
+# person. "Open from files" on the page lists the person's folders; Save
+# writes back to where a document was opened, and asks where for a new one.
+# A file changed elsewhere since it was opened is not overwritten unasked.
+# The pod keeps no file and no token: each call carries the token the edge
+# hands this app, which the server exchanges at the tenant's realm for one
+# valid at the home (present-only: integrations[].asPerson with
+# vouching.exchange and no keys). It reaches nobody's files but those of a
+# person signed in at this address at that moment.
+#
+# Until the tenant's administrator grants the contract, and in a tenant with
+# no home, the app is served as upstream ships it: Open is the browser's file
+# picker, Save and Export are downloads.
+#
+# Preferences are the browser's localStorage either way.
 #
 # ── Outside calls ──
 # None at start: the page loads its own files and nothing else. The links in
 # the app (upstream's website, source and community) open in a new tab when a
-# person follows them. The pod makes no outbound call, so the profile asks for
-# no egress.
+# person follows them. The pod calls the tenant's realm and the home, both in
+# the cluster, and asks for no egress.
 #
 # ── Sign-in ──
 # None of its own. The app has no accounts and nothing to administer, so it
@@ -30,7 +44,8 @@
 # the tenant's administrator granted the app (can_launch) reach it.
 #
 # Secret inventory:
-#   Platform-provided: none.
+#   Platform-provided: vouching-wordcraft-ce (the client the server asks the
+#     realm with, and the home's scope), mounted as files.
 #   Generated: none.
 #
 # Backup: nothing to back up; the app has no store and no volume.
@@ -46,30 +61,48 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.1.0-dev"
+  version: "0.2.0-dev"
   launch: tile
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: wordcraft
-      version: "0.1.0-develop.e052c3b"
+      version: "0.2.0-develop.1ea00d1"
     extraValues:
       fullnameOverride: "wordcraft-ce"
       ingress:
         enabled: false
       podAnnotations:
         reloader.stakater.com/auto: "true"
+    valueMapping:
+      integrations:
+        file-store:
+          endpointKey: home.url
+
+  # The tenant's file home, called as the person and only while they are
+  # present (see Files, above).
+  integrations:
+    - contract: file-store
+      asPerson: true
+      capabilities: [webdav:read, webdav:write]
 
   requires:
     # The oldest platform version line this build runs on (docs/profile-bundles.md).
     platform: ">=0.5"
-    # No services: no database, bucket, cache, mail or sign-in client.
+    services:
+      # No keys: the server signs nothing and nobody is linked to it. It
+      # exchanges the token of the person at its page.
+      vouching:
+        exchange: true
 
   expose:
     - name: web
       surface: gateway
       authMode: oidc
       subDomain: "wordcraft"
+      # The realm issues the person's token for this app alone; the server
+      # exchanges it for the home's.
+      exchangeToken: true
       backend:
         service: "wordcraft-ce"
         port: 8080
