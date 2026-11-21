@@ -23,7 +23,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.7-dev"
+  version: "0.5.8-dev"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
@@ -198,11 +198,10 @@ spec:
 
   integrations:
     - contract: file-store
-      provider: nextcloud
-      capabilities: [webdav:read, webdav:write]
       # "Attach from files" (odoo-modules gentian_files): the person picks a
       # file in the platform's file dialog, and the record keeps a link to
-      # it. Odoo is given no access to anybody's files.
+      # it. No provider and no capabilities: the tenant's file home answers,
+      # and Odoo is given no access to anybody's files.
       dialog: [pick]
     - contract: central-navigation
       provider: portal
