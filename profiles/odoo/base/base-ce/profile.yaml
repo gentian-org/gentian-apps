@@ -23,7 +23,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.6-dev"
+  version: "0.5.7-dev"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
@@ -138,25 +138,13 @@ spec:
         smtp: {}
     privileges:
       egress:
-        - name: egress-1
-          rule:
-            to:
-              - ipBlock:
-                  cidr: 192.168.0.100/32
-            ports:
-              - protocol: TCP
-                port: 9418
-          reason: 'REVIEW: say what this component reaches and why'
-        - name: egress-2
-          rule:
-            ports:
-              - protocol: TCP
-                port: 443
+        - name: module-source
+          hosts: [github.com]
+          reason: "Fetches the tenant's Odoo modules from their Git repository on GitHub."
 
   # No sidecars. git-modules used to be declared here as a standalone
   # Deployment with its own ReadWriteMany PVC; it is now two containers inside
   # Odoo's own pod, configured by extraValues.gentian.git above.
-          reason: 'REVIEW: say what this component reaches and why'
   provides:
     - name: erp-core
       protocol: http-json
