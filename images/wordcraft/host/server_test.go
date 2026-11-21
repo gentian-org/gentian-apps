@@ -20,6 +20,7 @@ import (
 type world struct {
 	t         *testing.T
 	handler   http.Handler
+	cfg       config
 	vouching  string
 	mu        sync.Mutex
 	exchanges []url.Values
@@ -52,10 +53,9 @@ func newWorld(t *testing.T) *world {
 
 	w.vouching = t.TempDir()
 	for k, v := range map[string]string{
-		"VOUCHING_CLIENT_ID":       "vouch-wordcraft-ce",
-		"VOUCHING_CLIENT_SECRET":   "s3cret",
-		"VOUCHING_TOKEN_URL":       realm.URL + "/token",
-		"VOUCHING_HOME_FILE_STORE": "home-files",
+		"VOUCHING_CLIENT_ID":     "vouch-wordcraft-ce",
+		"VOUCHING_CLIENT_SECRET": "s3cret",
+		"VOUCHING_TOKEN_URL":     realm.URL + "/token",
 	} {
 		if err := os.WriteFile(filepath.Join(w.vouching, k), []byte(v), 0o600); err != nil {
 			t.Fatal(err)
@@ -66,11 +66,12 @@ func newWorld(t *testing.T) *world {
 	_ = os.WriteFile(filepath.Join(site, "app.wasm"), []byte("wasm"), 0o600)
 	_ = os.WriteFile(filepath.Join(site, "app.wasm.gz"), []byte("gzipped"), 0o600)
 
-	w.handler = newServer(config{
+	w.cfg = config{
 		app: "wordcraft", title: "WordCraft", site: site,
-		home: home.URL + "/remote.php/dav/", vouching: w.vouching,
+		home: home.URL + "/remote.php/dav/", homeScope: "home-files", vouching: w.vouching,
 		extensions: []string{".docx", ".txt"}, maxBytes: 1 << 20,
-	})
+	}
+	w.handler = newServer(w.cfg)
 	return w
 }
 
@@ -275,10 +276,9 @@ func TestWithoutAHomeTheAppIsServedAsItIs(t *testing.T) {
 	if rec := page(); rec.Code != http.StatusOK || !strings.Contains(rec.Header().Get("Content-Security-Policy"), "frame-src 'self'") {
 		t.Fatalf("the page with a home: %d", rec.Code)
 	}
-	// The grant is taken back: the platform removes the scope's entry.
-	if err := os.Remove(filepath.Join(w.vouching, "VOUCHING_HOME_FILE_STORE")); err != nil {
-		t.Fatal(err)
-	}
+	// The grant is taken back: the platform leaves the scope out.
+	w.cfg.homeScope = ""
+	w.handler = newServer(w.cfg)
 	if rec := page(); rec.Code != http.StatusFound || rec.Header().Get("Location") != "/app/" {
 		t.Fatalf("the page without a home: %d %s", rec.Code, rec.Header().Get("Location"))
 	}

@@ -44,8 +44,11 @@ type config struct {
 	// home is the address the tenant's file home answers WebDAV at, empty
 	// while the tenant grants none.
 	home string
+	// homeScope is the scope the realm issues the home's token under, empty
+	// while the tenant grants none. The platform sets it with the address.
+	homeScope string
 	// vouching is the directory the platform's Secret is mounted at: the
-	// client to ask the realm with, and the scope of the home.
+	// client to ask the realm with.
 	vouching string
 	// extensions are the file name endings the app opens.
 	extensions []string
@@ -66,6 +69,7 @@ func configFromEnv() config {
 		site:       get("CRAFT_SITE", "/site"),
 		listen:     get("CRAFT_LISTEN", ":8080"),
 		home:       os.Getenv("CRAFT_HOME_URL"),
+		homeScope:  os.Getenv("CRAFT_HOME_SCOPE"),
 		vouching:   get("CRAFT_VOUCHING_DIR", "/var/run/gentian/vouching"),
 		extensions: splitList(get("CRAFT_EXTENSIONS", ".docx,.odt,.md,.txt,.rtf,.html")),
 		maxBytes:   256 << 20,

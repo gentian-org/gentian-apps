@@ -78,7 +78,7 @@ func (c *homeClient) told(key string) string {
 
 // scope is the scope the realm issues the home's token under, empty while
 // the tenant grants no home.
-func (c *homeClient) scope() string { return c.told("VOUCHING_HOME_FILE_STORE") }
+func (c *homeClient) scope() string { return c.cfg.homeScope }
 
 // sessionFor exchanges the token the edge handed this request for one valid
 // at the home, and finds the person's files there. Kept until the home's

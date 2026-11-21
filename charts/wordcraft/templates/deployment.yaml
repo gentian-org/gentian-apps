@@ -35,6 +35,7 @@ spec:
             - {name: CRAFT_TITLE, value: WordCraft}
             - {name: CRAFT_LISTEN, value: ":{{ .Values.port }}"}
             - {name: CRAFT_HOME_URL, value: {{ .Values.home.url | quote }}}
+            - {name: CRAFT_HOME_SCOPE, value: {{ .Values.home.scope | quote }}}
             - {name: CRAFT_VOUCHING_DIR, value: /var/run/gentian/vouching}
           ports:
             - name: http
@@ -48,8 +49,7 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            # Read when a person's token is asked for, never kept: the
-            # platform changes the entries while the pod runs.
+            # Read when a person's token is asked for, never kept.
             - {name: vouching, mountPath: /var/run/gentian/vouching, readOnly: true}
       volumes:
         - name: vouching
