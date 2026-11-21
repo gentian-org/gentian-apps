@@ -23,7 +23,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.5-dev"
+  version: "0.5.6-dev"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
