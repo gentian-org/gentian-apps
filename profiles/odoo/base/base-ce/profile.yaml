@@ -212,6 +212,10 @@ spec:
     - contract: file-store
       provider: nextcloud
       capabilities: [webdav:read, webdav:write]
+      # "Attach from files" (odoo-modules gentian_files): the person picks a
+      # file in the platform's file dialog, and the record keeps a link to
+      # it. Odoo is given no access to anybody's files.
+      dialog: [pick]
     - contract: central-navigation
       provider: portal
       capabilities: [navigation:register]
