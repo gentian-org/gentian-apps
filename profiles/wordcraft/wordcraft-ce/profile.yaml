@@ -45,7 +45,8 @@
 #
 # Secret inventory:
 #   Platform-provided: vouching-wordcraft-ce (the client the server asks the
-#     realm with, and the home's scope), mounted as files.
+#     realm with), mounted as files. The home's address and scope are chart
+#     values the platform sets while the contract is granted.
 #   Generated: none.
 #
 # Backup: nothing to back up; the app has no store and no volume.
@@ -61,13 +62,13 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.2.0-dev"
+  version: "0.2.1-dev"
   launch: tile
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: wordcraft
-      version: "0.2.0-develop.1ea00d1"
+      version: "0.2.1-develop.fa49b12"
     extraValues:
       fullnameOverride: "wordcraft-ce"
       ingress:
@@ -78,6 +79,7 @@ spec:
       integrations:
         file-store:
           endpointKey: home.url
+          homeScopeKey: home.scope
 
   # The tenant's file home, called as the person and only while they are
   # present (see Files, above).
