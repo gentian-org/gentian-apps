@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.4-dev"
+  version: "0.5.5-dev"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -432,6 +432,17 @@ spec:
         service: nextcloud
         port: 8080
         path: /remote.php/dav/
+      # What the platform's file dialog needs beyond WebDAV: a person's files
+      # are under files/<user id>/, a file's id is Nextcloud's fileid (the
+      # same for everyone who may see the file, and kept across a move), and
+      # /f/<fileid> opens a file in Nextcloud's own page, which asks the
+      # viewer's own sign-in.
+      files:
+        root: /files/{principal}/
+        idProperty: "{http://owncloud.org/ns}fileid"
+        open:
+          entry: web
+          path: "/f/{id}"
     - name: calendar-store
       protocol: caldav
       endpoint:
