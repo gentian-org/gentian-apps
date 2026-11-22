@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -49,38 +48,45 @@ func (s *server) relayRoutes() {
 }
 
 // app serves the build at this address's root. A path that names no file is
-// one of the app's own routes and gets its entry page.
+// one of the app's own routes and gets its entry page. Files are opened
+// through os.Root, which refuses any name that leads out of the build.
 func (s *server) app(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		fail(w, http.StatusMethodNotAllowed, "the app is only read")
 		return
 	}
-	rel := path.Clean("/" + r.URL.Path)
-	file := filepath.Join(s.cfg.site, filepath.FromSlash(rel))
-	if info, err := os.Stat(file); err != nil || info.IsDir() {
-		rel = "/index.html"
-		file = filepath.Join(s.cfg.site, "index.html")
+	site, err := os.OpenRoot(s.cfg.site)
+	if err != nil {
+		log.Printf("site: %v", err)
+		http.NotFound(w, r)
+		return
 	}
+	defer site.Close()
+	name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+	f, info := openFile(site, name)
+	if f == nil {
+		name = "index.html"
+		if f, info = openFile(site, name); f == nil {
+			http.NotFound(w, r)
+			return
+		}
+	}
+	defer f.Close()
 	h := w.Header()
-	switch path.Ext(rel) {
+	switch path.Ext(name) {
 	case ".html", ".json", ".webmanifest":
 		// The entry page, the service worker's manifest and the app's
 		// settings: asked for again each time.
 		h.Set("Cache-Control", "no-cache")
 	}
-	if ct := contentTypes[path.Ext(rel)]; ct != "" {
+	if ct := contentTypes[path.Ext(name)]; ct != "" {
 		h.Set("Content-Type", ct)
-	} else if ct := mime.TypeByExtension(path.Ext(rel)); ct != "" {
+	} else if ct := mime.TypeByExtension(path.Ext(name)); ct != "" {
 		h.Set("Content-Type", ct)
-	}
-	info, err := os.Stat(file)
-	if err != nil {
-		http.NotFound(w, r)
-		return
 	}
 	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-		if gz, err := os.Open(file + ".gz"); err == nil {
+		if gz, _ := openFile(site, name+".gz"); gz != nil {
 			defer gz.Close()
 			h.Set("Content-Encoding", "gzip")
 			h.Add("Vary", "Accept-Encoding")
@@ -88,7 +94,25 @@ func (s *server) app(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	http.ServeFile(w, r, file)
+	http.ServeContent(w, r, name, info.ModTime(), f)
+}
+
+// openFile opens a file of the build, or nothing for a folder, a missing
+// file or a name outside the build.
+func openFile(site *os.Root, name string) (*os.File, os.FileInfo) {
+	if name == "" {
+		return nil, nil
+	}
+	f, err := site.Open(name)
+	if err != nil {
+		return nil, nil
+	}
+	info, err := f.Stat()
+	if err != nil || info.IsDir() {
+		f.Close()
+		return nil, nil
+	}
+	return f, info
 }
 
 // settings are the app's default settings, which point its WebDAV sync at
