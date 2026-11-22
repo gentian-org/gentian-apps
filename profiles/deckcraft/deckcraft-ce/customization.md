@@ -4,7 +4,7 @@
 
 Framework: [gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md).
 
-A static WebAssembly app with no server side of its own. The image adds a small server (`images/crafting-apps/host`) that serves the build and a page framing it.
+A static WebAssembly app with no server side of its own. The image adds a small server (`images/app-host`) that serves the build and a page framing it.
 
 | Rung | Available | How, here |
 |---|---|---|

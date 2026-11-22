@@ -6,10 +6,11 @@
 # static files (<app>-web-<version>.zip). An image serves that build unchanged:
 # the app runs in the browser. The release and its checksum are pinned.
 #
-# What serves it is host/, a small server of this repository. Beside the
+# What serves it is images/app-host, a small server of this repository that
+# other images share; the build is given it as the context named "app-host". Beside the
 # build it serves a page that frames the app and four file calls, so that the
 # app opens and saves in the tenant's file home as the signed-in person
-# (host/main.go). Without a home it serves the build and nothing else.
+# (images/app-host/main.go). Without a home it serves the build and nothing else.
 
 FROM docker.io/nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6 AS site
 ARG CRAFT_APP
@@ -31,7 +32,7 @@ FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.27.3-bookworm@sha256:d
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
-COPY host/ .
+COPY --from=app-host . .
 RUN go test ./... \
  && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /host .
 

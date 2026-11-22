@@ -1,0 +1,10 @@
+{
+  "isEnabled": true,
+  "syncProvider": "WebDAV",
+  "webDav": {
+    "baseUrl": "{{origin}}/webdav/",
+    "userName": "{{name}}",
+    "password": "signed-in",
+    "syncFolderPath": "/"
+  }
+}

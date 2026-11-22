@@ -10,8 +10,7 @@
 #   build of the chart names the same commit's develop image.
 #
 # Nothing of upstream's is changed: the release's files are served as they
-# are. What this repository adds is the server in the image (images/crafting-apps/
-# host): beside the build it serves a page that frames the app, by the app's
+# are. What this repository adds is the server in the image (images/app-host): beside the build it serves a page that frames the app, by the app's
 # own host messages, and four file calls.
 #
 # ── Files ──
@@ -62,7 +61,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.2.2-dev"
+  version: "0.2.2-dev.1"
   launch: tile
   package:
     chart:
