@@ -4,7 +4,8 @@ fullnameOverride: wordcraft-ce
 replicaCount: 1
 
 image:
-  # Built by this repository from upstream's released web build (images/wordcraft):
+  # Built by this repository from upstream's released web build (images/crafting-apps,
+  # pinned in images/wordcraft/versions.env):
   # upstream publishes no image. A develop build of this chart names the
   # same commit's develop-<sha7> image instead (pin-image-tag in CI).
   repository: ghcr.io/gentian-org/wordcraft

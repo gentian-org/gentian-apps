@@ -27,6 +27,9 @@ on:
       - "charts/erpnext/**"
       - "charts/uno-calculator/**"
       - "charts/wordcraft/**"
+      - "charts/gridcraft/**"
+      - "charts/deckcraft/**"
+      - "charts/pdfcraft/**"
       - "charts/vectorcraft/**"
       # The validators: a change to one is checked by running it.
       - "scripts/**"
@@ -120,7 +123,7 @@ jobs:
                  --jq '.files[].filename' > /tmp/changed \
             && [ "$(wc -l < /tmp/changed)" -gt 0 ] \
             && [ "$(wc -l < /tmp/changed)" -lt 300 ]; then
-            if ! grep -qE '^(apps/|profiles/|images/|e2e/|charts/(odoo|gentian-sidecar-git-modules|mathesar|docmost|flowable|erpnext|paperless-ngx|uno-calculator|wordcraft|vectorcraft)/|scripts/|\.github/workflows/apps-ci\.yaml$|\.github/actions/)' /tmp/changed; then
+            if ! grep -qE '^(apps/|profiles/|images/|e2e/|charts/(odoo|gentian-sidecar-git-modules|mathesar|docmost|flowable|erpnext|paperless-ngx|uno-calculator|wordcraft|gridcraft|deckcraft|pdfcraft|vectorcraft)/|scripts/|\.github/workflows/apps-ci\.yaml$|\.github/actions/)' /tmp/changed; then
               relevant=false
             fi
           fi
@@ -422,13 +425,18 @@ jobs:
           branch-versions: ${{ needs.release-gate.outputs.develop }}
           pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
 
-  # WordCraft: upstream publishes no image, so this serves the web build of the
-  # release images/wordcraft/versions.env pins, and packages the chart naming
+  # The Crafting Apps that open and save in the tenant's file home: upstream
+  # publishes no image, so each is built from images/crafting-apps with the
+  # release images/<app>/versions.env pins, and its chart is packaged naming
   # this build's image.
-  build-wordcraft:
+  build-crafting-apps:
     needs: [release-gate, scope]
     if: needs.scope.outputs.relevant == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [wordcraft, gridcraft, deckcraft, pdfcraft]
     permissions:
       contents: read
       packages: write
@@ -436,34 +444,41 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - name: Read WordCraft versions
+      - name: Read the app's versions
         id: versions
+        env:
+          APP: ${{ matrix.app }}
         run: |
-          # shellcheck disable=SC1091
-          source images/wordcraft/versions.env
+          # shellcheck disable=SC1090
+          source "images/${APP}/versions.env"
           {
             echo "image_tag=${IMAGE_TAG}"
-            echo "version=${WORDCRAFT_VERSION}"
-            echo "web_sha256=${WORDCRAFT_WEB_SHA256}"
+            echo "version=${CRAFT_VERSION}"
+            echo "web_sha256=${CRAFT_WEB_SHA256}"
+            echo "title=${CRAFT_TITLE}"
+            echo "extensions=${CRAFT_EXTENSIONS}"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Build and push WordCraft image
+      - name: Build and push the image
         uses: ./.github/actions/image
         with:
-          dir: images/wordcraft
+          dir: images/crafting-apps
           publish: ${{ needs.release-gate.outputs.publish }}
           develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
           args: |
-            WORDCRAFT_VERSION=${{ steps.versions.outputs.version }}
-            WORDCRAFT_WEB_SHA256=${{ steps.versions.outputs.web_sha256 }}
+            CRAFT_APP=${{ matrix.app }}
+            CRAFT_VERSION=${{ steps.versions.outputs.version }}
+            CRAFT_WEB_SHA256=${{ steps.versions.outputs.web_sha256 }}
+            CRAFT_TITLE=${{ steps.versions.outputs.title }}
+            CRAFT_EXTENSIONS=${{ steps.versions.outputs.extensions }}
           refs: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/wordcraft:${{ steps.versions.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/wordcraft:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/${{ matrix.app }}:${{ steps.versions.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/${{ matrix.app }}:${{ github.sha }}
 
       - name: Package and push chart
         uses: ./.github/actions/chart
         with:
-          dir: charts/wordcraft
+          dir: charts/${{ matrix.app }}
           lint: "true"
           publish: ${{ needs.release-gate.outputs.publish }}
           branch-versions: ${{ needs.release-gate.outputs.develop }}
@@ -1075,7 +1090,7 @@ jobs:
   # run: a decision that was skipped is not a decision.
   gate:
     runs-on: ubuntu-latest
-    needs: [release-gate, scope, e2e-scope, audit-python, build-nextcloud, build-nextcloud-mcp, build-xwiki, assemble-catalogue-site, publish-catalogue, validate-profiles, build-odoo-chart, build-git-modules-sidecar-chart, build-mathesar-chart, build-docmost-chart, build-flowable-chart, build-erpnext-chart, build-paperless-ngx-chart, build-paperless-ngx-mcp, build-uno-calculator, build-wordcraft, build-vectorcraft, build-git-modules-sidecar-image, test-sso-saml-sidecar, e2e-sso-saml-sidecar, e2e-oidc-sign-out, e2e-restore-rewrites, build-sso-saml-sidecar-image]
+    needs: [release-gate, scope, e2e-scope, audit-python, build-nextcloud, build-nextcloud-mcp, build-xwiki, assemble-catalogue-site, publish-catalogue, validate-profiles, build-odoo-chart, build-git-modules-sidecar-chart, build-mathesar-chart, build-docmost-chart, build-flowable-chart, build-erpnext-chart, build-paperless-ngx-chart, build-paperless-ngx-mcp, build-uno-calculator, build-crafting-apps, build-vectorcraft, build-git-modules-sidecar-image, test-sso-saml-sidecar, e2e-sso-saml-sidecar, e2e-oidc-sign-out, e2e-restore-rewrites, build-sso-saml-sidecar-image]
     if: always()
     steps:
       - env:
