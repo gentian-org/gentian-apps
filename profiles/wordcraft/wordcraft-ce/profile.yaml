@@ -4,13 +4,13 @@
 # Source: https://github.com/storytold/wordcraft (MIT OR Apache-2.0), one of the
 #   Crafting Apps. Upstream publishes neither an image nor a chart, but every
 #   release carries the browser build as static files, so this repository
-#   builds both: images/wordcraft serves the pinned release's web build
+#   builds both: images/crafting-apps serves the pinned release's web build
 #   unchanged, and charts/wordcraft runs that one container. The app is
 #   WebAssembly and runs in the browser. The chart names its image; a develop
 #   build of the chart names the same commit's develop image.
 #
 # Nothing of upstream's is changed: the release's files are served as they
-# are. What this repository adds is the server in the image (images/wordcraft/
+# are. What this repository adds is the server in the image (images/crafting-apps/
 # host): beside the build it serves a page that frames the app, by the app's
 # own host messages, and four file calls.
 #
@@ -62,13 +62,13 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.2.1-dev"
+  version: "0.2.2-dev"
   launch: tile
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: wordcraft
-      version: "0.2.1-develop.fa49b12"
+      version: "0.2.2-develop.d00c404"
     extraValues:
       fullnameOverride: "wordcraft-ce"
       ingress:
