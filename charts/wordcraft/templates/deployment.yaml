@@ -31,8 +31,6 @@ spec:
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           env:
-            - {name: CRAFT_APP, value: wordcraft}
-            - {name: CRAFT_TITLE, value: WordCraft}
             - {name: CRAFT_LISTEN, value: ":{{ .Values.port }}"}
             - {name: CRAFT_HOME_URL, value: {{ .Values.home.url | quote }}}
             - {name: CRAFT_HOME_SCOPE, value: {{ .Values.home.scope | quote }}}

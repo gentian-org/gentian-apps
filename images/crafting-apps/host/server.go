@@ -80,7 +80,8 @@ func (s *server) page(w http.ResponseWriter, r *http.Request) {
 func (s *server) icon(w http.ResponseWriter, r *http.Request) {
 	found, _ := filepath.Glob(filepath.Join(s.cfg.site, "*.ico"))
 	if len(found) == 0 {
-		http.NotFound(w, r)
+		// Not every app's build has one; the browser asks all the same.
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	w.Header().Set("Cache-Control", "public, max-age=86400")
