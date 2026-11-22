@@ -1,0 +1,6 @@
+apiVersion: v2
+name: super-productivity
+description: Super Productivity (personal to-do list, time tracker and planner) for Gentian OS tenants
+type: application
+version: 0.1.0
+appVersion: "20.1.0"

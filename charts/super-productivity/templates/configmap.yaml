@@ -1,0 +1,35 @@
+{{- /*
+nginx's main configuration, in place of the image's: the same, with a fixed
+number of worker processes (the image's "auto" starts one per CPU of the
+node) and its pid file where the read-only root filesystem allows one. The
+server block is still the image's own template, rendered at start.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "super-productivity.fullname" . }}-nginx
+  labels:
+    {{- include "super-productivity.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    worker_processes  {{ .Values.workerProcesses }};
+    error_log  /dev/stderr notice;
+    pid        /tmp/nginx.pid;
+
+    events {
+        worker_connections  1024;
+    }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+        access_log    {{ if .Values.accessLog }}/dev/stdout{{ else }}off{{ end }};
+        sendfile      on;
+        keepalive_timeout  65;
+        client_body_temp_path /tmp/client_temp;
+        proxy_temp_path       /tmp/proxy_temp;
+        fastcgi_temp_path     /tmp/fastcgi_temp;
+        uwsgi_temp_path       /tmp/uwsgi_temp;
+        scgi_temp_path        /tmp/scgi_temp;
+        include /etc/nginx/conf.d/*.conf;
+    }
