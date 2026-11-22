@@ -32,6 +32,7 @@ on:
       - "charts/pdfcraft/**"
       - "charts/vectorcraft/**"
       - "charts/vikunja/**"
+      - "charts/super-productivity/**"
       # The validators: a change to one is checked by running it.
       - "scripts/**"
       - ".github/workflows/apps-ci.yaml"
@@ -124,7 +125,7 @@ jobs:
                  --jq '.files[].filename' > /tmp/changed \
             && [ "$(wc -l < /tmp/changed)" -gt 0 ] \
             && [ "$(wc -l < /tmp/changed)" -lt 300 ]; then
-            if ! grep -qE '^(apps/|profiles/|images/|e2e/|charts/(odoo|gentian-sidecar-git-modules|mathesar|docmost|flowable|erpnext|paperless-ngx|uno-calculator|wordcraft|gridcraft|deckcraft|pdfcraft|vectorcraft|vikunja)/|scripts/|\.github/workflows/apps-ci\.yaml$|\.github/actions/)' /tmp/changed; then
+            if ! grep -qE '^(apps/|profiles/|images/|e2e/|charts/(odoo|gentian-sidecar-git-modules|mathesar|docmost|flowable|erpnext|paperless-ngx|uno-calculator|wordcraft|gridcraft|deckcraft|pdfcraft|vectorcraft|vikunja|super-productivity)/|scripts/|\.github/workflows/apps-ci\.yaml$|\.github/actions/)' /tmp/changed; then
               relevant=false
             fi
           fi
@@ -464,6 +465,8 @@ jobs:
         uses: ./.github/actions/image
         with:
           dir: images/crafting-apps
+          contexts: |
+            app-host=images/app-host
           publish: ${{ needs.release-gate.outputs.publish }}
           develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
           args: |
@@ -527,6 +530,53 @@ jobs:
         uses: ./.github/actions/chart
         with:
           dir: charts/vectorcraft
+          lint: "true"
+          publish: ${{ needs.release-gate.outputs.publish }}
+          branch-versions: ${{ needs.release-gate.outputs.develop }}
+          pin-image-tag: ${{ needs.release-gate.outputs.develop_tag }}
+
+  # Super Productivity: upstream's web build, taken from upstream's image by
+  # digest, served by images/app-host with a WebDAV relay to the tenant's
+  # file home; the chart is packaged naming this build's image.
+  build-super-productivity:
+    needs: [release-gate, scope]
+    if: needs.scope.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Read Super Productivity versions
+        id: versions
+        run: |
+          # shellcheck disable=SC1091
+          source images/super-productivity/versions.env
+          {
+            echo "image_tag=${IMAGE_TAG}"
+            echo "sp_image=${SP_IMAGE}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Super Productivity image
+        uses: ./.github/actions/image
+        with:
+          dir: images/super-productivity
+          contexts: |
+            app-host=images/app-host
+          publish: ${{ needs.release-gate.outputs.publish }}
+          develop-tag: ${{ needs.release-gate.outputs.develop_tag }}
+          args: |
+            SP_IMAGE=${{ steps.versions.outputs.sp_image }}
+          refs: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/super-productivity:${{ steps.versions.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_ORG }}/super-productivity:${{ github.sha }}
+
+      - name: Package and push chart
+        uses: ./.github/actions/chart
+        with:
+          dir: charts/super-productivity
           lint: "true"
           publish: ${{ needs.release-gate.outputs.publish }}
           branch-versions: ${{ needs.release-gate.outputs.develop }}
@@ -1108,7 +1158,7 @@ jobs:
   # run: a decision that was skipped is not a decision.
   gate:
     runs-on: ubuntu-latest
-    needs: [release-gate, scope, e2e-scope, audit-python, build-nextcloud, build-nextcloud-mcp, build-xwiki, assemble-catalogue-site, publish-catalogue, validate-profiles, build-odoo-chart, build-git-modules-sidecar-chart, build-mathesar-chart, build-docmost-chart, build-flowable-chart, build-erpnext-chart, build-paperless-ngx-chart, build-vikunja-chart, build-paperless-ngx-mcp, build-uno-calculator, build-crafting-apps, build-vectorcraft, build-git-modules-sidecar-image, test-sso-saml-sidecar, e2e-sso-saml-sidecar, e2e-oidc-sign-out, e2e-restore-rewrites, build-sso-saml-sidecar-image]
+    needs: [release-gate, scope, e2e-scope, audit-python, build-nextcloud, build-nextcloud-mcp, build-xwiki, assemble-catalogue-site, publish-catalogue, validate-profiles, build-odoo-chart, build-git-modules-sidecar-chart, build-mathesar-chart, build-docmost-chart, build-flowable-chart, build-erpnext-chart, build-paperless-ngx-chart, build-vikunja-chart, build-super-productivity, build-paperless-ngx-mcp, build-uno-calculator, build-crafting-apps, build-vectorcraft, build-git-modules-sidecar-image, test-sso-saml-sidecar, e2e-sso-saml-sidecar, e2e-oidc-sign-out, e2e-restore-rewrites, build-sso-saml-sidecar-image]
     if: always()
     steps:
       - env:

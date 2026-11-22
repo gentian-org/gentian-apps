@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-// Command host serves a Crafting App's browser build and, where the tenant
-// has a home for files, a page that frames the app and lets it open and save
-// there as the signed-in person.
+// Command host serves a browser app's build and, where the tenant has a home
+// for files, lets the app reach it as the signed-in person. It does so in one
+// of two ways, chosen by CRAFT_MODE:
+//
+//   - "frame" (the Crafting Apps): a page that frames the app and four file
+//     calls, by which the app opens and saves where the person chooses;
+//   - "relay": the app served as it is, and a WebDAV relay under /webdav/
+//     into one folder of the person's files, for an app that syncs with a
+//     WebDAV server of its own accord.
 //
 // It holds nothing of anybody: the person's token arrives with each request
 // from the tenant's edge, is exchanged at the realm for one valid at the
@@ -54,6 +60,16 @@ type config struct {
 	extensions []string
 	// maxBytes bounds one file.
 	maxBytes int64
+	// mode is "frame" or "relay" (see the package comment).
+	mode string
+	// davFolder is, in relay mode, the folder of the person's files the
+	// relay reaches, and nothing beside it.
+	davFolder string
+	// settingsPath is, in relay mode, the address the app reads its default
+	// settings from, and settingsTemplate the file they are made from:
+	// {{origin}}, {{folder}} and {{name}} are put in. Empty serves none.
+	settingsPath     string
+	settingsTemplate string
 }
 
 func configFromEnv() config {
@@ -73,5 +89,10 @@ func configFromEnv() config {
 		vouching:   get("CRAFT_VOUCHING_DIR", "/var/run/gentian/vouching"),
 		extensions: splitList(get("CRAFT_EXTENSIONS", ".docx,.odt,.md,.txt,.rtf,.html")),
 		maxBytes:   256 << 20,
+		mode:       get("CRAFT_MODE", "frame"),
+		davFolder:  get("CRAFT_DAV_FOLDER", "Apps"),
+
+		settingsPath:     os.Getenv("CRAFT_SETTINGS_PATH"),
+		settingsTemplate: os.Getenv("CRAFT_SETTINGS_TEMPLATE"),
 	}
 }

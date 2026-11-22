@@ -35,6 +35,8 @@ type homeSession struct {
 	token   string
 	root    string // the person's files, ending in a slash
 	expires time.Time
+	// folderReady says the relay's folder is known to exist.
+	folderReady bool
 }
 
 // entry is one file or folder of a listing.
