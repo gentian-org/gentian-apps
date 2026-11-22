@@ -1,0 +1,61 @@
+nameOverride: super-productivity
+fullnameOverride: super-productivity-ce
+
+replicaCount: 1
+
+image:
+  # Built by this repository (images/super-productivity, pinned in its
+  # versions.env): upstream's web build, taken from upstream's image by
+  # digest and unchanged, served by images/app-host. A develop build of this
+  # chart names the same commit's develop-<sha7> image instead (pin-image-tag
+  # in CI).
+  repository: ghcr.io/gentian-org/super-productivity
+  tag: "20.1.0"
+  pullPolicy: IfNotPresent
+
+port: 8080
+
+# The tenant's home for files (the platform's file-store contract). With an
+# address and a scope, which the platform fills in once the tenant's
+# administrator grants the contract, the app's WebDAV sync reaches the folder
+# "Super Productivity" of the signed-in person's files there. Without, each
+# person's tasks stay in their browser.
+home:
+  # Where the home answers WebDAV. The platform fills it in.
+  url: ""
+  # The scope the server asks the tenant's realm a person's token for the
+  # home with. The platform fills it in.
+  scope: ""
+  # The platform's Secret for this app: the client it asks the tenant's realm
+  # with. Mounted as files; it may not exist yet.
+  vouchingSecret: vouching-super-productivity-ce
+
+# One small server for the app's files and the relay; the app runs in the
+# browser.
+resources:
+  requests:
+    cpu: "5m"
+    memory: "16Mi"
+  limits:
+    cpu: "200m"
+    memory: "64Mi"
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 101
+  runAsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+podLabels: {}
+podAnnotations: {}
+
+# The operator routes from the profile's spec.expose; the chart has no Ingress.
+ingress:
+  enabled: false

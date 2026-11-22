@@ -1,0 +1,127 @@
+# SPDX-License-Identifier: MIT
+# ComponentProfile — Super Productivity (personal to-do list, time tracker and
+# daily planner, in the browser)
+#
+# Source: upstream's web build of
+#   https://github.com/super-productivity/super-productivity (MIT), taken by
+#   digest from upstream's image johannesjo/super-productivity and served
+#   unchanged. Upstream publishes no chart, so this repository builds both:
+#   images/super-productivity serves the build with images/app-host (the
+#   server the Crafting Apps run on, in relay mode), and
+#   charts/super-productivity runs that one container. The chart names its
+#   image; a develop build of the chart names the same commit's develop image.
+#
+# ── Where the data is ──
+# In each person's browser (IndexedDB), and, once the person turns sync on,
+# in the folder "Super Productivity" of their own files at the tenant's home
+# for files (the file-store contract). The app syncs with a WebDAV server of
+# its own accord; its default settings, which the server serves, name this
+# address's relay at /webdav/ as that server, so turning sync on in the app
+# is one save. The relay passes the app's WebDAV calls to that one folder and
+# nowhere else, as the signed-in person: each call carries the token the
+# edge hands this app, which the server exchanges at the tenant's realm for
+# one valid at the home (present-only: integrations[].asPerson with
+# vouching.exchange and no keys). The pod keeps no file and no token. The
+# user name and password the app's sync form shows are placeholders: the
+# edge replaces whatever the app sends, and the home never sees them.
+#
+# Which home that is, the app cannot tell and does not need to: the
+# platform gives the server the home's address and the scope to ask for.
+# Until the tenant's administrator grants the contract, and in a tenant with
+# no home, the app is served as upstream ships it and keeps its data in the
+# browser only.
+#
+# ── Outside calls ──
+# None from the pod but to the tenant's realm and home, both in the cluster,
+# so the profile asks for no egress. What the app reaches outside, it reaches
+# from the person's browser, and only when the person sets it up: sync to
+# Dropbox or the vendor's SuperSync service instead of the home, and its
+# issue-tracker and calendar integrations. The platform does not stand
+# between the browser and those.
+#
+# ── Sign-in ──
+# None of its own. The app has no accounts and nothing to administer, so it
+# declares no identity client, no provisioning hook and no App Admin role.
+# The gateway entry below puts it behind the tenant's session: only people
+# the tenant's administrator granted the app (can_launch) reach it.
+#
+# Secret inventory:
+#   Platform-provided: vouching-super-productivity-ce (the client the server
+#     asks the realm with), mounted as files. The home's address and scope
+#     are chart values the platform sets while the contract is granted.
+#   Generated: none.
+#
+# Backup: nothing to back up here; the app has no store and no volume. What
+# is synced is in the home, and backed up with it.
+apiVersion: gentianos.io/v1alpha1
+kind: ComponentProfile
+metadata:
+  name: super-productivity-ce
+  labels:
+    gentianos.io/profile-name: super-productivity-ce
+    gentianos.io/profile-family: super-productivity
+    gentianos.io/profile-edition: ce
+spec:
+  classes:
+    - app
+  trustTier: certified
+  version: "0.1.0-dev"
+  launch: tile
+  package:
+    chart:
+      repository: "oci://ghcr.io/gentian-org/charts"
+      name: super-productivity
+      # On develop a -develop.<sha7> build of the chart (docs/releasing.md).
+      version: "0.1.0-develop.1180b4e"
+    extraValues:
+      fullnameOverride: "super-productivity-ce"
+      ingress:
+        enabled: false
+      podAnnotations:
+        reloader.stakater.com/auto: "true"
+    valueMapping:
+      integrations:
+        file-store:
+          endpointKey: home.url
+          homeScopeKey: home.scope
+
+  # The tenant's file home, called as the person and only while they are
+  # present (see Where the data is, above).
+  integrations:
+    - contract: file-store
+      asPerson: true
+      capabilities: [webdav:read, webdav:write]
+
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
+    services:
+      # No keys: the server signs nothing and nobody is linked to it. It
+      # exchanges the token of the person at its page.
+      vouching:
+        exchange: true
+
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: "super-productivity"
+      # The realm issues the person's token for this app alone; the server
+      # exchanges it for the home's.
+      exchangeToken: true
+      backend:
+        service: "super-productivity-ce"
+        port: 8080
+      tile:
+        displayName: "Super Productivity"
+        description: "Personal to-do list, time tracker and planner"
+        image: assets/tile.png
+        logo: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAABmJLR0QA/wD/AP+gvaeTAAAM2klEQVR4nO3dfXSU1Z0H8O+9z+tMZpIwmRBCAgkSXoQClaBVVFap7S5arXWFtm67p7uyUqouihRBD+g5VkRyitLjWl+r62t1Ww+sLaenlkY5FNRDRDBBIInyGggJIZnJzDPP690/SNjAJCRgk+eZee7nz2cmM78z9/vce/M8d+4QXLC5QlHRXlXTbGX06BHSygdun1pWVnKlGghMlCRhHKWkmBIaBCF5F/4e/kYAxhjrcBynw3bsA3rKqIvFkzt+v/7Pf3355XfbFYUZra2hFFBjfoX3OF/XiJHI4aAsh5Xnn3no8lGjir4fDAS+A0LyRIFCFEVQSkApBQgBAQEhF/A2HBhjYGAAY3AcB5Zlw7JtODYzTcva2nq89dUlyx/7Y339/lR7e0HiQoJwPi1Do9EJOXl5BYHfPPvQjcOHR+8RJPFrsiRCliVIksgbeoiYpg3TNKEbBhzHaWpp7Xjy3vsefrWx8XCyra2hE4Az0NcaYItVKOGwGHrx2ZXTp0yZUCVK4jRVkaEo8qkznXMFYwy6bkBL6bBsu76h/uD9t/142eZ43OoEGvSBvIbQ3xMKCyeHKivL899648kVZWUl61RVKQ6FgpBliZ/xLiOEQBRFqIoMSkhBfn7uvB/edkPk0KGm7R0djpNMthj9vca5AkAikYrcxYvnly1dPP+3waD6vVBODlFVmTe8xxBCIEkiRFEkgkArv/nNy67NH5ZXvWNHo55KnTxnCPoKABk27KLcVauWTLz+21dvUFXl4nAoCFHst8PgXCQIFIosgTmsePy4slsqvz5586bqHR2pVHufw0GvLRqJVOSuWrVk4uxZl/+hu8vnY31mIIRAUWQwhlC0MPrd6TOmfrBpU017XyFIC0Bh4eTQ4sXzy7rO/OJQKMi7/AwkyxIABKIFkZvGjiv707Zte+Oa1pYWgrMCUKFMnlyct2zJgjcDAWUSb/zMJkkiHMcJjCoZ8W0lEFzf0BDT4vGjZ1wr6Nmv03BYDD379GMPKqp8WU5OgDd+FsjJCUCWpbIf3PqPTzuOkwNUSj0fPx2AaHRCzgvPrLgkHAoszAnyMT9bEEKQkxOAoiqz//eddT/NzU2F0eP6T9cQcI1YXKzk3rvoX19VVbVYVWWXyuUGA6UUAqWglM4cM3bU+pqaA+2JRLMJdPUAkcjh4EvPPXyTKInTAgHF3Wq5QdF1uV655qrpjyeTqQC6Tn4KzBVMk8qFwwvuVvml3awWDKqQZOnaN1+rmhWNTggCAC0q2qu+8eqaKwRRnKoovOvPZoIgQFVkjBlTukzXmQJAoJpmK6NGjZgnSyI/+31AUSRIknjpSy88UllUNFWlo0ePkIIB9cauCwdclhMEAbIkYlxF2b9omq3QlQ/cPhWE5EmS6HZt3BCRZQmBgPrdadNKFVpWVnKlKFB+0cdHJEkECMldsuRnl1I1EJgoivzs9xNCCCRRQElRdBbtWsDpdk3cEBNFAaoiT6KUkmI++/cfSilEUZxACaFh8PHfdwiloAKJUEpIkFzI6nAuo3Ut18+l7MxbwpyPMIAP/n7HA+BzPAA+xwPgczwAPscD4HM8AD7HA+BzPAA+xwPgczwAPscD4HM8AD6XUWvBHIehtq4dNZ+04cQJHbYz4L2QBpUkEhQVBXDF5cNx0ZiQ2+WcF7Lv850sHMqBJHl7949Pd7Zh7ZO70dAYd7uUc5pRGcXS+yajtDTodinnZJo24p2JzBgC/rDxMO6+52PPNz4AbK9pxe0LtmLnrpNulzIgng/Apzvb8HhVLWybuV3KgMXjJu5fXoOmo0m3S+mXpwPgOAxr1+3OqMbvFoubWPvk526X0S9PTwLrdrejoSG92591dRGum10MKnhjLaOhO/jdO/ux+/OOM45v3XYc+w90orzMuxNDTweg5pMTaceuvqoIqx+d7kI15zb72hG442fbsG9f7Izj27a1eDoAnh4CWlvT9zj81nXFLlTSP1mmmHdredrxpqPa0BdzHjwdANNM/z9fkb1bcjiU3qEahjeuVfTFu58mNyR4AHyOB8DneAB8jgfA53gAfI4HwOd4AHyOB6AP9fUxVH9wDM3HU26XMqg8fS/ALc+/uA8vv9IIxgBFEbC2agYu+XrE7bIGBe8BzvLMc/vw0n+fanwA0HUbv3m5wd2iBhEPQA/PPLcPr7zWmHbcMGwXqhkaPABd+mp8AJjby12+bJHVAfjiyzjefOtLfLIjfV1BT+dq/P+8ayKum+3NW9B/D1k7Cfzb1hYse7Dm9HKyW24uw333TkrbEa+/xv/BvDGDXaqrsrYHeO2NxjPWEr6z/gCq1tadntwBvPGBLO4BerN+w0EAwM8XT8azz/PGB7I4AD+6bSw+q62B45y5onj9hoOo292O+vpYr3/np8YHsngIuHJmIZbf/zX0thF2X42/cMEEXzU+kMU9AADcMKcUjAGr19Sm9QRn89uZ3y1re4Bu37m+FMuW9t4TdPNr4wM+CABwKgR9DQd+7PZ7yuohoKcb5pQCAB6vqoVlMQgCwd13Tux1Lb+f+CYAwKkQXDItgj37Yhh7URhlo3PcLsl1vgoAAIwcGcTIkd7+7v5Q8sUcgOsbD4DP8QD4HA+Az/EA+BwPgM/xAPgcD4DPeToAci+7gXR2Wi5UMjCpVPrqYUny9Efs7QAUjwikHfvt/+yHrntvmTZjwJ//0pR2fPhwxYVqBs7Tl4JnzizEU7/ec8ax+voYFt71Ieb+czkU1Rvb21qmg/c2NeFvW1vSHqucXuBCRQPn6QCUl4Vw5czCtA92z94YHlm1y6WqBm78+FxMujjf7TLOydNDAADcu2gScsOS22WcN1EkWLwofRm613g+ACOLg1izuhLhUOaEQBQJli+dgqlThrldSr88HwAAmDplGF58bia+cVnU7VL6NWF8Hp5a9w3M+acSt0sZkIz5vYBuX+7vxIcfteDYMQ1GLxtJukESCaJRFTMqo7h4Yp7nu33g/38vwNOTwN6MKQ9hTLl3997NNBkxBHCDhwfA53gAfI4HwOd4AHyOB8DneAB8jgfA53gAfI4HwOd4AHyOB8DneAB8jhIw762w5IYEARzKGOIMmffjzNxXw8DAGEtQx2YnmeONhRXcEGIMDCxOLdve5/AA+I7jOHBsp4mmdL3Osvg0wG8ch8Gw7QbadOTEZtOywRifB/iJZVlIadoeWvXEf30MxmKm6d3v3HF/X4wxWLaDLxqbttCdOw/rmpbaYBim23VxQ8Q0LYCxk4+ufqGWBgKCXt9w4HXDtGDbfC7gB4ZhQkum3j148JhJm5t3pf5t/ooa07A+0nXeC2Q7x3FgmBYOHTnydiAg6BSArShEP3jo8C9TusF7gSyn6wZs06qdv+AXHzc370pRAGht3Zuc98OfV5uG8RdN092ukRskjuMgpRtoOnb8l4YR1wHY3TeD7GBQ1d7fsuMBwzB1PiHMTpqmwzKt7XcsfGRjW1tpEuhxN7C5eVdy+fJ1jW3tsVWJpMaHgixjmBYMw3Rq6+ofjMU6ksD7FnDm7WAWi6nxm29Z9Gs9ZVQnEhq/OJQlHMdBMqkhFk/86t//4+Galpa6ZPdjZ30l+KiTm1sCapPNU6aOu54xFpHlzPlePpeOMYZEQoOhG9vvXLTyrvr6znag5fRVv7TvhMfjR83dew+bFePLN48qLb4FDAFJyrgvEXNdEgkNum7sf/2tjbe+995HxxOJ2lTPx3vdFEDT2owtW2o7K2dM2xwtGHYTYyzAe4LM0n3m67pxfNMH27+3Zs3TX7a2ft559vP63BUilWrXN22qab+0csr7BdFhc2zbCcmyBJIJux/4nOM4p8/896p33LxixWP1J082xnt77jm3BUml2vVN1Z+2D4sUbKioGH2FZdnFgiBCEPhSQq8yTRudiSR0zfjw9bc3zquqemp/V+P3OqPvd1+YVOqk/tlnTcmaT/a+8w+zKnMIMB1gRBQF3ht4yKmZfgqaptmxWOJX8396/93V1TUtvXX7PZ1HC1Yo4bAYeuOVqqsrxpc8LgrC+ICqQFFkHgQXOY4DXTeQ0g2YplXz6Y7GpQvuXLkzHhfiQJ3R39+fb8vRSKQiNHZsafCJJx76UWEk/x5KaYkiy5AkKWM2msp0juPAsmwYhgnDtGBb1q6mo8efuGPhIxtjsY5k1//5A1rnd4GnbqWUn38iZ9y4crVq1bI5hcOjP5Yk6SpCIUmiCFEUQCkFCAEB4T3EBWKnFm4CjJ1aw+cwWJYFy3YAxk5qydS7h44ceXv+gl98bBhx/dTl3ffPa2XPV2yZSika7VR1ncg/+cmN+XNv/ta14XDOJbKqThYoKaeU5hFC8thXfh8fYyzGwDod22kybLshpWl7vmhs2vLo6hdqDx48ZgYCgt7cvCsF4IKu3f8fGPDS5KWDxB0AAAAASUVORK5CYII=
+        relation: can_launch
+
+  customization:
+    grade: unknown
+    supportedRungs: [L0, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/super-productivity/super-productivity-ce/customization.md
+    repackage:
+      chartOwnership: gentian-owned

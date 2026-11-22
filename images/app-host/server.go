@@ -35,6 +35,10 @@ func newServer(cfg config) http.Handler {
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, "ok\n")
 	})
+	if cfg.mode == "relay" {
+		s.relayRoutes()
+		return s
+	}
 	s.mux.HandleFunc("GET /{$}", s.page)
 	s.mux.HandleFunc("GET /favicon.ico", s.icon)
 	s.mux.HandleFunc("GET /host/page.js", asset(pageJS, "text/javascript; charset=utf-8"))
