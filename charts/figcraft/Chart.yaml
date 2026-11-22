@@ -1,0 +1,6 @@
+apiVersion: v2
+name: figcraft
+description: FigCraft (interface design in the browser) for Gentian OS tenants
+type: application
+version: 0.1.0
+appVersion: "0.18.1"

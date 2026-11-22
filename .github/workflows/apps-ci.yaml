@@ -28,6 +28,9 @@ on:
       - "charts/uno-calculator/**"
       - "charts/wordcraft/**"
       - "charts/gridcraft/**"
+      - "charts/cadcraft/**"
+      - "charts/figcraft/**"
+      - "charts/filmcraft/**"
       - "charts/deckcraft/**"
       - "charts/pdfcraft/**"
       - "charts/vectorcraft/**"
@@ -125,7 +128,7 @@ jobs:
                  --jq '.files[].filename' > /tmp/changed \
             && [ "$(wc -l < /tmp/changed)" -gt 0 ] \
             && [ "$(wc -l < /tmp/changed)" -lt 300 ]; then
-            if ! grep -qE '^(apps/|profiles/|images/|e2e/|charts/(odoo|gentian-sidecar-git-modules|mathesar|docmost|flowable|erpnext|paperless-ngx|uno-calculator|wordcraft|gridcraft|deckcraft|pdfcraft|vectorcraft|vikunja|super-productivity)/|scripts/|\.github/workflows/apps-ci\.yaml$|\.github/actions/)' /tmp/changed; then
+            if ! grep -qE '^(apps/|profiles/|images/|e2e/|charts/(odoo|gentian-sidecar-git-modules|mathesar|docmost|flowable|erpnext|paperless-ngx|uno-calculator|wordcraft|gridcraft|cadcraft|figcraft|filmcraft|deckcraft|pdfcraft|vectorcraft|vikunja|super-productivity)/|scripts/|\.github/workflows/apps-ci\.yaml$|\.github/actions/)' /tmp/changed; then
               relevant=false
             fi
           fi
@@ -438,7 +441,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [wordcraft, gridcraft, deckcraft, pdfcraft]
+        app: [wordcraft, gridcraft, deckcraft, pdfcraft, cadcraft, figcraft, filmcraft]
     permissions:
       contents: read
       packages: write
