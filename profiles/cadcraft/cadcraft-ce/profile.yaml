@@ -1,0 +1,124 @@
+# SPDX-License-Identifier: MIT
+# ComponentProfile — CADCraft (2D drafting, in the browser)
+#
+# Source: https://github.com/storytold/cadcraft (MIT OR Apache-2.0), one of the
+#   Crafting Apps. Upstream publishes neither an image nor a chart, but every
+#   release carries the browser build as static files, so this repository
+#   builds both: images/crafting-apps serves the pinned release's web build
+#   unchanged, and charts/cadcraft runs that one container. The app is
+#   WebAssembly and runs in the browser. The chart names its image; a develop
+#   build of the chart names the same commit's develop image.
+#
+# Nothing of upstream's is changed: the release's files are served as they
+# are. What this repository adds is the server in the image
+# (images/app-host): beside the build it serves a page that frames the app, by the app's
+# own host messages, and four file calls.
+#
+# ── Files ──
+# The tenant's home for files (the file-store contract), as the signed-in
+# person. "Open from files" on the page lists the person's folders; Save
+# writes back to where a document was opened, and asks where for a new one.
+# A file changed elsewhere since it was opened is not overwritten unasked.
+# The pod keeps no file and no token: each call carries the token the edge
+# hands this app, which the server exchanges at the tenant's realm for one
+# valid at the home (present-only: integrations[].asPerson with
+# vouching.exchange and no keys). It reaches nobody's files but those of a
+# person signed in at this address at that moment.
+#
+# Until the tenant's administrator grants the contract, and in a tenant with
+# no home, the app is served as upstream ships it: Open is the browser's file
+# picker, Save and Export are downloads.
+#
+# Preferences are the browser's localStorage either way.
+#
+# ── Outside calls ──
+# None at start: the page loads its own files and nothing else. The links in
+# the app (upstream's website, source and community) open in a new tab when a
+# person follows them. The pod calls the tenant's realm and the home, both in
+# the cluster, and asks for no egress.
+#
+# ── Sign-in ──
+# None of its own. The app has no accounts and nothing to administer, so it
+# declares no identity client, no provisioning hook and no App Admin role.
+# The gateway entry below puts it behind the tenant's session: only people
+# the tenant's administrator granted the app (can_launch) reach it.
+#
+# Secret inventory:
+#   Platform-provided: vouching-cadcraft-ce (the client the server asks the
+#     realm with), mounted as files. The home's address and scope are chart
+#     values the platform sets while the contract is granted.
+#   Generated: none.
+#
+# Backup: nothing to back up; the app has no store and no volume.
+apiVersion: gentianos.io/v1alpha1
+kind: ComponentProfile
+metadata:
+  name: cadcraft-ce
+  labels:
+    gentianos.io/profile-name: cadcraft-ce
+    gentianos.io/profile-family: cadcraft
+    gentianos.io/profile-edition: ce
+spec:
+  classes:
+    - app
+  trustTier: certified
+  version: "0.1.0-dev"
+  launch: tile
+  package:
+    chart:
+      repository: "oci://ghcr.io/gentian-org/charts"
+      name: cadcraft
+      version: "0.1.0-develop.33247fb"
+    extraValues:
+      fullnameOverride: "cadcraft-ce"
+      ingress:
+        enabled: false
+      podAnnotations:
+        reloader.stakater.com/auto: "true"
+    valueMapping:
+      integrations:
+        file-store:
+          endpointKey: home.url
+          homeScopeKey: home.scope
+
+  # The tenant's file home, called as the person and only while they are
+  # present (see Files, above).
+  integrations:
+    - contract: file-store
+      asPerson: true
+      capabilities: [webdav:read, webdav:write]
+
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
+    services:
+      # No keys: the server signs nothing and nobody is linked to it. It
+      # exchanges the token of the person at its page.
+      vouching:
+        exchange: true
+
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: "cadcraft"
+      # The realm issues the person's token for this app alone; the server
+      # exchanges it for the home's.
+      exchangeToken: true
+      backend:
+        service: "cadcraft-ce"
+        port: 8080
+      tile:
+        displayName: "CADCraft"
+        displayNames: {de_DE: "CADCraft"}
+        description: "2D drawings in DWG and DXF, with layers, blocks and dimensions"
+        image: assets/tile.png
+        logo: data:image/png;base64,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
+        relation: can_launch
+
+  customization:
+    grade: unknown
+    supportedRungs: [L0, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/cadcraft/cadcraft-ce/customization.md
+    repackage:
+      chartOwnership: gentian-owned
