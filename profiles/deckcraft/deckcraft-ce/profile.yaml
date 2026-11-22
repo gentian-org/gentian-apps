@@ -1,0 +1,124 @@
+# SPDX-License-Identifier: MIT
+# ComponentProfile — DeckCraft (presentations, in the browser)
+#
+# Source: https://github.com/storytold/deckcraft (MIT OR Apache-2.0), one of the
+#   Crafting Apps. Upstream publishes neither an image nor a chart, but every
+#   release carries the browser build as static files, so this repository
+#   builds both: images/crafting-apps serves the pinned release's web build
+#   unchanged, and charts/deckcraft runs that one container. The app is
+#   WebAssembly and runs in the browser. The chart names its image; a develop
+#   build of the chart names the same commit's develop image.
+#
+# Nothing of upstream's is changed: the release's files are served as they
+# are. What this repository adds is the server in the image (images/crafting-apps/
+# host): beside the build it serves a page that frames the app, by the app's
+# own host messages, and four file calls.
+#
+# ── Files ──
+# The tenant's home for files (the file-store contract), as the signed-in
+# person. "Open from files" on the page lists the person's folders; Save
+# writes back to where a document was opened, and asks where for a new one.
+# A file changed elsewhere since it was opened is not overwritten unasked.
+# The pod keeps no file and no token: each call carries the token the edge
+# hands this app, which the server exchanges at the tenant's realm for one
+# valid at the home (present-only: integrations[].asPerson with
+# vouching.exchange and no keys). It reaches nobody's files but those of a
+# person signed in at this address at that moment.
+#
+# Until the tenant's administrator grants the contract, and in a tenant with
+# no home, the app is served as upstream ships it: Open is the browser's file
+# picker, Save and Export are downloads.
+#
+# The browser build keeps no preferences between visits.
+#
+# ── Outside calls ──
+# None at start: the page loads its own files and nothing else. The links in
+# the app (upstream's website, source and community) open in a new tab when a
+# person follows them. The pod calls the tenant's realm and the home, both in
+# the cluster, and asks for no egress.
+#
+# ── Sign-in ──
+# None of its own. The app has no accounts and nothing to administer, so it
+# declares no identity client, no provisioning hook and no App Admin role.
+# The gateway entry below puts it behind the tenant's session: only people
+# the tenant's administrator granted the app (can_launch) reach it.
+#
+# Secret inventory:
+#   Platform-provided: vouching-deckcraft-ce (the client the server asks the
+#     realm with), mounted as files. The home's address and scope are chart
+#     values the platform sets while the contract is granted.
+#   Generated: none.
+#
+# Backup: nothing to back up; the app has no store and no volume.
+apiVersion: gentianos.io/v1alpha1
+kind: ComponentProfile
+metadata:
+  name: deckcraft-ce
+  labels:
+    gentianos.io/profile-name: deckcraft-ce
+    gentianos.io/profile-family: deckcraft
+    gentianos.io/profile-edition: ce
+spec:
+  classes:
+    - app
+  trustTier: certified
+  version: "0.1.0-dev"
+  launch: tile
+  package:
+    chart:
+      repository: "oci://ghcr.io/gentian-org/charts"
+      name: deckcraft
+      version: "0.1.0-develop.d00c404"
+    extraValues:
+      fullnameOverride: "deckcraft-ce"
+      ingress:
+        enabled: false
+      podAnnotations:
+        reloader.stakater.com/auto: "true"
+    valueMapping:
+      integrations:
+        file-store:
+          endpointKey: home.url
+          homeScopeKey: home.scope
+
+  # The tenant's file home, called as the person and only while they are
+  # present (see Files, above).
+  integrations:
+    - contract: file-store
+      asPerson: true
+      capabilities: [webdav:read, webdav:write]
+
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
+    services:
+      # No keys: the server signs nothing and nobody is linked to it. It
+      # exchanges the token of the person at its page.
+      vouching:
+        exchange: true
+
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: "deckcraft"
+      # The realm issues the person's token for this app alone; the server
+      # exchanges it for the home's.
+      exchangeToken: true
+      backend:
+        service: "deckcraft-ce"
+        port: 8080
+      tile:
+        displayName: "DeckCraft"
+        displayNames: {de_DE: "DeckCraft"}
+        description: "Presentations and slide shows"
+        image: assets/tile.png
+        logo: data:image/png;base64,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
+        relation: can_launch
+
+  customization:
+    grade: unknown
+    supportedRungs: [L0, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/deckcraft/deckcraft-ce/customization.md
+    repackage:
+      chartOwnership: gentian-owned
