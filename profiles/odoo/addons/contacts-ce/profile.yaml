@@ -10,13 +10,12 @@ metadata:
   annotations:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: addon
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["contacts"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1"
+  version: "0.5.2-dev"
   requires:
     # The oldest platform version line this build runs on (docs/profile-bundles.md).
     platform: ">=0.5"

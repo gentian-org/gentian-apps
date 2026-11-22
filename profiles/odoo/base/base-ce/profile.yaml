@@ -20,10 +20,23 @@ metadata:
     gentianos.io/deployment-role: base
     gentianos.io/portal-auth-mode: oidc
 spec:
+  # What the roles of Odoo itself are called inside it, as group XML ids. A
+  # person with any role on Odoo is an internal user; its administrator holds
+  # Settings and Access Rights. Each add-on names the groups of its own roles.
+  # The platform writes the groups of the roles a person holds into the
+  # sign-in token (gentian_app_roles), and the gentian_os module sets them.
+  roles:
+    user:
+      inApp:
+        - base.group_user
+    admin:
+      inApp:
+        - base.group_system
+        - base.group_erp_manager
   classes:
     - app
   trustTier: certified
-  version: "0.5.8-dev"
+  version: "0.5.9-dev"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts

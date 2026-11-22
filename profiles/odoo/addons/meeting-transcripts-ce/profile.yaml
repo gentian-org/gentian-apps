@@ -10,13 +10,22 @@ metadata:
   annotations:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: addon
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["sales_team.group_sale_manager"],"gentianOdooGroupRoles":["sales_team.group_sale_salesman"],"gentianOdooModules":["crm_meeting_transcript"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
+  # What this add-on's roles are called inside Odoo, as group XML ids. The
+  # platform writes the groups of the roles a person holds into Odoo's
+  # sign-in token, and the gentian_os module sets them at sign-in.
+  roles:
+    user:
+      inApp:
+        - sales_team.group_sale_salesman
+    admin:
+      inApp:
+        - sales_team.group_sale_manager
   classes:
     - app
   trustTier: certified
-  version: "0.5.2"
+  version: "0.5.3-dev"
   requires:
     # The oldest platform version line this build runs on (docs/profile-bundles.md).
     platform: ">=0.5"

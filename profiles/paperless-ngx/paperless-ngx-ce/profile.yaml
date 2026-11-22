@@ -18,7 +18,7 @@
 # takes basic auth and tokens, which is what the technical accounts use.
 #
 # ── Who administers Paperless ───────────────────────────────────────────────
-# Who holds the platform's App Admin role (gentian:tenant:<t>:app-admins),
+# Who holds the role admin on this app,
 # applied by spec.hooks.provisioning below: the platform resolves the
 # members and runs the Job, the Job sets is_superuser on their Paperless
 # accounts over the REST API as the technical superuser, and takes it from
@@ -83,7 +83,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1"
+  version: "0.5.2-dev"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"

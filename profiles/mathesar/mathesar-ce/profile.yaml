@@ -47,7 +47,7 @@
 #   use that account directly: spec.provisioning.syncJob uses it to call
 #   Mathesar's users.add/users.patch_other RPC (HTTP Basic Auth — the only auth
 #   mode those methods accept, see mathesar/rpc/decorators.py upstream) and
-#   keeps every gentian:tenant:<t>:app-admins member's is_superuser flag in sync,
+#   keeps every administrator of the app's is_superuser flag in sync,
 #   pre-provisioning the account by email when needed so their eventual first
 #   SSO login links to it instead of creating a fresh non-admin one (see
 #   mathesar/sso.py's save_user). Password login stays enabled
@@ -65,7 +65,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1"
+  version: "0.5.2-dev"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -304,7 +304,7 @@ spec:
                             f.save(update_fields=["submit_redirect_url"])
                             say("form %d redirects to %s" % (f.id, dst))
 
-  # Maps gentian:tenant:<t>:app-admins members to Mathesar is_superuser —
+  # Maps the app's administrators to Mathesar is_superuser —
   # never the portalTiles allowedGroup above, which only gates the tile/OIDC
   # entitlement.
   expose:
