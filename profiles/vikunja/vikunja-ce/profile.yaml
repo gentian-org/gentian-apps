@@ -1,0 +1,224 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# ComponentProfile — Vikunja (tasks, lists, boards and Gantt charts)
+#
+# Source: charts/vikunja, a first-party chart wrapping the official
+#   docker.io/vikunja/vikunja image unmodified (one Go binary serving the API
+#   and the web app, FROM scratch, uid 1000, read-only root filesystem).
+#   Upstream's own chart wraps a library chart under a "vikunja:" key, where
+#   the platform's podLabels would never reach the pod; the chart's
+#   values.yaml says more.
+#
+# ── Sign-in: the tenant's realm, through Vikunja's OpenID Connect ───────────
+# Vikunja signs people in with its own OIDC client at the tenant's realm and
+# makes an account at a person's first sign-in. Its password sign-in and its
+# registration are switched off in the chart, so the realm is the only way
+# in, and with one provider and no password form the sign-in page goes
+# straight to it.
+#
+# Vikunja's web app then calls the API with a token of Vikunja's own, in the
+# Authorization header. The front door removes that header on every app route
+# unless the entry says the header is the app's: hence
+# clientAuthorization: app below. It is a request. Until the tenant's
+# perimeter approver has approved it, the header is removed and every call of
+# the web app is refused with 401: the page loads and shows nothing. Approved,
+# a person still has to hold the tenant's session and the right to open this
+# app (can_launch) to reach Vikunja at all.
+#
+# ── Who administers Vikunja ─────────────────────────────────────────────────
+# Nobody, inside Vikunja. Its instance administrator role
+# (`vikunja user set-admin`) is a Vikunja Pro feature and needs a license key,
+# which this edition does not configure. So there is no
+# hooks.provisioning: the platform's App Admin role has nothing to apply to.
+# Everything a person does is on their own projects and the ones shared with
+# them; a team's owner manages the team. What the platform administers is
+# who may open the app at all.
+#
+# ── What is switched off ────────────────────────────────────────────────────
+# Account deletion by the person (accounts are the realm's), CalDAV (its
+# clients authenticate with basic auth, which no program gets through a front
+# door that asks for a browser session), webhooks (outbound by design, and
+# egress is closed), Sentry, Unsplash backgrounds and the Todoist, Trello and
+# Microsoft To Do importers (each calls out). Avatars are initials, never
+# Gravatar. The license check calls out only when a license key is set,
+# and none is.
+#
+# Secret inventory:
+#   Platform-provided:
+#     database host/port/name/user/password (valueMapping.database)
+#     s3 endpoint/bucket/region/access key/secret key (valueMapping.s3)
+#     OIDC issuer and client secret (valueMapping.oidc)
+#     smtp host/port/user/password (valueMapping.smtp)
+#   Generated (1), secrets.generated:
+#     service_secret → secret: the key Vikunja signs its tokens with; pinned,
+#                      or every session dies at each restart
+apiVersion: gentianos.io/v1alpha1
+kind: ComponentProfile
+metadata:
+  name: vikunja-ce
+  labels:
+    gentianos.io/profile-name: vikunja-ce
+    gentianos.io/profile-family: vikunja
+    gentianos.io/profile-edition: ce
+spec:
+  classes:
+    - app
+  trustTier: certified
+  version: "0.1.0-dev"
+  package:
+    chart:
+      repository: "oci://ghcr.io/gentian-org/charts"
+      name: vikunja
+      # On develop a -develop.<sha7> build of the chart (docs/releasing.md).
+      version: "0.1.0-develop.7ef2aa8"
+
+    valueMapping:
+      oidc:
+        # The realm's issuer; Vikunja discovers the endpoints from it,
+        # server-side, and checks the tokens against it.
+        issuerKey: "oidc.issuer"
+        clientSecretKey: "oidc.clientSecret"
+      database:
+        hostKey: "database.host"
+        portKey: "database.port"
+        nameKey: "database.name"
+        userKey: "database.user"
+        passwordKey: "database.password"
+      s3:
+        endpointKey: "s3.endpoint"
+        bucketKey: "s3.bucket"
+        accessKeyKey: "s3.accessKeyId"
+        regionKey: "s3.region"
+        secretKeyKey: "s3.secretAccessKey"
+      smtp:
+        hostKey: "smtp.host"
+        portKey: "smtp.port"
+        userKey: "smtp.user"
+        passwordKey: "smtp.password"
+      platform:
+        # The server's time zone; each person can set their own.
+        timeZoneKey: "timeZone"
+
+    extraValues:
+      fullnameOverride: "vikunja-ce"
+      appUrl: "https://vikunja.${TENANT_DOMAIN}"
+
+      oidc:
+        enabled: true
+        providerId: "gentian"
+        name: "Gentian"
+        clientId: "gentian-vikunja"
+
+      s3:
+        forcePathStyle: true
+
+      smtp:
+        fromAddress: "gentian-system@${TENANT_DOMAIN}"
+
+      ingress:
+        enabled: false
+
+      podAnnotations:
+        secret.reloader.stakater.com/reload: vikunja-ce-sensitive-values
+
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
+    services:
+      identity:
+        oidc:
+          clientId: "gentian-vikunja"
+          name: "Vikunja"
+          accessType: CONFIDENTIAL
+          # The web app's return address: /auth/openid/<provider id>, the
+          # provider id being extraValues.oidc.providerId.
+          redirectUris:
+            - "https://vikunja.${TENANT_DOMAIN}/auth/openid/gentian"
+          postLogoutRedirectUris:
+            - "https://vikunja.${TENANT_DOMAIN}/"
+            - "https://desktop.${TENANT_DOMAIN}/"
+        # No backchannelLogout: Vikunja has no endpoint that receives a
+        # logout_token (its OIDC module knows a logout redirect, nothing
+        # more). Signing out of the platform therefore leaves the web app's
+        # own token valid until it runs out (service.jwtttl, three days);
+        # the front door still refuses a person without a session.
+      database:
+        engine: postgresql
+      # Attachments, project backgrounds and uploaded avatars. The pod keeps
+      # no data of its own.
+      storage:
+        s3: {}
+      # Task reminders and the daily mail of overdue tasks.
+      mail:
+        smtp: {}
+    # No cache: Vikunja's key-value store is in memory, in its one pod.
+
+  provides:
+    - name: task-management
+      protocol: http-html
+
+  integrations:
+    - contract: central-navigation
+      provider: portal
+      capabilities:
+        - navigation:register
+
+  secrets:
+    generated:
+      - name: service_secret
+        valuePath: "secret"
+
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: "vikunja"
+      # The web app sends Vikunja's own token in this header; see the header
+      # comment for what that asks of the tenant's perimeter approver.
+      clientAuthorization: app
+      backend:
+        service: "vikunja-ce"
+        port: 3456
+      tile:
+        displayName: "Vikunja"
+        description: "Tasks, lists and boards"
+        image: assets/tile.png
+        logo: data:image/png;base64,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
+        relation: can_launch
+
+  # The default -- scale to zero, dump the database, copy the bucket -- is
+  # right: Vikunja keeps nothing else. Only the check after a restore is
+  # declared: Vikunja's own diagnosis, which reaches the database, writes to
+  # the bucket and asks the realm, and exits non-zero when any of it fails.
+  backup:
+    quiesce:
+      container: vikunja
+    restore:
+      verify:
+        - /app/vikunja/vikunja
+        - doctor
+
+  # Customization ladder — see customization.md
+  customization:
+    grade: C
+    rubricScore: 4
+    supportedRungs: [L0, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/vikunja/vikunja-ce/customization.md
+    configure:
+      hotReload: false
+    publishes:
+      apis:
+        - contract: tasks-api
+          protocol: http-json
+          path: /api/v1/
+          # A token of a Vikunja account (the web app's, or an API token a
+          # person makes in Vikunja's settings); not the realm's tokens.
+          auth: vikunja-token
+    repackage:
+      chartOwnership: gentian-owned
+    patch:
+      allowed: false
+      seriesPath: patches/series
+      requiresApproval: platform-team
+    fork:
+      allowed: false
+  launch: tile
