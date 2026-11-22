@@ -24,7 +24,7 @@ spec:
   # person with any role on Odoo is an internal user; its administrator holds
   # Settings and Access Rights. Each add-on names the groups of its own roles.
   # The platform writes the groups of the roles a person holds into the
-  # sign-in token (gentian_roles), and the gentian_os module sets them.
+  # sign-in token (gentian_app_roles), and the gentian_os module sets them.
   roles:
     user:
       inApp:

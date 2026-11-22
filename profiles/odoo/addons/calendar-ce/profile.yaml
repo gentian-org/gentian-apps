@@ -10,7 +10,6 @@ metadata:
   annotations:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: addon
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooModules":["calendar"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
   classes:

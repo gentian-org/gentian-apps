@@ -16,7 +16,6 @@ metadata:
     # The module's four other groups -- stages, recurring tasks, task
     # dependencies, milestones -- are feature toggles rather than access tiers,
     # so they are not roles to hand out here.
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["project.group_project_manager"],"gentianOdooGroupRoles":["project.group_project_user"],"gentianOdooModules":["project"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
   # What this add-on's roles are called inside Odoo, as group XML ids. The

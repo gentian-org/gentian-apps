@@ -10,7 +10,6 @@ metadata:
   annotations:
     gentianos.io/platform-app: "false"
     gentianos.io/deployment-role: addon
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["point_of_sale.group_pos_manager"],"gentianOdooGroupRoles":["point_of_sale.group_pos_user","point_of_sale.group_pos_manager","stock.group_stock_user","account.group_account_invoice"],"gentianOdooModules":["pos_restaurant"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
   # What this add-on's roles are called inside Odoo, as group XML ids. The

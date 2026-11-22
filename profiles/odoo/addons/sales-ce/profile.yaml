@@ -17,7 +17,6 @@ metadata:
     # which implies the salesman, so the admin tier subsumes the member tier.
     # These are the same roles odoo-crm-ce grants -- both apps share one Sales
     # privilege in Odoo.
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["sales_team.group_sale_manager"],"gentianOdooGroupRoles":["sales_team.group_sale_salesman"],"gentianOdooModules":["sale_management"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
   # What this add-on's roles are called inside Odoo, as group XML ids. The
