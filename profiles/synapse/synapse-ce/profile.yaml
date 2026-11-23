@@ -16,11 +16,11 @@
 # -- is what decides who gets a token. Password login is off: an account
 # exists only through that sign-in.
 #
-# What is still missing: Synapse keeps the state of that sign-in in a cookie
-# of its own (oidc_session, oidc_session_no_samesite) between the redirect
-# and the callback, and a perimeter entry passes no cookie. Until an entry
-# can name the cookies of the app's own sign-in, Element installs and loads,
-# and the sign-in fails at the callback.
+# Synapse keeps the state of that sign-in in cookies of its own
+# (oidc_session, oidc_session_no_samesite) between the redirect and the
+# callback. The entry names them (signInCookies), so they pass on those
+# paths alone, and the approver approves the entry with them
+# (publicAppSignIn). Everywhere else on the entry no cookie passes.
 #
 # Federation is off: no other homeserver is admitted, and its paths are not
 # published.
@@ -50,7 +50,7 @@ spec:
   classes:
     - app
   trustTier: experimental
-  version: "0.1.0-dev"
+  version: "0.1.1-dev"
   launch: none
   package:
     chart:
@@ -223,6 +223,14 @@ spec:
       denyPaths:
         - /_matrix/federation
         - /_matrix/key
+      # Synapse's sign-in through the realm: the redirect sets the cookies,
+      # the callback reads them.
+      signInCookies:
+        names: [oidc_session, oidc_session_no_samesite]
+        paths:
+          - /_matrix/client/v3/login/sso
+          - /_matrix/client/r0/login/sso
+          - /_synapse/client/oidc
       backend:
         service: synapse-web
         port: 8008
