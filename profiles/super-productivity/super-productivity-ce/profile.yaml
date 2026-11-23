@@ -5,7 +5,8 @@
 # Source: upstream's web build of
 #   https://github.com/super-productivity/super-productivity (MIT), taken by
 #   digest from upstream's image johannesjo/super-productivity and served
-#   unchanged. Upstream publishes no chart, so this repository builds both:
+#   with one change: the CalDAV form is filled in in advance (see Calendars).
+#   Upstream publishes no chart, so this repository builds both:
 #   images/super-productivity serves the build with images/app-host (the
 #   server the Crafting Apps run on, in relay mode), and
 #   charts/super-productivity runs that one container. The chart names its
@@ -25,11 +26,23 @@
 # user name and password the app's sync form shows are placeholders: the
 # edge replaces whatever the app sends, and the home never sees them.
 #
+# ── Calendars ──
+# The app's CalDAV integration (tasks kept in one of the person's calendars,
+# both ways) reaches the tenant's home for calendars (the calendar-store
+# contract) through this address's relay at /caldav/, the same way: as the
+# signed-in person, by the same exchange. The relay finds the person's
+# calendars as every CalDAV client does (current-user-principal,
+# calendar-home-set) and reaches those and nothing else of the home. The
+# image fills in the app's CalDAV form with that address and placeholder
+# credentials, so adding it is naming the calendar (gentian-apps#370 asks
+# upstream for defaults it reads itself). The app's "CalDAV Events" plugin
+# reaches the same address once the person enters it.
+#
 # Which home that is, the app cannot tell and does not need to: the
 # platform gives the server the home's address and the scope to ask for.
-# Until the tenant's administrator grants the contract, and in a tenant with
-# no home, the app is served as upstream ships it and keeps its data in the
-# browser only.
+# Until the tenant's administrator grants the contracts, and in a tenant with
+# no home, the app keeps its data in the browser only, and the relays answer
+# that there is no home.
 #
 # ── Outside calls ──
 # None from the pod but to the tenant's realm and home, both in the cluster,
@@ -47,8 +60,9 @@
 #
 # Secret inventory:
 #   Platform-provided: vouching-super-productivity-ce (the client the server
-#     asks the realm with), mounted as files. The home's address and scope
-#     are chart values the platform sets while the contract is granted.
+#     asks the realm with), mounted as files. The homes' addresses and
+#     scopes are chart values the platform sets while each contract is
+#     granted.
 #   Generated: none.
 #
 # Backup: nothing to back up here; the app has no store and no volume. What
@@ -65,14 +79,14 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.1.0-dev"
+  version: "0.2.0-dev"
   launch: tile
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: super-productivity
       # On develop a -develop.<sha7> build of the chart (docs/releasing.md).
-      version: "0.1.0-develop.1180b4e"
+      version: "0.2.0-develop.4fb5d9b"
     extraValues:
       fullnameOverride: "super-productivity-ce"
       ingress:
@@ -84,13 +98,19 @@ spec:
         file-store:
           endpointKey: home.url
           homeScopeKey: home.scope
+        calendar-store:
+          endpointKey: calendars.url
+          homeScopeKey: calendars.scope
 
-  # The tenant's file home, called as the person and only while they are
-  # present (see Where the data is, above).
+  # The tenant's homes for files and calendars, called as the person and
+  # only while they are present (see Where the data is and Calendars, above).
   integrations:
     - contract: file-store
       asPerson: true
       capabilities: [webdav:read, webdav:write]
+    - contract: calendar-store
+      asPerson: true
+      capabilities: [caldav:read, caldav:write]
 
   requires:
     # The oldest platform version line this build runs on (docs/profile-bundles.md).
