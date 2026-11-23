@@ -8,7 +8,9 @@
 //     calls, by which the app opens and saves where the person chooses;
 //   - "relay": the app served as it is, and a WebDAV relay under /webdav/
 //     into one folder of the person's files, for an app that syncs with a
-//     WebDAV server of its own accord.
+//     WebDAV server of its own accord; and, where the tenant has a home
+//     for calendars, a CalDAV relay under /caldav/ into the person's
+//     calendars, for an app that reads and writes a CalDAV server.
 //
 // It holds nothing of anybody: the person's token arrives with each request
 // from the tenant's edge, is exchanged at the realm for one valid at the
@@ -70,6 +72,11 @@ type config struct {
 	// {{origin}}, {{folder}} and {{name}} are put in. Empty serves none.
 	settingsPath     string
 	settingsTemplate string
+	// calendarHome is, in relay mode, the address the tenant's calendar
+	// home answers CalDAV at, and calendarScope the scope its token is
+	// issued under; both empty while the tenant grants none.
+	calendarHome  string
+	calendarScope string
 }
 
 func configFromEnv() config {
@@ -94,5 +101,7 @@ func configFromEnv() config {
 
 		settingsPath:     os.Getenv("CRAFT_SETTINGS_PATH"),
 		settingsTemplate: os.Getenv("CRAFT_SETTINGS_TEMPLATE"),
+		calendarHome:     os.Getenv("CRAFT_CALENDAR_URL"),
+		calendarScope:    os.Getenv("CRAFT_CALENDAR_SCOPE"),
 	}
 }

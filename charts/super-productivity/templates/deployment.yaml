@@ -36,6 +36,8 @@ spec:
             - {name: CRAFT_LISTEN, value: ":{{ .Values.port }}"}
             - {name: CRAFT_HOME_URL, value: {{ .Values.home.url | quote }}}
             - {name: CRAFT_HOME_SCOPE, value: {{ .Values.home.scope | quote }}}
+            - {name: CRAFT_CALENDAR_URL, value: {{ .Values.calendars.url | quote }}}
+            - {name: CRAFT_CALENDAR_SCOPE, value: {{ .Values.calendars.scope | quote }}}
             - {name: CRAFT_VOUCHING_DIR, value: /var/run/gentian/vouching}
           ports:
             - name: http

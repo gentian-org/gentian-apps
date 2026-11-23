@@ -540,7 +540,8 @@ jobs:
 
   # Super Productivity: upstream's web build, taken from upstream's image by
   # digest, served by images/app-host with a WebDAV relay to the tenant's
-  # file home; the chart is packaged naming this build's image.
+  # file home and a CalDAV relay to its calendar home; the chart is packaged
+  # naming this build's image.
   build-super-productivity:
     needs: [release-gate, scope]
     if: needs.scope.outputs.relevant == 'true'

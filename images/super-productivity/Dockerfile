@@ -1,19 +1,26 @@
 # Super Productivity's web build, with sync to the tenant's file home.
 #
 # Upstream's image serves the web build with nginx. This one serves the same
-# files, taken from upstream's image by its digest and unchanged, with
-# images/app-host in relay mode: the app at the root, and under /webdav/ a
+# files, taken from upstream's image by its digest and changed in one place
+# (below), with images/app-host in relay mode: the app at the root, and under /webdav/ a
 # WebDAV relay into the folder "Super Productivity" of the signed-in person's
 # files at the tenant's home. The app is told so in its default settings
 # (sync-settings.json, served where it reads them), so its WebDAV sync points
 # here. Without a home the relay answers nothing and the app is as upstream
 # ships it.
+#
+# Where the tenant has a home for calendars, /caldav/ relays CalDAV to the
+# person's calendars there, and the app's CalDAV integration is filled in
+# with that address in advance (prefill-caldav.sh): the one change made to
+# upstream's files.
 
 ARG SP_IMAGE
 FROM ${SP_IMAGE} AS upstream
 
 FROM docker.io/library/alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f AS site
 COPY --from=upstream /usr/share/nginx/html /site
+COPY prefill-caldav.sh /usr/local/bin/prefill-caldav
+RUN prefill-caldav /site
 # The source maps are for upstream's debugging and are not served. The rest
 # is compressed once here and served as it is.
 RUN find /site -name '*.map' -delete \
@@ -40,7 +47,7 @@ ENV CRAFT_MODE=relay \
     CRAFT_SETTINGS_PATH=/assets/sync-config-default-override.json \
     CRAFT_SETTINGS_TEMPLATE=/etc/app-host/sync-settings.json
 LABEL org.opencontainers.image.title="Super Productivity" \
-      org.opencontainers.image.description="The web build of Super Productivity, with WebDAV sync to the tenant's file home" \
+      org.opencontainers.image.description="The web build of Super Productivity, with WebDAV sync to the tenant's file home and CalDAV to its calendar home" \
       org.opencontainers.image.source="https://github.com/gentian-org/gentian-apps" \
       org.opencontainers.image.licenses="MIT"
 USER 101:101

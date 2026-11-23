@@ -30,6 +30,17 @@ home:
   # with. Mounted as files; it may not exist yet.
   vouchingSecret: vouching-super-productivity-ce
 
+# The tenant's home for calendars (the platform's calendar-store contract).
+# With an address and a scope, which the platform fills in once the tenant's
+# administrator grants the contract, /caldav/ reaches the signed-in person's
+# calendars there, and the app's CalDAV integration is filled in with that
+# address. The token is asked for with the client of home.vouchingSecret.
+calendars:
+  # Where the home answers CalDAV. The platform fills it in.
+  url: ""
+  # The scope for the calendar home's token. The platform fills it in.
+  scope: ""
+
 # One small server for the app's files and the relay; the app runs in the
 # browser.
 resources:
