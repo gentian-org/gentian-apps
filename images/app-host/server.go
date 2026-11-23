@@ -28,10 +28,13 @@ type server struct {
 	cfg   config
 	mux   *http.ServeMux
 	homes *homeClient
+	// calendars is the tenant's calendar home, which the relay passes
+	// CalDAV to.
+	calendars *homeClient
 }
 
 func newServer(cfg config) http.Handler {
-	s := &server{cfg: cfg, mux: http.NewServeMux(), homes: newHomeClient(cfg)}
+	s := &server{cfg: cfg, mux: http.NewServeMux(), homes: newHomeClient(cfg), calendars: newCalendarClient(cfg)}
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, "ok\n")
 	})
@@ -60,7 +63,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // hasHome reports whether the tenant grants a home now: an address, and the
 // scope to ask the realm for.
 func (s *server) hasHome() bool {
-	return s.cfg.home != "" && s.homes.scope() != ""
+	return s.homes.granted()
 }
 
 // page is the page that frames the app, or the app itself while there is no

@@ -37,6 +37,11 @@ type homeSession struct {
 	expires time.Time
 	// folderReady says the relay's folder is known to exist.
 	folderReady bool
+	// principal and calendars are, for a calendar home, the paths of the
+	// person's principal and of their calendars (calendar-home-set), each
+	// ending in a slash.
+	principal string
+	calendars string
 }
 
 // entry is one file or folder of a listing.
@@ -51,14 +56,34 @@ type entry struct {
 type homeClient struct {
 	cfg  config
 	http *http.Client
+	// home is the address the home answers at, and homeScope the scope
+	// its token is issued under; both empty while the tenant grants none.
+	home      string
+	homeScope string
+	// calendars says the home is a calendar home: a session finds the
+	// person's calendars, not their files.
+	calendars bool
 
 	mu       sync.Mutex
 	sessions map[[32]byte]*homeSession
 }
 
+// newHomeClient is the client of the tenant's file home.
 func newHomeClient(cfg config) *homeClient {
+	return newClient(cfg, cfg.home, cfg.homeScope, false)
+}
+
+// newCalendarClient is the client of the tenant's calendar home.
+func newCalendarClient(cfg config) *homeClient {
+	return newClient(cfg, cfg.calendarHome, cfg.calendarScope, true)
+}
+
+func newClient(cfg config, home, scope string, calendars bool) *homeClient {
 	return &homeClient{
-		cfg: cfg,
+		cfg:       cfg,
+		home:      home,
+		homeScope: scope,
+		calendars: calendars,
 		http: &http.Client{
 			// A person's token is sent to the home and the realm and
 			// follows nobody's redirect.
@@ -80,7 +105,11 @@ func (c *homeClient) told(key string) string {
 
 // scope is the scope the realm issues the home's token under, empty while
 // the tenant grants no home.
-func (c *homeClient) scope() string { return c.cfg.homeScope }
+func (c *homeClient) scope() string { return c.homeScope }
+
+// granted reports whether the tenant grants this home now: an address, and
+// the scope to ask the realm for.
+func (c *homeClient) granted() bool { return c.home != "" && c.homeScope != "" }
 
 // sessionFor exchanges the token the edge handed this request for one valid
 // at the home, and finds the person's files there. Kept until the home's
@@ -105,12 +134,15 @@ func (c *homeClient) sessionFor(ctx context.Context, edgeToken string) (*homeSes
 	if err != nil {
 		return nil, err
 	}
-	root, err := c.findRoot(ctx, token)
-	if err != nil {
+	// Ended a little early, so a call in flight does not arrive expired.
+	s = &homeSession{token: token, expires: now.Add(lifetime - 15*time.Second)}
+	if c.calendars {
+		if s.principal, s.calendars, err = c.findCalendars(ctx, token); err != nil {
+			return nil, err
+		}
+	} else if s.root, err = c.findRoot(ctx, token); err != nil {
 		return nil, err
 	}
-	// Ended a little early, so a call in flight does not arrive expired.
-	s = &homeSession{token: token, root: root, expires: now.Add(lifetime - 15*time.Second)}
 	if lifetime > 30*time.Second {
 		c.mu.Lock()
 		c.sessions[key] = s
@@ -173,7 +205,7 @@ const principalQuery = `<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop>
 // principals/, as Nextcloud and ownCloud do) is asked who the person is; a
 // home whose address is the person's files already is used as it is.
 func (c *homeClient) findRoot(ctx context.Context, token string) (string, error) {
-	base := c.cfg.home
+	base := c.home
 	if !strings.HasSuffix(base, "/") {
 		base += "/"
 	}

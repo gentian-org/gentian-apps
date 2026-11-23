@@ -296,7 +296,7 @@ func TestRewriteHrefs(t *testing.T) {
 	in := `<d:multistatus xmlns:d="DAV:"><d:response><d:href>/dav/files/ada/Super%20Productivity/</d:href></d:response>` +
 		`<d:response><D:href>https://h/dav/files/ada/Super%20Productivity/a%20b.json</D:href></d:response>` +
 		`<d:response><href>/dav/files/ada/other.txt</href></d:response></d:multistatus>`
-	out := string(rewriteHrefs([]byte(in), "/dav/files/ada/Super Productivity/"))
+	out := string(rewriteHrefs([]byte(in), "/dav/files/ada/Super Productivity/", davPrefix))
 	for _, want := range []string{"<d:href>/webdav/</d:href>", "<D:href>/webdav/a%20b.json</D:href>", "<href>/webdav/</href>"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %s in %s", want, out)

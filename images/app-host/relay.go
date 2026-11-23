@@ -39,6 +39,7 @@ func (s *server) relayRoutes() {
 	s.mux.HandleFunc(davPrefix, func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, davPrefix+"/", http.StatusPermanentRedirect)
 	})
+	s.calRoutes()
 	if s.cfg.settingsPath != "" {
 		s.mux.HandleFunc("GET "+s.cfg.settingsPath, s.settings)
 	}
@@ -167,14 +168,7 @@ func jsonText(s string) string {
 // relay passes one WebDAV call of the app to the person's folder at the
 // home, as the person.
 func (s *server) relay(w http.ResponseWriter, r *http.Request) {
-	// A call of the app's own script, never a page a browser navigates to:
-	// a file of the home is not rendered as a document of this address.
-	if r.Header.Get("Sec-Fetch-Mode") == "navigate" {
-		fail(w, http.StatusForbidden, "not a call of this app")
-		return
-	}
-	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" {
-		fail(w, http.StatusForbidden, "not a call of this app")
+	if !fromTheApp(w, r) {
 		return
 	}
 	if r.Method == http.MethodOptions {
@@ -187,7 +181,7 @@ func (s *server) relay(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusMethodNotAllowed, "not a call this relay passes")
 		return
 	}
-	rel, ok := relayPath(r.URL.Path)
+	rel, ok := underPrefix(r.URL.Path, davPrefix)
 	if !ok {
 		fail(w, http.StatusBadRequest, "no such file")
 		return
@@ -247,7 +241,28 @@ func (s *server) relay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer resp.Body.Close()
+	answer(w, r, resp, pathOf(folder), davPrefix, s.cfg.maxBytes, "")
+}
 
+// fromTheApp refuses what is not a call of the app's own script: never a
+// page a browser navigates to, so nothing of the home is rendered as a
+// document of this address, and never a call from another site.
+func fromTheApp(w http.ResponseWriter, r *http.Request) bool {
+	if r.Header.Get("Sec-Fetch-Mode") == "navigate" {
+		fail(w, http.StatusForbidden, "not a call of this app")
+		return false
+	}
+	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" {
+		fail(w, http.StatusForbidden, "not a call of this app")
+		return false
+	}
+	return true
+}
+
+// answer gives the app the home's answer. A listing's addresses are turned
+// from the home's, below fromBase, into the relay's, below toPrefix. A body
+// of the type passType keeps it; any other is bytes.
+func answer(w http.ResponseWriter, r *http.Request, resp *http.Response, fromBase, toPrefix string, maxBytes int64, passType string) {
 	h := w.Header()
 	for _, k := range answerHeaders {
 		if v := resp.Header.Get(k); v != "" {
@@ -269,26 +284,29 @@ func (s *server) relay(w http.ResponseWriter, r *http.Request) {
 			fail(w, http.StatusBadGateway, "the place for files did not answer")
 			return
 		}
-		out := rewriteHrefs(listing, pathOf(folder))
+		out := rewriteHrefs(listing, fromBase, toPrefix)
 		h.Set("Content-Type", "application/xml; charset=utf-8")
 		w.WriteHeader(status)
 		_, _ = w.Write(out)
 		return
 	}
 	h.Set("Content-Type", "application/octet-stream")
+	if mt, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type")); err == nil && passType != "" && mt == passType {
+		h.Set("Content-Type", passType+"; charset=utf-8")
+	}
 	if n := resp.Header.Get("Content-Length"); n != "" {
 		h.Set("Content-Length", n)
 	}
 	w.WriteHeader(status)
 	if r.Method != http.MethodHead {
-		_, _ = io.Copy(w, io.LimitReader(resp.Body, s.cfg.maxBytes))
+		_, _ = io.Copy(w, io.LimitReader(resp.Body, maxBytes))
 	}
 }
 
-// relayPath is the path below the relay's address: decoded, with no step
-// upwards. A trailing slash, which names a folder, is kept.
-func relayPath(p string) (string, bool) {
-	rel := strings.TrimPrefix(p, davPrefix)
+// underPrefix is the path below one of the relay's addresses: decoded, with
+// no step upwards. A trailing slash, which names a folder, is kept.
+func underPrefix(p, prefix string) (string, bool) {
+	rel := strings.TrimPrefix(p, prefix)
 	if rel == "" {
 		rel = "/"
 	}
@@ -314,12 +332,12 @@ func escapePath(p string) string {
 
 var hrefElement = regexp.MustCompile(`(<(?:[A-Za-z][\w.-]*:)?href>)([^<]*)(</(?:[A-Za-z][\w.-]*:)?href>)`)
 
-// rewriteHrefs puts the relay's addresses in place of the home's in a
-// listing: the app compares them with the paths it asked for. An address
-// outside the folder, which a home never lists, is left out of the
-// listing's meaning by being sent to the relay's root.
-func rewriteHrefs(listing []byte, folderPath string) []byte {
-	base := strings.TrimSuffix(folderPath, "/")
+// rewriteHrefs puts the relay's addresses (below toPrefix) in place of the
+// home's (below fromBase) in a listing: the app compares them with the paths
+// it asked for and follows them. An address outside fromBase, which the
+// relay does not reach, is sent to the relay's root.
+func rewriteHrefs(listing []byte, fromBase, toPrefix string) []byte {
+	base := strings.TrimSuffix(fromBase, "/")
 	return hrefElement.ReplaceAllFunc(listing, func(m []byte) []byte {
 		parts := hrefElement.FindSubmatch(m)
 		href := pathOf(strings.TrimSpace(xmlUnescape(string(parts[2]))))
@@ -329,7 +347,7 @@ func rewriteHrefs(listing []byte, folderPath string) []byte {
 		}
 		var b bytes.Buffer
 		b.Write(parts[1])
-		b.WriteString(xmlEscape(davPrefix + escapePath(rest)))
+		b.WriteString(xmlEscape(toPrefix + escapePath(rest)))
 		b.Write(parts[3])
 		return b.Bytes()
 	})
