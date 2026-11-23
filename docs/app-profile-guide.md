@@ -637,12 +637,13 @@ and is reachable only inside the namespace.
 
 `spec.package.composition` names a Crossplane Composition the bundle brings,
 `app-<profile>`, for an app whose rollout needs objects the chart cannot
-express (Element's Synapse beside Element Web). It
-is rendered only for a profile of `platform` trust (the operator refuses it
+express. It is rendered only for a profile of `platform` trust (the operator refuses it
 with `CompositionRefused` otherwise, whatever the schema admitted), travels
 only in a catalog of the whole cluster, and is used beside a chart: a
 composition alone is `PackageUnsupported`. Everything a hook or an extension
-can do is done there instead.
+can do is done there instead, and two apps that run together are two
+profiles, the one people open naming the other in `comesWith` (Element and
+the Synapse homeserver it talks to).
 
 ## 12. The customization declaration
 
