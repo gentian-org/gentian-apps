@@ -1,34 +1,35 @@
-# Customization ladder — Element + Synapse (family `element-ce`)
+# Customization ladder — Element Web (`element-ce`)
 
-**Grade: B** · rubric score **6/8** · characterized 2026-08-06
+**Grade: C** · rubric score **3/8**
 
 Framework: [gentian-os/docs/guides/app-customization.md](https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md).
 
-This profile deploys **two** components with different customization surfaces. The grade is
-the lower of the two, because a request usually lands on whichever one is less accommodating.
+This profile is the chat client in the browser and nothing else. The homeserver it talks to is
+Synapse, a profile of its own that comes with it: [synapse-ce](../../synapse/synapse-ce/customization.md).
+A request about accounts, rooms, sign-in, mail or server behavior belongs there.
 
 ## Rubric
 
 | Criterion | Score | Evidence |
 |---|---|---|
-| Documented config reference | 1 | `config.json` (Element) and `homeserver.yaml` (Synapse) |
-| Declared drop-in directories | 1 | Synapse `conf.d`-style config directory |
-| Documented plugin/addon API | 1 | Synapse Module API (server side only) |
-| Plugin API versioned + deprecation policy | 1 | Synapse module API is versioned and deprecations are announced |
-| Published HTTP API with a spec | 1 | Matrix Client-Server API |
+| Documented config reference | 1 | `config.json` |
+| Declared drop-in directories | 1 | `config.json` keys through the `element-config` drop-in |
+| Documented plugin/addon API | 0 | Element Web has no plugin API |
+| Plugin API versioned + deprecation policy | 0 | none |
+| Published HTTP API with a spec | 0 | none of its own; the API is the homeserver's |
 | Upstream accepts patches | 1 | active PR flow |
-| Plugin ABI survives minor releases | 0 | Synapse module API has broken across releases |
-| Test harness for plugin authors | 0 | none packaged |
+| Plugin ABI survives minor releases | 0 | no plugin ABI |
+| Test harness for plugin authors | 0 | none |
 
 ## Reachable rungs
 
 | Rung | Available | How, here |
 |---|---|---|
-| **L0** Configure | yes | `spec.extraValues` → `ananace/matrix-synapse` chart values |
-| **L1** Drop-in | yes | `synapse-config` (Synapse config directory, yaml) and `element-config` (`config.json`, tenant-editable for branding keys only) |
-| **L2** Companion | always | Matrix Client-Server API, or an application service |
-| **L3** Extension | **server only** | a Synapse Python addon. There is **no** plugin system for the Element web client |
-| **L4** Repackage | yes | upstream chart + composition (Jitsi overlay lives here) |
+| **L0** Configure | yes | `spec.extraValues` → `ananace/element-web` chart values, `config` becomes `config.json` |
+| **L1** Drop-in | yes | `element-config` (`config.json`, tenant-editable for branding keys only) |
+| **L2** Companion | always | a widget or an app speaking the homeserver's Matrix Client-Server API |
+| **L3** Extension | **no** | there is no plugin system for the Element web client |
+| **L4** Repackage | yes | upstream chart, values only |
 | **L5** Patch | **no** | not permitted |
 | **L6** Fork | **no** | not permitted |
 
@@ -40,12 +41,9 @@ flags) or L2 (a companion widget/app). Rebuilding the Element bundle to inject b
 and is not permitted here; treat a request that seems to need it as a signal to redesign toward
 a widget.
 
-Server-side behavior (auth, spam checking, event hooks) *is* L3 via the Synapse Module API —
-but note the ABI score above: addons have broken across Synapse releases, so pin
-`testMatrix` and expect to re-verify on every bump.
-
 ## Gotchas
 
-- Double CSP headers and `frame-ancestors` handling for portal embedding are L4 concerns
-  already solved in the composition — see `app-profile-guide.md` §7.1.
-- Element SSO redirect URIs are host-sensitive; changing them is L0, not L1.
+- The homeserver address in `config.json` is `https://matrix.<tenant domain>`, written from
+  `defaultServer`; changing it is L0, not L1.
+- The image sends its own `X-Frame-Options` and `frame-ancestors`; the operator owns the frame
+  policy of every route and replaces them (`app-profile-guide.md` §7.1).
