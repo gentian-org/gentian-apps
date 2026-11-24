@@ -872,6 +872,9 @@ jobs:
         run: python3 scripts/validate-customizations.py
       - name: Validate chart references
         run: python3 scripts/validate-chart-refs.py
+      # Helm comes with the runner image.
+      - name: Validate that charts take the pull secrets they are given
+        run: python3 scripts/validate-pull-secrets.py
       - name: Validate secret references
         run: python3 scripts/validate-secret-refs.py
       - name: Validate that no Composition writes an app's secrets

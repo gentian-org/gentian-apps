@@ -22,11 +22,14 @@ metadata:
     gentianos.io/profile-edition: ce
   annotations:
     gentianos.io/portal-auth-mode: oidc
+    # The element-web chart writes imagePullSecrets into the pod spec as it
+    # is, so it is given `name:` entries, not plain names.
+    gentianos.io/standard-image-pull-secrets: "true"
 spec:
   classes:
     - app
   trustTier: experimental
-  version: "0.5.2-dev"
+  version: "0.5.3-dev"
   launch: tile
   package:
     chart:
