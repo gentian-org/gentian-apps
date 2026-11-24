@@ -1,0 +1,59 @@
+nameOverride: mailcraft
+fullnameOverride: mailcraft-ce
+
+replicaCount: 1
+
+image:
+  # Built by this repository from upstream's released web build
+  # (images/mailcraft, pinned in images/mailcraft/versions.env): upstream
+  # publishes no image. A develop build of this chart names the same commit's
+  # develop-<sha7> image instead (pin-image-tag in CI).
+  repository: ghcr.io/gentian-org/mailcraft
+  tag: "0.15.0"
+  pullPolicy: IfNotPresent
+
+port: 8080
+
+# The tenant's mail server outside the cluster (mail.serviceMode external),
+# which MailCraft reads and sends with over JMAP, from the browser.
+mail:
+  # The mail server's IMAP host. The platform fills it in from the app's IMAP
+  # record; empty on a cluster with no mail server outside it.
+  imapHost: ""
+jmap:
+  # The address of the server's JMAP session resource. Empty takes
+  # https://<mail.imapHost>/jmap/session, where a server that answers IMAP and
+  # HTTPS on one name (Stalwart) has it. Set it, in the tenant's manifest
+  # (spec.apps[].config.extraValues), where the server answers JMAP elsewhere.
+  # It has to be the session's own address: the app follows no redirect.
+  session: ""
+
+# One small server for the app's files and the script that names the
+# person's account; the app runs in the browser.
+resources:
+  requests:
+    cpu: "5m"
+    memory: "16Mi"
+  limits:
+    cpu: "100m"
+    memory: "64Mi"
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 101
+  runAsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+podLabels: {}
+podAnnotations: {}
+
+# The operator routes from the profile's spec.expose; the chart has no Ingress.
+ingress:
+  enabled: false
