@@ -77,13 +77,14 @@ accepted, is sign a person out of one app; it could never sign anybody in.
 ## Who administers the app
 
 One more thing is read from the answer, and from nowhere else: whether the person administers the
-app. The platform's role for that is **App Admin** — membership of the tenant's group
-`gentian:tenant:<tenant>:app-admins`, which a tenant's administrator gives and takes away in the
-admin console. The platform gives the sidecar's client at the realm one role,
-`gentian-app-admin`, grants it to that group, and has the realm list a person's roles at this
-client in the assertion, in the attribute `Role` (gentian-os,
-`crossplane/compositions/app-default.yaml`). The client is not given the realm's other roles, so
-the list is that one role or nothing.
+app, which is whether they hold the app's `admin` role in the platform's rights store — directly,
+or through a position such as App administrator, given and taken in the administration console.
+The platform's SAML mapper at the realm asks the rights store for the roles the person holds on
+the app and lists them in the assertion, in the attribute `Role`, under the names the profile
+gives them; a profile that names none gets the one name the sidecar knows for `admin`,
+`gentian-app-admin` (gentian-os, `internal/apprender/identity_signin.go`). A sidecar app's
+profile therefore gives `admin` no other in-app name. When the rights store cannot be asked, the
+sign-in fails rather than reading as a person without the role.
 
 The sidecar reads the attribute from the assertion as the realm signed it and hands the handler
 `person.appAdmin`: `true` when the assertion's own attribute `Role` has the value
@@ -130,7 +131,7 @@ module.exports = {
   //                           email is what the realm vouched for, in lower case.
   //                           name is for display only (it comes from the front door).
   //                           appAdmin is true when the realm's signed answer says the
-  //                           person holds the platform's App Admin role, else false.
+  //                           person holds the app's admin role, else false.
   // ctx:    { sessionSeconds, origin, log(event, fields) }
   async onLogin(person, ctx) {
     // find or make the person's account in the app; make it an administrator's

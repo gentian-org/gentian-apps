@@ -32,7 +32,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.3-dev"
+  version: "0.5.4-dev"
   package:
     chart:
       repository: "https://charts.openproject.org/"
@@ -188,7 +188,7 @@ spec:
         # signs in with a password here, and the sign-in sidecar signs nobody
         # in to a locked account, so no person at the platform becomes this
         # administrator by holding its address. Who administers OpenProject
-        # is who holds the platform's App Admin role: customization.md.
+        # is who holds the admin role on this app: customization.md.
         admin_user:
           name: "OpenProject Internal Admin"
           mail: "openproject-admin@${TENANT_DOMAIN}"

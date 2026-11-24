@@ -52,7 +52,8 @@
 #   SSO login links to it instead of creating a fresh non-admin one (see
 #   mathesar/sso.py's save_user). Password login stays enabled
 #   (REQUIRE_SSO_LOGIN=false) only because Mathesar requires it to exist as a
-#   toggle — app-admins members are expected to use SSO like everyone else.
+#   toggle — the app's administrators are expected to use SSO like everyone
+#   else.
 apiVersion: gentianos.io/v1alpha1
 kind: ComponentProfile
 metadata:
@@ -65,7 +66,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.2-dev"
+  version: "0.5.3-dev"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -304,9 +305,9 @@ spec:
                             f.save(update_fields=["submit_redirect_url"])
                             say("form %d redirects to %s" % (f.id, dst))
 
-  # Maps the app's administrators to Mathesar is_superuser —
-  # never the portalTiles allowedGroup above, which only gates the tile/OIDC
-  # entitlement.
+  # Maps the app's administrators (whoever holds admin on it) to Mathesar
+  # is_superuser: hooks.provisioning below. Who may open Mathesar at all is
+  # whoever holds any role on it, which the front door checks.
   expose:
     - name: web
       surface: gateway
@@ -362,11 +363,11 @@ spec:
       # what it means.
         name: superuser
 
-    # How this app applies that role. The platform resolves app-admins
-    # membership, publishes it as JSON and runs this Job; everything below is
-    # Mathesar's own protocol and stays in Mathesar's catalog entry, because
-    # the kernel must not know any application's admin API (app-profile-guide.md,
-    # "Platform boundary").
+    # How this app applies that role. The platform reads from the rights
+    # store who holds admin on the app, publishes it as JSON and runs this
+    # Job; everything below is Mathesar's own protocol and stays in Mathesar's
+    # catalog entry, because the kernel must not know any application's admin
+    # API (app-profile-guide.md, "Platform boundary").
     #
     # Runs on the app's own image, which already has Python and requests.
     # Idempotent by construction: it converges Mathesar to exactly the

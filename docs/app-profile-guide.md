@@ -327,18 +327,19 @@ requires:
 
 ### 5.3 What the realm tells the app
 
-The `groups` claim carries bare names: `gentian:tenant:<t>:members`,
-`gentian:tenant:<t>:admins`, `gentian:tenant:<t>:app-admins` and
-`gentian:tenant:<t>:app:<profile>`. Two rules follow:
+The token says who the person is; it carries no `groups` claim, and nothing in
+it is a right by itself. Who may use the app is the platform's rights store:
+the front door refuses a person who holds no role on the app before the app
+sees a request. What the app may learn of a person's roles, and how, is §6.
 
-- **Gate on the app's own group**, `…:app:<profile>`, which a person holds
-  only where the tenant's administrator granted them this app. Gating on
-  `…:members` hands the app to the whole tenant and discards the check.
-- **Watch the app's default allow-list.** Several apps ship one that names
-  roles like `user,admin`, which this platform never issues; left in place,
-  every member is refused after a successful sign-in, which reads as a broken
-  login. Set the app's "everyone who signs in is a member" switch instead,
-  and let the entitlement group be the boundary.
+**Watch the app's default allow-list.** Several apps ship one that names roles
+like `user,admin`; it only works when the token carries those names. Either
+give the app's roles those names in `spec.roles` and point the app at the
+claim (Open WebUI: `OAUTH_ROLES_CLAIM=gentian_app_roles`,
+`OAUTH_ALLOWED_ROLES=user,admin`, `OAUTH_ADMIN_ROLES=admin`), or set the app's
+"everyone who signs in is a member" switch and let the front door be the
+boundary. An allow-list the token never satisfies refuses every person after a
+successful sign-in, which reads as a broken login.
 
 The `email` claim is a person's workspace address. The person's `sub` and the
 realm's issuer are what is unique; a username is unique within one realm only.
@@ -377,20 +378,79 @@ The handler, one JavaScript file in the bundle as the ConfigMap
 `<profile>.sign-in-handler`, is the program that knows how this app keeps a
 session. It can become anybody in the app, so it is the last resort and comes
 with a `Customization` record (rung L2) that says what it writes itself. Who
-administers the app is who holds the platform's App Admin role, and the
-handler gives and takes the app's own administrator role at every sign-in.
+administers the app is who holds its `admin` role (`person.appAdmin`, §6.2),
+and the handler gives and takes the app's own administrator role at every
+sign-in.
 Refuse the app's first-run or setup call under `denyPaths`: whoever reached it
 first would own the installation. The full contract is
 [app-customization.md §2.3a](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/app-customization.md)
 and [`images/gentian-sidecar-sso-saml/README.md`](../images/gentian-sidecar-sso-saml/README.md);
 `images/gentian-sidecar-sso-saml/e2e/` runs the handler against the real app.
 
-## 6. App administrators
+## 6. Rights
 
-The platform knows who the tenant's app administrators are, the members of
-`gentian:tenant:<t>:app-admins`. How an app grants its own administrator role
-is the app's business, so the profile supplies the Job and the platform runs it
-whenever the membership changes:
+Who may do what in an app is the platform's to say, in the app's own words.
+The model is gentian-os [iam.md §1.2](https://github.com/gentian-org/gentian-os/blob/develop/docs/concepts/iam.md)
+(roles and positions) and [§1.8](https://github.com/gentian-org/gentian-os/blob/develop/docs/concepts/iam.md)
+(roles inside apps); the fields are
+[app-customization.md §1.1 and §1.2](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/app-customization.md).
+This section is what a profile has to decide.
+
+### 6.1 The app's roles
+
+Every app has `user` and `admin`; `admin` holds every other role of the app.
+Roles between the two are declared in `spec.roles.declared`, and each role says
+what it is called inside the app (`inApp`). Odoo's base names its two; the
+declared roles below show the shape:
+
+```yaml
+spec:
+  roles:
+    user:
+      inApp: [base.group_user]
+    admin:
+      inApp: [base.group_system, base.group_erp_manager]
+    declared:
+      - name: sales-manager
+        title: Sales manager
+        description: Runs the sales team and its pipeline.
+        includes: [salesperson]
+        inApp: [sales_team.group_sale_manager]
+      - name: salesperson
+        title: Salesperson
+        inApp: [sales_team.group_sale_salesman]
+```
+
+An add-on declares its own `spec.roles` (the Odoo add-ons under
+`profiles/odoo/addons/`). A role on an add-on lets a person into its base app,
+and the base's administrators administer the add-on. Its roles reach the
+token of the base app it is activated in: under their in-app names, or, where
+the token carries the platform's names, as `<add-on>/<role>`
+(`odoo-sales-ce/admin`). An add-on's own `claim` is not read.
+
+### 6.2 How the app learns a person's roles
+
+Pick one:
+
+| Way | The profile declares | What the app gets | For |
+|---|---|---|---|
+| Token claim | `spec.roles` with `inApp` names | In the ID token, access token and userinfo: `gentian_app_roles` (or `spec.roles.claim`), the in-app names of the roles held, and `gentian_app_roles_mapped`, every in-app name the platform decides. The app gives the first, takes away the rest of the second and leaves alone what is in neither. A role without `inApp` names is not in the token; a profile and add-ons that name none get no claim | an app with its own OIDC client that maps a claim to its roles (Odoo, Open WebUI) |
+| Exchanged token | `exchangeToken: true` on a `gateway`/`oidc` entry | The access token the front door hands the app carries `gentian_app_roles` in the platform's names: `user`, `admin`, declared roles, `<add-on>/<role>` | an app behind the front door without a client of its own |
+| Hand-over | `requires.services.authorization.roles: handOver` | In its own store, one tuple `user:<realm>/<subject> holder role:<name>` per role held. The model declares `type role` with `define holder: [user]`; the app writes no role tuple (the arbiter answers 403) | an app that decides per record in its own model ([app-authorization.md §2.6](https://github.com/gentian-org/gentian-os/blob/develop/docs/concepts/app-authorization.md)) |
+| Sync Job | `hooks.provisioning.privilegedRole` and `syncJob` | Two lists in files: who holds `admin` (for an add-on, also its base's administrators) and who holds any role. Not which declared role | an app that keeps its own administrator flag and reads no claim (§6.3) |
+| Sign-in sidecar | `requires.services.identity.sidecar` | `person.appAdmin`, true for a holder of `admin` | an app with neither OIDC nor SAML (§5.4). Give `admin` no `inApp` name: the sidecar recognizes only `gentian-app-admin`, the name the platform uses when the profile names none |
+
+A role given takes effect at the person's next sign-in. A role taken ends the
+person's sessions in the realm, and an app told of the sign-out
+(`backchannelLogout`, §5.2) drops its own; a person left with no role on the
+app is stopped by the front door at once. A handed-over store follows within
+seconds, and the sync Job runs again whenever either list changes.
+
+### 6.3 The sync Job
+
+How an app grants its own administrator flag is the app's business, so the
+profile supplies the Job; the platform reads the lists from the rights store
+and runs it whenever they change:
 
 ```yaml
 hooks:
@@ -408,27 +468,69 @@ hooks:
       script: |
         #!/bin/sh
         set -eu
-        # converge the app to exactly the membership in $GENTIAN_APP_ADMINS_FILE
+        # converge the app to exactly the administrators in $GENTIAN_APP_ADMINS_FILE
 ```
 
 The Job is given `GENTIAN_APP_ADMINS_FILE` (a JSON array of `{id, username,
-email}`), `GENTIAN_APP_USERS_FILE`, `GENTIAN_PRIVILEGED_ROLE`, `GENTIAN_TENANT`
-and `GENTIAN_APP`. Write the script to **converge**: everyone in the file gets
-the role, everyone else loses it, and nothing is written when the app already
-matches. It re-runs on every change and on every failure. Exclude the
-technical account it authenticates as, or a sync locks itself out. An account
-that does not exist yet (the person has not signed in) is named in the log
-and promoted on a later run. Bind credentials with `env` and `secretKeyRef`,
-not `envFrom`: the Secret's keys are hyphenated, and Kubernetes drops those
-from `envFrom` without a word. A `privilegedRole` without a `syncJob` is
-reported as `AppPrivilegesReady: False`, not silently ignored.
+email}`, the holders of `admin`), `GENTIAN_APP_USERS_FILE` (the same shape,
+everyone who holds a role on the app), `GENTIAN_PRIVILEGED_ROLE`,
+`GENTIAN_TENANT` and `GENTIAN_APP`. Write the script to **converge**: everyone
+in the file gets the role, everyone else loses it, and nothing is written when
+the app already matches. It re-runs on every change and on every failure.
+Exclude the technical account it authenticates as, or a sync locks itself out.
+An account that does not exist yet (the person has not signed in) is named in
+the log and promoted on a later run. Bind credentials with `env` and
+`secretKeyRef`, not `envFrom`: the Secret's keys are hyphenated, and Kubernetes
+drops those from `envFrom` without a word. A `privilegedRole` without a
+`syncJob` is reported as `AppPrivilegesReady: False`, not silently ignored.
 
-An app that takes roles from a claim instead of a Job (Odoo) declares them on
-its group through `gentianos.io/keycloak-group-attributes`; the Odoo profiles
-and [app-customization.md §4.2](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/app-customization.md)
-are the reference. Either way, a profile that grants a member role also
-declares the administrator role; an app where administrators can do no more
-than members reads as "this app has no settings".
+Whichever way the app learns its roles, `admin` must administer it; an app
+where administrators can do no more than members reads as "this app has no
+settings".
+
+### 6.4 Positions, seen from the app
+
+People hold roles through positions, which the tenant gives. Four exist in
+every tenant: User (`user`, the desktop and no app), All apps (`all-apps`,
+`user` on every installed app and add-on), App administrator
+(`app-administrator`, `admin` on every installed app) and Tenant administrator
+(`tenant-administrator`, the tenant and no app). For a profile that means:
+
+- **An install reaches few people.** The app goes to the holders of All apps
+  and App administrator, and to the positions named at install
+  (`kubectl gentian apps install <app> --tenant <t> --positions <a,b>`, or the
+  console's Apps tab), each of which holds `user` on it. A person who holds
+  only User does not see the app until somebody gives them a position.
+- **Declared roles reach people only through positions the tenant declares**
+  (`Tenant.spec.positions`, roles `{app, role}`) or given to one person
+  directly. No shipped position holds a declared role; `admin` holds them all.
+- **There is no install "for everyone".** `defaultGrant` and `addonGrants` on
+  a tenant's app, and `requires.services.authorization.groups: mirror`, are
+  accepted and have no effect; do not write them.
+
+### 6.5 Testing rights
+
+1. Give a test person a position that reaches the app, or one role beside
+   their positions: the console's Members tab, the person opened. To test a
+   declared role, declare a position for it in the test tenant first.
+2. Have them sign in to the app again: a role given takes effect at the next
+   sign-in. The console's Access tab shows what the person holds and through
+   which position.
+3. Check what the app was told:
+   - **Token claim:** decode the ID token or the userinfo answer the app
+     received; `gentian_app_roles` lists the in-app names held and
+     `gentian_app_roles_mapped` every name the platform decides. For an
+     exchanged token, decode the bearer the front door hands the app.
+   - **Hand-over:** from the app, `POST /v1/read` on `AUTHORIZATION_URL` with
+     `{"tuple": {"user": "user:<realm>/<subject>", "relation": "holder", "object": "role:"}}`
+     lists the roles the person holds there.
+   - **Sync Job:** the tenant's condition `AppPrivilegesReady`, and the log of
+     the Job `<profile>-privilege-sync` in the tenant's namespace.
+   - **Sidecar:** the handler's log at the next sign-in, and the account's
+     role in the app.
+4. Take the position again. The person's sessions end; after the next sign-in
+   the role is gone from the claim, the store or the app, and a person left
+   with no role on the app is refused at the front door.
 
 ## 7. Exposure and the desktop
 
@@ -729,10 +831,14 @@ Before opening a pull request:
 - [ ] `identity` is one of `oidc`, `saml`, `sidecar`; an OIDC client has
       `redirectUris` and `postLogoutRedirectUris` on `${TENANT_DOMAIN}` and
       `backchannelLogout` as a path, or a comment saying why not
-- [ ] The app gates on `gentian:tenant:<t>:app:<profile>`, not on members, and
-      its own allow-list default is dealt with
-- [ ] `hooks.provisioning` applies the App Admin role when the app has one;
-      the script converges and excludes its own technical account
+- [ ] The app's own allow-list default is dealt with: it names what the
+      roles claim carries, or it is off and the front door is the boundary
+- [ ] The app learns its people's roles one way (§6.2): `spec.roles` with
+      `inApp` names for the claim, `roles: handOver`, a sync Job, or the
+      sidecar; the app's `admin` role administers it
+- [ ] A sync Job converges and excludes its own technical account
+- [ ] Rights were tested with a position given and taken (§6.5); no
+      `defaultGrant`, `addonGrants` or `groups: mirror` is written
 - [ ] Every entry is `gateway` + `oidc` unless it is for the internet; no CSP
       or frame header anywhere; the tile is the product's name and a 128x128
       PNG kept in sync

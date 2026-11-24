@@ -51,7 +51,7 @@
 # A person's first sign-in creates their account, found by email first, with
 # the role "Desk User", which opens the desk and grants nothing in it. Who holds
 # System Manager is the platform's to say: hooks.provisioning below gives it,
-# with every other role, to the tenant's app administrators and takes them from
+# with every other role, to whoever holds admin on this app and takes them from
 # everyone else. Frappe's
 # password form is switched off; nobody, Administrator included, signs in with
 # a password, and Frappe's login page goes straight on to the realm.
@@ -77,7 +77,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1"
+  version: "0.5.2-dev"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -221,17 +221,18 @@ spec:
         # Frappe's administrator role.
         name: System Manager
 
-      # How this app applies that role. The platform resolves the tenant's app
-      # administrators and runs this job with them; the calls are Frappe's REST
-      # API, made inside the cluster as Administrator with its API key.
-      # Converges: every app administrator holds System Manager and every
+      # How this app applies that role. The platform reads from the rights
+      # store who holds admin on the app and who holds any role on it, and runs
+      # this job with both lists; the calls are Frappe's REST API, made inside
+      # the cluster as Administrator with its API key.
+      # Converges: every holder of admin holds System Manager and every
       # other role Frappe's setup wizard gives its first account; nobody else
       # holds System Manager, and whoever loses it loses those roles with it.
-      # Everyone else entitled to the app holds USER_ROLES, the roles an
+      # Everyone else with a role on the app holds USER_ROLES, the roles an
       # ordinary employee is given: their own Employee record and the reports
       # Frappe prepares in the background. What a department needs beyond that
-      # an administrator gives in ERPNext. Whoever loses the app loses
-      # USER_ROLES. Administrator is never touched. A person who has not signed
+      # an administrator gives in ERPNext. Whoever loses every role on the
+      # app loses USER_ROLES. Administrator is never touched. A person who has not signed
       # in yet gets an account by email, which their first sign-in takes.
       syncJob:
         image: docker.io/frappe/erpnext:v16.51.1

@@ -11,7 +11,8 @@ skip this directory for the same reason.
 
 The parked file is in the retired `AppProfile` format. Re-enabling means rewriting
 it as a `ComponentProfile` ([app-profile-guide.md](../../../../docs/app-profile-guide.md)),
-not renaming it; the group mapping and the assets are what is worth keeping.
+not renaming it, with the add-on's roles declared in `spec.roles`; its assets are what is worth
+keeping.
 
 ## Why it is parked
 

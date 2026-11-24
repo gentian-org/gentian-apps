@@ -49,9 +49,11 @@ Three delivery routes are wired up:
 - **`image-layer`** — for airgapped or reproducibility-critical installs.
 
 Per-tenant module sets are permitted **because Odoo runs one instance per tenant namespace**,
-with a database of its own. Activation is driven by Keycloak group attributes
-(`gentianos.io/keycloak-group-attributes` → `gentianOdooModules`), never by divergent module
-binaries. See §2.4 of the framework doc for why this is a hard rule.
+with a database of its own. Activation is driven by the add-ons the tenant activated
+(`Tenant.spec.apps[].addons`, resolved to module names through each add-on's
+`spec.package.addon` and installed through `gentian.addonModules`), never by divergent module
+binaries. Who may use an add-on's part of Odoo is the roles the add-on declares, which reach
+Odoo's token as in-app group names (`spec.roles`). See §2.4 of the framework doc for why this is a hard rule.
 
 ## L5/L6 — the fork
 
