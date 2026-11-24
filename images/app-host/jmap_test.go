@@ -97,19 +97,21 @@ func TestJMAPScriptNamesThePersonsAccount(t *testing.T) {
 			t.Fatalf("%d %q", w.Code, w.Header().Get("Cache-Control"))
 		}
 		start := strings.Index(body, "accounts: [") + len("accounts: [")
-		end := strings.Index(body, "],\n  secret")
+		end := strings.Index(body, "],\n};")
 		var account map[string]any
 		if err := json.Unmarshal([]byte(body[start:end]), &account); err != nil {
 			t.Fatalf("account is not JSON: %v\n%s", err, body)
 		}
-		if account["email"] != "ada@example.net" || account["session"] != c.want || account["bearer"] != true {
+		if account["email"] != "ada@example.net" || account["session"] != c.want || account["bearer"] != false {
 			t.Errorf("account = %v, want session %s", account, c.want)
 		}
 		if strings.Contains(body, "</script>") {
 			t.Errorf("a name ends up as markup in the script:\n%s", body)
 		}
-		if !strings.Contains(body, `fetch("/host/jmap-token"`) {
-			t.Errorf("secret does not ask the host:\n%s", body)
+		// The app asks the person for the password: no secret is named, and
+		// nothing of a token is in the script.
+		if strings.Contains(body, "secret") || strings.Contains(body, "token") {
+			t.Errorf("the script hands over a credential:\n%s", body)
 		}
 	}
 }
@@ -133,43 +135,13 @@ func TestJMAPScriptNamesNothingWithoutAServerOrAnAddress(t *testing.T) {
 	}
 }
 
-// The token goes to this address's own script only, and is the one the
-// edge handed this request.
-func TestJMAPTokenOnlyToThePagesScript(t *testing.T) {
+// No token is handed out: the address the earlier design used is the app's
+// entry page like any app route, and carries no credential.
+func TestJMAPHandsOutNoToken(t *testing.T) {
 	h := jmapServer(t, "", "imap.example.net")
-	page := map[string]string{"X-Craft-Host": "1", "Sec-Fetch-Site": "same-origin", "Sec-Fetch-Mode": "cors", "Authorization": "Bearer edge-token-of-ada"}
-
-	w := get(h, "/host/jmap-token", page)
-	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "no-store" {
-		t.Fatalf("%d %q", w.Code, w.Header().Get("Cache-Control"))
-	}
-	var answer map[string]string
-	_ = json.NewDecoder(w.Body).Decode(&answer)
-	if answer["token"] != "edge-token-of-ada" {
-		t.Fatalf("token = %q", answer["token"])
-	}
-
-	refused := map[string]func(map[string]string){
-		"without the page's header": func(h map[string]string) { delete(h, "X-Craft-Host") },
-		"from another site":         func(h map[string]string) { h["Sec-Fetch-Site"] = "cross-site" },
-		"as a navigation":           func(h map[string]string) { h["Sec-Fetch-Mode"] = "navigate" },
-	}
-	for name, change := range refused {
-		headers := map[string]string{}
-		for k, v := range page {
-			headers[k] = v
-		}
-		change(headers)
-		if w := get(h, "/host/jmap-token", headers); w.Code != http.StatusForbidden || strings.Contains(w.Body.String(), "edge-token") {
-			t.Errorf("%s: %d %s", name, w.Code, w.Body.String())
-		}
-	}
-	noSignIn := map[string]string{"X-Craft-Host": "1", "Sec-Fetch-Site": "same-origin"}
-	if w := get(h, "/host/jmap-token", noSignIn); w.Code != http.StatusUnauthorized {
-		t.Errorf("without a sign-in: %d", w.Code)
-	}
-	if w := get(jmapServer(t, "", ""), "/host/jmap-token", page); w.Code != http.StatusNotFound {
-		t.Errorf("without a mail server: %d", w.Code)
+	w := get(h, "/host/jmap-token", map[string]string{"X-Craft-Host": "1", "Authorization": "Bearer edge-token-of-ada"})
+	if strings.Contains(w.Body.String(), "edge-token-of-ada") {
+		t.Fatalf("the token was handed out: %s", w.Body.String())
 	}
 }
 

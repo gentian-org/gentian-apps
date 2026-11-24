@@ -8,10 +8,10 @@
 #
 # What serves it is images/app-host in jmap mode, given as the context named
 # "app-host": the app at the root, with one script put first in its entry
-# page that names the person's account at the mail server and hands the app
-# the person's token on each of its jobs. The app then reads and sends mail
-# with that server directly. Without a mail server named, the app starts as
-# upstream ships it.
+# page that names the person's account at the mail server. The app asks the
+# person for their password there, keeps it in the page's memory, and reads
+# and sends mail with that server directly. Without a mail server named, the
+# app starts as upstream ships it.
 
 FROM docker.io/nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6 AS site
 ARG MAILCRAFT_VERSION
@@ -43,7 +43,7 @@ ENV CRAFT_MODE=jmap \
     CRAFT_APP=mailcraft \
     CRAFT_TITLE=MailCraft
 LABEL org.opencontainers.image.title="MailCraft" \
-      org.opencontainers.image.description="The browser build of MailCraft, signed in at the workspace's JMAP mail server as the person at the page" \
+      org.opencontainers.image.description="The browser build of MailCraft, for the workspace's JMAP mail server" \
       org.opencontainers.image.source="https://github.com/gentian-org/gentian-apps" \
       org.opencontainers.image.licenses="MIT OR Apache-2.0"
 USER 101:101

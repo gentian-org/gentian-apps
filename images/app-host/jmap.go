@@ -19,28 +19,18 @@ import (
 // 8621) itself, from the browser: MailCraft's browser build. The app is
 // served at the root as upstream ships it, with one script put in at the top
 // of its entry page. That script names the person's account at the tenant's
-// mail server, and gives the app, each time it asks, the token the tenant's
-// edge handed this request for the person. The app then talks JMAP to the
-// mail server directly; nothing of the person's mail passes this pod.
+// mail server; the app asks the person for their password there, keeps it in
+// the page's memory and talks JMAP to the server directly. Nothing of the
+// person's mail and no credential passes this pod.
 //
-// The pod keeps no token. The one it hands over is the edge's for this app,
-// short-lived and renewed by the edge with the person's session; the page
-// holds it in memory for one job of the app at a time.
-//
-// The mail server has to accept that token (it is checked at the tenant's
-// realm, by introspection or userinfo), and has to let this app's address
-// in (CORS). Both are set at the mail server, not here.
+// The mail server has to let this app's address in (CORS). That is set at
+// the mail server, not here.
 
 // jmapScriptPath is the script the entry page loads before the app starts.
 const jmapScriptPath = "/host/jmap.js"
 
-// jmapTokenPath is where the script asks for the token, on each job of the
-// app.
-const jmapTokenPath = "/host/jmap-token"
-
 func (s *server) jmapRoutes() {
 	s.mux.HandleFunc("GET "+jmapScriptPath, s.jmapScript)
-	s.mux.HandleFunc("GET "+jmapTokenPath, s.jmapToken)
 	// Without a method: GET / would conflict with the patterns above. The
 	// app refuses what is not a read itself.
 	s.mux.HandleFunc("/", s.jmapApp)
@@ -81,47 +71,18 @@ func (s *server) jmapScript(w http.ResponseWriter, r *http.Request) {
 	if name == "" {
 		name = email
 	}
+	// bearer false and no secret: the app asks the person for their password
+	// at the server, as for any JMAP account, and keeps it in memory only.
 	account, _ := json.Marshal(map[string]any{
-		"email": email, "session": session, "bearer": true, "name": name,
+		"email": email, "session": session, "bearer": false, "name": name,
 	})
-	tokenPath, _ := json.Marshal(jmapTokenPath)
 	var b bytes.Buffer
 	b.WriteString("// Written by the host for the person at this page: their account at the\n")
-	b.WriteString("// workspace's mail server, and where the token the app signs in with is asked\n")
-	b.WriteString("// for on each of its jobs.\n")
+	b.WriteString("// workspace's mail server. The app asks them for its password.\n")
 	b.WriteString("window.mailcraftJmap = {\n  accounts: [")
 	b.Write(account)
-	b.WriteString("],\n  secret: function () {\n    return fetch(")
-	b.Write(tokenPath)
-	b.WriteString(", {headers: {\"X-Craft-Host\": \"1\"}, cache: \"no-store\", credentials: \"same-origin\"})\n")
-	b.WriteString("      .then(function (r) { if (!r.ok) { throw new Error(\"no sign-in: \" + r.status); } return r.json(); })\n")
-	b.WriteString("      .then(function (j) { return j.token; });\n  },\n};\n")
+	b.WriteString("],\n};\n")
 	_, _ = w.Write(b.Bytes())
-}
-
-// jmapToken gives this address's own script the token the edge handed this
-// request for the person. Only to the page's script: never a navigation,
-// never a call from another site, and only with the header a page of
-// another site cannot send without the browser asking first.
-func (s *server) jmapToken(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("X-Craft-Host") != "1" || r.Header.Get("Sec-Fetch-Mode") == "navigate" {
-		fail(w, http.StatusForbidden, "not a call of this page")
-		return
-	}
-	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" {
-		fail(w, http.StatusForbidden, "not a call of this page")
-		return
-	}
-	if s.jmapSession() == "" {
-		fail(w, http.StatusNotFound, "this workspace names no mail server")
-		return
-	}
-	token := bearer(r)
-	if token == "" {
-		fail(w, http.StatusUnauthorized, "no sign-in")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"token": token})
 }
 
 // jmapApp serves the app's build at the root, with the entry page carrying
