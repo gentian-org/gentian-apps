@@ -10,7 +10,10 @@
 //     into one folder of the person's files, for an app that syncs with a
 //     WebDAV server of its own accord; and, where the tenant has a home
 //     for calendars, a CalDAV relay under /caldav/ into the person's
-//     calendars, for an app that reads and writes a CalDAV server.
+//     calendars, for an app that reads and writes a CalDAV server;
+//   - "jmap": the app served as it is, told the person's account at the
+//     tenant's JMAP mail server and given the person's token to reach it
+//     with, for an app that reads that server itself (jmap.go).
 //
 // It holds nothing of anybody: the person's token arrives with each request
 // from the tenant's edge, is exchanged at the realm for one valid at the
@@ -77,6 +80,12 @@ type config struct {
 	// issued under; both empty while the tenant grants none.
 	calendarHome  string
 	calendarScope string
+	// jmapSession is, in jmap mode, the address of the mail server's JMAP
+	// session resource, and jmapIMAPHost the server's IMAP host, from which
+	// that address is made when none is given; both empty while the
+	// tenant's mail is on no server outside the cluster.
+	jmapSession  string
+	jmapIMAPHost string
 }
 
 func configFromEnv() config {
@@ -103,5 +112,7 @@ func configFromEnv() config {
 		settingsTemplate: os.Getenv("CRAFT_SETTINGS_TEMPLATE"),
 		calendarHome:     os.Getenv("CRAFT_CALENDAR_URL"),
 		calendarScope:    os.Getenv("CRAFT_CALENDAR_SCOPE"),
+		jmapSession:      os.Getenv("CRAFT_JMAP_SESSION"),
+		jmapIMAPHost:     os.Getenv("CRAFT_JMAP_IMAP_HOST"),
 	}
 }
