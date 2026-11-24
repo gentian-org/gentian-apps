@@ -39,12 +39,16 @@ See [docs/SECURITY.md](docs/SECURITY.md) for OIDC, ReBAC hooks, pod hardening, a
 what the platform enforces vs what app authors must implement.
 
 **Rights.** The front door lets in only people who hold a role on the app, so a route
-behind `get_current_user` is already limited to them. The template reads no role:
-it neither asks for `exchangeToken` nor reads `gentian_app_roles`, and
-`require_permission()` (`backend/app/core/authz.py`) is a stub that talks to an
-`OPENFGA_API_URL` the platform does not provide and lets every call through when it
-is unset. An app that needs `admin` or its own roles declares them and picks one way
-to learn who holds them:
+behind `get_current_user` is already limited to them. The api entry asks for
+`exchangeToken`, and the token it gets carries the person's roles on the app in
+`gentian_app_roles`, in the platform's names (`user`, `admin`, the roles the profile
+declares). `require_role()` (`backend/app/core/roles.py`) admits a holder of a role
+and refuses everyone else; the example `DELETE /items/{id}` requires `admin`. An app
+that decides per record declares an authorization store and asks it with
+`check_permission()` (`backend/app/core/authz.py`), through the arbiter, as
+`user:<realm>/<subject>`; that check refuses when no store is configured or the
+arbiter cannot be asked. Declaring roles, positions, and the other ways an app can
+learn them:
 [app-profile-guide.md §6](https://github.com/gentian-org/gentian-apps/blob/develop/docs/app-profile-guide.md).
 
 ## The profile

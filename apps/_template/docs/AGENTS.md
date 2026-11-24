@@ -107,10 +107,12 @@ serves every cluster.
 1. Create `backend/app/api/routes/<feature>.py` with an `APIRouter`.
 2. Register it in `backend/app/main.py`.
 3. Protect routes with `Depends(get_current_user)` when tenant-scoped.
-4. For a route only the app's administrators may call, check the person's `admin` role from
-   the roles the app is told (gentian-apps docs/app-profile-guide.md §6.2).
-   `require_permission()` in `backend/app/core/authz.py` is a stub: it calls an
-   `OPENFGA_API_URL` the platform does not provide and allows every call while that is unset.
+4. For a route only the app's administrators may call, depend on
+   `require_role("admin")` (`backend/app/core/roles.py`), which reads the token's
+   `gentian_app_roles`; a role the profile declares works the same way (gentian-apps
+   docs/app-profile-guide.md §6). A decision per record asks the app's own store with
+   `check_permission()` (`backend/app/core/authz.py`), which refuses when no store is
+   configured.
 
 ## Add a React page
 

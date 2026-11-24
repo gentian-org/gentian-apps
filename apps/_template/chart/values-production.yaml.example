@@ -19,7 +19,7 @@ api:
     # HTTPS origin for this app host — required (M9)
     BACKEND_CORS_ORIGINS: https://app.example.gentian.cloud
     # From existingSecret via valueMapping in the ComponentProfile
-    # OIDC_ISSUER, OIDC_CLIENT_ID, DATABASE_URL, OPENFGA_*
+    # OIDC_ISSUER, OIDC_CLIENT_ID, DATABASE_URL; AUTHORIZATION_* from authorization.secretName
 
 web:
   resources:
@@ -35,6 +35,5 @@ web:
     VITE_OIDC_REDIRECT_URI: https://app.example.gentian.cloud/
     VITE_AUTH_DISABLED: "false"
 
-openfga:
-  apiUrl: ""
-  storeId: ""
+authorization:
+  secretName: ""

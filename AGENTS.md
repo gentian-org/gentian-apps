@@ -91,9 +91,10 @@ First-party apps share the FastAPI + React + Helm stack scaffolded by `apps/_tem
 1. Create `backend/app/api/routes/<feature>.py` with an `APIRouter`.
 2. Register it in `backend/app/main.py`.
 3. Protect routes with `Depends(get_current_user)` when tenant-scoped.
-4. For a route only the app's administrators may call, check the person's `admin` role from
-   the roles the app is told (docs/app-profile-guide.md §6.2). The template's
-   `require_permission()` is a stub that allows every call until it is wired to a store.
+4. For a route only the app's administrators may call, depend on the template's
+   `require_role("admin")`, which reads the token's `gentian_app_roles`
+   (docs/app-profile-guide.md §6). A decision per record asks the app's own store with
+   `check_permission()`, which refuses when no store is configured.
 
 ### Add a React page
 
