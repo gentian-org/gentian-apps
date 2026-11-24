@@ -8,6 +8,8 @@
 #   e2e/run.sh docmost         one of: sidecar, docmost, openproject
 #
 # Every container it starts is removed again; E2E_KEEP=1 leaves them to look at.
+# Keycloak runs with the platform's extension (E2E_LISTENER_IMAGE), asking a
+# stand-in for the rights store (e2e/lib/rights.js) for a person's roles.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -21,5 +23,10 @@ for run in "${runs[@]}"; do
     echo "=== ${run} ==="
     node --test "e2e/${run}.e2e.js" || status=1
 done
-[ -n "${E2E_KEEP:-}" ] || docker rm -f "${E2E_NETWORK:-sso-e2e}-kc" >/dev/null 2>&1 || true
+if [ -z "${E2E_KEEP:-}" ]; then
+    kc="${E2E_NETWORK:-sso-e2e}-kc"
+    files="$(docker inspect "${kc}" -f '{{index .Config.Labels "e2e.listener-files"}}' 2>/dev/null || true)"
+    docker rm -f "${kc}" "${kc}-rights" >/dev/null 2>&1 || true
+    case "${files}" in "${TMPDIR:-/tmp}"/sso-e2e-kc-*) rm -rf "${files}" ;; esac
+fi
 exit "${status}"
