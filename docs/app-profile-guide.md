@@ -691,6 +691,7 @@ gentian-os [app-customization.md](https://github.com/gentian-org/gentian-os/blob
 | `validate-profile-versions.py` | a changed bundle with an unchanged `spec.version`; a `-dev` version or develop chart on `main` |
 | `validate-platform-schema.py` | a profile that does not fit the CRD of every line from `requires.platform` up |
 | `validate-chart-refs.py`, `validate-image-tags.py` | a chart or image that does not exist where the profile says; a `develop-<sha7>` image on `main` |
+| `validate-pull-secrets.py` | a chart that renders the pull secrets it is given as plain names in a pod's `imagePullSecrets`; a chart that writes the list as it is needs `gentianos.io/standard-image-pull-secrets: "true"` on the profile |
 | `validate-profile-tiles.py` | a `logo` that is not the 128x128 PNG of its `image` |
 | `validate-ingress-annotations.py` | an entry annotation other than the two that exist |
 | `validate-secret-refs.py`, `validate-secret-seeds.py` | a Secret name that is not this profile's; a composition that writes to the vault |
