@@ -593,7 +593,7 @@ spec:
   # Caps, at the realm, how long a sign-in through the component's OIDC
   # clients lasts: past that age the realm refuses their refresh, so the
   # component cannot renew its tokens without a new sign-in, which reads the
-  # person's groups again. It does not end a session the component keeps in
+  # person's roles again. It does not end a session the component keeps in
   # its own cookie; a component that never goes back to the realm keeps that
   # session as long as it allows.
   # sessionMaxAge: 8h
@@ -643,12 +643,14 @@ spec:
   #     readOnlyPVC:
   #       claimName: COMPONENT_ID-data
   #       mountPath: /var/lib/component
-  #   # How workspace group membership becomes an in-app role. The platform
-  #   # resolves who is in gentian:tenant:<t>:app-admins, publishes the list and
-  #   # runs the Job; the script speaks whatever protocol this component happens
-  #   # to expose, which is exactly the knowledge that must not live in the
-  #   # kernel. The script re-runs whenever membership changes, so it must
-  #   # converge on the membership it is given rather than apply a delta.
+  #   # How the app's admin role becomes an in-app administrator, for a
+  #   # component that cannot read its people's roles from a token. The
+  #   # platform reads from the rights store who holds admin on the component
+  #   # and who holds any role on it, publishes both lists and runs the Job;
+  #   # the script speaks whatever protocol this component happens to expose,
+  #   # which is exactly the knowledge that must not live in the kernel. The
+  #   # script re-runs whenever the lists change, so it must converge on what
+  #   # it is given rather than apply a delta (app-profile-guide.md §6.3).
   #   provisioning:
   #     privilegedRole:
   #       kind: group

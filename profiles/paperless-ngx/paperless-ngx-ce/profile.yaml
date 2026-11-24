@@ -19,13 +19,13 @@
 #
 # ── Who administers Paperless ───────────────────────────────────────────────
 # Who holds the role admin on this app,
-# applied by spec.hooks.provisioning below: the platform resolves the
-# members and runs the Job, the Job sets is_superuser on their Paperless
-# accounts over the REST API as the technical superuser, and takes it from
-# everyone else. Not Paperless' own claim-driven superuser sync
-# (PAPERLESS_SOCIAL_ACCOUNT_SYNC_SUPERUSER_GROUP): that reads the groups
-# claim from the id token or userinfo, and the realm puts it in the access
-# token only. A member who has not signed in yet has no account to promote;
+# applied by spec.hooks.provisioning below: the platform reads who holds it
+# from the rights store and runs the Job, the Job sets is_superuser on their
+# Paperless accounts over the REST API as the technical superuser, and takes
+# it from everyone else. Not Paperless' own claim-driven superuser sync
+# (PAPERLESS_SOCIAL_ACCOUNT_SYNC_SUPERUSER_GROUP): this profile gives its
+# roles no in-app names (spec.roles), so the token carries no roles claim to
+# read. A person who has not signed in yet has no account to promote;
 # the Job says so and promotes them on a later run, after their first
 # sign-in.
 #
@@ -83,7 +83,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.2-dev"
+  version: "0.5.3-dev"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
@@ -300,7 +300,7 @@ spec:
         # Everyday use of Paperless: documents and their filing vocabulary,
         # saved views, notes, share links, mail fetching, one's own settings
         # and tasks. Not workflows, users, groups or the app's settings: those
-        # are the App Admin role's (superuser, by the sync Job).
+        # are the admin role's (superuser, by the sync Job).
         MEMBERS = "Members"
         MEMBER_PERMISSIONS = [
             "%s_%s" % (action, model)
@@ -466,8 +466,8 @@ spec:
         # group; descriptive only. The script below is what it means.
         name: superuser
 
-      # How this app applies that role. The platform resolves app-admins
-      # membership, publishes it as JSON and runs this Job; everything below is
+      # How this app applies that role. The platform reads who holds admin on
+      # the app, publishes it as JSON and runs this Job; everything below is
       # Paperless' own protocol and stays in Paperless' catalog entry.
       #
       # Converges rather than applies a delta: everyone in the file who has an

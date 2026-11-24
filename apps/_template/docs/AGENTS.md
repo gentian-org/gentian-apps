@@ -107,7 +107,10 @@ serves every cluster.
 1. Create `backend/app/api/routes/<feature>.py` with an `APIRouter`.
 2. Register it in `backend/app/main.py`.
 3. Protect routes with `Depends(get_current_user)` when tenant-scoped.
-4. Use `Depends(require_permission(...))` for sensitive ops once OpenFGA is wired.
+4. For a route only the app's administrators may call, check the person's `admin` role from
+   the roles the app is told (gentian-apps docs/app-profile-guide.md §6.2).
+   `require_permission()` in `backend/app/core/authz.py` is a stub: it calls an
+   `OPENFGA_API_URL` the platform does not provide and allows every call while that is unset.
 
 ## Add a React page
 

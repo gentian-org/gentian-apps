@@ -51,19 +51,16 @@ gated purely on "does any `is_superuser=True` user exist"
 (`mathesar/views/installation/decorators.py`), and OIDC never grants `is_superuser` on its own
 (`mathesar/sso.py` always creates plain SSO logins as regular users). `spec.postInstallJob`
 creates one technical superuser ("gentian-bootstrap-admin") via `manage.py shell`, idempotently.
-`spec.provisioning.privilegedRole` (protocol `mathesar-rpc`, implemented in gentian-os's
-`internal/controller/app_privilege_reconciler.go` + `internal/provisioning/mathesar`) then uses
-that account's HTTP Basic Auth credentials to keep every `gentian:tenant:<t>:app-admins`
-member's `is_superuser` flag in sync via `users.list`/`users.add`/`users.patch_other` —
-pre-provisioning the account by email when a member hasn't logged in yet, so their first SSO
-login links to it instead of creating a fresh non-admin account. This was the first
-`privilegedRole` protocol actually implemented in gentian-os; before this, `PrivilegedRoleSpec`
-existed on the CRD but `syncAppPrivilegedRole` unconditionally returned "not implemented" for
-every profile (including the `nextcloud` OCS-API case §6 of the app-profile-guide claimed was
-supported — it never was; that section has been corrected).
+`spec.hooks.provisioning` then runs a sync Job that uses that account's HTTP Basic Auth
+credentials to keep the `is_superuser` flag of whoever holds `admin` on the app — as the
+platform's rights store answers — in sync via `users.list`/`users.add`/`users.patch_other`,
+pre-provisioning the account by email when a person hasn't logged in yet, so their first SSO
+login links to it instead of creating a fresh non-admin account
+(gentian-os `internal/controller/app_privilege_reconciler.go` runs the Job; the protocol is the
+script's, in `profile.yaml`).
 
 The technical account is excluded from its own sync (matched by the fixed username
-`gentian-bootstrap-admin`, not group membership) so the reconciler can never lock itself out.
+`gentian-bootstrap-admin`) so the reconciler can never lock itself out.
 
 ## Restore
 

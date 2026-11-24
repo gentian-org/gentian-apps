@@ -38,6 +38,15 @@ ecosystem. See [docs/FRONTEND-STACK.md](docs/FRONTEND-STACK.md).
 See [docs/SECURITY.md](docs/SECURITY.md) for OIDC, ReBAC hooks, pod hardening, and
 what the platform enforces vs what app authors must implement.
 
+**Rights.** The front door lets in only people who hold a role on the app, so a route
+behind `get_current_user` is already limited to them. The template reads no role:
+it neither asks for `exchangeToken` nor reads `gentian_app_roles`, and
+`require_permission()` (`backend/app/core/authz.py`) is a stub that talks to an
+`OPENFGA_API_URL` the platform does not provide and lets every call through when it
+is unset. An app that needs `admin` or its own roles declares them and picks one way
+to learn who holds them:
+[app-profile-guide.md §6](https://github.com/gentian-org/gentian-apps/blob/develop/docs/app-profile-guide.md).
+
 ## The profile
 
 `profile/componentprofile.yaml.tmpl` is the skeleton of the `ComponentProfile`, the one
@@ -60,7 +69,7 @@ for how a profile is written.
 1. Copy this repo to `gentian-apps/apps/<name>/`.
 2. Rename chart, images, and `profile/componentprofile.yaml.tmpl`.
 3. Add `gentian-apps/profiles/<name>/profile.yaml`.
-4. See [custom-app-guide.md](https://github.com/gentian-org/gentian-apps/blob/main/custom-app-guide.md).
+4. See [custom-app-guide.md](https://github.com/gentian-org/gentian-apps/blob/develop/docs/custom-app-guide.md).
 
 ## Components the platform ships itself
 

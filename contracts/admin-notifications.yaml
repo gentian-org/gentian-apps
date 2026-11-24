@@ -26,14 +26,25 @@ spec:
       tenant:
         type: string
         description: Target tenant id when scope is tenant
-      groups:
+      positions:
         type: array
         items:
           type: string
-        description: Keycloak group paths; defaults to gentian:tenant:<t>:members
+        description: >
+          The tenant's positions the notice is for, by name; "user" is every person
+          of the tenant. A tenant notice that names no position and no person is for
+          every person of the tenant.
+      people:
+        type: array
+        items:
+          type: string
+        description: >
+          People the notice is for, by subject, username or email address (the
+          desktop's notices contract). An audience names no groups; the notices
+          contract refuses the field.
   publishers:
-  - platform superadmin (scope platform or any managed group)
-  - tenant admin (scope tenant, groups within gentian:tenant:<t>:*)
+  - platform administrator (scope platform)
+  - tenant administrator (scope tenant, positions of its own tenant)
   rest:
     publish: POST /api/v1/admin/notifications
     list: GET /api/v1/admin/notifications

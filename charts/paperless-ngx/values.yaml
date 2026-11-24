@@ -76,7 +76,7 @@ secretKey: ""
 
 # The technical superuser Paperless creates at first start
 # (PAPERLESS_ADMIN_USER). Nobody signs in as it: the post-install Job and the
-# app-admins sync Job authenticate as it over the REST API, and people sign in
+# administrators' sync Job authenticate as it over the REST API, and people sign in
 # through the realm. Password from secrets.generated (admin_password).
 admin:
   user: "gentian-bootstrap-admin"

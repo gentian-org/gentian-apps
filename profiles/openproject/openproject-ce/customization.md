@@ -70,7 +70,7 @@ that container, started with this profile's values as the chart starts it
 | Step | By | OpenProject's own way |
 |---|---|---|
 | An account for a person who has none | `POST /api/v3/users`, inside the cluster, as the service account the profile configures (global basic auth) | yes — its published interface. An ordinary account |
-| Who administers OpenProject | `PATCH /api/v3/users/<id>` with `admin` true or false, as the same service account, when the account is not what the platform's App Admin role says it should be | yes — except taking the flag from the last active administrator, which OpenProject refuses and the handler writes (see "Who administers OpenProject") |
+| Who administers OpenProject | `PATCH /api/v3/users/<id>` with `admin` true or false, as the same service account, when the account is not what the app's `admin` role says it should be | yes — except taking the flag from the last active administrator, which OpenProject refuses and the handler writes (see "Who administers OpenProject") |
 | The password that call demands | a random value, then its row in `user_passwords` deleted | no — the row is deleted in the database |
 | An account somebody invited the person's address to | its status set from invited to active, with the name the platform knows the person by | no — written to `users`; OpenProject's own way is a form that sets a password |
 | A "stay signed in" token for the account | a row in `tokens` (`Token::AutoLogin`), its value stored as OpenProject stores one: SHA-256 of the value and `secret_key_base` (`app/models/token/hashed_token.rb`) | no — the row is written; the token itself is OpenProject's own feature |
@@ -108,13 +108,13 @@ form that is off.
 
 ### Who administers OpenProject
 
-Who holds the platform's **App Admin** role, and nobody else: not the tenant's administrator for
+Who holds the `admin` role on OpenProject, and nobody else: not the tenant's administrator for
 being that, not the first person in.
 
-The role is the tenant's group `gentian:tenant:<tenant>:app-admins`. A tenant's administrator
-gives it in the admin console — *Groups*, under *Roles*, the group `app-admins`: add the person;
-or the person's own page, under their groups — and takes it away in the same place. It is one role for
-the tenant: who holds it administers every app of the tenant that is signed in to this way.
+The role is held in the platform's rights store, through a position — App administrator holds
+it on every installed app, and a tenant may declare a position that holds it on OpenProject alone —
+or given to one person beside their positions. A tenant's administrator gives and takes both in
+the administration console, on the Members tab.
 
 - The sidecar tells the handler whether the realm's signed answer says the person holds the role
   (`person.appAdmin`). At every sign-in the handler makes the account what it should be, before
