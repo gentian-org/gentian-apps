@@ -2,7 +2,7 @@
 
 This template implements the **application-layer** slice of
 [gentian-os/docs/security/design.md](https://github.com/gentian-org/gentian-os/blob/main/docs/security/design.md).
-Platform MAC (namespaces, default-deny egress, mesh) is enforced by Gentian OS;
+Platform MAC (namespaces, default-deny egress, the edge) is enforced by Gentian OS;
 apps must not weaken it.
 
 ---
@@ -53,7 +53,7 @@ Public unauthenticated endpoints are limited to **`/healthz`** and **`/readyz`**
 
 | # | Requirement | How |
 |---|-------------|-----|
-| M16 | **Gateway API HTTPRoute only** | `chart/templates/httproute.yaml`; no nginx Ingress, no in-pod reverse proxy |
+| M16 | **Routes from the profile's `spec.expose` only** | The operator writes them; `chart/templates/httproute.yaml` stays off under a profile; no nginx Ingress, no in-pod reverse proxy |
 | M17 | **Split API and static web at the gateway** | `/api`, `/healthz`, `/readyz` → API Service; `/` → web Service |
 
 ### Catalog declaration (catalog apps only)
@@ -101,7 +101,7 @@ Enable these when the condition is true — not optional laziness.
 | App exposes **admin or destructive operations** | M22: **OpenFGA / AuthZEN `Check`** before the handler runs (via `require_permission()` once PDP is wired) |
 | App runs **AI agents or workflows** | M23: **Dedicated Keycloak client per agent instance** — never reuse human credentials or a shared service account |
 | App agents act **on behalf of a user** | M24: **RFC 8693 token exchange** with `act` / `may_act`; rights derived through user ceiling (§2.3) |
-| App calls **external URLs** | M25: Declare endpoints; rely on platform egress allowlist — do not disable NetworkPolicy |
+| App calls **external URLs** | M25: Declare each in `requires.privileges.egress` with a reason: `hosts` when the names are known, `hostsAtApproval` when the installation chooses them, a `rule` only for destinations chosen at run time ([app-profile-guide.md §4.5](../../../docs/app-profile-guide.md#45-switch-off-what-calls-the-internet)); do not disable NetworkPolicy |
 | App stores **tenant/user data** | M26: **Row-level tenant isolation** in queries; no cross-tenant reads even if ReBAC is not wired yet |
 | **Production** deploy | M27: **CPU/memory requests and limits** on api and web containers |
 
@@ -147,7 +147,7 @@ in the chart unless platform docs explicitly require an app-specific supplement.
 | Control | Owner |
 |---------|--------|
 | Per-tenant namespace isolation | Gentian OS / Crossplane |
-| Default-deny egress NetworkPolicy (Cilium) | Gentian OS |
+| Default-deny egress NetworkPolicy, the outgoing gateway for granted hosts | Gentian OS |
 | Tenant Gateway + wildcard TLS (cert-manager) | Gentian OS operator |
 | `frame-ancestors` / CSP for portal iframe embedding | Gentian OS gateway policy |
 | Admission control (no privileged pods, image policy) | Kyverno / Gatekeeper |
