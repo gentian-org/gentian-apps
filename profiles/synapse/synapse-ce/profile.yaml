@@ -50,7 +50,7 @@ spec:
   classes:
     - app
   trustTier: experimental
-  version: "0.1.1-dev"
+  version: "0.1.2-dev"
   launch: none
   package:
     chart:
@@ -146,6 +146,13 @@ spec:
           enabled: false
         # No other homeserver is admitted.
         federation_domain_whitelist: []
+        # The tenant's own Element gets the login token straight back after
+        # the sign-in. Any other address still gets Synapse's confirmation
+        # page, which may not be shown in a frame: Element opens inside the
+        # desktop, so its own address must not need it.
+        sso:
+          client_whitelist:
+            - "https://element.${TENANT_DOMAIN}/"
         email:
           enable_notifs: true
           require_transport_security: true
@@ -162,7 +169,9 @@ spec:
             user_mapping_provider:
               config:
                 subject_claim: sub
-                localpart_template: "{{ user.preferred_username }}"
+                # The realm's username is an email address: the Matrix ID
+                # takes the part before the @ (a number is added on a clash).
+                localpart_template: "{{ user.preferred_username | localpart_from_email }}"
                 display_name_template: "{{ user.name }}"
                 email_template: "{{ user.email }}"
 
