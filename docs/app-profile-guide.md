@@ -266,9 +266,63 @@ fetches, license pings and public CDN assets, and switch each off in
 `extraValues`, or in the app's own configuration from a hook where it has no
 value for it: Docmost's `telemetry.disabled` is the first, Nextcloud's
 `occ config:app:set password_policy enforceHaveIBeenPwned --value=false` in
-its start-up script the second. What the app legitimately needs from
-outside is a privilege with a `reason` (`requires.privileges.egress`), granted
-by the tenant's approver.
+its start-up script the second.
+
+What the app legitimately needs from outside is a request under
+`requires.privileges.egress`, answered by the tenant's perimeter approver.
+Each request states exactly one of three forms (§4.7 maps every need, in
+and out, to its declaration):
+
+| Form | When | How it leaves |
+|---|---|---|
+| `hosts: [...]` | the names are known when the profile is written | the outgoing gateway, which passes only the granted names and records each connection; port 443 unless the host says `:port` |
+| `hostsAtApproval: true` | the installation chooses the hosts, such as the operator's own ERP or bucket | the outgoing gateway; the approver names the hosts |
+| `rule:` | destinations chosen at run time, or a protocol that names no host (mail to other servers, a database protocol) | the component's own NetworkPolicy, by address; not in the gateway's record |
+
+```yaml
+requires:
+  privileges:
+    egress:
+      - name: vendor-api
+        hosts: [api.example.com, uploads.example.com:8443]
+        reason: "Synchronizes the documents with the vendor's hosted API."
+```
+
+```yaml
+requires:
+  privileges:
+    egress:
+      - name: customer-erp
+        hostsAtApproval: true
+        reason: "Reads orders from the ERP the operator connects."
+```
+
+```yaml
+requires:
+  privileges:
+    egress:
+      - name: outbound-mail
+        rule:
+          to: [{ipBlock: {cidr: 0.0.0.0/0}}]
+          ports: [{protocol: TCP, port: 25}]
+        reason: "Delivers mail to the recipients' servers, known only when a message is sent."
+```
+
+- **Never a rule when the names are known.** An approver reads a rule as
+  addresses and ports, with no host to judge.
+- **All known names in one request.** A profile names its hosts in one
+  `hosts` request, answered once; a host is one name, not a pattern.
+- **A `reason` an approver can judge**: what the app does there, for whom.
+- **A host this cluster serves itself**, another app's address or an inside
+  entry (§7.1), is still requested, and is reached directly at the edge, not
+  through the gateway.
+- **An approval is a person's**, the tenant's perimeter approver's, or a
+  trusted domain's: a `hosts` request whose every host is in a domain the
+  cluster or the tenant trusts counts as granted. No catalog is pre-approved.
+
+The model is gentian-os [edge.md](https://github.com/gentian-org/gentian-os/blob/develop/docs/concepts/edge.md); approving,
+trusted domains and troubleshooting are in the operating guide
+[edge.md](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/edge.md).
 
 ### 4.6 Pin what you ship
 
@@ -277,6 +331,24 @@ image tag. On `develop`, that is the `<version>-develop.<sha7>` chart and the
 `develop-<sha7>` image CI published for the commit; before `develop` is merged
 into `main`, the profile goes back to plain versions ([releasing.md](releasing.md)).
 CI checks that every chart and image a profile names exists where it says.
+
+### 4.7 Which way in, which way out
+
+Declare the narrowest way that serves the need.
+
+| The app needs | Declare | Answered by |
+|---|---|---|
+| people to use it in a browser | `expose`: `surface: gateway`, `authMode: oidc` (§7.1) | nobody: it sits behind the session |
+| its own token in the `Authorization` header behind sign-in | a gateway entry with `clientAuthorization: app` | the perimeter approver |
+| anyone on the internet to reach some paths | `surface: perimeter`, `authMode: none` | the perimeter approver, per install |
+| outside programs to call it with a credential the app issued | `surface: perimeter`, `authMode: app` | the perimeter approver, per install |
+| only the cluster's own pods to call it, with such a credential | `surface: inside`, `authMode: app`, `subDomain` | the perimeter approver, per install; each caller needs an egress grant for the host |
+| to call outside hosts known in advance | `egress[].hosts` (§4.5) | the perimeter approver, or a trusted domain |
+| to call hosts the installation chooses | `egress[].hostsAtApproval: true` | the perimeter approver, who names them |
+| destinations chosen at run time, or a protocol with no host name | `egress[].rule` | the perimeter approver, who reads addresses |
+
+The full table for catalog authors is in gentian-os
+[custom-catalogs.md](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/custom-catalogs.md).
 
 ## 5. Sign-in
 
@@ -372,6 +444,7 @@ expose:
     surface: gateway
     authMode: oidc
     denyPaths: [/api/auth/login, /api/auth/setup]   # the app's own ways in, refused at the front door
+    backend: {service: "example-ce", port: 3000}
 ```
 
 The handler, one JavaScript file in the bundle as the ConfigMap
@@ -534,6 +607,8 @@ every tenant: User (`user`, the desktop and no app), All apps (`all-apps`,
 
 ## 7. Exposure and the desktop
 
+Which surface fits which need is the table in §4.7.
+
 ### 7.1 Entries
 
 ```yaml
@@ -547,9 +622,8 @@ expose:
 ```
 
 - **One entry per host and purpose**, `surface: gateway` with `authMode: oidc`
-  for anything a person uses. The schema also admits a gateway entry that
-  pins its caller (`source`) instead; the operator routes gateway entries
-  with `oidc` only.
+  for anything a person uses. The other gateway mode, `bearer`, is a token
+  entry for a profile of `platform` trust.
 - **The backend is this app's own Service** on the port the chart serves; an
   addon's entry names its base with `backend.component` (§11.1).
 - **Some names are the platform's** in every tenant: `desktop`, `admin`,
@@ -558,9 +632,30 @@ expose:
 - **A second entry on the same host** serves a companion under its own paths:
   Nextcloud's Collabora entry shares `subDomain: nextcloud`, lists its `paths`
   and puts the editor's administration under `denyPaths`. Deny wins over allow.
-- **Anything for the internet is a `perimeter` entry**, `authMode: none` or
-  `app`, and publishes nothing until the tenant's perimeter approver approves
-  it. It is a request, not a setting.
+- **Anything for the internet without a session is a `perimeter` entry.**
+  `authMode: none` is for anyone (approval kind `public`); `authMode: app`
+  passes the caller's `Authorization` header to the app, which checks it
+  (kind `publicAppCredential`, or `publicAppSignIn` with `signInCookies`).
+  It publishes nothing until the tenant's perimeter approver enables it for
+  the install, with a review date and, where it is temporary, an expiry. It
+  is a request, not a setting.
+- **What only the cluster's own pods call is an `inside` entry**:
+  `surface: inside`, `authMode: app`, a `subDomain` of its own, no `apex`.
+  The internet has no route and no public DNS record for it; it is reachable
+  only by the cluster's pods that hold an egress grant for its host. The
+  perimeter approver enables it like a perimeter entry (kind
+  `insideAppCredential`). Prefer it to a perimeter entry whenever nobody
+  outside the cluster calls.
+
+  ```yaml
+  expose:
+    - name: sync-api
+      surface: inside
+      authMode: app
+      subDomain: "example-sync"          # example-sync.${TENANT_DOMAIN}, inside only
+      paths: [/api]
+      backend: {service: "example-ce", port: 8000}
+  ```
 - **Only two annotations exist on an entry**:
   `gentianos.io/gateway-frame-ancestors` and
   `gentianos.io/gateway-escaped-slashes-action` (the latter for WOPI and
@@ -827,7 +922,8 @@ Before opening a pull request:
 - [ ] Only the five placeholders appear; no cluster address, namespace or realm
       is written by hand; in-cluster calls use Service names
 - [ ] Telemetry, update checks and other outbound calls are off; what the app
-      needs from outside is an egress privilege with a reason
+      needs from outside is an egress request with a reason, by `hosts`
+      unless the names are unknown (§4.5)
 - [ ] `identity` is one of `oidc`, `saml`, `sidecar`; an OIDC client has
       `redirectUris` and `postLogoutRedirectUris` on `${TENANT_DOMAIN}` and
       `backchannelLogout` as a path, or a comment saying why not
@@ -839,7 +935,8 @@ Before opening a pull request:
 - [ ] A sync Job converges and excludes its own technical account
 - [ ] Rights were tested with a position given and taken (§6.5); no
       `defaultGrant`, `addonGrants` or `groups: mirror` is written
-- [ ] Every entry is `gateway` + `oidc` unless it is for the internet; no CSP
+- [ ] Every entry is `gateway` + `oidc` unless it is for the internet
+      (`perimeter`) or for the cluster's pods alone (`inside`); no CSP
       or frame header anywhere; the tile is the product's name and a 128x128
       PNG kept in sync
 - [ ] Generated secrets have a `valuePath`; keys the app signs with are
