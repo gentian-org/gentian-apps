@@ -32,7 +32,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.2-dev"
+  version: "0.5.3-dev"
   package:
     chart:
       repository: "https://charts.openproject.org/"
@@ -133,6 +133,13 @@ spec:
       replicaCount: 1
       backgroundReplicaCount: 0
 
+      # good_job takes its threads + 3 connections (the chart's
+      # RAILS_MAX_THREADS: a NOTIFY listener, two cron threads), and its pool
+      # is web threads + 1 like every OpenProject process's: 2 + 3 = 5 = 4 + 1.
+      workers:
+        default:
+          maxThreads: 2
+
       resources:
         limits:
           cpu: "750m"
@@ -193,6 +200,13 @@ spec:
         enabled: false
 
       environment:
+      # Every OpenProject process sizes its database pool to the web threads
+      # + 1 (config/initializers/database_pool_size.rb). The default, 16
+      # threads in each of 2 web processes, needs about 75 connections across
+      # the release; the account may hold connectionLimit, on a server every
+      # tenant's apps share. Four threads per process are plenty for one
+      # tenant.
+        OPENPROJECT_WEB_MAX__THREADS: "4"
       # The root file system is read-only; /tmp and /app/tmp are the chart's
       # per-pod volumes (useTmpVolumes). Ruby takes a temporary directory
       # only if it is not world-writable or has the sticky bit, and a storage
@@ -259,6 +273,11 @@ spec:
           appPort: 8080
       database:
         engine: postgresql
+        # The most OpenProject's pools can hold: web 2 processes x 5, the
+        # background worker 5, the seeder 5, the sign-in sidecar 4, and a
+        # second web pod while a rollout runs both. The default, 25, is
+        # less than that.
+        connectionLimit: 40
       storage:
         s3: {}
       cache:
