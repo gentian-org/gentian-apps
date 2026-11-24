@@ -32,7 +32,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.1"
+  version: "0.5.2-dev"
   package:
     chart:
       repository: "https://charts.openproject.org/"
@@ -193,6 +193,17 @@ spec:
         enabled: false
 
       environment:
+      # The root file system is read-only; /tmp and /app/tmp are the chart's
+      # per-pod volumes (useTmpVolumes). Ruby takes a temporary directory
+      # only if it is not world-writable or has the sticky bit, and a storage
+      # class that ignores fsGroup (microk8s-hostpath) makes those volumes
+      # world-writable without it: the seeder then fails with "could not find
+      # a temporary directory" and the web pod waits for it forever. Every
+      # OpenProject process starts from a bash script, and bash expands
+      # BASH_ENV before reading it: the expansion makes a directory only the
+      # app's user can write, and TMPDIR points Ruby there.
+        BASH_ENV: "$(mkdir -p -m 0700 /tmp/openproject)"
+        TMPDIR: "/tmp/openproject"
         OPENPROJECT_LOGIN__REQUIRED: "true"
       # Nobody signs in to OpenProject with a password: its own form answers
       # 404, and with it go registering and resetting a password. People come
