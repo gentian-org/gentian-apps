@@ -311,6 +311,33 @@ spec:
         #   entityId: "https://COMPONENT_ID.${TENANT_DOMAIN}/saml/metadata"
         #   acsUrl: "https://COMPONENT_ID.${TENANT_DOMAIN}/saml/acs"
 
+      # An authorization store of this app's own, for an app that decides
+      # per record (who may see which item). Not needed to tell user from
+      # admin, or to read roles declared in spec.roles: those arrive in the
+      # token's gentian_app_roles (backend/app/core/roles.py). The platform
+      # writes the Secret authorization-<component> (AUTHORIZATION_URL,
+      # AUTHORIZATION_KEY), which this chart reads when extraValues names it
+      # (authorization.secretName: authorization-COMPONENT_ID), and the
+      # backend asks it through backend/app/core/authz.py. With roles:
+      # handOver the platform also writes, per role a person holds here,
+      # user:<realm>/<subject> holder role:<name>, so the model can give
+      # objects to role:<name>#holder (app-profile-guide.md §6.2).
+      # authorization:
+      #   roles: handOver
+      #   model: |
+      #     model
+      #       schema 1.1
+      #     type user
+      #     type role
+      #       relations
+      #         define holder: [user]
+      #     type item
+      #       relations
+      #         define owner: [user]
+      #         define admin: [role#holder]
+      #         define can_delete: owner or admin
+      #   # Each item gets item:<id>#admin@role:admin#holder when it is made.
+
       # A relational database. This is the one contract the component
       # reconciler fulfils today: it provisions the database, writes the
       # credentials Secret beside the component and opens egress to the

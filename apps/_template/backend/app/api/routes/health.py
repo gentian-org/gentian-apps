@@ -20,17 +20,14 @@ def readyz(response: Response) -> dict[str, object]:
     if settings.is_production and not settings.oidc_issuer:
         errors.append("OIDC_ISSUER required in production")
 
-    if settings.openfga_api_url and not settings.openfga_store_id:
-        errors.append("OPENFGA_STORE_ID required when OPENFGA_API_URL is set")
-
     checks["oidc"] = "ok" if settings.oidc_issuer or not settings.is_production else "missing"
     checks["database"] = (
         "configured (stub ping — wire SELECT 1 when using Postgres)"
         if settings.database_url
         else "skipped"
     )
-    checks["openfga"] = (
-        "configured" if settings.openfga_api_url and settings.openfga_store_id else "skipped"
+    checks["authorization"] = (
+        "configured" if settings.authorization_url and settings.authorization_key else "skipped"
     )
 
     if errors:

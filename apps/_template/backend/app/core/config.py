@@ -48,8 +48,16 @@ class Settings(BaseSettings):
     director_url: str | None = Field(default=None, alias="DIRECTOR_URL")
     cluster_id: str | None = Field(default=None, alias="GENTIAN_CLUSTER_ID")
 
-    openfga_api_url: str | None = Field(default=None, alias="OPENFGA_API_URL")
-    openfga_store_id: str | None = Field(default=None, alias="OPENFGA_STORE_ID")
+    # The claim the caller's roles on this app arrive in (spec.roles.claim
+    # in the profile; the platform's default).
+    roles_claim: str = Field(default="gentian_app_roles", alias="ROLES_CLAIM")
+
+    # This app's own authorization store, for per-record checks: the Secret
+    # authorization-<component> the platform writes when the profile
+    # declares requires.services.authorization. Unset means there is no
+    # store, and a per-record check refuses (app.core.authz).
+    authorization_url: str | None = Field(default=None, alias="AUTHORIZATION_URL")
+    authorization_key: str | None = Field(default=None, alias="AUTHORIZATION_KEY")
 
     auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
 

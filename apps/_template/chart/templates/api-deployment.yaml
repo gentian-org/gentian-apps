@@ -100,14 +100,6 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            {{- if .Values.openfga.apiUrl }}
-            - name: OPENFGA_API_URL
-              value: {{ .Values.openfga.apiUrl | quote }}
-            {{- end }}
-            {{- if .Values.openfga.storeId }}
-            - name: OPENFGA_STORE_ID
-              value: {{ .Values.openfga.storeId | quote }}
-            {{- end }}
           {{- /* The Secret the platform writes for this component, when it
                asked for anything that comes with credentials -- a database, a
                bucket, a cache. A component that asked for none has no such
@@ -116,10 +108,16 @@ spec:
                CreateContainerConfigError, which says nothing about why.
                Leaving existingSecret.name empty is how a component says it
                needs nothing from the platform but the caller's token. */}}
-          {{- if .Values.existingSecret.name }}
+          {{- if or .Values.existingSecret.name .Values.authorization.secretName }}
           envFrom:
+            {{- if .Values.existingSecret.name }}
             - secretRef:
                 name: {{ .Values.existingSecret.name }}
+            {{- end }}
+            {{- if .Values.authorization.secretName }}
+            - secretRef:
+                name: {{ .Values.authorization.secretName }}
+            {{- end }}
           {{- end }}
           volumeMounts:
             - name: tmp
