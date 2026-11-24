@@ -12,6 +12,11 @@ const path = require('path');
 const NETWORK = process.env.E2E_NETWORK || 'sso-e2e';
 const KEYCLOAK_IMAGE = process.env.E2E_KEYCLOAK_IMAGE || 'quay.io/keycloak/keycloak:26.8.0';
 const SIDECAR_IMAGE = process.env.E2E_SIDECAR_IMAGE || 'sso-sidecar:e2e';
+// The platform's Keycloak extension, which carries the mapper that asks the
+// rights store for a person's roles on an app (gentian-os,
+// kernel/extensions/keycloak-event-listener).
+const LISTENER_IMAGE = process.env.E2E_LISTENER_IMAGE || 'ghcr.io/gentian-org/keycloak-event-listener:develop';
+const KEY_ID = 'e2e';
 const IDP_HOST = 'id.e2e.test';
 const IDP_BASE = `https://${IDP_HOST}/auth`;
 
@@ -68,8 +73,57 @@ async function waitFor(what, probe, seconds = 180) {
     throw new Error(`${what} did not come up in ${seconds}s${last ? ': ' + last.message : ''}`);
 }
 
+// The extension's jar and the key Keycloak signs its questions with, in a
+// directory of their own, readable by Keycloak's user in the container.
+function listenerFiles() {
+    const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'sso-e2e-kc-'));
+    fs.chmodSync(dir, 0o755);
+    fs.mkdirSync(path.join(dir, 'providers'), { mode: 0o755 });
+    const holder = `${NETWORK}-listener-${process.pid}`;
+    tryDocker('rm', '-f', holder);
+    docker('create', '--name', holder, LISTENER_IMAGE);
+    try {
+        docker('cp', `${holder}:/providers/gentian-keycloak-event-listener.jar`, path.join(dir, 'providers'));
+    } finally {
+        tryDocker('rm', '-f', holder);
+    }
+    fs.chmodSync(path.join(dir, 'providers', 'gentian-keycloak-event-listener.jar'), 0o644);
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
+    fs.writeFileSync(path.join(dir, 'listener.pem'), privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o644 });
+    fs.writeFileSync(path.join(dir, 'listener.pub'), publicKey.export({ type: 'spki', format: 'pem' }), { mode: 0o644 });
+    return dir;
+}
+
+// The stand-in for the rights store (rights.js), in a container on the
+// network, where Keycloak asks it; the run sets who holds what through its
+// port on this host.
+let rightsUpstream;
+
+function holderKey(tenant, app, person) {
+    return `${tenant}/${app}/${person}`;
+}
+
+async function startRights(name, files) {
+    if (!tryDocker('ps', '-q', '-f', `name=^${name}$`)) {
+        tryDocker('rm', '-f', name);
+        docker('run', '-d', '--name', name, '--network', NETWORK, '-p', '127.0.0.1::8080',
+            '-e', `KEY_ID=${KEY_ID}`,
+            '-v', `${path.join(__dirname, 'rights.js')}:/stand-in/rights.js:ro`,
+            '-v', `${path.join(files, 'listener.pub')}:/stand-in/listener.pub:ro`,
+            '--entrypoint', 'node', SIDECAR_IMAGE, '/stand-in/rights.js');
+    }
+    rightsUpstream = `http://127.0.0.1:${publishedPort(name, 8080)}`;
+    await waitFor('the rights stand-in', async () => (await call('DELETE', `${rightsUpstream}/holders/probe`)).status === 204, 30);
+}
+
+async function setHolder(key, member) {
+    const res = await call(member ? 'PUT' : 'DELETE', `${rightsUpstream}/holders/${encodeURIComponent(key)}`);
+    if (res.status !== 204) throw new Error(`the rights stand-in answered ${res.status}`);
+}
+
 // Keycloak as the platform runs it: under /auth, told its public address, so
-// every address it writes is the public one whoever asks.
+// every address it writes is the public one whoever asks, and with the
+// platform's extension, which asks the stand-in above for a person's roles.
 //
 // backchannelDynamic is the platform's own setting for it
 // (--hostname-backchannel-dynamic=true): asked under its name inside the
@@ -78,15 +132,30 @@ async function waitFor(what, probe, seconds = 180) {
 // answers to inside the network.
 async function startKeycloak({ name = `${NETWORK}-kc`, backchannelDynamic = false, aliases = [] } = {}) {
     tryDocker('network', 'create', NETWORK);
-    if (!tryDocker('ps', '-q', '-f', `name=^${name}$`)) {
+    const rightsName = `${name}-rights`;
+    let files = tryDocker('inspect', name, '-f', '{{index .Config.Labels "e2e.listener-files"}}');
+    if (!tryDocker('ps', '-q', '-f', `name=^${name}$`) || !files || !fs.existsSync(files)) {
         tryDocker('rm', '-f', name);
+        files = listenerFiles();
+        tryDocker('rm', '-f', rightsName);
+        const rightsURL = `http://${rightsName}:8080/`;
         docker('run', '-d', '--name', name, '--network', NETWORK, ...aliases.flatMap((alias) => ['--network-alias', alias]),
+            '--label', `e2e.listener-files=${files}`,
+            '-v', `${path.join(files, 'providers')}:/opt/keycloak/providers:ro`,
+            '-v', `${path.join(files, 'listener.pem')}:/etc/gentian/listener/listener.pem:ro`,
+            '-e', `KC_SPI_EVENTS_LISTENER_GENTIAN_DIRECTOR_DIRECTOR_URL=${rightsURL}`,
+            '-e', `KC_SPI_EVENTS_LISTENER_GENTIAN_DIRECTOR_KEY_ID=${KEY_ID}`,
+            '-e', 'KC_SPI_EVENTS_LISTENER_GENTIAN_DIRECTOR_PRIVATE_KEY_FILE=/etc/gentian/listener/listener.pem',
+            '-e', `KC_SPI_PROTOCOL_MAPPER_GENTIAN_APP_ROLES_URL=${rightsURL}`,
+            '-e', `KC_SPI_PROTOCOL_MAPPER_GENTIAN_APP_ROLES_KEY_ID=${KEY_ID}`,
+            '-e', 'KC_SPI_PROTOCOL_MAPPER_GENTIAN_APP_ROLES_PRIVATE_KEY_FILE=/etc/gentian/listener/listener.pem',
             '-p', '127.0.0.1::8080',
             '-e', 'KC_BOOTSTRAP_ADMIN_USERNAME=admin', '-e', 'KC_BOOTSTRAP_ADMIN_PASSWORD=admin-e2e',
             '-e', 'KC_HTTP_RELATIVE_PATH=/auth', '-e', `KC_HOSTNAME=${IDP_BASE}`,
             '-e', `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=${backchannelDynamic}`, '-e', 'KC_HTTP_ENABLED=true', '-e', 'KC_PROXY_HEADERS=xforwarded',
             KEYCLOAK_IMAGE, 'start-dev');
     }
+    await startRights(rightsName, files);
     const upstream = `http://127.0.0.1:${publishedPort(name, 8080)}`;
     const headers = { host: IDP_HOST, 'x-forwarded-proto': 'https' };
     await waitFor('Keycloak', async () => (await call('GET', `${upstream}/auth/realms/master`, { headers })).status === 200);
@@ -159,24 +228,11 @@ function sidecarClient(host, { logoutUrl } = {}) {
     };
 }
 
-// The role the realm lists for a person who administers the app, the
-// attribute it is listed under, and the group whose members hold the
-// platform's App Admin role in a tenant. The names are the platform's
-// (gentian-os: app-default.yaml, internal/keycloak/groups.go) and the
-// sidecar's (lib/signin.js).
+// The name the sidecar knows the app's administrator by, and the attribute
+// the realm lists it under (gentian-os: internal/apprender/identity_signin.go;
+// the sidecar's lib/signin.js).
 const APP_ADMIN_ROLE = 'gentian-app-admin';
 const ROLE_ATTRIBUTE = 'Role';
-function appAdminsGroup(tenant) {
-    return `gentian:tenant:${tenant}:app-admins`;
-}
-
-async function groupId(kc, realm, name) {
-    await kc.admin('POST', `/realms/${realm}/groups`, { name });
-    const found = JSON.parse((await kc.admin('GET', `/realms/${realm}/groups?search=${encodeURIComponent(name)}&exact=true`)).body);
-    const group = found.find((g) => g.name === name);
-    if (!group) throw new Error(`no group ${name} in ${realm}`);
-    return group.id;
-}
 
 async function userId(kc, realm, email) {
     const found = JSON.parse((await kc.admin('GET', `/realms/${realm}/users?email=${encodeURIComponent(email)}&exact=true`)).body);
@@ -185,11 +241,12 @@ async function userId(kc, realm, email) {
 }
 
 // What the platform composes for an app's sign-in sidecar: the client above,
-// one role at it, that role granted to the tenant's app administrators'
-// group, and a mapper that lists a person's roles at this client in the
-// assertion. The scope the realm gives every new SAML client ("role_list")
-// is left as the realm made it, as it is on a cluster.
-async function ensureSidecarClient(kc, realm, host, { tenant = realm, logoutUrl } = {}) {
+// the mapper that asks the rights store for the roles the person holds on
+// the app and lists them as Role in the app's names (gentian-saml-app-roles),
+// and the mapper that names the person by username. The scope the realm
+// gives every new SAML client ("role_list") is left as the realm made it, as
+// it is on a cluster. app is the app's profile name, as the mapper asks it.
+async function ensureSidecarClient(kc, realm, host, { tenant = realm, app = appOf(host), logoutUrl } = {}) {
     const clientId = `https://${host}/sso`;
     const created = await kc.admin('POST', `/realms/${realm}/clients`, sidecarClient(host, { logoutUrl }));
     const clients = JSON.parse((await kc.admin('GET', `/realms/${realm}/clients?clientId=${encodeURIComponent(clientId)}`)).body);
@@ -203,24 +260,37 @@ async function ensureSidecarClient(kc, realm, host, { tenant = realm, logoutUrl 
             attributes: { ...clients[0].attributes, 'saml_single_logout_service_url_post': logoutUrl || '' },
         });
     }
-    await kc.admin('POST', `/realms/${realm}/clients/${id}/roles`, { name: APP_ADMIN_ROLE });
-    const role = JSON.parse((await kc.admin('GET', `/realms/${realm}/clients/${id}/roles/${APP_ADMIN_ROLE}`)).body);
-    const group = await groupId(kc, realm, appAdminsGroup(tenant));
-    await kc.admin('POST', `/realms/${realm}/groups/${group}/role-mappings/clients/${id}`, [{ id: role.id, name: role.name }]);
     await kc.admin('POST', `/realms/${realm}/clients/${id}/protocol-mappers/models`, {
-        name: 'app-admin', protocol: 'saml', protocolMapper: 'saml-role-list-mapper',
-        config: { 'attribute.name': ROLE_ATTRIBUTE, 'attribute.nameformat': 'Basic', single: 'true' },
+        name: 'app-roles', protocol: 'saml', protocolMapper: 'gentian-saml-app-roles',
+        config: {
+            'attribute.name': ROLE_ATTRIBUTE, 'gentian.tenant': tenant, 'gentian.app': app,
+            'gentian.roles': JSON.stringify({ [app]: { admin: [APP_ADMIN_ROLE] } }),
+        },
+    });
+    await kc.admin('POST', `/realms/${realm}/clients/${id}/protocol-mappers/models`, {
+        name: 'name-id', protocol: 'saml', protocolMapper: 'saml-user-attribute-nameid-mapper',
+        config: { 'user.attribute': 'username', 'mapper.nameid.format': 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress' },
     });
     return id;
 }
 
-// setAppAdmin gives a person the platform's App Admin role in a tenant, or
-// takes it away: membership of the tenant's app administrators' group, which
-// is what a tenant's administrator changes in the admin console.
-async function setAppAdmin(kc, realm, email, member, { tenant = realm } = {}) {
-    const group = await groupId(kc, realm, appAdminsGroup(tenant));
-    const user = await userId(kc, realm, email);
-    await kc.admin(member ? 'PUT' : 'DELETE', `/realms/${realm}/users/${user}/groups/${group}`);
+// The app's profile name a sidecar at host stands for, unless a run names one.
+function appOf(host) {
+    return host.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
+
+// setAppAdmin gives a person the app's admin role in a tenant, or takes it
+// away, in the rights store: what a position such as app-administrator,
+// given in the admin console, comes to. app '*' is every app of the tenant.
+// The realm learns it at the person's next sign-in, when the mapper asks.
+async function setAppAdmin(kc, realm, email, member, { tenant = realm, app = '*' } = {}) {
+    await setHolder(holderKey(tenant, app, await userId(kc, realm, email)), member);
+}
+
+// setTenantAdmin gives a person the tenant's own admin role, or takes it:
+// administering the tenant, which is not administering its apps.
+async function setTenantAdmin(kc, realm, email, member, { tenant = realm } = {}) {
+    await setHolder(holderKey(tenant, '', await userId(kc, realm, email)), member);
 }
 
 // The roles the realm listed in an answer it posted, read from the answer
@@ -343,5 +413,5 @@ function logsOf(container) {
 module.exports = {
     NETWORK, IDP_HOST, IDP_BASE, docker, tryDocker, publishedPort, sleep, call, waitFor,
     startKeycloak, ensureRealm, ensureSidecarClient, sidecarClient, startSidecar, sidecarReady, logsOf,
-    logoutUrlOf, signOutAtRealm, removeSidecar, signOutPosts, postSignOut, waitForSignOut, setAppAdmin, groupId, userId, rolesIn, appAdminsGroup, APP_ADMIN_ROLE, ROLE_ATTRIBUTE,
+    logoutUrlOf, signOutAtRealm, removeSidecar, signOutPosts, postSignOut, waitForSignOut, setAppAdmin, setTenantAdmin, appOf, userId, rolesIn, APP_ADMIN_ROLE, ROLE_ATTRIBUTE,
 };

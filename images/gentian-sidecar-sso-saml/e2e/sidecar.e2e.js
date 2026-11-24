@@ -142,7 +142,8 @@ test('the realm posts an answer to the registered address and to no other', asyn
 });
 
 // Who administers the app: the realm says it, in the answer it signs, for a
-// member of the tenant's app administrators' group and for nobody else.
+// person the rights store says holds the app's admin role, and for nobody
+// else. The realm asks the store at each sign-in.
 
 function saysAdmin(browser, host) {
     return Buffer.from(browser.cookie(host, 'e2e_session').value, 'base64url').toString().split('|')[2];
@@ -155,14 +156,14 @@ async function open(place, person, extra) {
     return browser;
 }
 
-test('a person who holds the App Admin role is told to the handler as the app\'s administrator, and nobody else is', async () => {
+test('a person who holds the app\'s admin role is told to the handler as the app\'s administrator, and nobody else is', async () => {
     const place = PLACES[0];
     await setup.setAppAdmin(kc, place.realm, ANNA.email, true);
     try {
         const anna = await open(place, ANNA);
         assert.equal(saysAdmin(anna, place.host), 'true');
-        // The one role of this client, and nothing else the realm knows
-        // about her: no group, no other role.
+        // The one name the sidecar knows, and nothing else the realm knows
+        // about her.
         assert.deepEqual(setup.rolesIn(anna.lastSamlResponse), [`${setup.ROLE_ATTRIBUTE}=${setup.APP_ADMIN_ROLE}`]);
 
         const ben = await open(place, BEN);
@@ -198,13 +199,11 @@ test('withdrawing the role takes effect at the next sign-in', async () => {
 
 test('the tenant\'s administrator is not the app\'s administrator for being that', async () => {
     const place = PLACES[0];
-    const admins = await setup.groupId(kc, place.realm, `gentian:tenant:${place.realm}:admins`);
-    const ben = await setup.userId(kc, place.realm, BEN.email);
-    await kc.admin('PUT', `/realms/${place.realm}/users/${ben}/groups/${admins}`);
+    await setup.setTenantAdmin(kc, place.realm, BEN.email, true);
     try {
         assert.equal(saysAdmin(await open(place, BEN), place.host), 'false');
     } finally {
-        await kc.admin('DELETE', `/realms/${place.realm}/users/${ben}/groups/${admins}`);
+        await setup.setTenantAdmin(kc, place.realm, BEN.email, false);
     }
 });
 
@@ -216,11 +215,15 @@ test('a role of the same name anywhere else in the realm makes no administrator'
     await kc.admin('POST', `/realms/${place.realm}/roles`, { name: setup.APP_ADMIN_ROLE });
     const realmRole = JSON.parse((await kc.admin('GET', `/realms/${place.realm}/roles/${setup.APP_ADMIN_ROLE}`)).body);
     await kc.admin('POST', `/realms/${place.realm}/users/${carl}/role-mappings/realm`, [{ id: realmRole.id, name: realmRole.name }]);
-    // The role of another app's client, held directly: Carl administers that
-    // app and not this one.
+    // A role of that name at another app's client, held directly: the
+    // realm's roles say nothing, the rights store does.
     const clients = JSON.parse((await kc.admin('GET', `/realms/${place.realm}/clients?clientId=${encodeURIComponent(`https://${other.host}/sso`)}`)).body);
-    const otherRole = JSON.parse((await kc.admin('GET', `/realms/${place.realm}/clients/${clients[0].id}/roles/${setup.APP_ADMIN_ROLE}`)).body);
-    await kc.admin('POST', `/realms/${place.realm}/users/${carl}/role-mappings/clients/${clients[0].id}`, [{ id: otherRole.id, name: otherRole.name }]);
+    await kc.admin('POST', `/realms/${place.realm}/clients/${clients[0].id}/roles`, { name: setup.APP_ADMIN_ROLE });
+    const clientRole = JSON.parse((await kc.admin('GET', `/realms/${place.realm}/clients/${clients[0].id}/roles/${setup.APP_ADMIN_ROLE}`)).body);
+    await kc.admin('POST', `/realms/${place.realm}/users/${carl}/role-mappings/clients/${clients[0].id}`, [{ id: clientRole.id, name: clientRole.name }]);
+    // The admin role on another app, in the rights store: Carl administers
+    // that app and not this one.
+    await setup.setAppAdmin(kc, place.realm, CARL.email, true, { app: setup.appOf(other.host) });
     assert.equal(saysAdmin(await open(place, CARL), place.host), 'false');
     assert.equal(saysAdmin(await open(other, CARL), other.host), 'true');
 });
