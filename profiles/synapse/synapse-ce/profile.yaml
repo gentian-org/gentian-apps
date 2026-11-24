@@ -50,7 +50,7 @@ spec:
   classes:
     - app
   trustTier: experimental
-  version: "0.1.2-dev"
+  version: "0.1.3-dev"
   launch: none
   package:
     chart:
@@ -95,6 +95,11 @@ spec:
       redis:
         enabled: true
       synapse:
+        # The media disk is ReadWriteOnce: a rolling update starts the new
+        # pod beside the old one, and on another node it waits for the disk
+        # for ever. The old pod stops first instead.
+        strategy:
+          type: Recreate
         podSecurityContext:
           fsGroup: 666
           runAsGroup: 666
