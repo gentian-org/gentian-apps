@@ -103,9 +103,10 @@ First-party apps share the FastAPI + React + Helm stack scaffolded by `apps/_tem
 
 ### Edge routing
 
-Production uses **Gateway API** (`chart/templates/httproute.yaml`), not nginx Ingress. Envoy
-Gateway routes `/api`, `/healthz`, `/readyz` to the API Service and `/` to the static web
-Service.
+Under a ComponentProfile the operator writes the routes from the profile's `spec.expose`: `/api`,
+`/healthz`, `/readyz` to the API Service and `/` to the static web Service. The chart's own
+`chart/templates/httproute.yaml` stays off (`gateway.enabled: false`); it is for a cluster nothing
+reconciles.
 
 ### Auth model
 
@@ -145,6 +146,18 @@ is annotated `gentianos.io/store-listed: "false"`, which the catalog index carri
 description, categories, links, author, logo — is the App Store's, which runs outside the
 cluster and keeps it in its own database. See
 [docs/app-profile-guide.md](docs/app-profile-guide.md) for the full workflow.
+
+**Ways in and out — declare the narrowest:**
+
+* Ways in ([app-profile-guide §7.1](docs/app-profile-guide.md#71-entries)): `gateway` + `oidc`
+  for people; `inside` + `app` (with a `subDomain`) when only the cluster's own pods call it;
+  `perimeter` only when callers outside the cluster need it.
+* Ways out ([§4.5](docs/app-profile-guide.md#45-switch-off-what-calls-the-internet)): switch off
+  telemetry and update checks first. Then `hosts` before `hostsAtApproval` before `rule`; a
+  `rule` only for destinations chosen at run time or a protocol that names no host. Exactly one
+  form per request, all known hosts in one request.
+* Every request carries a `reason` an approver can judge. The need-to-declaration table is
+  [§4.7](docs/app-profile-guide.md#47-which-way-in-which-way-out).
 
 **Layout rules — CI enforces both:**
 
