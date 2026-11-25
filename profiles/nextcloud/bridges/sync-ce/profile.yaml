@@ -33,7 +33,7 @@ spec:
     - bridge
   launch: none
   trustTier: certified
-  version: "0.3.0-dev"
+  version: "0.3.0"
   requires:
     # The oldest platform version line this build runs on (docs/profile-bundles.md).
     platform: ">=0.5"

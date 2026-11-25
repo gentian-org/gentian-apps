@@ -50,7 +50,7 @@ spec:
   classes:
     - app
   trustTier: experimental
-  version: "0.1.3-dev"
+  version: "0.1.3"
   launch: none
   package:
     chart:

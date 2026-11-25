@@ -63,13 +63,13 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.1.1-dev"
+  version: "0.1.1"
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: vikunja
       # On develop a -develop.<sha7> build of the chart (docs/releasing.md).
-      version: "0.1.0-develop.3d4f86f"
+      version: "0.1.0"
 
     valueMapping:
       oidc:

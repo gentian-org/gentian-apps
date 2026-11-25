@@ -61,13 +61,13 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.2.2-dev.1"
+  version: "0.2.2"
   launch: tile
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: wordcraft
-      version: "0.2.2-develop.d00c404"
+      version: "0.2.2"
     extraValues:
       fullnameOverride: "wordcraft-ce"
       ingress:

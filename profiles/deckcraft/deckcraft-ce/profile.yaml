@@ -61,13 +61,13 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.1.0-dev.1"
+  version: "0.1.0"
   launch: tile
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: deckcraft
-      version: "0.1.0-develop.d00c404"
+      version: "0.1.0"
     extraValues:
       fullnameOverride: "deckcraft-ce"
       ingress:

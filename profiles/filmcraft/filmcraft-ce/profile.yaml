@@ -62,13 +62,13 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.1.0-dev"
+  version: "0.1.0"
   launch: tile
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: filmcraft
-      version: "0.1.0-develop.33247fb"
+      version: "0.1.0"
     extraValues:
       fullnameOverride: "filmcraft-ce"
       ingress:
