@@ -25,9 +25,13 @@
 # The mail server has to let this app's address in (CORS), set by its
 # administrator.
 #
-# Where the cluster has no mail server outside it, the IMAP record names
-# none and the app starts as upstream ships it: an empty mailbox in the
-# browser, nothing sent anywhere.
+# Only for a cluster whose mail is on a JMAP server outside it. Where the
+# cluster runs its own mail (mail.serviceMode internal), the IMAP record
+# names the cluster's Dovecot, which speaks no JMAP: the app finds no session
+# there and cannot connect, so install it only where mail is external. Where
+# the cluster only relays, the IMAP record names no server and the app starts
+# as upstream ships it: an empty mailbox in the browser, nothing sent
+# anywhere.
 #
 # ── Outside calls ──
 # The page calls the mail server from the browser. The pod calls nobody and
@@ -57,7 +61,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.1.0-dev"
+  version: "0.1.1-dev"
   launch: tile
   package:
     chart:
