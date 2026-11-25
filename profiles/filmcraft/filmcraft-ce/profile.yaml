@@ -68,7 +68,7 @@ spec:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: filmcraft
-      version: "0.1.0elop.33247fb"
+      version: "0.1.0"
     extraValues:
       fullnameOverride: "filmcraft-ce"
       ingress:

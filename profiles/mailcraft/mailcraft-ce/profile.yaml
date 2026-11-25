@@ -67,7 +67,7 @@ spec:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: mailcraft
-      version: "0.1.0elop.af7c021"
+      version: "0.1.0"
     extraValues:
       fullnameOverride: "mailcraft-ce"
       ingress:
