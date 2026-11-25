@@ -20,10 +20,23 @@ metadata:
     gentianos.io/deployment-role: base
     gentianos.io/portal-auth-mode: oidc
 spec:
+  # What the roles of Odoo itself are called inside it, as group XML ids. A
+  # person with any role on Odoo is an internal user; its administrator holds
+  # Settings and Access Rights. Each add-on names the groups of its own roles.
+  # The platform writes the groups of the roles a person holds into the
+  # sign-in token (gentian_app_roles), and the gentian_os module sets them.
+  roles:
+    user:
+      inApp:
+        - base.group_user
+    admin:
+      inApp:
+        - base.group_system
+        - base.group_erp_manager
   classes:
     - app
   trustTier: certified
-  version: "0.5.2"
+  version: "0.5.9"
   package:
     chart:
       repository: oci://ghcr.io/gentian-org/charts
@@ -138,34 +151,71 @@ spec:
         smtp: {}
     privileges:
       egress:
-        - name: egress-1
-          rule:
-            to:
-              - ipBlock:
-                  cidr: 192.168.0.100/32
-            ports:
-              - protocol: TCP
-                port: 9418
-          reason: 'REVIEW: say what this component reaches and why'
-        - name: egress-2
-          rule:
-            ports:
-              - protocol: TCP
-                port: 443
+        - name: module-source
+          hosts: [github.com]
+          reason: "Fetches the tenant's Odoo modules from their Git repository on GitHub."
 
   # No sidecars. git-modules used to be declared here as a standalone
   # Deployment with its own ReadWriteMany PVC; it is now two containers inside
   # Odoo's own pod, configured by extraValues.gentian.git above.
-          reason: 'REVIEW: say what this component reaches and why'
   provides:
     - name: erp-core
       protocol: http-json
 
 
+  # Odoo keeps meetings and contacts in its own tables, which its pages read.
+  # The tenant's home sync keeps them equal to the tenant's home, per person
+  # who signs in here (gentian-os#1156); Odoo runs no sync code of its own.
+  # Its API takes the person's token of the realm (gentian_os realm_token).
+  # A recurring meeting is one series in Odoo and one entry at the home: the
+  # driver keeps the series' base event and writes a change to the whole
+  # series. Single occurrences moved or cancelled are not kept equal.
+  homeSync:
+    endpoint: {service: odoo, port: 8069}
+    calendar:
+      driver: odoo
+      model: calendar.event
+      fields:
+        summary: name
+        description: description
+        location: location
+        start: start
+        end: stop
+        allDay: allday
+        startDate: start_date
+        endDate: stop_date
+        rrule: rrule
+      # The person's meetings: those they attend.
+      filter: [[partner_ids, in, ["$partner"]]]
+      defaults:
+        user_id: "$user"
+        partner_ids: [[4, "$partner"]]
+    contacts:
+      driver: odoo
+      model: res.partner
+      fields:
+        name: name
+        email: email
+        # Odoo 19 keeps one number on a contact; it has no mobile.
+        phone: phone
+        organization: company_name
+        title: function
+        street: street
+        city: city
+        zip: zip
+        website: website
+      # A person's own contacts: those they are the salesperson of.
+      filter: [[user_id, "=", "$user"], [is_company, "=", false]]
+      defaults:
+        user_id: "$user"
+
   integrations:
     - contract: file-store
-      provider: nextcloud
-      capabilities: [webdav:read, webdav:write]
+      # "Attach from files" (odoo-modules gentian_files): the person picks a
+      # file in the platform's file dialog, and the record keeps a link to
+      # it. No provider and no capabilities: the tenant's file home answers,
+      # and Odoo is given no access to anybody's files.
+      dialog: [pick]
     - contract: central-navigation
       provider: portal
       capabilities: [navigation:register]

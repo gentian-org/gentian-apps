@@ -73,12 +73,12 @@
         "cluster": { "type": "string" }
       }
     },
-    "openfga": {
+    "authorization": {
       "type": "object",
       "additionalProperties": false,
+      "description": "This app's own authorization store: the Secret authorization-<component> the platform writes for requires.services.authorization.",
       "properties": {
-        "apiUrl": { "type": "string" },
-        "storeId": { "type": "string" }
+        "secretName": { "type": "string" }
       }
     },
     "dropIns": {

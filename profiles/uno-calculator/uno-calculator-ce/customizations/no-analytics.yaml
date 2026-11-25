@@ -1,0 +1,81 @@
+# Customization record — see gentian-os/docs/guides/app-customization.md §5
+#
+# Covers the patch our image carries (images/uno-calculator/patches/).
+apiVersion: gentianos.io/v1alpha1
+kind: Customization
+metadata:
+  name: uno-calculator-ce.no-analytics
+  labels:
+    gentianos.io/profile-name: uno-calculator-ce
+spec:
+  summary: "Never load Google Analytics: a tenant's calculator reports nothing to a third party"
+
+  target:
+    family: uno-calculator
+    profile: uno-calculator-ce
+    appVersion: "1.2.4-c32d9b2"
+    chartVersion: "0.1.0"
+
+  rung: L5
+  scope: profile
+
+  rungJustification:
+    L0: >-
+      No setting turns it off: AnalyticsService.Wasm.cs calls gtag on start
+      and on every view, unconditionally.
+    L1: >-
+      Nothing to drop in: the call is compiled into the WebAssembly build.
+    L2: >-
+      A companion cannot change what the app's own code does in the browser.
+    L3: >-
+      The calculator has no plugin surface.
+    L4: >-
+      The chart decides what runs, not what the compiled app does. Blocking
+      googletagmanager.com at the gateway would still leave the call in the
+      code and an error in every browser console.
+
+  upstreamFirst:
+    attempted: true
+    forwarded: "no"
+    reason: >-
+      Upstream has no switch for it, and analytics is its own choice for its
+      public demo site rather than a fault. A build option that leaves the
+      calls out would be the upstream fix; not asked for yet.
+
+  artifacts:
+    - repo: gentian-org/gentian-apps
+      path: images/uno-calculator/patches/0001-no-analytics.patch
+      version: "1.2.4-c32d9b2"
+    - repo: gentian-org/gentian-apps
+      path: images/uno-calculator
+      version: "1.2.4-c32d9b2"
+
+  origin:
+    authorship: gentian
+    repoOwnership: gentian
+    reviewedBy: platform-team
+    supportContract: none
+
+  owner: platform-team
+  created: 2026-11-16
+  reviewBy: 2027-05-16
+  exitCriteria: >-
+    Gone when upstream builds without analytics by a setting; the patch is
+    then replaced by that setting in images/uno-calculator/Dockerfile. Until
+    then, on every bump of CALCULATOR_COMMIT the build fails if the patch no
+    longer applies.
+  upgradeRisk: low
+  testedAgainst: ["1.2.4-c32d9b2"]
+
+  security:
+    macWaivers: []
+    newEgress: []
+    handlesPersonalData: false
+
+  licensing:
+    effect: none
+    notes: >-
+      MIT code rebuilt from source with two calls removed; no branding,
+      license check or paid feature is touched. Trust tier: the guide reserves
+      L5 for trustTier platform; like open-webui-ce this stays certified as an
+      accepted exception until gentian-os#1064 settles the rung obligations.

@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "super-productivity.fullname" . }}
+  labels:
+    {{- include "super-productivity.labels" . | nindent 4 }}
+spec:
+  # The pod holds nothing: any number of replicas will do.
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "super-productivity.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "super-productivity.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+        - name: web
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - {name: CRAFT_LISTEN, value: ":{{ .Values.port }}"}
+            - {name: CRAFT_HOME_URL, value: {{ .Values.home.url | quote }}}
+            - {name: CRAFT_HOME_SCOPE, value: {{ .Values.home.scope | quote }}}
+            - {name: CRAFT_CALENDAR_URL, value: {{ .Values.calendars.url | quote }}}
+            - {name: CRAFT_CALENDAR_SCOPE, value: {{ .Values.calendars.scope | quote }}}
+            - {name: CRAFT_VOUCHING_DIR, value: /var/run/gentian/vouching}
+          ports:
+            - name: http
+              containerPort: {{ .Values.port }}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            # Read when a person's token is asked for, never kept.
+            - {name: vouching, mountPath: /var/run/gentian/vouching, readOnly: true}
+      volumes:
+        - name: vouching
+          secret:
+            secretName: {{ .Values.home.vouchingSecret }}
+            optional: true

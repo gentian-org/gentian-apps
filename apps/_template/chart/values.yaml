@@ -108,9 +108,12 @@ director:
   url: ""
   cluster: ""
 
-openfga:
-  apiUrl: ""
-  storeId: ""
+# This app's own authorization store, for per-record checks: the Secret
+# authorization-<component> (AUTHORIZATION_URL, AUTHORIZATION_KEY) the
+# platform writes when the profile declares requires.services.authorization.
+# Empty for an app with no store of its own.
+authorization:
+  secretName: ""
 
 # Enable when the app calls the Kubernetes or Gentian APIs (e.g. App Store)
 rbac:

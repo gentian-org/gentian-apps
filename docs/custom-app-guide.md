@@ -83,7 +83,13 @@ add the sibling `kustomization.yaml` and `assets/tile.png`, and set what
 - `requires.services` (typically `database` and, for an app that runs its own login, `identity.oidc`; this
   template runs behind the edge and needs no client of its own) (§3.2, §5)
 - `package.valueMapping` keys aligned with the chart's values (§4.2)
-- one `expose` entry with `subDomain`, the chart's Service as `backend`, and a `tile` (§7)
+- the `expose` entries, `gateway` + `oidc` with `subDomain`, the chart's Services as `backend`, and
+  a `tile` (§7); another surface only for another need (§4.7)
+- `requires.privileges.egress` only for what the app calls outside, by `hosts` where the names
+  are known (§4.5)
+- the app's roles and how it learns who holds them (§6): every app has `user` and `admin`;
+  further roles go in `spec.roles.declared`. Behind the edge, `exchangeToken: true` on the
+  entry hands the app a token whose `gentian_app_roles` claim lists the person's roles
 - `customization` (§12)
 
 Validation is what CI runs; locally, `python3 scripts/build-catalogue-source.py --check`
@@ -105,8 +111,12 @@ On merge to `main` (from `develop` the same artifacts go out under develop names
 **CLI (fallback):**
 
 ```bash
-kubectl gentian apps install my-app --tenant gtn-demo
+kubectl gentian apps install my-app --tenant gtn-demo --positions sales
 ```
+
+An installed app reaches the holders of the positions All apps and App administrator and
+of the positions named here, and nobody else; test it with a position given to a test
+person (app-profile-guide.md §6.5).
 
 **App Store:** the tile on an administrator's desktop. It opens the store, which runs outside the cluster.
 

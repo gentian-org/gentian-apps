@@ -2,7 +2,7 @@
 
 This template implements the **application-layer** slice of
 [gentian-os/docs/security/design.md](https://github.com/gentian-org/gentian-os/blob/main/docs/security/design.md).
-Platform MAC (namespaces, default-deny egress, mesh) is enforced by Gentian OS;
+Platform MAC (namespaces, default-deny egress, the edge) is enforced by Gentian OS;
 apps must not weaken it.
 
 ---
@@ -53,7 +53,7 @@ Public unauthenticated endpoints are limited to **`/healthz`** and **`/readyz`**
 
 | # | Requirement | How |
 |---|-------------|-----|
-| M16 | **Gateway API HTTPRoute only** | `chart/templates/httproute.yaml`; no nginx Ingress, no in-pod reverse proxy |
+| M16 | **Routes from the profile's `spec.expose` only** | The operator writes them; `chart/templates/httproute.yaml` stays off under a profile; no nginx Ingress, no in-pod reverse proxy |
 | M17 | **Split API and static web at the gateway** | `/api`, `/healthz`, `/readyz` → API Service; `/` → web Service |
 
 ### Catalog declaration (catalog apps only)
@@ -98,10 +98,10 @@ Enable these when the condition is true — not optional laziness.
 | Condition | Requirement |
 |-----------|-------------|
 | App calls **Kubernetes or Gentian APIs** | M21: Dedicated **ServiceAccount** + **Role/RoleBinding** (or ClusterRole if cross-namespace) with **minimum verbs/resources**; `rbac.create: true` |
-| App exposes **admin or destructive operations** | M22: **OpenFGA / AuthZEN `Check`** before the handler runs (via `require_permission()` once PDP is wired) |
+| App exposes **admin or destructive operations** | M22: require the app's `admin` role (or a declared role) before the handler runs, with `require_role()`; a decision per record asks the app's own store with `check_permission()` |
 | App runs **AI agents or workflows** | M23: **Dedicated Keycloak client per agent instance** — never reuse human credentials or a shared service account |
 | App agents act **on behalf of a user** | M24: **RFC 8693 token exchange** with `act` / `may_act`; rights derived through user ceiling (§2.3) |
-| App calls **external URLs** | M25: Declare endpoints; rely on platform egress allowlist — do not disable NetworkPolicy |
+| App calls **external URLs** | M25: Declare each in `requires.privileges.egress` with a reason: `hosts` when the names are known, `hostsAtApproval` when the installation chooses them, a `rule` only for destinations chosen at run time ([app-profile-guide.md §4.5](../../../docs/app-profile-guide.md#45-switch-off-what-calls-the-internet)); do not disable NetworkPolicy |
 | App stores **tenant/user data** | M26: **Row-level tenant isolation** in queries; no cross-tenant reads even if ReBAC is not wired yet |
 | **Production** deploy | M27: **CPU/memory requests and limits** on api and web containers |
 
@@ -110,12 +110,13 @@ Enable these when the condition is true — not optional laziness.
 ## Authorization with the platform's store
 
 An app that declares `requires.services.authorization` is given an OpenFGA store of its
-own with its own model, reached through the arbiter (gentian-os app-catalog.md §14.2).
-For such an app:
+own with its own model, reached through the arbiter with the Secret
+`authorization-<component>` (`AUTHORIZATION_URL`, `AUTHORIZATION_KEY`); never OpenFGA
+itself. People are `user:<realm>/<subject>`. For such an app:
 
 | # | Requirement |
 |---|-------------|
-| S1 | Call OpenFGA **Check** (AuthZEN API) on every mutation and sensitive read |
+| S1 | Ask the store (`POST $AUTHORIZATION_URL/v1/check`) on every mutation and sensitive read; refuse when it cannot be asked |
 | S2 | Effective access = `ComponentProfile contract declaration ∩ tenant grant (AppGrant) ∩ user ceiling ∩ ABAC` |
 | S3 | Agent routes validate **delegation tuple + task TTL** before acting |
 
@@ -131,7 +132,8 @@ An app without a store of its own relies on M1–M4 and M26.
 | Log redaction (M7) | `backend/app/core/logging_middleware.py` |
 | Health probes (M8) | `backend/app/api/routes/health.py` |
 | CORS (M9) | `backend/app/core/config.py`, `chart/values.yaml` |
-| OpenFGA PEP stub (M22, S1) | `backend/app/core/authz.py`, `backend/app/core/openfga_client.py` |
+| Roles from the token (M22) | `backend/app/core/roles.py` |
+| Per-record checks through the arbiter (S1) | `backend/app/core/authz.py` |
 | Tenant DB scoping (M26) | `backend/app/db/session.py` |
 | Resource limits (M27) | `chart/values.yaml`, `chart/values-production.yaml.example` |
 | Frontend OIDC + bearer (M1) | `frontend/src/auth/`, `frontend/src/api/client.ts` |
@@ -147,7 +149,7 @@ in the chart unless platform docs explicitly require an app-specific supplement.
 | Control | Owner |
 |---------|--------|
 | Per-tenant namespace isolation | Gentian OS / Crossplane |
-| Default-deny egress NetworkPolicy (Cilium) | Gentian OS |
+| Default-deny egress NetworkPolicy, the outgoing gateway for granted hosts | Gentian OS |
 | Tenant Gateway + wildcard TLS (cert-manager) | Gentian OS operator |
 | `frame-ancestors` / CSP for portal iframe embedding | Gentian OS gateway policy |
 | Admission control (no privileged pods, image policy) | Kyverno / Gatekeeper |

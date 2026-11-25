@@ -32,17 +32,20 @@ metadata:
     gentianos.io/profile-name: flowable-ce
     gentianos.io/profile-family: flowable
     gentianos.io/profile-edition: ce
+  annotations:
+    # Not offered: it comes with the app that uses its contract.
+    gentianos.io/store-listed: "false"
 spec:
   classes:
     - app
   trustTier: certified
-  version: "0.1.0"
+  version: "0.1.1"
   launch: none
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: flowable
-      version: "0.1.0"
+      version: "0.1.1"
 
     valueMapping:
       database:

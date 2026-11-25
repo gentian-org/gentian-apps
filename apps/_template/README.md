@@ -38,6 +38,19 @@ ecosystem. See [docs/FRONTEND-STACK.md](docs/FRONTEND-STACK.md).
 See [docs/SECURITY.md](docs/SECURITY.md) for OIDC, ReBAC hooks, pod hardening, and
 what the platform enforces vs what app authors must implement.
 
+**Rights.** The front door lets in only people who hold a role on the app, so a route
+behind `get_current_user` is already limited to them. The api entry asks for
+`exchangeToken`, and the token it gets carries the person's roles on the app in
+`gentian_app_roles`, in the platform's names (`user`, `admin`, the roles the profile
+declares). `require_role()` (`backend/app/core/roles.py`) admits a holder of a role
+and refuses everyone else; the example `DELETE /items/{id}` requires `admin`. An app
+that decides per record declares an authorization store and asks it with
+`check_permission()` (`backend/app/core/authz.py`), through the arbiter, as
+`user:<realm>/<subject>`; that check refuses when no store is configured or the
+arbiter cannot be asked. Declaring roles, positions, and the other ways an app can
+learn them:
+[app-profile-guide.md §6](https://github.com/gentian-org/gentian-apps/blob/develop/docs/app-profile-guide.md).
+
 ## The profile
 
 `profile/componentprofile.yaml.tmpl` is the skeleton of the `ComponentProfile`, the one
@@ -60,7 +73,7 @@ for how a profile is written.
 1. Copy this repo to `gentian-apps/apps/<name>/`.
 2. Rename chart, images, and `profile/componentprofile.yaml.tmpl`.
 3. Add `gentian-apps/profiles/<name>/profile.yaml`.
-4. See [custom-app-guide.md](https://github.com/gentian-org/gentian-apps/blob/main/custom-app-guide.md).
+4. See [custom-app-guide.md](https://github.com/gentian-org/gentian-apps/blob/develop/docs/custom-app-guide.md).
 
 ## Components the platform ships itself
 

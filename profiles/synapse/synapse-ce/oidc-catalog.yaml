@@ -1,10 +1,10 @@
-# OIDC packs for Element / Synapse.
+# OIDC packs for Synapse, the homeserver Element signs in through.
 apiVersion: gentianos.io/v1alpha1
 kind: OIDCPackCatalog
 metadata:
-  name: element-ce-oidc
+  name: synapse-ce-oidc
   labels:
-    gentianos.io/profile-name: element-ce
+    gentianos.io/profile-name: synapse-ce
 spec:
   mapperTemplates:
     email:

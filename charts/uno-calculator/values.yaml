@@ -1,0 +1,43 @@
+nameOverride: uno-calculator
+fullnameOverride: uno-calculator-ce
+
+replicaCount: 1
+
+image:
+  # Built by this repository from upstream source (images/uno-calculator):
+  # upstream publishes no image. A develop build of this chart names the
+  # same commit's develop-<sha7> image instead (pin-image-tag in CI).
+  repository: ghcr.io/gentian-org/uno-calculator
+  tag: "1.2.4-c32d9b2"
+  pullPolicy: IfNotPresent
+
+port: 8080
+
+# nginx serving static files; the calculation runs in the browser.
+resources:
+  requests:
+    cpu: "5m"
+    memory: "16Mi"
+  limits:
+    cpu: "100m"
+    memory: "64Mi"
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 101
+  runAsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+podLabels: {}
+podAnnotations: {}
+
+# The operator routes from the profile's spec.expose; the chart has no Ingress.
+ingress:
+  enabled: false

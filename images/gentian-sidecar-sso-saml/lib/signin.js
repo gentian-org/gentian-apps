@@ -38,11 +38,11 @@ const NAMEID_EMAIL = 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress';
 const METHOD_BEARER = 'urn:oasis:names:tc:SAML:2.0:cm:bearer';
 
 // How the realm says that a person administers this app: the platform gives
-// the sidecar's client at the realm one role, grants it to the people who hold
-// the platform's App Admin role, and has the realm list a person's roles at
-// this client in the assertion (gentian-os,
-// crossplane/compositions/app-default.yaml). A client the platform composed
-// has that one role in scope and no other.
+// the sidecar's client at the realm a mapper that asks the rights store,
+// at each sign-in, which roles the person holds on the app, and lists them
+// in the assertion as Role, in the app's names; a person who holds the app's
+// admin role is listed as gentian-app-admin unless the profile names it
+// otherwise (gentian-os, internal/apprender/identity_signin.go).
 const ROLE_ATTRIBUTE = 'Role';
 const APP_ADMIN_ROLE = 'gentian-app-admin';
 

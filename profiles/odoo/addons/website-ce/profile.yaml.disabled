@@ -12,7 +12,6 @@ metadata:
     # group_website_designer is "Editor and Designer". The designer group
     # declares implied_ids onto the restricted editor, so the admin tier already
     # subsumes the member tier and each is declared where it belongs.
-    gentianos.io/keycloak-group-attributes: '{"gentianOdooAdminRoles":["website.group_website_designer"],"gentianOdooGroupRoles":["website.group_website_restricted_editor"],"gentianOdooModules":["website"]}'
     gentianos.io/portal-auth-mode: oidc
 spec:
   displayName: "Odoo Website"

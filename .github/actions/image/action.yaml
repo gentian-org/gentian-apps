@@ -10,6 +10,13 @@ inputs:
   refs:
     description: Full image references, one per line.
     required: true
+  contexts:
+    description: >
+      Further build contexts, one name=directory per line, which the
+      Dockerfile reads with COPY --from=<name>: a source tree several images
+      share and that lives outside each one's directory.
+    required: false
+    default: ""
   args:
     description: Build arguments, one NAME=value per line.
     required: false
@@ -84,6 +91,7 @@ runs:
         sbom: true
         provenance: mode=max
         context: ${{ inputs.dir }}
+        build-contexts: ${{ inputs.contexts }}
         tags: ${{ steps.refs.outputs.refs }}
         build-args: ${{ inputs.args }}
         platforms: ${{ inputs.platforms }}

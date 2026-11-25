@@ -53,12 +53,12 @@ takes the secret inline; there is no file or ref form for it). The profile's pos
 reads the same Secret, so what it sets in Paperless is what the pod runs with.
 
 **Admin bootstrap is fully automated.** `PAPERLESS_ADMIN_USER` makes the technical superuser
-`gentian-bootstrap-admin` at first start. Human administrators are whoever holds the tenant's
-App Admin role: `spec.hooks.provisioning.syncJob` sets `is_superuser` on their accounts over the
-REST API, as that technical account, and takes it from everyone else. Not Paperless' own
-claim-driven sync (`PAPERLESS_SOCIAL_ACCOUNT_SYNC_SUPERUSER_GROUP`): it reads the `groups`
-claim from the id token or userinfo, and the realm's mapper writes it to the access token only.
-A member who has not signed in yet has no account to promote (allauth makes it at the first
+`gentian-bootstrap-admin` at first start. Human administrators are whoever holds the `admin`
+role on Paperless: `spec.hooks.provisioning.syncJob` sets `is_superuser` on their accounts over
+the REST API, as that technical account, and takes it from everyone else. Not Paperless' own
+claim-driven sync (`PAPERLESS_SOCIAL_ACCOUNT_SYNC_SUPERUSER_GROUP`): the profile gives its roles
+no in-app names (`spec.roles`), so the sign-in token carries no roles claim for it to read.
+A person who has not signed in yet has no account to promote (allauth makes it at the first
 sign-in and would not link one made ahead of it); the Job names them and promotes them on a
 later run.
 
@@ -68,7 +68,7 @@ permissions at all, and every screen then refuses the person. The chart's
 `spec.hooks.postInstall` makes that group with everyday permissions (documents, including
 deleting them, their filing vocabulary, saved views, notes, share links, mail fetching, one's own
 settings and tasks) and adds the accounts made before it. Workflows, users, groups and the app's
-settings stay with the App Admin role. Which documents a member sees is still Paperless' own
+settings stay with the `admin` role. Which documents a member sees is still Paperless' own
 ownership and sharing.
 
 **The MCP companion** authenticates as the ordinary account `mcp-service`, made by

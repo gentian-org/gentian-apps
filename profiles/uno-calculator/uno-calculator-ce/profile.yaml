@@ -1,0 +1,94 @@
+# SPDX-License-Identifier: MIT
+# ComponentProfile — Uno Calculator (standard, scientific, programmer and date
+# calculator, and unit converter, in the browser)
+#
+# Source: Uno Platform's WebAssembly port of the Windows Calculator,
+#   https://github.com/unoplatform/calculator (MIT), the same build that
+#   https://calculator.platform.uno serves. Upstream publishes neither an
+#   image nor a chart, so this repository builds both: images/uno-calculator
+#   compiles the pinned commit into static files served by unprivileged
+#   nginx, and charts/uno-calculator runs that one container. The calculation
+#   happens in the browser; the pod only serves files. The chart names its
+#   image; a develop build of the chart names the same commit's develop image.
+#
+# What differs from upstream (customizations/no-analytics.yaml): Google
+# Analytics is never loaded. Upstream injects gtag.js at start and reports
+# every mode switch to Google.
+#
+# Left as upstream ships it: the currency converter. It is the one mode that
+# reaches outside, and only when a person opens it: their browser, not the
+# pod, fetches the rates from aka.platform.uno (open.er-api.com and
+# uno-assets.platform.uno behind it). Where the browser cannot reach them the
+# converter says the rates are unavailable and every other mode works. The
+# pod makes no outbound call, so the profile asks for no egress.
+#
+# Also left as upstream ships it: Uno's header banner. At every start the
+# browser loads its four images from uno-assets.platform.uno, two of them with
+# the app's name and run mode in the query. No cookie; where the host is
+# unreachable the header shows no images and the app works.
+#
+# ── Sign-in ──
+# None of its own. The app has no accounts, stores nothing on a server and
+# has nothing to administer, so it declares no identity client, no
+# provisioning hook and no App Admin role. The gateway entry below puts it
+# behind the tenant's session: only people the tenant's administrator granted
+# the app (can_launch) reach it.
+#
+# Secret inventory:
+#   Platform-provided: none.
+#   Generated: none.
+#
+# Backup: nothing to back up; the app has no store and no volume.
+apiVersion: gentianos.io/v1alpha1
+kind: ComponentProfile
+metadata:
+  name: uno-calculator-ce
+  labels:
+    gentianos.io/profile-name: uno-calculator-ce
+    gentianos.io/profile-family: uno-calculator
+    gentianos.io/profile-edition: ce
+spec:
+  classes:
+    - app
+  trustTier: certified
+  version: "0.1.0"
+  launch: tile
+  package:
+    chart:
+      repository: "oci://ghcr.io/gentian-org/charts"
+      name: uno-calculator
+      version: "0.1.0"
+    extraValues:
+      fullnameOverride: "uno-calculator-ce"
+      ingress:
+        enabled: false
+      podAnnotations:
+        reloader.stakater.com/auto: "true"
+
+  requires:
+    # The oldest platform version line this build runs on (docs/profile-bundles.md).
+    platform: ">=0.5"
+    # No services: no database, bucket, cache, mail or sign-in client.
+
+  expose:
+    - name: web
+      surface: gateway
+      authMode: oidc
+      subDomain: "calculator"
+      backend:
+        service: "uno-calculator-ce"
+        port: 8080
+      tile:
+        displayName: "Uno Calculator"
+        displayNames: {de_DE: "Uno Calculator"}
+        description: "Standard, scientific and programmer calculator, unit converter"
+        image: assets/tile.png
+        logo: data:image/png;base64,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
+        relation: can_launch
+
+  customization:
+    grade: unknown
+    supportedRungs: [L0, L4]
+    ladderDocs: https://github.com/gentian-org/gentian-apps/blob/main/profiles/uno-calculator/uno-calculator-ce/customization.md
+    repackage:
+      chartOwnership: gentian-owned

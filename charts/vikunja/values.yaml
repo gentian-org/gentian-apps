@@ -1,0 +1,138 @@
+nameOverride: vikunja
+fullnameOverride: vikunja-ce
+
+image:
+  # The official image, unmodified: one Go binary that serves the API and
+  # the web app on one port, FROM scratch, running as uid 1000. Upstream's
+  # own Helm chart (go-vikunja/helm-chart) wraps an old bjw-s library chart
+  # whose values sit under a "vikunja:" key, where the platform's podLabels
+  # would never reach the pod; so this is a first-party chart, the shape of
+  # charts/paperless-ngx and charts/docmost.
+  repository: docker.io/vikunja/vikunja
+  tag: "2.8.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# The public address: service.publicurl. Vikunja builds every link in a mail
+# and the sign-in's return address from it. Required.
+appUrl: ""
+port: 3456
+
+# Signs the tokens Vikunja hands the web app (service.secret). Unset, Vikunja
+# makes a new one at every start and every session dies with the pod.
+secret: ""
+
+# The time zone of the server; each person can set their own.
+timeZone: "Europe/Zurich"
+logLevel: "INFO"
+
+# The platform's PostgreSQL, delivered through the profile's
+# valueMapping.database and written into the config Secret only.
+database:
+  host: ""
+  port: 5432
+  name: ""
+  user: ""
+  password: ""
+  # Vikunja's default; the platform's database is reached inside the cluster.
+  sslMode: "disable"
+
+# Attachments, project backgrounds and uploaded avatars, all in the
+# platform's bucket (files.type s3): the pod holds no data of its own.
+s3:
+  endpoint: ""
+  bucket: ""
+  region: "us-east-1"
+  accessKeyId: ""
+  secretAccessKey: ""
+  forcePathStyle: true
+
+files:
+  maxSize: "20MB"
+
+# Signing in through the tenant's realm: Vikunja's OpenID Connect provider.
+# Vikunja discovers the endpoints from the issuer
+# (<issuer>/.well-known/openid-configuration), server-side. The return
+# address is <appUrl>/auth/openid/<providerId>. Vikunja's own password
+# sign-in and its registration are always off in this chart.
+oidc:
+  enabled: true
+  providerId: "gentian"
+  name: "Gentian"
+  clientId: ""
+  clientSecret: ""
+  issuer: ""
+  scope: "openid email profile"
+
+# Outbound mail: task reminders and the daily overdue mail. Off while no
+# host is given.
+smtp:
+  host: ""
+  port: 587
+  user: ""
+  password: ""
+  fromAddress: ""
+
+features:
+  # CalDAV (/dav) takes HTTP basic auth with a Vikunja token. No CalDAV
+  # program gets through a front door that asks for a browser session, so it
+  # is off until there is a way in for programs.
+  caldav: false
+  # Public links to a project, for people without an account. Behind the
+  # tenant's sign-in a link only works for people who are signed in anyway.
+  linkSharing: true
+
+# What a new account starts with; each person can change it.
+defaultSettings:
+  # Colleagues find each other by name and address when they share a
+  # project. Everybody who can sign in is a member of the same tenant.
+  discoverableByName: true
+  discoverableByEmail: true
+  # Monday.
+  weekStart: 1
+  emailReminders: true
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "96Mi"
+  limits:
+    cpu: "1"
+    memory: "512Mi"
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+  # Vikunja writes nothing but temporary files (/tmp, an emptyDir): the
+  # configuration is mounted, the files are in the bucket, the log is stdout.
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+podLabels: {}
+podAnnotations: {}
+
+# The conventional names the platform writes into: on a cluster without a
+# public certificate, the trust anchor as a volume and SSL_CERT_FILE, which
+# Go reads, so that the server-side discovery trusts the realm.
+extraEnvVars: []
+extraVolumes: []
+extraVolumeMounts: []
+
+# The chart never makes its own Ingress or HTTPRoute: the operator routes
+# from the profile's expose entries.
+ingress:
+  enabled: false

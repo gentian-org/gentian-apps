@@ -1,0 +1,6 @@
+apiVersion: v2
+name: vectorcraft
+description: VectorCraft (vector illustration in the browser) for Gentian OS tenants
+type: application
+version: 0.1.0
+appVersion: "0.24.1"

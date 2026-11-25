@@ -57,7 +57,7 @@ container (`images/gentian-sidecar-sso-saml/e2e/docmost.e2e.js`):
 | The invitation's id and token | read from `workspace_invitations` | no — read from the database instead of through `invites/link` |
 | The password those two calls demand | a random value, then `password` set to NULL | no — the row is written |
 | The session | a row in `user_sessions` and a token `{sub, email, workspaceId, type: access, sessionId}` signed with `APP_SECRET`, issuer `Docmost` | the same row and token `SessionService.createSessionAndToken` makes, made here |
-| Who administers Docmost | `POST /api/workspace/members/change-role` to `admin` or `member`, inside the cluster, with a one-minute token for the workspace's owner, when the account is not what the platform's App Admin role says it should be | yes — the call an owner changes a member's role with |
+| Who administers Docmost | `POST /api/workspace/members/change-role` to `admin` or `member`, inside the cluster, with a one-minute token for the workspace's owner, when the account is not what the app's `admin` role says it should be | yes — the call an owner changes a member's role with |
 | A space of the person's own, at their first sign-in | `POST /api/spaces/create`, then `…/spaces/members/add` with the person as its `admin`, with the same kind of token | yes — an ordinary space. Not Docmost's paid "personal spaces": see below |
 | Membership of the tenant's group, at the first sign-in | `POST /api/groups/members/add`, with the same kind of token | yes |
 | An account switched off in Docmost | refused | — |
@@ -74,13 +74,13 @@ realm tells once: if the sidecar is not running at that moment the session lasts
 
 ### Who administers Docmost
 
-Who holds the platform's **App Admin** role, and nobody else: not the tenant's administrator for
+Who holds the `admin` role on Docmost, and nobody else: not the tenant's administrator for
 being that, not the first person in.
 
-The role is the tenant's group `gentian:tenant:<tenant>:app-admins`. A tenant's administrator
-gives it in the admin console — *Groups*, under *Roles*, the group `app-admins`: add the person;
-or the person's own page, under their groups — and takes it away in the same place. It is one role for
-the tenant: who holds it administers every app of the tenant that is signed in to this way.
+The role is held in the platform's rights store, through a position — App administrator holds
+it on every installed app, and a tenant may declare a position that holds it on Docmost alone —
+or given to one person beside their positions. A tenant's administrator gives and takes both in
+the administration console, on the Members tab.
 
 The sidecar tells the handler whether the realm's signed answer says the person holds the role
 (`person.appAdmin`). At every sign-in the handler makes the account what it should be, before it
@@ -158,7 +158,7 @@ first sign-in ("What a tenant's Docmost has from the start").
 - A person removed at the platform keeps their account and their pages in Docmost. They cannot
   reach it — the front door refuses them — but nothing deletes it.
 - The workspace's owner is an account nobody can sign in as. Who administers it is who holds the
-  platform's App Admin role, which is one role for all of the tenant's apps of this kind.
+  `admin` role on Docmost.
 - The post-install job and the handler depend on more of Docmost than the sign-in did: the tables
   `groups`, `group_users` and `spaces`, and the calls for spaces and groups.
 - The handler depends on two tables (`users`, `user_sessions`), on the invitation table, and on
