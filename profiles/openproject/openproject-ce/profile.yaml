@@ -32,7 +32,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.4-dev"
+  version: "0.5.4"
   package:
     chart:
       repository: "https://charts.openproject.org/"

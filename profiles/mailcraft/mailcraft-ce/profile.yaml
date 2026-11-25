@@ -61,13 +61,13 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.1.1-dev"
+  version: "0.1.1"
   launch: tile
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: mailcraft
-      version: "0.1.0-develop.af7c021"
+      version: "0.1.0elop.af7c021"
     extraValues:
       fullnameOverride: "mailcraft-ce"
       ingress:

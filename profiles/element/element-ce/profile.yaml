@@ -29,7 +29,7 @@ spec:
   classes:
     - app
   trustTier: experimental
-  version: "0.5.4-dev"
+  version: "0.5.4"
   launch: tile
   package:
     chart:

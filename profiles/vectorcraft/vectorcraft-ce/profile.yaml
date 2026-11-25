@@ -50,13 +50,13 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.1.0-dev"
+  version: "0.1.0"
   launch: tile
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: vectorcraft
-      version: "0.1.0-develop.e052c3b"
+      version: "0.1.0elop.e052c3b"
     extraValues:
       fullnameOverride: "vectorcraft-ce"
       ingress:

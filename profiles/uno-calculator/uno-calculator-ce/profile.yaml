@@ -51,13 +51,13 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.1.0-dev"
+  version: "0.1.0"
   launch: tile
   package:
     chart:
       repository: "oci://ghcr.io/gentian-org/charts"
       name: uno-calculator
-      version: "0.1.0-develop.2d8e39d"
+      version: "0.1.0elop.2d8e39d"
     extraValues:
       fullnameOverride: "uno-calculator-ce"
       ingress:
