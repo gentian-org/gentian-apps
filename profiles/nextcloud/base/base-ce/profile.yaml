@@ -21,7 +21,7 @@ spec:
   classes:
     - app
   trustTier: certified
-  version: "0.5.6-dev"
+  version: "0.5.7-dev"
   package:
     chart:
       repository: https://nextcloud.github.io/helm/
@@ -412,6 +412,10 @@ spec:
         engine: redis
       mail:
         smtp: {}
+        # The IMAP record valueMapping.imap reads: the operator writes it
+        # only for a profile that declares it, and the app's Secret fails
+        # without it.
+        imap: {}
     privileges:
       podSecurity:
         - name: gentian-disallow-privilege-escalation-co
