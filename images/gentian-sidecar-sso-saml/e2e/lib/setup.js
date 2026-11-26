@@ -232,7 +232,7 @@ function sidecarClient(host, { logoutUrl } = {}) {
 // the realm lists it under (gentian-os: internal/apprender/identity_signin.go;
 // the sidecar's lib/signin.js).
 const APP_ADMIN_ROLE = 'gentian-app-admin';
-const ROLE_ATTRIBUTE = 'Role';
+const ROLE_ATTRIBUTE = 'GentianAppRole';
 
 async function userId(kc, realm, email) {
     const found = JSON.parse((await kc.admin('GET', `/realms/${realm}/users?email=${encodeURIComponent(email)}&exact=true`)).body);
@@ -242,7 +242,7 @@ async function userId(kc, realm, email) {
 
 // What the platform composes for an app's sign-in sidecar: the client above,
 // the mapper that asks the rights store for the roles the person holds on
-// the app and lists them as Role in the app's names (gentian-saml-app-roles),
+// the app and lists them as GentianAppRole in the app's names (gentian-saml-app-roles),
 // and the mapper that names the person by username. The scope the realm
 // gives every new SAML client ("role_list") is left as the realm made it, as
 // it is on a cluster. app is the app's profile name, as the mapper asks it.

@@ -247,7 +247,7 @@ test('another value, or the value under another name, makes no administrator', a
         const result = await attempt({ attributes: roleAttribute(roles) });
         assert.equal(result.person.appAdmin, false, JSON.stringify(roles));
     }
-    for (const name of ['role', 'Roles', 'gentianAppAdmin', 'appAdmin', 'groups', 'memberOf']) {
+    for (const name of ['Role', 'role', 'Roles', 'gentianAppRole', 'gentianAppAdmin', 'appAdmin', 'groups', 'memberOf']) {
         const result = await attempt({ attributes: roleAttribute(['gentian-app-admin'], name) });
         assert.equal(result.person.appAdmin, false, name);
     }

@@ -215,12 +215,14 @@ test('a role of the same name anywhere else in the realm makes no administrator'
     await kc.admin('POST', `/realms/${place.realm}/roles`, { name: setup.APP_ADMIN_ROLE });
     const realmRole = JSON.parse((await kc.admin('GET', `/realms/${place.realm}/roles/${setup.APP_ADMIN_ROLE}`)).body);
     await kc.admin('POST', `/realms/${place.realm}/users/${carl}/role-mappings/realm`, [{ id: realmRole.id, name: realmRole.name }]);
-    // A role of that name at another app's client, held directly: the
-    // realm's roles say nothing, the rights store does.
-    const clients = JSON.parse((await kc.admin('GET', `/realms/${place.realm}/clients?clientId=${encodeURIComponent(`https://${other.host}/sso`)}`)).body);
-    await kc.admin('POST', `/realms/${place.realm}/clients/${clients[0].id}/roles`, { name: setup.APP_ADMIN_ROLE });
-    const clientRole = JSON.parse((await kc.admin('GET', `/realms/${place.realm}/clients/${clients[0].id}/roles/${setup.APP_ADMIN_ROLE}`)).body);
-    await kc.admin('POST', `/realms/${place.realm}/users/${carl}/role-mappings/clients/${clients[0].id}`, [{ id: clientRole.id, name: clientRole.name }]);
+    // A role of that name at this app's client and at another app's client,
+    // held directly: the realm's roles say nothing, the rights store does.
+    for (const host of [place.host, other.host]) {
+        const clients = JSON.parse((await kc.admin('GET', `/realms/${place.realm}/clients?clientId=${encodeURIComponent(`https://${host}/sso`)}`)).body);
+        await kc.admin('POST', `/realms/${place.realm}/clients/${clients[0].id}/roles`, { name: setup.APP_ADMIN_ROLE });
+        const clientRole = JSON.parse((await kc.admin('GET', `/realms/${place.realm}/clients/${clients[0].id}/roles/${setup.APP_ADMIN_ROLE}`)).body);
+        await kc.admin('POST', `/realms/${place.realm}/users/${carl}/role-mappings/clients/${clients[0].id}`, [{ id: clientRole.id, name: clientRole.name }]);
+    }
     // The admin role on another app, in the rights store: Carl administers
     // that app and not this one.
     await setup.setAppAdmin(kc, place.realm, CARL.email, true, { app: setup.appOf(other.host) });
@@ -236,7 +238,7 @@ test('nothing a browser sends makes an administrator', async () => {
     // attribute's name is in the jar.
     const request = browser.request.bind(browser);
     browser.request = (method, url, options = {}) => request(method, url, { ...options, headers: { ...(options.headers || {}), ...claims } });
-    browser.jar.push({ host: place.host, name: 'Role', value: setup.APP_ADMIN_ROLE, path: '/', sameSite: 'None', httpOnly: false, secure: true, raw: '' });
+    browser.jar.push({ host: place.host, name: setup.ROLE_ATTRIBUTE, value: setup.APP_ADMIN_ROLE, path: '/', sameSite: 'None', httpOnly: false, secure: true, raw: '' });
     const res = await browser.navigate(`https://${place.host}/?appAdmin=true`, { credentials: { username: BEN.email, password: BEN.password } });
     assert.equal(new URL(res.url).pathname, '/signed-in', browser.log.join(' -> '));
     assert.equal(saysAdmin(browser, place.host), 'false');

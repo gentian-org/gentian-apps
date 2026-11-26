@@ -136,9 +136,9 @@ function buildResponse(idp, config, options) {
     return Buffer.from(o.afterSigning(response), 'utf8').toString('base64');
 }
 
-// roleAttribute is the attribute statement a realm writes for a person's
-// roles at the sidecar's client, one value per role.
-function roleAttribute(roles, name = 'Role') {
+// roleAttribute is the attribute statement the platform's mapper writes for
+// a person's roles on the app, one value per role.
+function roleAttribute(roles, name = 'GentianAppRole') {
     return '<saml:AttributeStatement>' +
         `<saml:Attribute Name="${name}" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic">` +
         roles.map((role) => '<saml:AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema" ' +
