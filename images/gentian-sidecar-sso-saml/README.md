@@ -80,14 +80,14 @@ One more thing is read from the answer, and from nowhere else: whether the perso
 app, which is whether they hold the app's `admin` role in the platform's rights store — directly,
 or through a position such as App administrator, given and taken in the administration console.
 The platform's SAML mapper at the realm asks the rights store for the roles the person holds on
-the app and lists them in the assertion, in the attribute `Role`, under the names the profile
+the app and lists them in the assertion, in the attribute `GentianAppRole`, under the names the profile
 gives them; a profile that names none gets the one name the sidecar knows for `admin`,
 `gentian-app-admin` (gentian-os, `internal/apprender/identity_signin.go`). A sidecar app's
 profile therefore gives `admin` no other in-app name. When the rights store cannot be asked, the
 sign-in fails rather than reading as a person without the role.
 
 The sidecar reads the attribute from the assertion as the realm signed it and hands the handler
-`person.appAdmin`: `true` when the assertion's own attribute `Role` has the value
+`person.appAdmin`: `true` when the assertion's own attribute `GentianAppRole` has the value
 `gentian-app-admin`, `false` in every other case — no attribute, another name, another value. No
 header, form field, cookie or address is read for it: on the path the answer is posted to nothing
 has vouched for the request, and an answer changed after it was signed is refused whole

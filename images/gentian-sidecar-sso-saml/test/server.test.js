@@ -179,12 +179,12 @@ test('nothing a request says about itself makes an administrator', async () => {
     // fields of the form beside the realm's answer.
     const samlResponse = buildResponse(idp, config, { requestId: started.requestId });
     const res = await call({
-        method: 'POST', path: '/sso/acs?appAdmin=true&Role=gentian-app-admin',
+        method: 'POST', path: '/sso/acs?appAdmin=true&GentianAppRole=gentian-app-admin',
         headers: {
             'content-type': 'application/x-www-form-urlencoded', ...claims,
-            cookie: started.cookiePair + '; appAdmin=true; Role=gentian-app-admin',
+            cookie: started.cookiePair + '; appAdmin=true; GentianAppRole=gentian-app-admin',
         },
-        body: 'SAMLResponse=' + encodeURIComponent(samlResponse) + '&appAdmin=true&Role=gentian-app-admin',
+        body: 'SAMLResponse=' + encodeURIComponent(samlResponse) + '&appAdmin=true&GentianAppRole=gentian-app-admin',
     });
     assert.equal(res.status, 303);
     assert.equal(handlerCalls.length, 1);
